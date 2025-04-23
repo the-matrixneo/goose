@@ -14,18 +14,17 @@ pub use goose::session::Identifier;
 
 use anyhow::{Context, Result};
 use completion::GooseCompleter;
-use etcetera::choose_app_strategy;
-use etcetera::AppStrategy;
+use etcetera::{choose_app_strategy, AppStrategy};
 use goose::agents::extension::{Envs, ExtensionConfig};
 use goose::agents::platform_tools::PLATFORM_ENABLE_EXTENSION_TOOL_NAME;
 use goose::agents::{Agent, SessionConfig};
 use goose::config::Config;
 use goose::message::{Message, MessageContent};
 use goose::session;
+use goose::token_counter::TokenCounter;
 use input::InputResult;
 use mcp_core::handler::ToolError;
 use mcp_core::prompt::PromptMessage;
-
 use rand::{distributions::Alphanumeric, Rng};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -320,9 +319,10 @@ impl Session {
         // Create and use a global history file in ~/.config/goose directory
         // This allows command history to persist across different chat sessions
         // instead of being tied to each individual session's messages
-        let history_file = choose_app_strategy(crate::APP_STRATEGY.clone())
-            .expect("goose requires a home dir")
-            .in_config_dir("history.txt");
+        let strategy =
+            choose_app_strategy(crate::APP_STRATEGY.clone()).expect("goose requires a home dir");
+        let config_dir = strategy.config_dir();
+        let history_file = config_dir.join("history.txt");
 
         // Ensure config directory exists
         if let Some(parent) = history_file.parent() {
@@ -348,6 +348,9 @@ impl Session {
 
         output::display_greeting();
         loop {
+            // Display context usage before each prompt
+            self.display_context_usage().await?;
+
             match input::get_input(&mut editor)? {
                 input::InputResult::Message(content) => {
                     match self.run_mode {
@@ -840,6 +843,56 @@ impl Session {
     pub fn get_total_token_usage(&self) -> Result<Option<i32>> {
         let metadata = self.get_metadata()?;
         Ok(metadata.total_tokens)
+    }
+
+    /// Calculate the current context window usage
+    pub async fn calculate_context_usage(&self) -> Result<(usize, usize)> {
+        // Get the model's context limit from the provider
+        let context_limit = self
+            .agent
+            .provider()
+            .get_model_config()
+            .context_limit
+            .unwrap_or(32000); // Default to 32k if not specified
+
+        // Create a token counter using the same tokenizer as the model
+        let token_counter =
+            TokenCounter::new(self.agent.provider().get_model_config().tokenizer_name());
+
+        // Calculate system prompt tokens (approximate using a simpler system prompt)
+        // Since we can't directly access the built system prompt
+        let system_prompt = "You are an AI assistant.";
+        let system_token_count = token_counter.count_tokens(system_prompt);
+
+        // Get tools token count
+        let tools = self.agent.list_tools(None).await;
+        let tools_token_count = token_counter.count_tokens_for_tools(&tools);
+
+        // Get message token counts
+        let message_token_counts: usize = self
+            .messages
+            .iter()
+            .map(|msg| token_counter.count_chat_tokens("", std::slice::from_ref(msg), &[]))
+            .sum();
+
+        // Calculate total active context
+        let total_tokens = system_token_count + tools_token_count + message_token_counts;
+
+        Ok((total_tokens, context_limit))
+    }
+
+    /// Display the current context window usage
+    pub async fn display_context_usage(&self) -> Result<()> {
+        match self.calculate_context_usage().await {
+            Ok((total_tokens, context_limit)) => {
+                output::display_context_usage(total_tokens, context_limit);
+            }
+            Err(e) => {
+                // Just log error but don't show anything to user in case of failure
+                tracing::warn!("Failed to calculate context usage: {}", e);
+            }
+        }
+        Ok(())
     }
 
     /// Handle prompt command execution
