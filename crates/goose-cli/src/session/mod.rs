@@ -873,24 +873,20 @@ impl Session {
     /// Calculate the current context window usage
     pub async fn calculate_context_usage(&self) -> Result<(usize, usize)> {
         // Get the model's context limit from the provider
-        let context_limit = self
-            .agent
-            .provider()
-            .get_model_config()
-            .context_limit
-            .unwrap_or(32000); // Default to 32k if not specified
+        let provider = self.agent.provider().await?;
+        let model_config = provider.get_model_config();
+        let context_limit = model_config.context_limit.unwrap_or(32000); // Default to 32k if not specified
 
         // Create a token counter using the same tokenizer as the model
-        let token_counter =
-            TokenCounter::new(self.agent.provider().get_model_config().tokenizer_name());
+        let token_counter = TokenCounter::new(model_config.tokenizer_name());
 
-        // Calculate system prompt tokens (approximate using a simpler system prompt)
-        // Since we can't directly access the built system prompt
-        let system_prompt = "You are an AI assistant.";
-        let system_token_count = token_counter.count_tokens(system_prompt);
+        // Get the exact system prompt and tools that would be used in a real request
+        let (system_prompt, tools) = self.agent.get_context_components().await?;
 
-        // Get tools token count
-        let tools = self.agent.list_tools(None).await;
+        // Count system prompt tokens
+        let system_token_count = token_counter.count_tokens(&system_prompt);
+
+        // Count tools tokens
         let tools_token_count = token_counter.count_tokens_for_tools(&tools);
 
         // Get message token counts
