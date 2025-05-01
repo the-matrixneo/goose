@@ -703,14 +703,4 @@ impl Agent {
 
         Ok(recipe)
     }
-
-    /// Get the components that make up the context window for token calculation
-    /// Returns the system prompt and a combined list of all tools that would be sent to the provider
-    pub async fn get_context_components(&self) -> anyhow::Result<(String, Vec<Tool>)> {
-        let (tools, toolshim_tools, system_prompt) = self.prepare_tools_and_prompt().await?;
-        // For token counting purposes, we include all tools that might contribute to the context
-        let mut all_tools = tools.clone();
-        all_tools.extend(toolshim_tools.iter().cloned());
-        Ok((system_prompt, all_tools))
-    }
 }

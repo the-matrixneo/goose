@@ -870,49 +870,40 @@ impl Session {
         Ok(metadata.total_tokens)
     }
 
-    /// Calculate the current context window usage
-    pub async fn calculate_context_usage(&self) -> Result<(usize, usize)> {
-        // Get the model's context limit from the provider
+    /// Display the current context window usage
+    pub async fn display_context_usage(&self) -> Result<()> {
         let provider = self.agent.provider().await?;
         let model_config = provider.get_model_config();
-        let context_limit = model_config.context_limit.unwrap_or(32000); // Default to 32k if not specified
+        let context_limit = model_config.context_limit.unwrap_or(32000);
+
+        // Get the exact system prompt and tools using prepare_tools_and_prompt
+        let (tools, toolshim_tools, system_prompt) = self.agent.prepare_tools_and_prompt().await?;
+
+        // Combine tools and toolshim_tools
+        let mut all_tools = tools.clone();
+        all_tools.extend(toolshim_tools.iter().cloned());
 
         // Create a token counter using the same tokenizer as the model
         let token_counter = TokenCounter::new(model_config.tokenizer_name());
-
-        // Get the exact system prompt and tools that would be used in a real request
-        let (system_prompt, tools) = self.agent.get_context_components().await?;
 
         // Count system prompt tokens
         let system_token_count = token_counter.count_tokens(&system_prompt);
 
         // Count tools tokens
-        let tools_token_count = token_counter.count_tokens_for_tools(&tools);
+        let tools_token_count = token_counter.count_tokens_for_tools(&all_tools);
 
-        // Get message token counts
-        let message_token_counts: usize = self
+        // Count message tokens
+        let message_token_count: usize = self
             .messages
             .iter()
             .map(|msg| token_counter.count_chat_tokens("", std::slice::from_ref(msg), &[]))
             .sum();
 
-        // Calculate total active context
-        let total_tokens = system_token_count + tools_token_count + message_token_counts;
+        // Calculate total tokens
+        let total_tokens = system_token_count + tools_token_count + message_token_count;
 
-        Ok((total_tokens, context_limit))
-    }
+        output::display_context_usage(total_tokens, context_limit);
 
-    /// Display the current context window usage
-    pub async fn display_context_usage(&self) -> Result<()> {
-        match self.calculate_context_usage().await {
-            Ok((total_tokens, context_limit)) => {
-                output::display_context_usage(total_tokens, context_limit);
-            }
-            Err(e) => {
-                // Just log error but don't show anything to user in case of failure
-                tracing::warn!("Failed to calculate context usage: {}", e);
-            }
-        }
         Ok(())
     }
 
