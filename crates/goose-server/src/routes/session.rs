@@ -1,4 +1,6 @@
 use super::utils::verify_secret_key;
+use std::sync::Arc;
+
 use crate::state::AppState;
 use axum::{
     extract::{Path, State},
@@ -8,7 +10,7 @@ use axum::{
 };
 use goose::message::Message;
 use goose::session;
-use goose::session::info::{get_session_info, SessionInfo};
+use goose::session::info::{get_session_info, SessionInfo, SortOrder};
 use serde::Serialize;
 
 #[derive(Serialize)]
@@ -25,19 +27,20 @@ struct SessionHistoryResponse {
 
 // List all available sessions
 async fn list_sessions(
-    State(state): State<AppState>,
+    State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> Result<Json<SessionListResponse>, StatusCode> {
     verify_secret_key(&headers, &state)?;
 
-    let sessions = get_session_info().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let sessions =
+        get_session_info(SortOrder::Descending).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     Ok(Json(SessionListResponse { sessions }))
 }
 
 // Get a specific session's history
 async fn get_session_history(
-    State(state): State<AppState>,
+    State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Path(session_id): Path<String>,
 ) -> Result<Json<SessionHistoryResponse>, StatusCode> {
@@ -64,7 +67,7 @@ async fn get_session_history(
 }
 
 // Configure routes for this module
-pub fn routes(state: AppState) -> Router {
+pub fn routes(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/sessions", get(list_sessions))
         .route("/sessions/:session_id", get(get_session_history))
