@@ -21,7 +21,6 @@ use goose::agents::{Agent, SessionConfig};
 use goose::config::Config;
 use goose::message::{Message, MessageContent};
 use goose::session;
-use goose::token_counter::TokenCounter;
 use input::InputResult;
 use mcp_core::handler::ToolError;
 use mcp_core::prompt::PromptMessage;
@@ -972,39 +971,27 @@ impl Session {
         Ok(metadata.total_tokens)
     }
 
-    /// Display the current context window usage
+    /// Display enhanced context usage with session totals
     pub async fn display_context_usage(&self) -> Result<()> {
         let provider = self.agent.provider().await?;
         let model_config = provider.get_model_config();
         let context_limit = model_config.context_limit.unwrap_or(32000);
 
-        // Get the exact system prompt and tools using prepare_tools_and_prompt
-        let (tools, toolshim_tools, system_prompt) = self.agent.prepare_tools_and_prompt().await?;
+        match self.get_metadata() {
+            Ok(metadata) => {
+                let total_tokens = metadata.total_tokens.unwrap_or(0) as usize;
 
-        // Combine tools and toolshim_tools
-        let mut all_tools = tools.clone();
-        all_tools.extend(toolshim_tools.iter().cloned());
-
-        // Create a token counter using the same tokenizer as the model
-        let token_counter = TokenCounter::new(model_config.tokenizer_name());
-
-        // Count system prompt tokens
-        let system_token_count = token_counter.count_tokens(&system_prompt);
-
-        // Count tools tokens
-        let tools_token_count = token_counter.count_tokens_for_tools(&all_tools);
-
-        // Count message tokens
-        let message_token_count: usize = self
-            .messages
-            .iter()
-            .map(|msg| token_counter.count_chat_tokens("", std::slice::from_ref(msg), &[]))
-            .sum();
-
-        // Calculate total tokens
-        let total_tokens = system_token_count + tools_token_count + message_token_count;
-
-        output::display_context_usage(total_tokens, context_limit);
+                // Enhanced display with session totals
+                output::display_context_usage_with_session_total(
+                    total_tokens,
+                    context_limit,
+                    metadata.accumulated_total_tokens,
+                );
+            }
+            Err(_) => {
+                output::display_context_usage(0, context_limit);
+            }
+        }
 
         Ok(())
     }

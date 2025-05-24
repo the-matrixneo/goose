@@ -562,7 +562,7 @@ pub fn display_greeting() {
     println!("\nGoose is running! Enter your instructions, or try asking what goose can do.\n");
 }
 
-/// Display context window usage as a colored dot visualization
+/// Display context window usage with both current and session totals
 pub fn display_context_usage(total_tokens: usize, context_limit: usize) {
     use console::style;
 
@@ -570,7 +570,6 @@ pub fn display_context_usage(total_tokens: usize, context_limit: usize) {
     let percentage = (total_tokens as f64 / context_limit as f64 * 100.0).round() as usize;
 
     // Create dot visualization
-    // Use 10 dots total
     let dot_count = 10;
     let filled_dots = ((percentage as f64 / 100.0) * dot_count as f64).round() as usize;
     let empty_dots = dot_count - filled_dots;
@@ -593,6 +592,19 @@ pub fn display_context_usage(total_tokens: usize, context_limit: usize) {
         "Context: {} {}% ({}/{} tokens)",
         colored_dots, percentage, total_tokens, context_limit
     );
+}
+
+/// Enhanced version that also shows session accumulated usage
+pub fn display_context_usage_with_session_total(
+    total_tokens: usize,
+    context_limit: usize,
+    accumulated_total: Option<i32>,
+) {
+    display_context_usage(total_tokens, context_limit);
+
+    if let Some(session_total) = accumulated_total {
+        println!("Session total: {} tokens", style(session_total).dim());
+    }
 }
 
 #[cfg(test)]
