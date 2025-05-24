@@ -21,10 +21,11 @@ Goose relies heavily on tool calling capabilities and currently works best with 
 |-----------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | [Amazon Bedrock](https://aws.amazon.com/bedrock/)                           | Offers a variety of foundation models, including Claude, Jurassic-2, and others. **AWS environment variables must be set in advance, not configured through `goose configure`**                                           | `AWS_PROFILE`, or `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, ...                                                                                                   |
 | [Anthropic](https://www.anthropic.com/)                                     | Offers Claude, an advanced AI model for natural language tasks.                                                                                                                                                           | `ANTHROPIC_API_KEY`, `ANTHROPIC_HOST` (optional)                                                                                                                                                                 |
-| [Azure OpenAI](https://learn.microsoft.com/en-us/azure/ai-services/openai/) | Access Azure-hosted OpenAI models, including GPT-4 and GPT-3.5.                                                                                                                                                           | `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_DEPLOYMENT_NAME`                                                                                                     |
+| [Azure OpenAI](https://learn.microsoft.com/en-us/azure/ai-services/openai/) | Access Azure-hosted OpenAI models, including GPT-4 and GPT-3.5. Supports both API key and Azure credential chain authentication.                                                                                          | `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_DEPLOYMENT_NAME`, `AZURE_OPENAI_API_KEY` (optional)                                                                                           |
 | [Databricks](https://www.databricks.com/)                                   | Unified data analytics and AI platform for building and deploying models.                                                                                                                                                 | `DATABRICKS_HOST`, `DATABRICKS_TOKEN`                                                                                                                                               |
 | [Gemini](https://ai.google.dev/gemini-api/docs)                             | Advanced LLMs by Google with multimodal capabilities (text, images).                                                                                                                                                      | `GOOGLE_API_KEY`                                                                                                                                                                    |
 | [GCP Vertex AI](https://cloud.google.com/vertex-ai)                         | Google Cloud's Vertex AI platform, supporting Gemini and Claude models. **Credentials must be configured in advance. Follow the instructions at https://cloud.google.com/vertex-ai/docs/authentication.**                 | `GCP_PROJECT_ID`, `GCP_LOCATION` and optional `GCP_MAX_RETRIES` (6), `GCP_INITIAL_RETRY_INTERVAL_MS` (5000), `GCP_BACKOFF_MULTIPLIER` (2.0), `GCP_MAX_RETRY_INTERVAL_MS` (320_000). |
+| [GitHub Copilot](https://docs.github.com/en/copilot/using-github-copilot/ai-models) | Access to GitHub Copilot's chat models including gpt-4o, o1, o3-mini, and Claude models. Uses device code authentication flow for secure access. | Uses GitHub device code authentication flow (no API key needed) |
 | [Groq](https://groq.com/)                                                   | High-performance inference hardware and tools for LLMs.                                                                                                                                                                   | `GROQ_API_KEY`                                                                                                                                                                      |
 | [Ollama](https://ollama.com/)                                               | Local model runner supporting Qwen, Llama, DeepSeek, and other open-source models. **Because this provider runs locally, you must first [download and run a model](/docs/getting-started/providers#local-llms-ollama).**  | `OLLAMA_HOST`                                                                                                                                                                       |
 | [OpenAI](https://platform.openai.com/api-keys)                              | Provides gpt-4o, o1, and other advanced language models. Also supports OpenAI-compatible endpoints (e.g., self-hosted LLaMA, vLLM, KServe). **o1-mini and o1-preview are not supported because Goose uses tool calling.** | `OPENAI_API_KEY`, `OPENAI_HOST` (optional), `OPENAI_ORGANIZATION` (optional), `OPENAI_PROJECT` (optional), `OPENAI_CUSTOM_HEADERS` (optional)                                       |
@@ -34,26 +35,24 @@ Goose relies heavily on tool calling capabilities and currently works best with 
    
 ## Configure Provider
 
-To configure your chosen provider or see available options, run `goose configure` in the CLI or visit the `Provider Settings` page in the Goose Desktop.
+To configure your chosen provider or see available options, run `goose configure` in the CLI or visit the `Settings` page in the Goose Desktop.
 
 <Tabs groupId="interface">
   <TabItem value="ui" label="Goose Desktop" default>
   **To update your LLM provider and API key:** 
-  1. Click `...` in the upper right corner
-  2. Click `Advanced Settings`
-  3. Next to `Models`, click `Browse`
-  4. Click `Configure` in the upper right corner
-  4. Press the `+` button next to the provider of your choice
-  5. Add additional configurations (API key, host, etc) then press `submit`
+  1. Click the gear on the Goose Desktop toolbar
+  1. Click `Advanced Settings`
+  1. Under `Models`, click `Configure provider`
+  1. Click `Configure` on the LLM provider to update
+  1. Add additional configurations (API key, host, etc) then press `submit`
 
   **To change provider model**
-  1. Click `...` in the upper right corner
+  1. Click the gear on the Goose Desktop toolbar
   2. Click `Advanced Settings`
-  3. Next to `Models`, click `Browse`
-  4. Scroll down to `Add Model` 
+  3. Under `Models`, click `Switch models`
   5. Select a Provider from drop down menu
-  6. Enter Model name
-  7. Press `+ Add Model`
+  6. Select a model from drop down menu
+  7. Press `Select Model`
 
   You can explore more models by selecting a `provider` name under `Browse by Provider`. A link will appear, directing you to the provider's website. Once you've found the model you want, return to step 6 and paste the model name.
   </TabItem>
@@ -455,6 +454,20 @@ ollama run michaelneale/deepseek-r1-goose
     ```
   </TabItem>
 </Tabs>
+
+## Azure OpenAI Credential Chain
+
+Goose supports two authentication methods for Azure OpenAI:
+
+1. **API Key Authentication** - Uses the `AZURE_OPENAI_API_KEY` for direct authentication
+2. **Azure Credential Chain** - Uses Azure CLI credentials automatically without requiring an API key
+
+To use the Azure Credential Chain:
+- Ensure you're logged in with `az login`
+- Have appropriate Azure role assignments for the Azure OpenAI service
+- Configure with `goose configure` and select Azure OpenAI, leaving the API key field empty
+
+This method simplifies authentication and enhances security for enterprise environments.
 
 ---
 

@@ -77,9 +77,8 @@ pub struct RedactedThinkingContent {
     pub data: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
-#[derive(ToSchema)]
 pub struct FrontendToolRequest {
     pub id: String,
     #[serde(with = "tool_result_serde")]
@@ -89,6 +88,11 @@ pub struct FrontendToolRequest {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct ContextLengthExceeded {
+    pub msg: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct SummarizationRequested {
     pub msg: String,
 }
 
@@ -105,6 +109,7 @@ pub enum MessageContent {
     Thinking(ThinkingContent),
     RedactedThinking(RedactedThinkingContent),
     ContextLengthExceeded(ContextLengthExceeded),
+    SummarizationRequested(SummarizationRequested),
 }
 
 impl MessageContent {
@@ -171,6 +176,19 @@ impl MessageContent {
 
     pub fn context_length_exceeded<S: Into<String>>(msg: S) -> Self {
         MessageContent::ContextLengthExceeded(ContextLengthExceeded { msg: msg.into() })
+    }
+
+    pub fn summarization_requested<S: Into<String>>(msg: S) -> Self {
+        MessageContent::SummarizationRequested(SummarizationRequested { msg: msg.into() })
+    }
+
+    // Add this new method to check for summarization requested content
+    pub fn as_summarization_requested(&self) -> Option<&SummarizationRequested> {
+        if let MessageContent::SummarizationRequested(ref summarization_requested) = self {
+            Some(summarization_requested)
+        } else {
+            None
+        }
     }
 
     pub fn as_tool_request(&self) -> Option<&ToolRequest> {
@@ -451,6 +469,11 @@ impl Message {
         self.content
             .iter()
             .all(|c| matches!(c, MessageContent::Text(_)))
+    }
+
+    /// Add summarization requested to the message
+    pub fn with_summarization_requested<S: Into<String>>(self, msg: S) -> Self {
+        self.with_content(MessageContent::summarization_requested(msg))
     }
 }
 
