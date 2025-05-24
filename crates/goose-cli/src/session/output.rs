@@ -594,19 +594,6 @@ pub fn display_context_usage(total_tokens: usize, context_limit: usize) {
     );
 }
 
-/// Enhanced version that also shows session accumulated usage
-pub fn display_context_usage_with_session_total(
-    total_tokens: usize,
-    context_limit: usize,
-    accumulated_total: Option<i32>,
-) {
-    display_context_usage(total_tokens, context_limit);
-
-    if let Some(session_total) = accumulated_total {
-        println!("Session total: {} tokens", style(session_total).dim());
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

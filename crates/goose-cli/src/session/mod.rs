@@ -981,12 +981,7 @@ impl Session {
             Ok(metadata) => {
                 let total_tokens = metadata.total_tokens.unwrap_or(0) as usize;
 
-                // Enhanced display with session totals
-                output::display_context_usage_with_session_total(
-                    total_tokens,
-                    context_limit,
-                    metadata.accumulated_total_tokens,
-                );
+                output::display_context_usage(total_tokens, context_limit);
             }
             Err(_) => {
                 output::display_context_usage(0, context_limit);
