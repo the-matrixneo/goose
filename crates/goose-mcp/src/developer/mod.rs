@@ -1882,6 +1882,7 @@ mod tests {
                     "path": temp_dir.path().join("test.log").to_str().unwrap(),
                     "file_text": "test content"
                 }),
+                dummy_sender(),
             )
             .await;
 
@@ -1900,6 +1901,7 @@ mod tests {
                     "path": temp_dir.path().join("allowed.txt").to_str().unwrap(),
                     "file_text": "test content"
                 }),
+                dummy_sender(),
             )
             .await;
 
@@ -1933,6 +1935,7 @@ mod tests {
                 json!({
                     "command": format!("cat {}", log_file_path.to_str().unwrap())
                 }),
+                dummy_sender(),
             )
             .await;
 
@@ -1952,6 +1955,7 @@ mod tests {
                 json!({
                     "command": format!("cat {}", allowed_file_path.to_str().unwrap())
                 }),
+                dummy_sender(),
             )
             .await;
 
