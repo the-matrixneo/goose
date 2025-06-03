@@ -574,7 +574,6 @@ pub fn display_greeting() {
     println!("\nGoose is running! Enter your instructions, or try asking what goose can do.\n");
 }
 
-
 /// Display context window usage with both current and session totals
 pub fn display_context_usage(total_tokens: usize, context_limit: usize) {
     use console::style;
