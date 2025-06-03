@@ -32,6 +32,10 @@ A session is a single, continuous interaction between you and Goose, providing a
         ```sh
         goose session 
         ```
+
+        :::tip
+        You can also use the [`project`](/docs/guides/goose-cli-commands#project) and [`projects`](/docs/guides/goose-cli-commands#projects) commands to start or resume sessions from a project, which is a tracked working directory with session metadata.
+        :::
     </TabItem>
 </Tabs>
 
@@ -104,6 +108,9 @@ Note that sessions are automatically saved when you exit.
         While you can resume sessions using the commands above, we recommend creating new sessions for new tasks to reduce the chance of [doom spiraling](/docs/troubleshooting#stuck-in-a-loop-or-unresponsive).
         :::
 
+        :::tip
+        You can also use the [`project`](/docs/guides/goose-cli-commands#project) and [`projects`](/docs/guides/goose-cli-commands#projects) commands to start or resume sessions from a project, which is a tracked working directory with session metadata.
+        :::
     </TabItem>
 </Tabs>
 
@@ -253,5 +260,33 @@ Search allows you to find specific content within your current session. The sear
         :::info
         Your specific terminal emulator may use a different keyboard shortcut. Check your terminal's documentation or settings for the search command.
         :::
+    </TabItem>
+</Tabs>
+
+## Share Files in Session
+
+<Tabs>
+    <TabItem value="ui" label="Goose Desktop" default>
+        Share files with Goose in three ways:
+
+        1. **Drag and Drop**: Simply drag files from your computer's file explorer/finder and drop them anywhere in the chat window. The file paths will be automatically added to your message.
+
+        2. **File Browser**: Click the paperclip icon (📎) in the bottom left corner of the chat input to open your system's file browser and select files.
+
+        3. **Manual Path**: Type or paste the file path directly into the chat input.
+    </TabItem>
+    <TabItem value="cli" label="Goose CLI">
+        You can reference files by their paths directly in your messages. Since you're already in a terminal, you can use standard shell commands to help with file paths:
+
+        ```bash
+        # Reference a specific file
+        What does this code do? ./src/main.rs
+
+        # Use tab completion
+        Can you explain the function in ./src/lib<tab>
+
+        # Use shell expansion
+        Review these test files: ./tests/*.rs
+        ```
     </TabItem>
 </Tabs>
