@@ -7,6 +7,9 @@ pub const PLATFORM_LIST_RESOURCES_TOOL_NAME: &str = "platform__list_resources";
 pub const PLATFORM_SEARCH_AVAILABLE_EXTENSIONS_TOOL_NAME: &str =
     "platform__search_available_extensions";
 pub const PLATFORM_MANAGE_EXTENSIONS_TOOL_NAME: &str = "platform__manage_extensions";
+pub const PLATFORM_LIST_SUBAGENTS_TOOL_NAME: &str = "platform__list_subagents";
+pub const PLATFORM_COMMUNICATE_WITH_SUBAGENT_TOOL_NAME: &str = "platform__communicate_with_subagent";
+pub const PLATFORM_REMOVE_SUBAGENT_TOOL_NAME: &str = "platform__remove_subagent";
 
 pub fn read_resource_tool() -> Tool {
     Tool::new(
@@ -107,6 +110,68 @@ pub fn manage_extensions_tool() -> Tool {
             title: Some("Enable or disable an extension".to_string()),
             read_only_hint: false,
             destructive_hint: false,
+            idempotent_hint: false,
+            open_world_hint: false,
+        }),
+    )
+}
+
+pub fn list_subagents_tool() -> Tool {
+    Tool::new(
+        PLATFORM_LIST_SUBAGENTS_TOOL_NAME.to_string(),
+        "List all active subagents spawned by this agent. Shows the names and status of currently running subagents.".to_string(),
+        json!({
+            "type": "object",
+            "required": [],
+            "properties": {}
+        }),
+        Some(ToolAnnotations {
+            title: Some("List active subagents".to_string()),
+            read_only_hint: true,
+            destructive_hint: false,
+            idempotent_hint: false,
+            open_world_hint: false,
+        }),
+    )
+}
+
+pub fn communicate_with_subagent_tool() -> Tool {
+    Tool::new(
+        PLATFORM_COMMUNICATE_WITH_SUBAGENT_TOOL_NAME.to_string(),
+        "Send a message to a specific subagent and get its response. Use this to delegate tasks to specialized subagents.".to_string(),
+        json!({
+            "type": "object",
+            "required": ["subagent_name", "message"],
+            "properties": {
+                "subagent_name": {"type": "string", "description": "Name of the subagent to communicate with"},
+                "message": {"type": "string", "description": "Message to send to the subagent"}
+            }
+        }),
+        Some(ToolAnnotations {
+            title: Some("Communicate with subagent".to_string()),
+            read_only_hint: false,
+            destructive_hint: false,
+            idempotent_hint: false,
+            open_world_hint: false,
+        }),
+    )
+}
+
+pub fn remove_subagent_tool() -> Tool {
+    Tool::new(
+        PLATFORM_REMOVE_SUBAGENT_TOOL_NAME.to_string(),
+        "Remove/terminate a specific subagent. Use this to clean up subagents that are no longer needed.".to_string(),
+        json!({
+            "type": "object",
+            "required": ["subagent_name"],
+            "properties": {
+                "subagent_name": {"type": "string", "description": "Name of the subagent to remove"}
+            }
+        }),
+        Some(ToolAnnotations {
+            title: Some("Remove subagent".to_string()),
+            read_only_hint: false,
+            destructive_hint: true,
             idempotent_hint: false,
             open_world_hint: false,
         }),

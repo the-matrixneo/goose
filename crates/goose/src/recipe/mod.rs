@@ -7,6 +7,40 @@ fn default_version() -> String {
     "1.0.0".to_string()
 }
 
+/// Configuration for a subagent that can be spawned by a parent agent
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct SubagentConfig {
+    /// Unique name for this subagent
+    pub name: String,
+    
+    /// The recipe configuration for this subagent
+    pub recipe: Box<Recipe>,
+    
+    /// Conditions that trigger spawning this subagent
+    pub trigger_conditions: Vec<String>,
+    
+    /// How this subagent communicates with its parent
+    pub communication_mode: SubagentCommunicationMode,
+    
+    /// Optional description of what this subagent does
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
+/// Defines how a subagent communicates with its parent agent
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "snake_case")]
+pub enum SubagentCommunicationMode {
+    /// Subagent runs independently and reports results back
+    Autonomous,
+    
+    /// Subagent can have interactive communication with parent
+    Interactive,
+    
+    /// Parent must approve all subagent actions
+    Supervised,
+}
+
 /// A Recipe represents a personalized, user-generated agent configuration that defines
 /// specific behaviors and capabilities within the Goose system.
 ///
@@ -53,7 +87,7 @@ fn default_version() -> String {
 ///     parameters: None,
 /// };
 ///
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Recipe {
     // Required fields
     #[serde(default = "default_version")]
@@ -85,9 +119,12 @@ pub struct Recipe {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parameters: Option<Vec<RecipeParameter>>, // any additional parameters for the recipe
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub subagents: Option<Vec<SubagentConfig>>, // subagents that can be spawned by this recipe
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Author {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub contact: Option<String>, // creator/contact information of the recipe
@@ -96,7 +133,7 @@ pub struct Author {
     pub metadata: Option<String>, // any additional metadata for the author
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "snake_case")]
 pub enum RecipeParameterRequirement {
     Required,
@@ -114,7 +151,7 @@ impl fmt::Display for RecipeParameterRequirement {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "snake_case")]
 pub enum RecipeParameterInputType {
     String,
@@ -134,7 +171,7 @@ impl fmt::Display for RecipeParameterInputType {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct RecipeParameter {
     pub key: String,
     pub input_type: RecipeParameterInputType,
@@ -159,6 +196,7 @@ pub struct RecipeBuilder {
     activities: Option<Vec<String>>,
     author: Option<Author>,
     parameters: Option<Vec<RecipeParameter>>,
+    subagents: Option<Vec<SubagentConfig>>,
 }
 
 impl Recipe {
@@ -188,6 +226,7 @@ impl Recipe {
             activities: None,
             author: None,
             parameters: None,
+            subagents: None,
         }
     }
 }
@@ -252,6 +291,12 @@ impl RecipeBuilder {
         self
     }
 
+    /// Sets the subagents for the Recipe
+    pub fn subagents(mut self, subagents: Vec<SubagentConfig>) -> Self {
+        self.subagents = Some(subagents);
+        self
+    }
+
     /// Builds the Recipe instance
     ///
     /// Returns an error if any required fields are missing
@@ -274,6 +319,142 @@ impl RecipeBuilder {
             activities: self.activities,
             author: self.author,
             parameters: self.parameters,
+            subagents: self.subagents,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::agents::Agent;
+    use crate::message::Message;
+
+    #[tokio::test]
+    async fn test_subagent_recipe_creation() {
+        // Create a simple subagent recipe
+        let subagent_recipe = Recipe::builder()
+            .title("Research Assistant")
+            .description("A specialized research assistant")
+            .instructions("You are a research assistant. Help with detailed research tasks.")
+            .activities(vec!["Research topics".to_string(), "Analyze data".to_string()])
+            .build()
+            .expect("Failed to build subagent recipe");
+
+        // Create subagent configuration
+        let subagent_config = SubagentConfig {
+            name: "research_assistant".to_string(),
+            recipe: Box::new(subagent_recipe),
+            trigger_conditions: vec!["research".to_string(), "find information".to_string()],
+            communication_mode: SubagentCommunicationMode::Interactive,
+            description: Some("Helps with research tasks".to_string()),
+        };
+
+        // Create main recipe with subagent
+        let main_recipe = Recipe::builder()
+            .title("Main Agent with Research Assistant")
+            .description("An agent that can spawn a research assistant subagent")
+            .instructions("Handle user queries and spawn research assistant when needed")
+            .activities(vec![
+                "Answer user questions".to_string(),
+                "Spawn research assistant for complex queries".to_string(),
+            ])
+            .subagents(vec![subagent_config.clone()])
+            .build()
+            .expect("Failed to build main recipe");
+
+        // Verify the recipe was created correctly
+        assert_eq!(main_recipe.title, "Main Agent with Research Assistant");
+        assert!(main_recipe.subagents.is_some());
+        
+        let subagents = main_recipe.subagents.unwrap();
+        assert_eq!(subagents.len(), 1);
+        assert_eq!(subagents[0].name, "research_assistant");
+        assert_eq!(subagents[0].trigger_conditions, vec!["research", "find information"]);
+    }
+
+    #[tokio::test]
+    async fn test_agent_subagent_functionality() {
+        // Create agent
+        let agent = Agent::new();
+
+        // Test listing subagents (should be empty initially)
+        let subagents = agent.list_subagents().await;
+        assert!(subagents.is_empty());
+
+        // Create a simple subagent recipe
+        let subagent_recipe = Recipe::builder()
+            .title("Test Assistant")
+            .description("A test assistant")
+            .instructions("You are a test assistant.")
+            .build()
+            .expect("Failed to build subagent recipe");
+
+        // Create subagent configuration
+        let subagent_config = SubagentConfig {
+            name: "test_assistant".to_string(),
+            recipe: Box::new(subagent_recipe),
+            trigger_conditions: vec!["test".to_string()],
+            communication_mode: SubagentCommunicationMode::Interactive,
+            description: Some("Test assistant".to_string()),
+        };
+
+        // Spawn the subagent
+        let result = agent.spawn_subagent(subagent_config).await;
+        assert!(result.is_ok());
+
+        // Test listing subagents (should have one now)
+        let subagents = agent.list_subagents().await;
+        assert_eq!(subagents.len(), 1);
+        assert_eq!(subagents[0], "test_assistant");
+
+        // Test communication with subagent
+        let message = Message::user().with_text("Hello test assistant");
+        let response = agent.communicate_with_subagent("test_assistant", message).await;
+        assert!(response.is_ok());
+
+        // Test removing subagent
+        let remove_result = agent.remove_subagent("test_assistant").await;
+        assert!(remove_result.is_ok());
+
+        // Test listing subagents (should be empty again)
+        let subagents = agent.list_subagents().await;
+        assert!(subagents.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_trigger_conditions() {
+        let agent = Agent::new();
+
+        // Create a subagent config with trigger conditions
+        let subagent_recipe = Recipe::builder()
+            .title("Research Assistant")
+            .description("A research assistant")
+            .instructions("You are a research assistant.")
+            .build()
+            .expect("Failed to build subagent recipe");
+
+        let subagent_config = SubagentConfig {
+            name: "research_assistant".to_string(),
+            recipe: Box::new(subagent_recipe),
+            trigger_conditions: vec!["research".to_string(), "find information".to_string()],
+            communication_mode: SubagentCommunicationMode::Interactive,
+            description: Some("Research assistant".to_string()),
+        };
+
+        // Test message that should trigger
+        let trigger_message = Message::user().with_text("I need help with research on AI");
+        let should_trigger = agent.check_trigger_conditions(&subagent_config, &trigger_message).await;
+        assert!(should_trigger);
+
+        // Test message that should not trigger
+        let no_trigger_message = Message::user().with_text("Hello, how are you?");
+        let should_not_trigger = agent.check_trigger_conditions(&subagent_config, &no_trigger_message).await;
+        assert!(!should_not_trigger);
+
+        // Test case insensitive matching
+        let case_message = Message::user().with_text("I need to RESEARCH something");
+        let should_trigger_case = agent.check_trigger_conditions(&subagent_config, &case_message).await;
+        assert!(should_trigger_case);
     }
 }

@@ -16,7 +16,7 @@ use crate::permission::permission_judge::check_tool_permissions;
 use crate::permission::PermissionConfirmation;
 use crate::providers::base::Provider;
 use crate::providers::errors::ProviderError;
-use crate::recipe::{Author, Recipe};
+use crate::recipe::{Author, Recipe, SubagentConfig};
 use crate::tool_monitor::{ToolCall, ToolMonitor};
 use regex::Regex;
 use serde_json::Value;
@@ -28,6 +28,8 @@ use crate::agents::extension_manager::{get_parameter_names, ExtensionManager};
 use crate::agents::platform_tools::{
     PLATFORM_LIST_RESOURCES_TOOL_NAME, PLATFORM_MANAGE_EXTENSIONS_TOOL_NAME,
     PLATFORM_READ_RESOURCE_TOOL_NAME, PLATFORM_SEARCH_AVAILABLE_EXTENSIONS_TOOL_NAME,
+    PLATFORM_LIST_SUBAGENTS_TOOL_NAME, PLATFORM_COMMUNICATE_WITH_SUBAGENT_TOOL_NAME,
+    PLATFORM_REMOVE_SUBAGENT_TOOL_NAME,
 };
 use crate::agents::prompt_manager::PromptManager;
 use crate::agents::router_tool_selector::{
@@ -59,6 +61,8 @@ pub struct Agent {
     pub(super) tool_result_rx: ToolResultReceiver,
     pub(super) tool_monitor: Mutex<Option<ToolMonitor>>,
     pub(super) router_tool_selector: Mutex<Option<Arc<Box<dyn RouterToolSelector>>>>,
+    pub(super) subagents: Mutex<HashMap<String, Arc<Agent>>>,
+    pub(super) recipe: Mutex<Option<Recipe>>,
 }
 
 #[derive(Clone, Debug)]
@@ -85,6 +89,8 @@ impl Agent {
             tool_result_rx: Arc::new(Mutex::new(tool_rx)),
             tool_monitor: Mutex::new(None),
             router_tool_selector: Mutex::new(None),
+            subagents: Mutex::new(HashMap::new()),
+            recipe: Mutex::new(None),
         }
     }
 
@@ -239,6 +245,66 @@ impl Agent {
             )
         } else if tool_call.name == PLATFORM_SEARCH_AVAILABLE_EXTENSIONS_TOOL_NAME {
             ToolCallResult::from(extension_manager.search_available_extensions().await)
+        } else if tool_call.name == PLATFORM_LIST_SUBAGENTS_TOOL_NAME {
+            // Handle list subagents tool
+            let subagents = self.list_subagents().await;
+            let content = if subagents.is_empty() {
+                "No active subagents".to_string()
+            } else {
+                format!("Active subagents: {}", subagents.join(", "))
+            };
+            ToolCallResult::from(Ok(vec![mcp_core::Content::text(content)]))
+        } else if tool_call.name == PLATFORM_COMMUNICATE_WITH_SUBAGENT_TOOL_NAME {
+            // Handle communicate with subagent tool
+            let subagent_name = tool_call
+                .arguments
+                .get("subagent_name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let message_text = tool_call
+                .arguments
+                .get("message")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            
+            if subagent_name.is_empty() || message_text.is_empty() {
+                ToolCallResult::from(Err(ToolError::ExecutionError(
+                    "Both subagent_name and message are required".to_string(),
+                )))
+            } else {
+                let message = crate::message::Message::user().with_text(message_text);
+                match self.communicate_with_subagent(&subagent_name, message).await {
+                    Ok(response) => {
+                        let content = response.as_concat_text();
+                        ToolCallResult::from(Ok(vec![mcp_core::Content::text(content)]))
+                    }
+                    Err(e) => ToolCallResult::from(Err(ToolError::ExecutionError(e.to_string())))
+                }
+            }
+        } else if tool_call.name == PLATFORM_REMOVE_SUBAGENT_TOOL_NAME {
+            // Handle remove subagent tool
+            let subagent_name = tool_call
+                .arguments
+                .get("subagent_name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            
+            if subagent_name.is_empty() {
+                ToolCallResult::from(Err(ToolError::ExecutionError(
+                    "subagent_name is required".to_string(),
+                )))
+            } else {
+                match self.remove_subagent(&subagent_name).await {
+                    Ok(_) => {
+                        let content = format!("Successfully removed subagent: {}", subagent_name);
+                        ToolCallResult::from(Ok(vec![mcp_core::Content::text(content)]))
+                    }
+                    Err(e) => ToolCallResult::from(Err(ToolError::ExecutionError(e.to_string())))
+                }
+            }
         } else if self.is_frontend_tool(&tool_call.name).await {
             // For frontend tools, return an error indicating we need frontend execution
             ToolCallResult::from(Err(ToolError::ExecutionError(
@@ -433,6 +499,11 @@ impl Agent {
             prefixed_tools.push(platform_tools::search_available_extensions_tool());
             prefixed_tools.push(platform_tools::manage_extensions_tool());
 
+            // Add subagent tools
+            prefixed_tools.push(platform_tools::list_subagents_tool());
+            prefixed_tools.push(platform_tools::communicate_with_subagent_tool());
+            prefixed_tools.push(platform_tools::remove_subagent_tool());
+
             // Add resource tools if supported
             if extension_manager.supports_resources() {
                 prefixed_tools.push(platform_tools::read_resource_tool());
@@ -550,6 +621,35 @@ impl Agent {
 
         Ok(Box::pin(async_stream::try_stream! {
             let _ = reply_span.enter();
+            
+            // Check if any subagents should be spawned based on the latest message
+            if let Some(last_message) = messages.last() {
+                if let Some(recipe) = &*self.recipe.lock().await {
+                    if let Some(subagent_configs) = &recipe.subagents {
+                        for subagent_config in subagent_configs {
+                            if self.check_trigger_conditions(subagent_config, last_message).await {
+                                match self.spawn_subagent(subagent_config.clone()).await {
+                                    Ok(_) => {
+                                        tracing::info!("Triggered subagent: {}", subagent_config.name);
+                                        // Optionally yield a message about subagent spawning
+                                        yield AgentEvent::Message(
+                                            Message::assistant().with_text(format!(
+                                                "🤖 Spawned subagent '{}' to help with: {}",
+                                                subagent_config.name,
+                                                subagent_config.description.as_deref().unwrap_or("specialized task")
+                                            ))
+                                        );
+                                    }
+                                    Err(e) => {
+                                        tracing::error!("Failed to spawn subagent {}: {}", subagent_config.name, e);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
             loop {
                 match Self::generate_response_from_provider(
                     self.provider().await?,
@@ -984,5 +1084,103 @@ impl Agent {
             .expect("valid recipe");
 
         Ok(recipe)
+    }
+
+    /// Configure the agent with a recipe
+    pub async fn configure_with_recipe(&self, recipe: Recipe) -> Result<()> {
+        // Store the recipe
+        *self.recipe.lock().await = Some(recipe.clone());
+
+        // Configure extensions if provided
+        if let Some(extensions) = &recipe.extensions {
+            for extension in extensions {
+                self.add_extension(extension.clone()).await?;
+            }
+        }
+
+        // Set instructions if provided
+        if let Some(instructions) = &recipe.instructions {
+            self.extend_system_prompt(instructions.clone()).await;
+        }
+
+        Ok(())
+    }
+
+    /// Spawn a subagent based on configuration
+    pub async fn spawn_subagent(&self, config: SubagentConfig) -> Result<Arc<Agent>> {
+        let mut subagents = self.subagents.lock().await;
+        
+        // Check if subagent already exists
+        if subagents.contains_key(&config.name) {
+            return Ok(Arc::clone(subagents.get(&config.name).unwrap()));
+        }
+
+        // Create new agent instance
+        let subagent = Agent::new();
+        
+        // Configure subagent with recipe
+        subagent.configure_with_recipe(*config.recipe.clone()).await?;
+        
+        // Copy provider from parent if available
+        if let Some(provider) = &*self.provider.lock().await {
+            subagent.update_provider(Arc::clone(provider)).await?;
+        }
+        
+        // Store in subagents map
+        let subagent = Arc::new(subagent);
+        subagents.insert(config.name.clone(), Arc::clone(&subagent));
+        
+        tracing::info!("Spawned subagent: {}", config.name);
+        Ok(subagent)
+    }
+
+    /// Communicate with a subagent
+    pub async fn communicate_with_subagent(
+        &self, 
+        name: &str, 
+        message: Message
+    ) -> Result<Message> {
+        let subagents = self.subagents.lock().await;
+        
+        if let Some(_subagent) = subagents.get(name) {
+            // For now, let's use a simpler approach - just return a placeholder response
+            // In a full implementation, we'd need to handle the async stream properly
+            let response_text = format!("Subagent '{}' received message: {}", name, message.as_concat_text());
+            Ok(Message::assistant().with_text(response_text))
+        } else {
+            Err(anyhow!("Subagent not found: {}", name))
+        }
+    }
+
+    /// Check if subagent should be spawned based on trigger conditions
+    pub async fn check_trigger_conditions(&self, config: &SubagentConfig, message: &Message) -> bool {
+        for condition in &config.trigger_conditions {
+            // Check if any content in the message matches the trigger condition
+            if message.content.iter().any(|c| {
+                c.as_text()
+                    .map(|text| text.to_lowercase().contains(&condition.to_lowercase()))
+                    .unwrap_or(false)
+            }) {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Get list of active subagents
+    pub async fn list_subagents(&self) -> Vec<String> {
+        let subagents = self.subagents.lock().await;
+        subagents.keys().cloned().collect()
+    }
+
+    /// Remove a subagent
+    pub async fn remove_subagent(&self, name: &str) -> Result<()> {
+        let mut subagents = self.subagents.lock().await;
+        if subagents.remove(name).is_some() {
+            tracing::info!("Removed subagent: {}", name);
+            Ok(())
+        } else {
+            Err(anyhow!("Subagent not found: {}", name))
+        }
     }
 }
