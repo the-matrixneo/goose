@@ -8,7 +8,8 @@ pub const PLATFORM_SEARCH_AVAILABLE_EXTENSIONS_TOOL_NAME: &str =
     "platform__search_available_extensions";
 pub const PLATFORM_MANAGE_EXTENSIONS_TOOL_NAME: &str = "platform__manage_extensions";
 pub const PLATFORM_LIST_SUBAGENTS_TOOL_NAME: &str = "platform__list_subagents";
-pub const PLATFORM_COMMUNICATE_WITH_SUBAGENT_TOOL_NAME: &str = "platform__communicate_with_subagent";
+pub const PLATFORM_COMMUNICATE_WITH_SUBAGENT_TOOL_NAME: &str =
+    "platform__communicate_with_subagent";
 pub const PLATFORM_REMOVE_SUBAGENT_TOOL_NAME: &str = "platform__remove_subagent";
 
 pub fn read_resource_tool() -> Tool {

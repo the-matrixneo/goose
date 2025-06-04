@@ -12,16 +12,16 @@ fn default_version() -> String {
 pub struct SubagentConfig {
     /// Unique name for this subagent
     pub name: String,
-    
+
     /// The recipe configuration for this subagent
     pub recipe: Box<Recipe>,
-    
+
     /// Conditions that trigger spawning this subagent
     pub trigger_conditions: Vec<String>,
-    
+
     /// How this subagent communicates with its parent
     pub communication_mode: SubagentCommunicationMode,
-    
+
     /// Optional description of what this subagent does
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
@@ -33,10 +33,10 @@ pub struct SubagentConfig {
 pub enum SubagentCommunicationMode {
     /// Subagent runs independently and reports results back
     Autonomous,
-    
+
     /// Subagent can have interactive communication with parent
     Interactive,
-    
+
     /// Parent must approve all subagent actions
     Supervised,
 }
@@ -337,7 +337,10 @@ mod tests {
             .title("Research Assistant")
             .description("A specialized research assistant")
             .instructions("You are a research assistant. Help with detailed research tasks.")
-            .activities(vec!["Research topics".to_string(), "Analyze data".to_string()])
+            .activities(vec![
+                "Research topics".to_string(),
+                "Analyze data".to_string(),
+            ])
             .build()
             .expect("Failed to build subagent recipe");
 
@@ -366,11 +369,14 @@ mod tests {
         // Verify the recipe was created correctly
         assert_eq!(main_recipe.title, "Main Agent with Research Assistant");
         assert!(main_recipe.subagents.is_some());
-        
+
         let subagents = main_recipe.subagents.unwrap();
         assert_eq!(subagents.len(), 1);
         assert_eq!(subagents[0].name, "research_assistant");
-        assert_eq!(subagents[0].trigger_conditions, vec!["research", "find information"]);
+        assert_eq!(
+            subagents[0].trigger_conditions,
+            vec!["research", "find information"]
+        );
     }
 
     #[tokio::test]
@@ -410,7 +416,9 @@ mod tests {
 
         // Test communication with subagent
         let message = Message::user().with_text("Hello test assistant");
-        let response = agent.communicate_with_subagent("test_assistant", message).await;
+        let response = agent
+            .communicate_with_subagent("test_assistant", message)
+            .await;
         assert!(response.is_ok());
 
         // Test removing subagent
@@ -444,17 +452,75 @@ mod tests {
 
         // Test message that should trigger
         let trigger_message = Message::user().with_text("I need help with research on AI");
-        let should_trigger = agent.check_trigger_conditions(&subagent_config, &trigger_message).await;
+        let should_trigger = agent
+            .check_trigger_conditions(&subagent_config, &trigger_message)
+            .await;
         assert!(should_trigger);
 
         // Test message that should not trigger
         let no_trigger_message = Message::user().with_text("Hello, how are you?");
-        let should_not_trigger = agent.check_trigger_conditions(&subagent_config, &no_trigger_message).await;
+        let should_not_trigger = agent
+            .check_trigger_conditions(&subagent_config, &no_trigger_message)
+            .await;
         assert!(!should_not_trigger);
 
         // Test case insensitive matching
         let case_message = Message::user().with_text("I need to RESEARCH something");
-        let should_trigger_case = agent.check_trigger_conditions(&subagent_config, &case_message).await;
+        let should_trigger_case = agent
+            .check_trigger_conditions(&subagent_config, &case_message)
+            .await;
         assert!(should_trigger_case);
+    }
+
+    #[tokio::test]
+    async fn test_subagent_recipe_configuration() {
+        // Create agent
+        let agent = Agent::new();
+
+        // Create a subagent recipe with specific instructions
+        let subagent_recipe = Recipe::builder()
+            .title("Math Assistant")
+            .description("A specialized math assistant")
+            .instructions("You are a math assistant. Help with mathematical calculations and explanations.")
+            .activities(vec!["Solve equations".to_string(), "Explain concepts".to_string()])
+            .build()
+            .expect("Failed to build subagent recipe");
+
+        // Create subagent configuration
+        let subagent_config = SubagentConfig {
+            name: "math_assistant".to_string(),
+            recipe: Box::new(subagent_recipe.clone()),
+            trigger_conditions: vec!["math".to_string(), "calculate".to_string()],
+            communication_mode: SubagentCommunicationMode::Interactive,
+            description: Some("Helps with math problems".to_string()),
+        };
+
+        // Spawn the subagent
+        let spawned_subagent = agent.spawn_subagent(subagent_config).await;
+        assert!(spawned_subagent.is_ok(), "Failed to spawn subagent: {:?}", spawned_subagent.err());
+
+        // Verify the subagent was configured with the correct recipe
+        let subagent = spawned_subagent.unwrap();
+        let configured_recipe = subagent.get_recipe().await;
+        assert!(configured_recipe.is_some(), "Subagent should have a recipe configured");
+        
+        let recipe = configured_recipe.unwrap();
+        assert_eq!(recipe.title, "Math Assistant");
+        assert_eq!(recipe.description, "A specialized math assistant");
+        assert_eq!(recipe.instructions, Some("You are a math assistant. Help with mathematical calculations and explanations.".to_string()));
+        
+        // Verify activities were configured
+        if let Some(activities) = &recipe.activities {
+            assert_eq!(activities.len(), 2);
+            assert!(activities.contains(&"Solve equations".to_string()));
+            assert!(activities.contains(&"Explain concepts".to_string()));
+        } else {
+            panic!("Activities should be configured");
+        }
+
+        // Test that the subagent is listed
+        let subagents = agent.list_subagents().await;
+        assert_eq!(subagents.len(), 1);
+        assert_eq!(subagents[0], "math_assistant");
     }
 }

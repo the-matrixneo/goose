@@ -26,10 +26,10 @@ use tracing::{debug, error, instrument};
 use crate::agents::extension::{ExtensionConfig, ExtensionError, ExtensionResult, ToolInfo};
 use crate::agents::extension_manager::{get_parameter_names, ExtensionManager};
 use crate::agents::platform_tools::{
-    PLATFORM_LIST_RESOURCES_TOOL_NAME, PLATFORM_MANAGE_EXTENSIONS_TOOL_NAME,
-    PLATFORM_READ_RESOURCE_TOOL_NAME, PLATFORM_SEARCH_AVAILABLE_EXTENSIONS_TOOL_NAME,
-    PLATFORM_LIST_SUBAGENTS_TOOL_NAME, PLATFORM_COMMUNICATE_WITH_SUBAGENT_TOOL_NAME,
-    PLATFORM_REMOVE_SUBAGENT_TOOL_NAME,
+    PLATFORM_COMMUNICATE_WITH_SUBAGENT_TOOL_NAME, PLATFORM_LIST_RESOURCES_TOOL_NAME,
+    PLATFORM_LIST_SUBAGENTS_TOOL_NAME, PLATFORM_MANAGE_EXTENSIONS_TOOL_NAME,
+    PLATFORM_READ_RESOURCE_TOOL_NAME, PLATFORM_REMOVE_SUBAGENT_TOOL_NAME,
+    PLATFORM_SEARCH_AVAILABLE_EXTENSIONS_TOOL_NAME,
 };
 use crate::agents::prompt_manager::PromptManager;
 use crate::agents::router_tool_selector::{
@@ -268,19 +268,22 @@ impl Agent {
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .to_string();
-            
+
             if subagent_name.is_empty() || message_text.is_empty() {
                 ToolCallResult::from(Err(ToolError::ExecutionError(
                     "Both subagent_name and message are required".to_string(),
                 )))
             } else {
                 let message = crate::message::Message::user().with_text(message_text);
-                match self.communicate_with_subagent(&subagent_name, message).await {
+                match self
+                    .communicate_with_subagent(&subagent_name, message)
+                    .await
+                {
                     Ok(response) => {
                         let content = response.as_concat_text();
                         ToolCallResult::from(Ok(vec![mcp_core::Content::text(content)]))
                     }
-                    Err(e) => ToolCallResult::from(Err(ToolError::ExecutionError(e.to_string())))
+                    Err(e) => ToolCallResult::from(Err(ToolError::ExecutionError(e.to_string()))),
                 }
             }
         } else if tool_call.name == PLATFORM_REMOVE_SUBAGENT_TOOL_NAME {
@@ -291,7 +294,7 @@ impl Agent {
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .to_string();
-            
+
             if subagent_name.is_empty() {
                 ToolCallResult::from(Err(ToolError::ExecutionError(
                     "subagent_name is required".to_string(),
@@ -302,7 +305,7 @@ impl Agent {
                         let content = format!("Successfully removed subagent: {}", subagent_name);
                         ToolCallResult::from(Ok(vec![mcp_core::Content::text(content)]))
                     }
-                    Err(e) => ToolCallResult::from(Err(ToolError::ExecutionError(e.to_string())))
+                    Err(e) => ToolCallResult::from(Err(ToolError::ExecutionError(e.to_string()))),
                 }
             }
         } else if self.is_frontend_tool(&tool_call.name).await {
@@ -621,7 +624,7 @@ impl Agent {
 
         Ok(Box::pin(async_stream::try_stream! {
             let _ = reply_span.enter();
-            
+
             // Check if any subagents should be spawned based on the latest message
             if let Some(last_message) = messages.last() {
                 if let Some(recipe) = &*self.recipe.lock().await {
@@ -649,7 +652,7 @@ impl Agent {
                     }
                 }
             }
-            
+
             loop {
                 match Self::generate_response_from_provider(
                     self.provider().await?,
@@ -1109,7 +1112,7 @@ impl Agent {
     /// Spawn a subagent based on configuration
     pub async fn spawn_subagent(&self, config: SubagentConfig) -> Result<Arc<Agent>> {
         let mut subagents = self.subagents.lock().await;
-        
+
         // Check if subagent already exists
         if subagents.contains_key(&config.name) {
             return Ok(Arc::clone(subagents.get(&config.name).unwrap()));
@@ -1117,35 +1120,35 @@ impl Agent {
 
         // Create new agent instance
         let subagent = Agent::new();
-        
-        // Configure subagent with recipe
-        subagent.configure_with_recipe(*config.recipe.clone()).await?;
-        
+
+        // Configure subagent with recipe - fix the Box<Recipe> dereference
+        subagent.configure_with_recipe((*config.recipe).clone()).await?;
+
         // Copy provider from parent if available
         if let Some(provider) = &*self.provider.lock().await {
             subagent.update_provider(Arc::clone(provider)).await?;
         }
-        
+
         // Store in subagents map
         let subagent = Arc::new(subagent);
         subagents.insert(config.name.clone(), Arc::clone(&subagent));
-        
+
         tracing::info!("Spawned subagent: {}", config.name);
         Ok(subagent)
     }
 
     /// Communicate with a subagent
-    pub async fn communicate_with_subagent(
-        &self, 
-        name: &str, 
-        message: Message
-    ) -> Result<Message> {
+    pub async fn communicate_with_subagent(&self, name: &str, message: Message) -> Result<Message> {
         let subagents = self.subagents.lock().await;
-        
+
         if let Some(_subagent) = subagents.get(name) {
             // For now, let's use a simpler approach - just return a placeholder response
             // In a full implementation, we'd need to handle the async stream properly
-            let response_text = format!("Subagent '{}' received message: {}", name, message.as_concat_text());
+            let response_text = format!(
+                "Subagent '{}' received message: {}",
+                name,
+                message.as_concat_text()
+            );
             Ok(Message::assistant().with_text(response_text))
         } else {
             Err(anyhow!("Subagent not found: {}", name))
@@ -1153,7 +1156,11 @@ impl Agent {
     }
 
     /// Check if subagent should be spawned based on trigger conditions
-    pub async fn check_trigger_conditions(&self, config: &SubagentConfig, message: &Message) -> bool {
+    pub async fn check_trigger_conditions(
+        &self,
+        config: &SubagentConfig,
+        message: &Message,
+    ) -> bool {
         for condition in &config.trigger_conditions {
             // Check if any content in the message matches the trigger condition
             if message.content.iter().any(|c| {
@@ -1171,6 +1178,11 @@ impl Agent {
     pub async fn list_subagents(&self) -> Vec<String> {
         let subagents = self.subagents.lock().await;
         subagents.keys().cloned().collect()
+    }
+
+    /// Get the current recipe configured for this agent
+    pub async fn get_recipe(&self) -> Option<Recipe> {
+        self.recipe.lock().await.clone()
     }
 
     /// Remove a subagent
