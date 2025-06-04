@@ -28,6 +28,7 @@ use crate::agents::extension_manager::{get_parameter_names, ExtensionManager};
 use crate::agents::platform_tools::{
     PLATFORM_LIST_RESOURCES_TOOL_NAME, PLATFORM_MANAGE_EXTENSIONS_TOOL_NAME,
     PLATFORM_READ_RESOURCE_TOOL_NAME, PLATFORM_SEARCH_AVAILABLE_EXTENSIONS_TOOL_NAME,
+    PLATFORM_CALL_RECIPE_TOOL_NAME,
 };
 use crate::agents::prompt_manager::PromptManager;
 use crate::agents::router_tool_selector::{
@@ -239,6 +240,41 @@ impl Agent {
             )
         } else if tool_call.name == PLATFORM_SEARCH_AVAILABLE_EXTENSIONS_TOOL_NAME {
             ToolCallResult::from(extension_manager.search_available_extensions().await)
+        } else if tool_call.name == PLATFORM_CALL_RECIPE_TOOL_NAME {
+            // Handle recipe calling
+            let recipe_name = tool_call
+                .arguments
+                .get("recipe_name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let message_text = tool_call
+                .arguments
+                .get("message")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let parameters = tool_call
+                .arguments
+                .get("parameters")
+                .and_then(|v| v.as_object())
+                .map(|obj| {
+                    obj.iter()
+                        .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default();
+
+            if recipe_name.is_empty() || message_text.is_empty() {
+                ToolCallResult::from(Err(ToolError::ExecutionError(
+                    "Both recipe_name and message are required".to_string(),
+                )))
+            } else {
+                match self.call_recipe(&recipe_name, &message_text, parameters).await {
+                    Ok(response) => ToolCallResult::from(Ok(vec![mcp_core::Content::text(response)])),
+                    Err(e) => ToolCallResult::from(Err(ToolError::ExecutionError(e.to_string()))),
+                }
+            }
         } else if self.is_frontend_tool(&tool_call.name).await {
             // For frontend tools, return an error indicating we need frontend execution
             ToolCallResult::from(Err(ToolError::ExecutionError(
@@ -432,6 +468,7 @@ impl Agent {
             // Add platform tools
             prefixed_tools.push(platform_tools::search_available_extensions_tool());
             prefixed_tools.push(platform_tools::manage_extensions_tool());
+            prefixed_tools.push(platform_tools::call_recipe_tool());
 
             // Add resource tools if supported
             if extension_manager.supports_resources() {
@@ -984,5 +1021,104 @@ impl Agent {
             .expect("valid recipe");
 
         Ok(recipe)
+    }
+
+    /// Call a recipe as a specialized agent
+    pub async fn call_recipe(
+        &self,
+        recipe_name: &str,
+        message: &str,
+        parameters: Vec<(String, String)>,
+    ) -> Result<String> {
+        // For now, we'll implement a simple recipe loading mechanism
+        // In the future, this could be enhanced to use the full CLI recipe loading
+        let recipe = self.load_simple_recipe(recipe_name, parameters).await?;
+
+        // Create a new agent for this recipe
+        let recipe_agent = Agent::new();
+        
+        // Copy the provider from the current agent
+        if let Some(provider) = &*self.provider.lock().await {
+            recipe_agent.update_provider(Arc::clone(provider)).await?;
+        } else {
+            return Err(anyhow!("No provider available for recipe agent"));
+        }
+
+        // Configure the recipe agent with the recipe's instructions
+        if let Some(instructions) = &recipe.instructions {
+            recipe_agent.extend_system_prompt(instructions.clone()).await;
+        }
+
+        // Add extensions from the recipe if specified
+        if let Some(extensions) = &recipe.extensions {
+            for extension in extensions {
+                recipe_agent.add_extension(extension.clone()).await?;
+            }
+        }
+
+        // Create a simple response using the provider directly instead of the streaming interface
+        let provider = recipe_agent.provider().await?;
+        let (tools, _, system_prompt) = recipe_agent.prepare_tools_and_prompt().await?;
+        
+        // Create a message for the recipe agent
+        let user_message = Message::user().with_text(message);
+        let messages = vec![user_message];
+
+        // Get the response from the provider directly
+        let (response, _usage) = provider.complete(&system_prompt, &messages, &tools).await?;
+        
+        Ok(response.as_concat_text())
+    }
+
+    /// Load a simple recipe from file or built-in recipes
+    async fn load_simple_recipe(
+        &self,
+        recipe_name: &str,
+        _parameters: Vec<(String, String)>,
+    ) -> Result<Recipe> {
+        // Try to load from file first
+        let recipe_path = std::path::Path::new(recipe_name);
+        
+        if recipe_path.exists() {
+            let content = std::fs::read_to_string(recipe_path)
+                .map_err(|e| anyhow!("Failed to read recipe file '{}': {}", recipe_name, e))?;
+            
+            // Try YAML first, then JSON
+            if let Ok(recipe) = serde_yaml::from_str::<Recipe>(&content) {
+                return Ok(recipe);
+            } else if let Ok(recipe) = serde_json::from_str::<Recipe>(&content) {
+                return Ok(recipe);
+            } else {
+                return Err(anyhow!("Failed to parse recipe file '{}' as YAML or JSON", recipe_name));
+            }
+        }
+
+        // If not a file path, try to find it as a recipe name
+        // Look for common recipe file extensions
+        for ext in &["yaml", "yml", "json"] {
+            let filename = format!("{}.{}", recipe_name, ext);
+            let path = std::path::Path::new(&filename);
+            
+            if path.exists() {
+                let content = std::fs::read_to_string(path)
+                    .map_err(|e| anyhow!("Failed to read recipe file '{}': {}", filename, e))?;
+                
+                if *ext == "json" {
+                    if let Ok(recipe) = serde_json::from_str::<Recipe>(&content) {
+                        return Ok(recipe);
+                    }
+                } else {
+                    if let Ok(recipe) = serde_yaml::from_str::<Recipe>(&content) {
+                        return Ok(recipe);
+                    }
+                }
+            }
+        }
+
+        // If still not found, return a helpful error
+        Err(anyhow!(
+            "Recipe '{}' not found. Please provide a valid recipe file path or ensure the recipe file exists in the current directory.",
+            recipe_name
+        ))
     }
 }

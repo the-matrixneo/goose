@@ -7,6 +7,7 @@ pub const PLATFORM_LIST_RESOURCES_TOOL_NAME: &str = "platform__list_resources";
 pub const PLATFORM_SEARCH_AVAILABLE_EXTENSIONS_TOOL_NAME: &str =
     "platform__search_available_extensions";
 pub const PLATFORM_MANAGE_EXTENSIONS_TOOL_NAME: &str = "platform__manage_extensions";
+pub const PLATFORM_CALL_RECIPE_TOOL_NAME: &str = "platform__call_recipe";
 
 pub fn read_resource_tool() -> Tool {
     Tool::new(
@@ -105,6 +106,43 @@ pub fn manage_extensions_tool() -> Tool {
         }),
         Some(ToolAnnotations {
             title: Some("Enable or disable an extension".to_string()),
+            read_only_hint: false,
+            destructive_hint: false,
+            idempotent_hint: false,
+            open_world_hint: false,
+        }),
+    )
+}
+
+pub fn call_recipe_tool() -> Tool {
+    Tool::new(
+        PLATFORM_CALL_RECIPE_TOOL_NAME.to_string(),
+        "Call a recipe as a specialized agent to handle specific tasks.
+        This allows you to delegate work to a recipe-defined agent that has specialized instructions and capabilities.
+        The recipe agent will process the given message and return its response.
+        Use this when you need specialized expertise or when a task would benefit from a focused agent."
+        .to_string(),
+        json!({
+            "type": "object",
+            "required": ["recipe_name", "message"],
+            "properties": {
+                "recipe_name": {
+                    "type": "string", 
+                    "description": "Name of the recipe to call (e.g., 'research_assistant', 'code_helper')"
+                },
+                "message": {
+                    "type": "string", 
+                    "description": "Message or task to send to the recipe agent"
+                },
+                "parameters": {
+                    "type": "object",
+                    "description": "Optional parameters to pass to the recipe (key-value pairs)",
+                    "additionalProperties": {"type": "string"}
+                }
+            }
+        }),
+        Some(ToolAnnotations {
+            title: Some("Call a recipe as an agent".to_string()),
             read_only_hint: false,
             destructive_hint: false,
             idempotent_hint: false,
