@@ -1056,15 +1056,17 @@ impl Agent {
             }
         }
 
-        // Create a simple response using the provider directly instead of the streaming interface
-        let provider = recipe_agent.provider().await?;
-        let (tools, _, system_prompt) = recipe_agent.prepare_tools_and_prompt().await?;
-        
         // Create a message for the recipe agent
         let user_message = Message::user().with_text(message);
         let messages = vec![user_message];
 
+        // Use the recipe agent's configured provider and tools directly
+        // This gives us the recipe's specialized configuration without the async stream complexity
+        let provider = recipe_agent.provider().await?;
+        let (tools, _, system_prompt) = recipe_agent.prepare_tools_and_prompt().await?;
+
         // Get the response from the provider directly
+        // The recipe agent is fully configured with its extensions and system prompt
         let (response, _usage) = provider.complete(&system_prompt, &messages, &tools).await?;
         
         Ok(response.as_concat_text())

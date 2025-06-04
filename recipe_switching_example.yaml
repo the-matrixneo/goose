@@ -1,0 +1,37 @@
+# Example: Recipe-switching approach
+
+# Main orchestrator recipe
+version: "1.0.0"
+title: "Multi-Modal Assistant"
+description: "An assistant that can switch between different specialized modes"
+instructions: |
+  You are a helpful assistant that can switch between different specialized modes.
+  When users need specialized help, use the platform__switch_to_recipe tool to switch to the appropriate mode:
+  - For research tasks: switch to "research_assistant"
+  - For coding tasks: switch to "code_assistant" 
+  - For general tasks: stay in current mode
+
+available_recipes:
+  - name: "research_assistant"
+    description: "Specialized for research and analysis"
+    trigger_keywords: ["research", "analyze", "investigate", "study"]
+  
+  - name: "code_assistant" 
+    description: "Specialized for programming and debugging"
+    trigger_keywords: ["code", "program", "debug", "implement"]
+
+---
+# research_assistant.yaml
+version: "1.0.0"
+title: "Research Assistant"
+description: "Specialized research and analysis agent"
+instructions: |
+  You are a research specialist. Excel at finding information, analyzing data, 
+  and providing detailed insights. Always cite sources and provide thorough analysis.
+  
+  When the user is done with research tasks, you can suggest switching back to the 
+  main assistant or to another specialist using platform__switch_to_recipe.
+
+extensions:
+  - name: "web_search"
+  - name: "document_analysis"

@@ -1,0 +1,7 @@
+version: "1.0.0"
+title: "Test Recipe Agent"
+description: "A simple test recipe for testing recipe-as-agent functionality"
+instructions: "You are a specialized test assistant. You always respond with 'Hello from test recipe!' followed by a summary of what the user asked."
+activities:
+  - "Respond to test queries"
+  - "Demonstrate recipe functionality"
