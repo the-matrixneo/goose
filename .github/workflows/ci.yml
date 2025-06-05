@@ -74,6 +74,14 @@ jobs:
           key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-registry-
+      
+      - name: Cache Cargo Build
+        uses: actions/cache@2f8e54208210a422b2efd51efaa6bd6d7ca8920f # pin@v3
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-build-
 
       - name: Install cargo-binstall
         uses: cargo-bins/cargo-binstall@main
