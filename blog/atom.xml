@@ -36,7 +36,7 @@
 <p>This is particularly important for users who are paying for their own LLM access (like ChatGPT or Gemini). Here's why:</p>
 <ul>
 <li>
-<p><strong>Input Tokens = Real Money</strong>: Every line in your <code>.goosehints</code> file consumes input tokens. The LLM must process these tokens as part of its system instructions before it even looks at your question. While a small <code>.goosehints</code> file might not seem like a big deal, it can quickly add up if you're not careful. All-day</p>
+<p><strong>Input Tokens = Real Money</strong>: Every line in your <code>.goosehints</code> file consumes input tokens. The LLM must process these tokens as part of its system instructions before it even looks at your question. While a small <code>.goosehints</code> file might not seem like a big deal, it can quickly add up if you're not careful. All-day vibe coding sessions are going to be using lots of tokens just interpreting that whole <code>.goosehints</code> file every time.</p>
 </li>
 <li>
 <p><strong>Context Window Impact</strong>: Large <code>.goosehints</code> files eat into your <a href="https://zapier.com/blog/context-window/#:~:text=The%20cons%20of%20a%20large%20context%20window%20in%20AI&amp;text=The%20requirements%20to%20process%20AI,request%2C%20things%20quickly%20add%20up." target="_blank" rel="noopener noreferrer">context window</a>, which is the amount of information the LLM can consider at one time. If your <code>.goosehints</code> file is too big, it can push out important context from your actual question or task, leading to less accurate or helpful responses.</p>
