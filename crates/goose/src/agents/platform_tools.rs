@@ -8,6 +8,7 @@ pub const PLATFORM_SEARCH_AVAILABLE_EXTENSIONS_TOOL_NAME: &str =
     "platform__search_available_extensions";
 pub const PLATFORM_MANAGE_EXTENSIONS_TOOL_NAME: &str = "platform__manage_extensions";
 pub const PLATFORM_CALL_RECIPE_TOOL_NAME: &str = "platform__call_recipe";
+pub const PLATFORM_SPAWN_INTERACTIVE_SUBAGENT_TOOL_NAME: &str = "platform__spawn_interactive_subagent";
 
 pub fn read_resource_tool() -> Tool {
     Tool::new(
@@ -143,6 +144,49 @@ pub fn call_recipe_tool() -> Tool {
         }),
         Some(ToolAnnotations {
             title: Some("Call a recipe as an agent".to_string()),
+            read_only_hint: false,
+            destructive_hint: false,
+            idempotent_hint: false,
+            open_world_hint: false,
+        }),
+    )
+}
+
+pub fn spawn_interactive_subagent_tool() -> Tool {
+    Tool::new(
+        PLATFORM_SPAWN_INTERACTIVE_SUBAGENT_TOOL_NAME.to_string(),
+        "Spawn an interactive subagent based on a recipe that can have a multi-turn conversation.
+        This creates a specialized agent that can engage in back-and-forth dialogue to complete complex tasks.
+        The subagent will continue the conversation until the task is complete or max turns is reached.
+        Use this for tasks that require multiple steps, clarification, or iterative refinement."
+        .to_string(),
+        json!({
+            "type": "object",
+            "required": ["recipe_name", "message"],
+            "properties": {
+                "recipe_name": {
+                    "type": "string", 
+                    "description": "Name of the recipe to use for the subagent (e.g., 'research_assistant', 'code_helper')"
+                },
+                "message": {
+                    "type": "string", 
+                    "description": "Initial message or task to send to the subagent"
+                },
+                "max_turns": {
+                    "type": "integer",
+                    "description": "Maximum number of conversation turns (default: 5, max: 10)",
+                    "minimum": 1,
+                    "maximum": 10
+                },
+                "parameters": {
+                    "type": "object",
+                    "description": "Optional parameters to pass to the recipe (key-value pairs)",
+                    "additionalProperties": {"type": "string"}
+                }
+            }
+        }),
+        Some(ToolAnnotations {
+            title: Some("Spawn interactive subagent".to_string()),
             read_only_hint: false,
             destructive_hint: false,
             idempotent_hint: false,

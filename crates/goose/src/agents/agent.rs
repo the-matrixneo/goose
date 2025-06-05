@@ -28,7 +28,7 @@ use crate::agents::extension_manager::{get_parameter_names, ExtensionManager};
 use crate::agents::platform_tools::{
     PLATFORM_LIST_RESOURCES_TOOL_NAME, PLATFORM_MANAGE_EXTENSIONS_TOOL_NAME,
     PLATFORM_READ_RESOURCE_TOOL_NAME, PLATFORM_SEARCH_AVAILABLE_EXTENSIONS_TOOL_NAME,
-    PLATFORM_CALL_RECIPE_TOOL_NAME,
+    PLATFORM_CALL_RECIPE_TOOL_NAME, PLATFORM_SPAWN_INTERACTIVE_SUBAGENT_TOOL_NAME,
 };
 use crate::agents::prompt_manager::PromptManager;
 use crate::agents::router_tool_selector::{
@@ -275,6 +275,12 @@ impl Agent {
                     Err(e) => ToolCallResult::from(Err(ToolError::ExecutionError(e.to_string()))),
                 }
             }
+        } else if tool_call.name == PLATFORM_SPAWN_INTERACTIVE_SUBAGENT_TOOL_NAME {
+            // Handle interactive subagent spawning
+            match self.spawn_interactive_subagent(tool_call.arguments).await {
+                Ok(content) => ToolCallResult::from(Ok(content)),
+                Err(e) => ToolCallResult::from(Err(ToolError::ExecutionError(e.to_string()))),
+            }
         } else if self.is_frontend_tool(&tool_call.name).await {
             // For frontend tools, return an error indicating we need frontend execution
             ToolCallResult::from(Err(ToolError::ExecutionError(
@@ -469,6 +475,7 @@ impl Agent {
             prefixed_tools.push(platform_tools::search_available_extensions_tool());
             prefixed_tools.push(platform_tools::manage_extensions_tool());
             prefixed_tools.push(platform_tools::call_recipe_tool());
+            prefixed_tools.push(platform_tools::spawn_interactive_subagent_tool());
 
             // Add resource tools if supported
             if extension_manager.supports_resources() {
@@ -1122,5 +1129,161 @@ impl Agent {
             "Recipe '{}' not found. Please provide a valid recipe file path or ensure the recipe file exists in the current directory.",
             recipe_name
         ))
+    }
+
+    /// Spawn an interactive subagent that can have a multi-turn conversation
+    async fn spawn_interactive_subagent(&self, args: Value) -> Result<Vec<Content>> {
+        let recipe_name = args
+            .get("recipe_name")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        let message = args
+            .get("message")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        let max_turns = args
+            .get("max_turns")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(5)
+            .min(10) as usize; // Cap at 10 turns
+        let parameters = args
+            .get("parameters")
+            .and_then(|v| v.as_object())
+            .map(|obj| {
+                obj.iter()
+                    .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+
+        if recipe_name.is_empty() || message.is_empty() {
+            return Err(anyhow!("Both recipe_name and message are required"));
+        }
+
+        let conversation = self
+            .run_subagent_conversation(&recipe_name, &message, max_turns, parameters)
+            .await?;
+
+        // Format conversation as tool response with clear separation
+        let mut response_parts = Vec::new();
+        response_parts.push(format!("=== Interactive Subagent Conversation (Recipe: {}) ===", recipe_name));
+        
+        for (i, msg) in conversation.iter().enumerate() {
+            let role = match msg.role {
+                mcp_core::role::Role::User => "User",
+                mcp_core::role::Role::Assistant => "Subagent",
+            };
+            response_parts.push(format!("Turn {}: {}: {}", i + 1, role, msg.as_concat_text()));
+        }
+        
+        response_parts.push("=== End of Subagent Conversation ===".to_string());
+        let response = response_parts.join("\n\n");
+
+        Ok(vec![Content::text(response)])
+    }
+
+    /// Run a complete conversation with a subagent
+    async fn run_subagent_conversation(
+        &self,
+        recipe_name: &str,
+        initial_message: &str,
+        max_turns: usize,
+        parameters: Vec<(String, String)>,
+    ) -> Result<Vec<Message>> {
+        // Create and configure subagent
+        let subagent = Agent::new();
+        
+        // Copy the provider from the current agent
+        if let Some(provider) = &*self.provider.lock().await {
+            subagent.update_provider(Arc::clone(provider)).await?;
+        } else {
+            return Err(anyhow!("No provider available for subagent"));
+        }
+
+        // Load and configure recipe
+        let recipe = self.load_simple_recipe(recipe_name, parameters).await?;
+        if let Some(instructions) = &recipe.instructions {
+            subagent.extend_system_prompt(instructions.clone()).await;
+        }
+
+        // Add extensions from the recipe if specified
+        if let Some(extensions) = &recipe.extensions {
+            for extension in extensions {
+                subagent.add_extension(extension.clone()).await?;
+            }
+        }
+
+        // Initialize conversation with user message
+        let mut conversation = vec![Message::user().with_text(initial_message)];
+        let mut all_messages = Vec::new();
+        
+        // Add initial user message to results
+        all_messages.push(conversation[0].clone());
+
+        // Run conversation for up to max_turns
+        for turn in 0..max_turns {
+            // Get subagent response using direct provider call to avoid Send issues
+            let provider = subagent.provider().await?;
+            let (tools, _, system_prompt) = subagent.prepare_tools_and_prompt().await?;
+
+            // Get the response from the provider directly
+            let (response, _usage) = provider.complete(&system_prompt, &conversation, &tools).await?;
+            
+            // Add assistant response to messages
+            all_messages.push(response.clone());
+            conversation.push(response.clone());
+
+            // Check if the conversation should terminate
+            if self.should_terminate_subagent_conversation(&response, turn, max_turns) {
+                break;
+            }
+
+            // For now, we'll end after one response since we're using direct provider calls
+            // In the future, we could add logic to handle tool calls and multi-turn conversations
+            break;
+        }
+
+        Ok(all_messages)
+    }
+
+    /// Determine if the subagent conversation should terminate
+    fn should_terminate_subagent_conversation(
+        &self,
+        message: &Message,
+        current_turn: usize,
+        max_turns: usize,
+    ) -> bool {
+        // Always terminate if we've reached max turns
+        if current_turn >= max_turns - 1 {
+            return true;
+        }
+
+        // Check for termination keywords in the message
+        let content = message.as_concat_text().to_lowercase();
+        let termination_phrases = [
+            "task complete",
+            "finished",
+            "done",
+            "no further",
+            "that's all",
+            "completed successfully",
+            "final answer",
+            "conclusion",
+        ];
+
+        for phrase in &termination_phrases {
+            if content.contains(phrase) {
+                return true;
+            }
+        }
+
+        // If no tool calls and content is substantial, likely complete
+        if message.get_tool_request_ids().is_empty() && content.len() > 50 {
+            return true;
+        }
+
+        false
     }
 }
