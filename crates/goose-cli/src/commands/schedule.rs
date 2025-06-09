@@ -262,7 +262,7 @@ pub async fn handle_schedule_run_now(id: String) -> Result<()> {
 pub async fn handle_schedule_services_status() -> Result<()> {
     // Check if we're using temporal scheduler
     let scheduler_type =
-        std::env::var("GOOSE_SCHEDULER_TYPE").unwrap_or_else(|_| "legacy".to_string());
+        std::env::var("GOOSE_SCHEDULER_TYPE").unwrap_or_else(|_| "temporal".to_string());
 
     if scheduler_type != "temporal" {
         println!("Service management is only available for temporal scheduler.");
@@ -293,7 +293,7 @@ pub async fn handle_schedule_services_status() -> Result<()> {
 pub async fn handle_schedule_services_stop() -> Result<()> {
     // Check if we're using temporal scheduler
     let scheduler_type =
-        std::env::var("GOOSE_SCHEDULER_TYPE").unwrap_or_else(|_| "legacy".to_string());
+        std::env::var("GOOSE_SCHEDULER_TYPE").unwrap_or_else(|_| "temporal".to_string());
 
     if scheduler_type != "temporal" {
         println!("Service management is only available for temporal scheduler.");

@@ -93,7 +93,7 @@ run-ui-only:
 
 
 # Run UI with alpha changes
-run-ui-alpha temporal="false":
+run-ui-alpha temporal="true":
     @just release-binary
     @echo "Running UI with {{ if temporal == "true" { "Temporal" } else { "Legacy" } }} scheduler..."
     cd ui/desktop && npm install && ALPHA=true GOOSE_SCHEDULER_TYPE={{ if temporal == "true" { "temporal" } else { "legacy" } }} npm run start-alpha-gui

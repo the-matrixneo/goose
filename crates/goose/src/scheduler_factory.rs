@@ -28,8 +28,8 @@ impl SchedulerType {
                 }
             },
             Err(_) => {
-                // Default to legacy for backward compatibility
-                SchedulerType::Legacy
+                // Default to temporal scheduler
+                SchedulerType::Temporal
             }
         }
     }
