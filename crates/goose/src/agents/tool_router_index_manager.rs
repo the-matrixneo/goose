@@ -27,23 +27,18 @@ impl ToolRouterIndexManager {
                     .await?;
 
                 if !tools.is_empty() {
-                    // Get extension description from config
-                    let extension_config = ExtensionConfigManager::get_config_by_name(extension_name)
-                        .map_err(|e| anyhow!("Failed to get extension config: {}", e))?
-                        .ok_or_else(|| anyhow!("Extension {} not found in config", extension_name))?;
+                    // Get extension instructions from the extension manager
+                    let extension_info = extension_manager.get_extensions_info().await;
+                    let extension_instructions = extension_info
+                        .iter()
+                        .find(|info| info.name == extension_name)
+                        .map(|info| info.instructions.clone())
+                        .unwrap_or_default();
 
-                    let extension_description = match &extension_config {
-                        ExtensionConfig::Builtin { display_name, .. } => {
-                            display_name.as_deref().unwrap_or(extension_name)
-                        }
-                        ExtensionConfig::Sse { description, .. } | ExtensionConfig::Stdio { description, .. } => {
-                            description.as_deref().unwrap_or(extension_name)
-                        }
-                        ExtensionConfig::Frontend { .. } => extension_name,
-                    };
+                    println!("Extension instructions: {}", extension_instructions);
 
-                    // Index all tools at once with extension description
-                    selector.index_tools(&tools, Some(extension_description)).await.map_err(|e| {
+                    // Index all tools at once with extension instructions
+                    selector.index_tools(&tools, Some(&extension_instructions)).await.map_err(|e| {
                         anyhow!(
                             "Failed to index tools for extension {}: {}",
                             extension_name,
