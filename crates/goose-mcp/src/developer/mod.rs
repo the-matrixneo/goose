@@ -38,7 +38,9 @@ use mcp_server::Router;
 
 use mcp_core::role::Role;
 
-use self::file_vectordb::{extract_file_contents, FileVectorDB, FileRecord, generate_file_table_id};
+use self::file_vectordb::{
+    extract_file_contents, generate_file_table_id, FileRecord, FileVectorDB,
+};
 use self::shell::{
     expand_path, format_command_for_platform, get_shell_config, is_absolute_path,
     normalize_line_endings,
@@ -48,9 +50,9 @@ use std::process::Stdio;
 use std::sync::{Arc, Mutex};
 use xcap::{Monitor, Window};
 
-use ignore::gitignore::{Gitignore, GitignoreBuilder};
-use goose::providers::{self, base::Provider};
 use goose::model::ModelConfig;
+use goose::providers::{self, base::Provider};
+use ignore::gitignore::{Gitignore, GitignoreBuilder};
 
 // Embeds the prompts directory to the build
 static PROMPTS_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/src/developer/prompts");
@@ -313,7 +315,8 @@ impl DeveloperRouter {
                 
                 The tool respects .gitignore patterns and skips binary files.
                 Results are returned as a list of file paths with relevant content snippets.
-            "#}.to_string(),
+            "#}
+            .to_string(),
             json!({
                 "type": "object",
                 "required": ["path", "query"],
@@ -323,7 +326,7 @@ impl DeveloperRouter {
                         "description": "Absolute path to the directory to search in"
                     },
                     "query": {
-                        "type": "string", 
+                        "type": "string",
                         "description": "Short description of what you're looking for (e.g., 'authentication functions', 'database configuration', 'error handling')"
                     },
                     "max_results": {
@@ -491,12 +494,12 @@ impl DeveloperRouter {
     // Helper method to create embedding provider (same logic as main goose)
     fn create_embedding_provider() -> Option<Arc<dyn Provider>> {
         use std::env;
-        
+
         // Try to create embedding provider using the same logic as the main goose system
         let embedding_model = env::var("GOOSE_EMBEDDING_MODEL")
             .unwrap_or_else(|_| "text-embedding-3-small".to_string());
-        let embedding_provider_name = env::var("GOOSE_EMBEDDING_MODEL_PROVIDER")
-            .unwrap_or_else(|_| "openai".to_string());
+        let embedding_provider_name =
+            env::var("GOOSE_EMBEDDING_MODEL_PROVIDER").unwrap_or_else(|_| "openai".to_string());
 
         // Create the provider using the factory
         let model_config = ModelConfig::new(embedding_model);
@@ -1222,15 +1225,19 @@ impl DeveloperRouter {
             .map_err(|e| ToolError::ExecutionError(format!("Failed to extract files: {}", e)))?;
 
         if files.is_empty() {
-            return Ok(vec![Content::text("No readable files found in the specified directory.")]);
+            return Ok(vec![Content::text(
+                "No readable files found in the specified directory.",
+            )]);
         }
 
         // Check if we have an embedding provider for true vector search
         if let Some(ref provider) = self.embedding_provider {
-            self.find_relevant_content_with_embeddings(provider, &path, query, max_results, files).await
+            self.find_relevant_content_with_embeddings(provider, &path, query, max_results, files)
+                .await
         } else {
             // Fallback to text-based search
-            self.find_relevant_content_text_based(&path, query, max_results, files).await
+            self.find_relevant_content_text_based(&path, query, max_results, files)
+                .await
         }
     }
 
@@ -1244,11 +1251,11 @@ impl DeveloperRouter {
     ) -> Result<Vec<Content>, ToolError> {
         // Create a unique table name for this search session
         let table_name = format!("files_{}", generate_file_table_id());
-        
+
         // Initialize vector database
-        let vector_db = FileVectorDB::new(Some(table_name))
-            .await
-            .map_err(|e| ToolError::ExecutionError(format!("Failed to initialize vector database: {}", e)))?;
+        let vector_db = FileVectorDB::new(Some(table_name)).await.map_err(|e| {
+            ToolError::ExecutionError(format!("Failed to initialize vector database: {}", e))
+        })?;
 
         // Prepare texts for embedding
         let mut file_records = Vec::new();
@@ -1266,7 +1273,7 @@ impl DeveloperRouter {
                 let lines: Vec<&str> = content.lines().collect();
                 let mut chunks = Vec::new();
                 let mut current_chunk = String::new();
-                
+
                 for line in lines {
                     if current_chunk.len() + line.len() > 2000 && !current_chunk.is_empty() {
                         chunks.push(current_chunk.trim().to_string());
@@ -1307,7 +1314,9 @@ impl DeveloperRouter {
         let embeddings = provider
             .create_embeddings(texts_to_embed)
             .await
-            .map_err(|e| ToolError::ExecutionError(format!("Failed to generate embeddings: {}", e)))?;
+            .map_err(|e| {
+                ToolError::ExecutionError(format!("Failed to generate embeddings: {}", e))
+            })?;
 
         // Update records with embeddings
         for (record, embedding) in file_records.iter_mut().zip(embeddings.into_iter()) {
@@ -1324,7 +1333,9 @@ impl DeveloperRouter {
         let query_embeddings = provider
             .create_embeddings(vec![query.to_string()])
             .await
-            .map_err(|e| ToolError::ExecutionError(format!("Failed to generate query embedding: {}", e)))?;
+            .map_err(|e| {
+                ToolError::ExecutionError(format!("Failed to generate query embedding: {}", e))
+            })?;
 
         let query_embedding = query_embeddings
             .into_iter()
@@ -1346,27 +1357,31 @@ impl DeveloperRouter {
 
         // Format results
         let result_count = results.len();
-        let mut result_text = format!("Found {} files related to '{}' (using vector similarity):\n\n", result_count, query);
-        
+        let mut result_text = format!(
+            "Found {} files related to '{}' (using vector similarity):\n\n",
+            result_count, query
+        );
+
         for result in &results {
             let file_path = PathBuf::from(&result.file_path);
-            let relative_path = file_path.strip_prefix(base_path)
+            let relative_path = file_path
+                .strip_prefix(base_path)
                 .unwrap_or(&file_path)
                 .display();
-            
+
             // Get a snippet of the content (first 200 characters)
             let snippet = if result.content.len() > 200 {
                 format!("{}...", &result.content[..200])
             } else {
                 result.content.clone()
             };
-            
+
             let chunk_info = if result.chunk_index > 0 {
                 format!(" (chunk {})", result.chunk_index + 1)
             } else {
                 String::new()
             };
-            
+
             result_text.push_str(&format!(
                 "**{}{}**\n```\n{}\n```\n\n",
                 relative_path, chunk_info, snippet
@@ -1374,8 +1389,11 @@ impl DeveloperRouter {
         }
 
         Ok(vec![
-            Content::text(format!("Found {} relevant files using vector similarity", result_count))
-                .with_audience(vec![Role::Assistant]),
+            Content::text(format!(
+                "Found {} relevant files using vector similarity",
+                result_count
+            ))
+            .with_audience(vec![Role::Assistant]),
             Content::text(result_text)
                 .with_audience(vec![Role::User])
                 .with_priority(0.0),
@@ -1403,10 +1421,9 @@ impl DeveloperRouter {
                 let content_lower = content.to_lowercase();
                 let score = query_lower
                     .split_whitespace()
-                    .map(|term| {
-                        content_lower.matches(term).count() as f32
-                    })
-                    .sum::<f32>() / content.len() as f32;
+                    .map(|term| content_lower.matches(term).count() as f32)
+                    .sum::<f32>()
+                    / content.len() as f32;
 
                 if score > 0.0 {
                     Some((file_path, content, file_type, score))
@@ -1431,20 +1448,24 @@ impl DeveloperRouter {
 
         // Format results
         let result_count = scored_files.len();
-        let mut result_text = format!("Found {} files related to '{}' (using text search):\n\n", result_count, query);
-        
+        let mut result_text = format!(
+            "Found {} files related to '{}' (using text search):\n\n",
+            result_count, query
+        );
+
         for (file_path, content, _file_type, score) in &scored_files {
-            let relative_path = file_path.strip_prefix(base_path)
+            let relative_path = file_path
+                .strip_prefix(base_path)
                 .unwrap_or(&file_path)
                 .display();
-            
+
             // Get a snippet of the content (first 200 characters)
             let snippet = if content.len() > 200 {
                 format!("{}...", &content[..200])
             } else {
                 content.to_string()
             };
-            
+
             result_text.push_str(&format!(
                 "**{}** (relevance: {:.4})\n```\n{}\n```\n\n",
                 relative_path, score, snippet
@@ -2028,6 +2049,7 @@ mod tests {
             instructions: String::new(),
             file_history: Arc::new(Mutex::new(HashMap::new())),
             ignore_patterns: Arc::new(ignore_patterns),
+            embedding_provider: None,
         };
 
         // Try to write to an ignored file
@@ -2087,6 +2109,7 @@ mod tests {
             instructions: String::new(),
             file_history: Arc::new(Mutex::new(HashMap::new())),
             ignore_patterns: Arc::new(ignore_patterns),
+            embedding_provider: None,
         };
 
         // Create an ignored file

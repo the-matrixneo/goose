@@ -380,7 +380,8 @@ pub fn extract_file_contents(
 fn is_likely_binary(file_type: &str) -> bool {
     matches!(
         file_type.to_lowercase().as_str(),
-        "exe" | "dll"
+        "exe"
+            | "dll"
             | "so"
             | "dylib"
             | "bin"
@@ -506,25 +507,32 @@ mod tests {
     #[test]
     fn test_extract_file_contents() {
         let temp_dir = TempDir::new().unwrap();
-        
+
         // Create some test files
         std::fs::write(temp_dir.path().join("test.txt"), "Hello, world!").unwrap();
         std::fs::write(temp_dir.path().join("test.rs"), "fn main() {}").unwrap();
-        
+
         let files = extract_file_contents(temp_dir.path(), Some(10)).unwrap();
-        
+
         assert_eq!(files.len(), 2);
-        assert!(files.iter().any(|(path, _, _)| path.file_name().unwrap() == "test.txt"));
-        assert!(files.iter().any(|(path, _, _)| path.file_name().unwrap() == "test.rs"));
+        assert!(files
+            .iter()
+            .any(|(path, _, _)| path.file_name().unwrap() == "test.txt"));
+        assert!(files
+            .iter()
+            .any(|(path, _, _)| path.file_name().unwrap() == "test.rs"));
     }
 
     #[test]
     fn test_chunk_content() {
         let content = "Line 1\nLine 2\nLine 3\nLine 4\nLine 5";
         let chunks = chunk_content(content, 15); // Small chunk size to force splitting
-        
-        assert!(chunks.len() > 1, "Content should be split into multiple chunks");
-        
+
+        assert!(
+            chunks.len() > 1,
+            "Content should be split into multiple chunks"
+        );
+
         // Test content that fits in one chunk
         let small_content = "Small content";
         let small_chunks = chunk_content(small_content, 100);
