@@ -22,7 +22,7 @@ pub enum RouterToolSelectionStrategy {
 #[async_trait]
 pub trait RouterToolSelector: Send + Sync {
     async fn select_tools(&self, params: Value) -> Result<Vec<Content>, ToolError>;
-    async fn index_tools(&self, tools: &[Tool]) -> Result<(), ToolError>;
+    async fn index_tools(&self, tools: &[Tool], extension_info: Option<&str>) -> Result<(), ToolError>;
     async fn remove_tool(&self, tool_name: &str) -> Result<(), ToolError>;
     async fn record_tool_call(&self, tool_name: &str) -> Result<(), ToolError>;
     async fn get_recent_tool_calls(&self, limit: usize) -> Result<Vec<String>, ToolError>;
@@ -119,13 +119,16 @@ impl RouterToolSelector for VectorToolSelector {
         Ok(selected_tools)
     }
 
-    async fn index_tools(&self, tools: &[Tool]) -> Result<(), ToolError> {
+    async fn index_tools(&self, tools: &[Tool], extension_info: Option<&str>) -> Result<(), ToolError> {
         let texts_to_embed: Vec<String> = tools
             .iter()
             .map(|tool| {
                 let schema_str = serde_json::to_string_pretty(&tool.input_schema)
                     .unwrap_or_else(|_| "{}".to_string());
-                format!("{} {} {}", tool.name, tool.description, schema_str)
+                let extension_context = extension_info
+                    .map(|info| format!("\nExtension Context: {}", info))
+                    .unwrap_or_default();
+                format!("{} {} {}{}", tool.name, tool.description, schema_str, extension_context)
             })
             .collect();
 
@@ -150,9 +153,12 @@ impl RouterToolSelector for VectorToolSelector {
             .map(|(tool, vector)| {
                 let schema_str = serde_json::to_string_pretty(&tool.input_schema)
                     .unwrap_or_else(|_| "{}".to_string());
+                let extension_context = extension_info
+                    .map(|info| format!("\nExtension Context: {}", info))
+                    .unwrap_or_default();
                 crate::agents::tool_vectordb::ToolRecord {
                     tool_name: tool.name.clone(),
-                    description: tool.description.clone(),
+                    description: format!("{}{}", tool.description, extension_context),
                     schema: schema_str,
                     vector,
                 }

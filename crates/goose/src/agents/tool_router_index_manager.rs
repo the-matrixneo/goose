@@ -5,6 +5,8 @@ use tracing;
 use crate::agents::extension_manager::ExtensionManager;
 use crate::agents::platform_tools;
 use crate::agents::router_tool_selector::{RouterToolSelectionStrategy, RouterToolSelector};
+use crate::config::extensions::ExtensionConfigManager;
+use crate::agents::extension::ExtensionConfig;
 
 /// Manages tool indexing operations for the router when vector routing is enabled
 pub struct ToolRouterIndexManager;
@@ -25,8 +27,23 @@ impl ToolRouterIndexManager {
                     .await?;
 
                 if !tools.is_empty() {
-                    // Index all tools at once
-                    selector.index_tools(&tools).await.map_err(|e| {
+                    // Get extension description from config
+                    let extension_config = ExtensionConfigManager::get_config_by_name(extension_name)
+                        .map_err(|e| anyhow!("Failed to get extension config: {}", e))?
+                        .ok_or_else(|| anyhow!("Extension {} not found in config", extension_name))?;
+
+                    let extension_description = match &extension_config {
+                        ExtensionConfig::Builtin { display_name, .. } => {
+                            display_name.as_deref().unwrap_or(extension_name)
+                        }
+                        ExtensionConfig::Sse { description, .. } | ExtensionConfig::Stdio { description, .. } => {
+                            description.as_deref().unwrap_or(extension_name)
+                        }
+                        ExtensionConfig::Frontend { .. } => extension_name,
+                    };
+
+                    // Index all tools at once with extension description
+                    selector.index_tools(&tools, Some(extension_description)).await.map_err(|e| {
                         anyhow!(
                             "Failed to index tools for extension {}: {}",
                             extension_name,
@@ -87,7 +104,7 @@ impl ToolRouterIndexManager {
 
         // Index all platform tools at once
         selector
-            .index_tools(&tools)
+            .index_tools(&tools, None)
             .await
             .map_err(|e| anyhow!("Failed to index platform tools: {}", e))?;
 

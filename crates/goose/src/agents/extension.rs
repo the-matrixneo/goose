@@ -54,7 +54,7 @@ impl Envs {
         "LD_AUDIT",         // Loads a monitoring library that can intercept execution
         "LD_DEBUG",         // Enables verbose linker logging (information disclosure risk)
         "LD_BIND_NOW",      // Forces immediate symbol resolution, affecting ASLR
-        "LD_ASSUME_KERNEL", // Tricks linker into thinking it’s running on an older kernel
+        "LD_ASSUME_KERNEL", // Tricks linker into thinking it's running on an older kernel
         // 🍎 macOS dynamic linker variables
         "DYLD_LIBRARY_PATH",     // Same as LD_LIBRARY_PATH but for macOS
         "DYLD_INSERT_LIBRARIES", // macOS equivalent of LD_PRELOAD
