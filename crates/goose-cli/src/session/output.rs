@@ -385,7 +385,7 @@ fn render_text_editor_request(call: &ToolCall, debug: bool) {
     // Print path first with special formatting
     if let Some(Value::String(path)) = call.arguments.get("path") {
         let path_line_content = format!("path: {}", shorten_path(path, debug));
-        let path_padding = content_width - path_line_content.len();
+        let path_padding = calculate_padding(&path_line_content, content_width);
         println!(
             "│ {}: {}{}│",
             style("path").dim(),
@@ -416,7 +416,7 @@ fn render_shell_request(call: &ToolCall, debug: bool) {
     match call.arguments.get("command") {
         Some(Value::String(s)) => {
             let command_line_content = format!("command: {}", s);
-            let command_padding = content_width - command_line_content.len();
+            let command_padding = calculate_padding(&command_line_content, content_width);
             println!(
                 "│ {}: {}{}│",
                 style("command").dim(),
@@ -455,7 +455,7 @@ fn print_tool_header(call: &ToolCall) {
 
     let content_width = 77;
     let header_line_content = format!("🔧 {} → {}", extension_name, tool_name);
-    let header_padding = content_width - header_line_content.len();
+    let header_padding = calculate_padding(&header_line_content, content_width);
 
     println!(
         "│ {} {} {} {}{}│",
@@ -505,7 +505,7 @@ fn print_params_boxed(value: &Value, depth: usize, debug: bool) {
                     Value::Object(_) => {
                         let nested_line_content = format!("{}:", key);
                         let nested_padding =
-                            content_width - indent.len() - nested_line_content.len();
+                            calculate_padding(&nested_line_content, content_width - indent.len());
                         println!(
                             "{}{}{}│",
                             indent,
@@ -516,7 +516,8 @@ fn print_params_boxed(value: &Value, depth: usize, debug: bool) {
                     }
                     Value::Array(arr) => {
                         let array_line_content = format!("{}:", key);
-                        let array_padding = content_width - indent.len() - array_line_content.len();
+                        let array_padding =
+                            calculate_padding(&array_line_content, content_width - indent.len());
                         println!(
                             "{}{}:{}│",
                             indent,
@@ -526,7 +527,7 @@ fn print_params_boxed(value: &Value, depth: usize, debug: bool) {
                         for item in arr.iter() {
                             let dash_line_content = "- ";
                             let dash_padding =
-                                content_width - indent.len() - dash_line_content.len();
+                                calculate_padding(dash_line_content, content_width - indent.len());
                             println!("{}- {}│", indent, " ".repeat(dash_padding));
                             print_params_boxed(item, depth + 2, debug);
                         }
@@ -534,8 +535,10 @@ fn print_params_boxed(value: &Value, depth: usize, debug: bool) {
                     Value::String(s) => {
                         if !debug && s.len() > get_tool_params_max_length() {
                             let truncated_line_content = format!("{}: ...", key);
-                            let truncated_padding =
-                                content_width - indent.len() - truncated_line_content.len();
+                            let truncated_padding = calculate_padding(
+                                &truncated_line_content,
+                                content_width - indent.len(),
+                            );
                             println!(
                                 "{}{}: {}{}│",
                                 indent,
@@ -545,8 +548,10 @@ fn print_params_boxed(value: &Value, depth: usize, debug: bool) {
                             );
                         } else {
                             let string_line_content = format!("{}: {}", key, s);
-                            let string_padding =
-                                content_width - indent.len() - string_line_content.len();
+                            let string_padding = calculate_padding(
+                                &string_line_content,
+                                content_width - indent.len(),
+                            );
                             println!(
                                 "{}{}: {}{}│",
                                 indent,
@@ -559,7 +564,7 @@ fn print_params_boxed(value: &Value, depth: usize, debug: bool) {
                     Value::Number(n) => {
                         let number_line_content = format!("{}: {}", key, n);
                         let number_padding =
-                            content_width - indent.len() - number_line_content.len();
+                            calculate_padding(&number_line_content, content_width - indent.len());
                         println!(
                             "{}{}: {}{}│",
                             indent,
@@ -570,7 +575,8 @@ fn print_params_boxed(value: &Value, depth: usize, debug: bool) {
                     }
                     Value::Bool(b) => {
                         let bool_line_content = format!("{}: {}", key, b);
-                        let bool_padding = content_width - indent.len() - bool_line_content.len();
+                        let bool_padding =
+                            calculate_padding(&bool_line_content, content_width - indent.len());
                         println!(
                             "{}{}: {}{}│",
                             indent,
@@ -581,7 +587,8 @@ fn print_params_boxed(value: &Value, depth: usize, debug: bool) {
                     }
                     Value::Null => {
                         let null_line_content = format!("{}: null", key);
-                        let null_padding = content_width - indent.len() - null_line_content.len();
+                        let null_padding =
+                            calculate_padding(&null_line_content, content_width - indent.len());
                         println!(
                             "{}{}: {}{}│",
                             indent,
@@ -596,7 +603,8 @@ fn print_params_boxed(value: &Value, depth: usize, debug: bool) {
         Value::String(s) => {
             if !debug && s.len() > get_tool_params_max_length() {
                 let redacted_content = format!("[REDACTED: {} chars]", s.len());
-                let redacted_padding = content_width - indent.len() - redacted_content.len();
+                let redacted_padding =
+                    calculate_padding(&redacted_content, content_width - indent.len());
                 println!(
                     "{}{}{}│",
                     indent,
@@ -605,9 +613,10 @@ fn print_params_boxed(value: &Value, depth: usize, debug: bool) {
                 );
             } else {
                 let string_content = s;
-                let string_padding = content_width - indent.len() - string_content.len();
+                let string_padding =
+                    calculate_padding(string_content, content_width - indent.len());
                 println!(
-                    "{}{}{} │",
+                    "{}{}{}│",
                     indent,
                     style(s).green(),
                     " ".repeat(string_padding)
@@ -772,7 +781,7 @@ pub fn display_session_info(
     // Content area is 77 chars wide
     let content_width = 77;
     let status_line_content = format!("{} {}", status_icon, status_text);
-    let status_padding = content_width - status_line_content.len();
+    let status_padding = calculate_padding(&status_line_content, content_width);
 
     println!(
         "│ {}{}│",
@@ -790,7 +799,7 @@ pub fn display_session_info(
                 "Provider: {} • Lead: {} • Worker: {}",
                 provider, lead_model, worker_model
             );
-            let provider_padding = content_width - provider_line_content.len();
+            let provider_padding = calculate_padding(&provider_line_content, content_width);
             println!(
                 "│ {} {} {} {}{}│",
                 style("Provider:").dim(),
@@ -801,7 +810,7 @@ pub fn display_session_info(
             );
         } else {
             let provider_line_content = format!("Provider: {} • {}", provider, model);
-            let provider_padding = content_width - provider_line_content.len();
+            let provider_padding = calculate_padding(&provider_line_content, content_width);
             println!(
                 "│ {} {} {} {}{}│",
                 style("Provider:").dim(),
@@ -814,7 +823,7 @@ pub fn display_session_info(
     } else {
         // Fallback to original behavior if no provider instance
         let provider_line_content = format!("Provider: {} • {}", provider, model);
-        let provider_padding = content_width - provider_line_content.len();
+        let provider_padding = calculate_padding(&provider_line_content, content_width);
         println!(
             "│ {} {} {} {}{}│",
             style("Provider:").dim(),
@@ -833,7 +842,7 @@ pub fn display_session_info(
             session_path.clone()
         };
         let session_line_content = format!("Session: {}", truncated_path);
-        let session_padding = content_width - session_line_content.len();
+        let session_padding = calculate_padding(&session_line_content, content_width);
         println!(
             "│ {} {}{}│",
             style("Session:").dim(),
@@ -849,7 +858,7 @@ pub fn display_session_info(
         working_dir.clone()
     };
     let directory_line_content = format!("Directory: {}", truncated_dir);
-    let directory_padding = content_width - directory_line_content.len();
+    let directory_padding = calculate_padding(&directory_line_content, content_width);
     println!(
         "│ {} {}{}│",
         style("Directory:").dim(),
@@ -875,7 +884,7 @@ pub fn display_greeting() {
     let content_width = 77;
 
     let line1_content = "🪿 Goose is ready to assist you!";
-    let line1_padding = content_width - line1_content.len();
+    let line1_padding = calculate_padding(line1_content, content_width);
     println!(
         "│ {}{}│",
         style(line1_content).bold(),
@@ -883,7 +892,7 @@ pub fn display_greeting() {
     );
 
     let line2_content = "💬 Enter your instructions or ask what I can do";
-    let line2_padding = content_width - line2_content.len();
+    let line2_padding = calculate_padding(line2_content, content_width);
     println!(
         "│ {}{}│",
         style(line2_content).dim(),
@@ -891,11 +900,10 @@ pub fn display_greeting() {
     );
 
     let line3_content = "ℹ️ Type /help for available commands";
-    let line3_padding = content_width - line3_content.len();
+    let line3_padding = calculate_padding(line3_content, content_width);
     println!(
-        "│ {} {}{}│",
-        style("ℹ️").dim(),
-        style("Type /help for available commands").dim(),
+        "│ {}{}│",
+        style(line3_content).dim(),
         " ".repeat(line3_padding)
     );
 
@@ -948,11 +956,7 @@ pub fn display_context_usage(total_tokens: usize, context_limit: usize) {
         formatted_total,
         formatted_limit
     );
-    let context_padding = if context_line_content.len() <= content_width {
-        content_width - context_line_content.len()
-    } else {
-        0
-    };
+    let context_padding = calculate_padding(&context_line_content, content_width);
 
     println!(
         "│ {} {}% │ {} / {} tokens {}│",
@@ -976,6 +980,28 @@ fn format_number(n: usize) -> String {
         result.push(c);
     }
     result.chars().rev().collect()
+}
+
+// Helper function to calculate display width accounting for Unicode characters
+fn display_width(s: &str) -> usize {
+    s.chars()
+        .map(|c| {
+            match c {
+                // Emojis and special Unicode chars take 2 display columns
+                '🪿' | '🔧' | '💬' | 'ℹ' | '️' | '↻' | '⚡' | '▶' | '🐛' | '🪱' | '🐍' => {
+                    2
+                }
+                // Most other characters take 1 column
+                _ => 1,
+            }
+        })
+        .sum()
+}
+
+// Helper function to calculate padding accounting for display width
+fn calculate_padding(content: &str, target_width: usize) -> usize {
+    let display_len = display_width(content);
+    target_width.saturating_sub(display_len)
 }
 
 pub struct McpSpinners {
