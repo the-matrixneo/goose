@@ -498,6 +498,7 @@ fn get_tool_params_max_length() -> usize {
 fn print_params_boxed(value: &Value, depth: usize, debug: bool) {
     let indent = "│ ";
     let content_width = 77;
+    let indent_width = display_width(indent);
 
     match value {
         Value::Object(map) => {
@@ -506,7 +507,7 @@ fn print_params_boxed(value: &Value, depth: usize, debug: bool) {
                     Value::Object(_) => {
                         let nested_line_content = format!("{}:", key);
                         let nested_padding =
-                            calculate_padding(&nested_line_content, content_width - indent.len());
+                            calculate_padding(&nested_line_content, content_width - indent_width);
                         println!(
                             "{}{}{}│",
                             indent,
@@ -518,7 +519,7 @@ fn print_params_boxed(value: &Value, depth: usize, debug: bool) {
                     Value::Array(arr) => {
                         let array_line_content = format!("{}:", key);
                         let array_padding =
-                            calculate_padding(&array_line_content, content_width - indent.len());
+                            calculate_padding(&array_line_content, content_width - indent_width);
                         println!(
                             "{}{}:{}│",
                             indent,
@@ -528,7 +529,7 @@ fn print_params_boxed(value: &Value, depth: usize, debug: bool) {
                         for item in arr.iter() {
                             let dash_line_content = "- ";
                             let dash_padding =
-                                calculate_padding(dash_line_content, content_width - indent.len());
+                                calculate_padding(dash_line_content, content_width - indent_width);
                             println!("{}- {}│", indent, " ".repeat(dash_padding));
                             print_params_boxed(item, depth + 2, debug);
                         }
@@ -538,7 +539,7 @@ fn print_params_boxed(value: &Value, depth: usize, debug: bool) {
                             let truncated_line_content = format!("{}: ...", key);
                             let truncated_padding = calculate_padding(
                                 &truncated_line_content,
-                                content_width - indent.len(),
+                                content_width - indent_width,
                             );
                             println!(
                                 "{}{}: {}{}│",
@@ -551,7 +552,7 @@ fn print_params_boxed(value: &Value, depth: usize, debug: bool) {
                             let string_line_content = format!("{}: {}", key, s);
                             let string_padding = calculate_padding(
                                 &string_line_content,
-                                content_width - indent.len(),
+                                content_width - indent_width,
                             );
                             println!(
                                 "{}{}: {}{}│",
@@ -565,7 +566,7 @@ fn print_params_boxed(value: &Value, depth: usize, debug: bool) {
                     Value::Number(n) => {
                         let number_line_content = format!("{}: {}", key, n);
                         let number_padding =
-                            calculate_padding(&number_line_content, content_width - indent.len());
+                            calculate_padding(&number_line_content, content_width - indent_width);
                         println!(
                             "{}{}: {}{}│",
                             indent,
@@ -577,7 +578,7 @@ fn print_params_boxed(value: &Value, depth: usize, debug: bool) {
                     Value::Bool(b) => {
                         let bool_line_content = format!("{}: {}", key, b);
                         let bool_padding =
-                            calculate_padding(&bool_line_content, content_width - indent.len());
+                            calculate_padding(&bool_line_content, content_width - indent_width);
                         println!(
                             "{}{}: {}{}│",
                             indent,
@@ -589,7 +590,7 @@ fn print_params_boxed(value: &Value, depth: usize, debug: bool) {
                     Value::Null => {
                         let null_line_content = format!("{}: null", key);
                         let null_padding =
-                            calculate_padding(&null_line_content, content_width - indent.len());
+                            calculate_padding(&null_line_content, content_width - indent_width);
                         println!(
                             "{}{}: {}{}│",
                             indent,
@@ -605,7 +606,7 @@ fn print_params_boxed(value: &Value, depth: usize, debug: bool) {
             if !debug && s.len() > get_tool_params_max_length() {
                 let redacted_content = format!("[REDACTED: {} chars]", s.len());
                 let redacted_padding =
-                    calculate_padding(&redacted_content, content_width - indent.len());
+                    calculate_padding(&redacted_content, content_width - indent_width);
                 println!(
                     "{}{}{}│",
                     indent,
@@ -615,7 +616,7 @@ fn print_params_boxed(value: &Value, depth: usize, debug: bool) {
             } else {
                 let string_content = s;
                 let string_padding =
-                    calculate_padding(string_content, content_width - indent.len());
+                    calculate_padding(string_content, content_width - indent_width);
                 println!(
                     "{}{}{}│",
                     indent,
