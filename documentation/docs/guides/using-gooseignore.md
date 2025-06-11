@@ -47,75 +47,48 @@ downloads/           # Ignore everything in the "downloads" directory
 !error.log           # Except for error.log file
 ```
 
-## How Goose Chooses Which Files to Ignore
-
+## How Ignore Files Work
 Goose uses a priority system to determine which files should be ignored. Here's how it works, from highest to lowest priority:
 
-1. **Global `.gooseignore`** (`~/.config/goose/.gooseignore`)
-   - Always applied first
-   - Affects all projects on your machine
-   - Perfect for personal preferences or system-wide restrictions
+#### 1. Global `.gooseignore`
+- Highest priority and always applied first
+- Located at `~/.config/goose/.gooseignore`
+- Affects all projects on your machine
 
-2. **Local `.gooseignore`** (in your project directory)
-   - Project-specific rules
-   - Overrides `.gitignore` completely
-   - Use this when you want different rules than Git
+```
+~/.config/goose/
+└── .gooseignore      ← Applied to all projects
+```
 
-3. **Local `.gitignore`** (in your project directory)
-   - Only used if no local `.gooseignore` exists
-   - Convenient for existing projects
-   - Goose will respect the same files Git ignores
+#### 2. Local `.gooseignore`
+- Project-specific rules
+- Located in your project root directory
+- Overrides `.gitignore` completely
 
-4. **Default Patterns**
-   - Used when no other ignore files are found
-   - Protects common sensitive files
+```
+Project/
+├── .gooseignore      ← Used by Goose
+├── .gitignore        ← Ignored when .gooseignore exists
+└── src/
+```
 
-### Examples of How Priority Works
+#### 3. `.gitignore` Fallback
+- Used when no local `.gooseignore` exists
+- Goose automatically uses your Git ignore rules
 
-1. **Most Common Setup** (using existing Git project):
-   ```
-   Project/
-   ├── .gitignore        ← Goose uses this automatically
-   ├── src/
-   └── ...
-   ```
+```
+Project/
+├── .gitignore        ← Used by Goose
+└── src/
+```
 
-2. **Custom Project Rules** (overriding Git's ignore rules):
-   ```
-   Project/
-   ├── .gitignore        ← Ignored by Goose
-   ├── .gooseignore      ← Takes precedence
-   ├── src/
-   └── ...
-   ```
-
-3. **Maximum Protection** (using both global and local rules):
-   ```
-   ~/.config/goose/
-   └── .gooseignore      ← Applied first (global rules)
-   
-   Project/
-   ├── .gooseignore      ← Applied second (local rules)
-   ├── .gitignore        ← Ignored by Goose
-   ├── src/
-   └── ...
-   ```
-
-:::tip
-If you're working on an existing project that uses Git, you probably don't need to create a `.gooseignore` file - Goose will automatically use your `.gitignore` rules!
-:::
-
-## Default patterns
-
-By default, if you haven't created any `.gooseignore` files **and no `.gitignore` file exists**, Goose will not modify files matching these patterns:
-
+#### 4. Default Patterns
+By default, if you haven't created any .gooseignore files and no .gitignore file exists, Goose will not modify files matching these patterns:
 ```plaintext
 **/.env
 **/.env.*
 **/secrets.*
 ```
-
-These default patterns only apply when neither `.gooseignore` nor `.gitignore` files are found in your project.
 
 ## Common use cases
 
