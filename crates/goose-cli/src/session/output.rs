@@ -8,9 +8,9 @@ use mcp_core::tool::ToolCall;
 use serde_json::Value;
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::io::Error;
+use std::io::{self, Error, Write};
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{atomic, Arc};
 use std::time::Duration;
 
 // Re-export theme for use in main
@@ -77,19 +77,55 @@ pub fn get_theme() -> Theme {
 #[derive(Default)]
 pub struct ThinkingIndicator {
     spinner: Option<cliclack::ProgressBar>,
+    worm_thread: Option<std::thread::JoinHandle<()>>,
+    should_stop: Option<Arc<atomic::AtomicBool>>,
 }
 
 impl ThinkingIndicator {
     pub fn show(&mut self) {
-        let spinner = cliclack::spinner();
-        spinner.start(format!(
-            "{}...",
-            super::thinking::get_random_thinking_message()
-        ));
-        self.spinner = Some(spinner);
+        // Start the animated worm progress indicator
+        let should_stop = Arc::new(atomic::AtomicBool::new(false));
+        self.should_stop = Some(should_stop.clone());
+
+        let worm_thread = std::thread::spawn(move || {
+            let worm_chars = ["🐛", "🪱", "🐍", "🪱"];
+            let mut frame = 0;
+
+            while !should_stop.load(atomic::Ordering::Relaxed) {
+                // Clear the line and show the worm
+                print!(
+                    "\r{} {} Thinking...",
+                    style("🪿").bold(),
+                    style(worm_chars[frame % worm_chars.len()]).green().bold()
+                );
+                io::stdout().flush().unwrap_or(());
+
+                frame += 1;
+                std::thread::sleep(std::time::Duration::from_millis(300));
+            }
+
+            // Clear the line when done
+            print!("\r{}", " ".repeat(50));
+            print!("\r");
+            io::stdout().flush().unwrap_or(());
+        });
+
+        self.worm_thread = Some(worm_thread);
     }
 
     pub fn hide(&mut self) {
+        // Stop the worm animation
+        if let Some(should_stop) = &self.should_stop {
+            should_stop.store(true, atomic::Ordering::Relaxed);
+        }
+
+        if let Some(thread) = self.worm_thread.take() {
+            let _ = thread.join();
+        }
+
+        self.should_stop = None;
+
+        // Also handle the old spinner if it exists
         if let Some(spinner) = self.spinner.take() {
             spinner.stop("");
         }
@@ -344,12 +380,17 @@ pub fn render_builtin_error(names: &str, error: &str) {
 fn render_text_editor_request(call: &ToolCall, debug: bool) {
     print_tool_header(call);
 
+    let content_width = 77;
+
     // Print path first with special formatting
     if let Some(Value::String(path)) = call.arguments.get("path") {
+        let path_line_content = format!("path: {}", shorten_path(path, debug));
+        let path_padding = content_width - path_line_content.len();
         println!(
-            "{}: {}",
+            "│ {}: {}{}│",
             style("path").dim(),
-            style(shorten_path(path, debug)).green()
+            style(shorten_path(path, debug)).green(),
+            " ".repeat(path_padding)
         );
     }
 
@@ -361,25 +402,38 @@ fn render_text_editor_request(call: &ToolCall, debug: bool) {
                 other_args.insert(k.clone(), v.clone());
             }
         }
-        print_params(&Value::Object(other_args), 0, debug);
+        print_params_boxed(&Value::Object(other_args), 0, debug);
     }
+    println!("╰─────────────────────────────────────────────────────────────────────────────╯");
     println!();
 }
 
 fn render_shell_request(call: &ToolCall, debug: bool) {
     print_tool_header(call);
 
+    let content_width = 77;
+
     match call.arguments.get("command") {
         Some(Value::String(s)) => {
-            println!("{}: {}", style("command").dim(), style(s).green());
+            let command_line_content = format!("command: {}", s);
+            let command_padding = content_width - command_line_content.len();
+            println!(
+                "│ {}: {}{}│",
+                style("command").dim(),
+                style(s).green(),
+                " ".repeat(command_padding)
+            );
         }
-        _ => print_params(&call.arguments, 0, debug),
+        _ => print_params_boxed(&call.arguments, 0, debug),
     }
+    println!("╰─────────────────────────────────────────────────────────────────────────────╯");
+    println!();
 }
 
 fn render_default_request(call: &ToolCall, debug: bool) {
     print_tool_header(call);
-    print_params(&call.arguments, 0, debug);
+    print_params_boxed(&call.arguments, 0, debug);
+    println!("╰─────────────────────────────────────────────────────────────────────────────╯");
     println!();
 }
 
@@ -387,20 +441,31 @@ fn render_default_request(call: &ToolCall, debug: bool) {
 
 fn print_tool_header(call: &ToolCall) {
     let parts: Vec<_> = call.name.rsplit("__").collect();
-    let tool_header = format!(
-        "─── {} | {} ──────────────────────────",
-        style(parts.first().unwrap_or(&"unknown")),
-        style(
-            parts
-                .split_first()
-                .map(|(_, s)| s.iter().rev().copied().collect::<Vec<_>>().join("__"))
-                .unwrap_or_else(|| "unknown".to_string())
-        )
-        .magenta()
-        .dim(),
-    );
+    let extension_name = parts.first().unwrap_or(&"unknown");
+    let tool_name = parts
+        .split_first()
+        .map(|(_, s)| s.iter().rev().copied().collect::<Vec<_>>().join("__"))
+        .unwrap_or_else(|| "unknown".to_string());
+
     println!();
-    println!("{}", tool_header);
+    println!(
+        "╭─ {} ─────────────────────────────────────────────────────────────────────────╮",
+        style("Tool Call").bold()
+    );
+
+    let content_width = 77;
+    let header_line_content = format!("🔧 {} → {}", extension_name, tool_name);
+    let header_padding = content_width - header_line_content.len();
+
+    println!(
+        "│ {} {} {} {}{}│",
+        style("🔧").bold(),
+        style(extension_name).magenta().bold(),
+        style("→").dim(),
+        style(&tool_name).cyan().bold(),
+        " ".repeat(header_padding)
+    );
+    println!("├─────────────────────────────────────────────────────────────────────────────┤");
 }
 
 // Respect NO_COLOR, as https://crates.io/crates/console already does
@@ -427,6 +492,133 @@ fn get_tool_params_max_length() -> usize {
         .get_param::<usize>("GOOSE_CLI_TOOL_PARAMS_TRUNCATION_MAX_LENGTH")
         .ok()
         .unwrap_or(40)
+}
+
+fn print_params_boxed(value: &Value, depth: usize, debug: bool) {
+    let indent = "│ ";
+    let content_width = 77;
+
+    match value {
+        Value::Object(map) => {
+            for (key, val) in map {
+                match val {
+                    Value::Object(_) => {
+                        let nested_line_content = format!("{}:", key);
+                        let nested_padding =
+                            content_width - indent.len() - nested_line_content.len();
+                        println!(
+                            "{}{}{}│",
+                            indent,
+                            style(key).dim(),
+                            " ".repeat(nested_padding)
+                        );
+                        print_params_boxed(val, depth + 1, debug);
+                    }
+                    Value::Array(arr) => {
+                        let array_line_content = format!("{}:", key);
+                        let array_padding = content_width - indent.len() - array_line_content.len();
+                        println!(
+                            "{}{}:{}│",
+                            indent,
+                            style(key).dim(),
+                            " ".repeat(array_padding)
+                        );
+                        for item in arr.iter() {
+                            let dash_line_content = "- ";
+                            let dash_padding =
+                                content_width - indent.len() - dash_line_content.len();
+                            println!("{}- {}│", indent, " ".repeat(dash_padding));
+                            print_params_boxed(item, depth + 2, debug);
+                        }
+                    }
+                    Value::String(s) => {
+                        if !debug && s.len() > get_tool_params_max_length() {
+                            let truncated_line_content = format!("{}: ...", key);
+                            let truncated_padding =
+                                content_width - indent.len() - truncated_line_content.len();
+                            println!(
+                                "{}{}: {}{}│",
+                                indent,
+                                style(key).dim(),
+                                style("...").dim(),
+                                " ".repeat(truncated_padding)
+                            );
+                        } else {
+                            let string_line_content = format!("{}: {}", key, s);
+                            let string_padding =
+                                content_width - indent.len() - string_line_content.len();
+                            println!(
+                                "{}{}: {}{}│",
+                                indent,
+                                style(key).dim(),
+                                style(s).green(),
+                                " ".repeat(string_padding)
+                            );
+                        }
+                    }
+                    Value::Number(n) => {
+                        let number_line_content = format!("{}: {}", key, n);
+                        let number_padding =
+                            content_width - indent.len() - number_line_content.len();
+                        println!(
+                            "{}{}: {}{}│",
+                            indent,
+                            style(key).dim(),
+                            style(n).blue(),
+                            " ".repeat(number_padding)
+                        );
+                    }
+                    Value::Bool(b) => {
+                        let bool_line_content = format!("{}: {}", key, b);
+                        let bool_padding = content_width - indent.len() - bool_line_content.len();
+                        println!(
+                            "{}{}: {}{}│",
+                            indent,
+                            style(key).dim(),
+                            style(b).blue(),
+                            " ".repeat(bool_padding)
+                        );
+                    }
+                    Value::Null => {
+                        let null_line_content = format!("{}: null", key);
+                        let null_padding = content_width - indent.len() - null_line_content.len();
+                        println!(
+                            "{}{}: {}{}│",
+                            indent,
+                            style(key).dim(),
+                            style("null").dim(),
+                            " ".repeat(null_padding)
+                        );
+                    }
+                }
+            }
+        }
+        Value::String(s) => {
+            if !debug && s.len() > get_tool_params_max_length() {
+                let redacted_content = format!("[REDACTED: {} chars]", s.len());
+                let redacted_padding = content_width - indent.len() - redacted_content.len();
+                println!(
+                    "{}{}{}│",
+                    indent,
+                    style(redacted_content).yellow(),
+                    " ".repeat(redacted_padding)
+                );
+            } else {
+                let string_content = s;
+                let string_padding = content_width - indent.len() - string_content.len();
+                println!(
+                    "{}{}{} │",
+                    indent,
+                    style(s).green(),
+                    " ".repeat(string_padding)
+                );
+            }
+        }
+        _ => {
+            // Handle other value types similarly to the original print_params
+            print_params(value, depth, debug);
+        }
+    }
 }
 
 fn print_params(value: &Value, depth: usize, debug: bool) {
@@ -552,69 +744,167 @@ pub fn display_session_info(
     session_file: &Path,
     provider_instance: Option<&Arc<dyn goose::providers::base::Provider>>,
 ) {
-    let start_session_msg = if resume {
-        "resuming session |"
+    // Create a modern header with better visual separation
+    println!();
+    println!(
+        "{}",
+        style("┌─ Goose Session ─────────────────────────────────────────────────────────────┐")
+            .dim()
+    );
+
+    let status_icon = if resume {
+        "↻"
     } else if session_file.to_str() == Some("/dev/null") || session_file.to_str() == Some("NUL") {
-        "running without session |"
+        "⚡"
     } else {
-        "starting session |"
+        "▶"
     };
+
+    let status_text = if resume {
+        "Resuming session"
+    } else if session_file.to_str() == Some("/dev/null") || session_file.to_str() == Some("NUL") {
+        "Running without session"
+    } else {
+        "Starting new session"
+    };
+
+    // Box width is 79 chars (77 content + 2 for │ chars)
+    // Content area is 77 chars wide
+    let content_width = 77;
+    let status_line_content = format!("{} {}", status_icon, status_text);
+    let status_padding = content_width - status_line_content.len();
+
+    println!(
+        "│ {}{}│",
+        style(format!("{} {}", status_icon, status_text))
+            .green()
+            .bold(),
+        " ".repeat(status_padding)
+    );
 
     // Check if we have lead/worker mode
     if let Some(provider_inst) = provider_instance {
         if let Some(lead_worker) = provider_inst.as_lead_worker() {
             let (lead_model, worker_model) = lead_worker.get_model_info();
+            let provider_line_content = format!(
+                "Provider: {} • Lead: {} • Worker: {}",
+                provider, lead_model, worker_model
+            );
+            let provider_padding = content_width - provider_line_content.len();
             println!(
-                "{} {} {} {} {} {} {}",
-                style(start_session_msg).dim(),
-                style("provider:").dim(),
-                style(provider).cyan().dim(),
-                style("lead model:").dim(),
-                style(&lead_model).cyan().dim(),
-                style("worker model:").dim(),
-                style(&worker_model).cyan().dim(),
+                "│ {} {} {} {}{}│",
+                style("Provider:").dim(),
+                style(provider).cyan(),
+                style("•").dim(),
+                style(format!("Lead: {} • Worker: {}", lead_model, worker_model)).cyan(),
+                " ".repeat(provider_padding)
             );
         } else {
+            let provider_line_content = format!("Provider: {} • {}", provider, model);
+            let provider_padding = content_width - provider_line_content.len();
             println!(
-                "{} {} {} {} {}",
-                style(start_session_msg).dim(),
-                style("provider:").dim(),
-                style(provider).cyan().dim(),
-                style("model:").dim(),
-                style(model).cyan().dim(),
+                "│ {} {} {} {}{}│",
+                style("Provider:").dim(),
+                style(provider).cyan(),
+                style("•").dim(),
+                style(model).cyan(),
+                " ".repeat(provider_padding)
             );
         }
     } else {
         // Fallback to original behavior if no provider instance
+        let provider_line_content = format!("Provider: {} • {}", provider, model);
+        let provider_padding = content_width - provider_line_content.len();
         println!(
-            "{} {} {} {} {}",
-            style(start_session_msg).dim(),
-            style("provider:").dim(),
-            style(provider).cyan().dim(),
-            style("model:").dim(),
-            style(model).cyan().dim(),
+            "│ {} {} {} {}{}│",
+            style("Provider:").dim(),
+            style(provider).cyan(),
+            style("•").dim(),
+            style(model).cyan(),
+            " ".repeat(provider_padding)
         );
     }
 
     if session_file.to_str() != Some("/dev/null") && session_file.to_str() != Some("NUL") {
+        let session_path = session_file.display().to_string();
+        let truncated_path = if session_path.len() > 60 {
+            format!("...{}", &session_path[session_path.len() - 57..])
+        } else {
+            session_path.clone()
+        };
+        let session_line_content = format!("Session: {}", truncated_path);
+        let session_padding = content_width - session_line_content.len();
         println!(
-            "    {} {}",
-            style("logging to").dim(),
-            style(session_file.display()).dim().cyan(),
+            "│ {} {}{}│",
+            style("Session:").dim(),
+            style(&truncated_path).cyan().dim(),
+            " ".repeat(session_padding)
         );
     }
 
+    let working_dir = std::env::current_dir().unwrap().display().to_string();
+    let truncated_dir = if working_dir.len() > 60 {
+        format!("...{}", &working_dir[working_dir.len() - 57..])
+    } else {
+        working_dir.clone()
+    };
+    let directory_line_content = format!("Directory: {}", truncated_dir);
+    let directory_padding = content_width - directory_line_content.len();
     println!(
-        "    {} {}",
-        style("working directory:").dim(),
-        style(std::env::current_dir().unwrap().display())
-            .cyan()
+        "│ {} {}{}│",
+        style("Directory:").dim(),
+        style(&truncated_dir).cyan().dim(),
+        " ".repeat(directory_padding)
+    );
+
+    println!(
+        "{}",
+        style("└─────────────────────────────────────────────────────────────────────────────┘")
             .dim()
     );
+    println!();
 }
 
 pub fn display_greeting() {
-    println!("\nGoose is running! Enter your instructions, or try asking what goose can do.\n");
+    println!(
+        "{}",
+        style("┌─ Ready to Help ─────────────────────────────────────────────────────────────┐")
+            .dim()
+    );
+
+    let content_width = 77;
+
+    let line1_content = "🪿 Goose is ready to assist you!";
+    let line1_padding = content_width - line1_content.len();
+    println!(
+        "│ {}{}│",
+        style(line1_content).bold(),
+        " ".repeat(line1_padding)
+    );
+
+    let line2_content = "💬 Enter your instructions or ask what I can do";
+    let line2_padding = content_width - line2_content.len();
+    println!(
+        "│ {}{}│",
+        style(line2_content).dim(),
+        " ".repeat(line2_padding)
+    );
+
+    let line3_content = "ℹ️ Type /help for available commands";
+    let line3_padding = content_width - line3_content.len();
+    println!(
+        "│ {} {}{}│",
+        style("ℹ️").dim(),
+        style("Type /help for available commands").dim(),
+        " ".repeat(line3_padding)
+    );
+
+    println!(
+        "{}",
+        style("└─────────────────────────────────────────────────────────────────────────────┘")
+            .dim()
+    );
+    println!();
 }
 
 /// Display context window usage with both current and session totals
@@ -624,29 +914,68 @@ pub fn display_context_usage(total_tokens: usize, context_limit: usize) {
     // Calculate percentage used
     let percentage = (total_tokens as f64 / context_limit as f64 * 100.0).round() as usize;
 
-    // Create dot visualization
-    let dot_count = 10;
-    let filled_dots = ((percentage as f64 / 100.0) * dot_count as f64).round() as usize;
-    let empty_dots = dot_count - filled_dots;
+    // Create a modern progress bar
+    let bar_width = 20;
+    let filled_width = ((percentage as f64 / 100.0) * bar_width as f64).round() as usize;
+    let empty_width = bar_width - filled_width;
 
-    let filled = "●".repeat(filled_dots);
-    let empty = "○".repeat(empty_dots);
+    let filled = "█".repeat(filled_width);
+    let empty = "░".repeat(empty_width);
 
-    // Combine dots and apply color
-    let dots = format!("{}{}", filled, empty);
-    let colored_dots = if percentage < 50 {
-        style(dots).green()
+    // Combine bars and apply color
+    let bar = format!("{}{}", filled, empty);
+    let colored_bar = if percentage < 50 {
+        style(bar).green()
     } else if percentage < 85 {
-        style(dots).yellow()
+        style(bar).yellow()
     } else {
-        style(dots).red()
+        style(bar).red()
     };
 
-    // Print the status line
-    println!(
-        "Context: {} {}% ({}/{} tokens)",
-        colored_dots, percentage, total_tokens, context_limit
+    // Format numbers with thousands separators
+    let formatted_total = format_number(total_tokens);
+    let formatted_limit = format_number(context_limit);
+
+    // Print the modern status line
+    println!("╭─ Context Usage ─────────────────────────────────────────────────────────────╮");
+
+    let content_width = 77;
+    // Calculate the content length without styling for accurate padding
+    let context_line_content = format!(
+        "{} {:3}% │ {} / {} tokens",
+        "█".repeat(bar_width), // Use a consistent character for length calculation
+        percentage,
+        formatted_total,
+        formatted_limit
     );
+    let context_padding = if context_line_content.len() <= content_width {
+        content_width - context_line_content.len()
+    } else {
+        0
+    };
+
+    println!(
+        "│ {} {}% │ {} / {} tokens {}│",
+        colored_bar,
+        style(format!("{:3}", percentage)).bold(),
+        style(&formatted_total).cyan(),
+        style(&formatted_limit).dim(),
+        " ".repeat(context_padding)
+    );
+    println!("╰─────────────────────────────────────────────────────────────────────────────╯");
+}
+
+// Helper function to format numbers with thousands separators
+fn format_number(n: usize) -> String {
+    let s = n.to_string();
+    let mut result = String::new();
+    for (i, c) in s.chars().rev().enumerate() {
+        if i > 0 && i % 3 == 0 {
+            result.push(',');
+        }
+        result.push(c);
+    }
+    result.chars().rev().collect()
 }
 
 pub struct McpSpinners {
