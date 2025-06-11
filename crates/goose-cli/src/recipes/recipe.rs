@@ -1,12 +1,14 @@
 use anyhow::Result;
 use console::style;
+use goose::agents::extension::Envs;
+use goose::config::ExtensionConfig;
 
 use crate::recipes::print_recipe::{
     missing_parameters_command_line, print_parameters_with_values, print_recipe_explanation,
     print_required_parameters_for_template,
 };
 use crate::recipes::search_recipe::retrieve_recipe_file;
-use goose::recipe::{Recipe, RecipeParameter, RecipeParameterRequirement};
+use goose::recipe::{Recipe, RecipeParameter, RecipeParameterRequirement, SubRecipe};
 use minijinja::{Environment, Error, Template, UndefinedBehavior};
 use serde_json::Value as JsonValue;
 use serde_yaml::Value as YamlValue;
@@ -258,6 +260,24 @@ fn render_content_with_params(content: &str, params: &HashMap<String, String>) -
             e.to_string()
         )
     })
+}
+
+pub fn subrecipe_extension(subrecipes: &Vec<SubRecipe>) -> ExtensionConfig {
+    let json = serde_json::to_string(subrecipes).expect("Failed to serialize subrecipes");
+    ExtensionConfig::Stdio {
+        name: String::from("subrecipes"),
+        cmd: String::from("uvx"),
+        args: vec![
+            String::from("subrecipes-mcp"),
+            String::from("--subrecipes-json"),
+            json,
+        ],
+        envs: Envs::default(),
+        timeout: None,
+        env_keys: vec![],
+        description: Some(String::from("Execute sub-recipes using the provided tools")),
+        bundled: None,
+    }
 }
 
 #[cfg(test)]
