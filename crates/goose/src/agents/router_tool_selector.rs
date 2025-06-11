@@ -16,7 +16,6 @@ use crate::message::Message;
 use crate::model::ModelConfig;
 use crate::providers::{self, base::Provider};
 
-
 #[derive(Debug, Clone, PartialEq)]
 pub enum RouterToolSelectionStrategy {
     Vector,
