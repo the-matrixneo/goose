@@ -47,10 +47,10 @@ downloads/           # Ignore everything in the "downloads" directory
 !error.log           # Except for error.log file
 ```
 
-## How Ignore Files Work
-Goose uses a priority system to determine which files should be ignored. Here's how it works, from highest to lowest priority:
+## Ignore File Types and Priority
+Goose respects ignore rules from three sources: global `.gooseignore`, local `.gooseignore`, and `.gitignore`. It uses a priority system to determine which files should be ignored. 
 
-#### 1. Global `.gooseignore`
+### 1. Global `.gooseignore`
 - Highest priority and always applied first
 - Located at `~/.config/goose/.gooseignore`
 - Affects all projects on your machine
@@ -60,19 +60,22 @@ Goose uses a priority system to determine which files should be ignored. Here's 
 └── .gooseignore      ← Applied to all projects
 ```
 
-#### 2. Local `.gooseignore`
+### 2. Local `.gooseignore`
 - Project-specific rules
 - Located in your project root directory
 - Overrides `.gitignore` completely
 
 ```
+~/.config/goose/
+└── .gooseignore      ← Global rules applied first
+
 Project/
-├── .gooseignore      ← Used by Goose
+├── .gooseignore      ← Local rules applied second
 ├── .gitignore        ← Ignored when .gooseignore exists
 └── src/
 ```
 
-#### 3. `.gitignore` Fallback
+### 3. `.gitignore` Fallback
 - Used when no local `.gooseignore` exists
 - Goose automatically uses your Git ignore rules
 
@@ -82,7 +85,7 @@ Project/
 └── src/
 ```
 
-#### 4. Default Patterns
+### 4. Default Patterns
 By default, if you haven't created any .gooseignore files and no .gitignore file exists, Goose will not modify files matching these patterns:
 ```plaintext
 **/.env
