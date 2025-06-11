@@ -256,7 +256,6 @@ impl RouterToolSelector for LLMToolSelector {
                 .await
                 .map_err(|e| ToolError::ExecutionError(format!("Failed to search tools: {}", e)))?;
 
-            println!("response: {:?}", response);
             // Extract just the message content from the response
             let (message, _usage) = response;
             let text = message.content[0].as_text().unwrap_or_default();
