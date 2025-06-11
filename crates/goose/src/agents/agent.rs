@@ -456,7 +456,7 @@ impl Agent {
             Some(RouterToolSelectionStrategy::Vector) => {
                 prefixed_tools.push(router_tools::vector_search_tool());
             }
-            Some(RouterToolSelectionStrategy::LLM) => {
+            Some(RouterToolSelectionStrategy::Llm) => {
                 prefixed_tools.push(router_tools::llm_search_tool());
             }
             None => {}
@@ -784,7 +784,7 @@ impl Agent {
 
         let strategy = match router_tool_selection_strategy.to_lowercase().as_str() {
             "vector" => Some(RouterToolSelectionStrategy::Vector),
-            "llm" => Some(RouterToolSelectionStrategy::LLM),
+            "llm" => Some(RouterToolSelectionStrategy::Llm),
             _ => None,
         };
 
@@ -796,7 +796,7 @@ impl Agent {
                     .map_err(|e| anyhow!("Failed to create tool selector: {}", e))?;
                 Arc::new(selector)
             }
-            Some(RouterToolSelectionStrategy::LLM) => {
+            Some(RouterToolSelectionStrategy::Llm) => {
                 let selector = create_tool_selector(strategy, provider, None)
                     .await
                     .map_err(|e| anyhow!("Failed to create tool selector: {}", e))?;

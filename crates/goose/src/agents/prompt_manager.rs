@@ -92,7 +92,7 @@ impl PromptManager {
                     Value::String(vector_search_tool_prompt()),
                 );
             }
-            Some(RouterToolSelectionStrategy::LLM) => {
+            Some(RouterToolSelectionStrategy::Llm) => {
                 context.insert(
                     "tool_selection_strategy",
                     Value::String(llm_search_tool_prompt()),

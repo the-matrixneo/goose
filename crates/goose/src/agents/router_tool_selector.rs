@@ -19,7 +19,7 @@ use crate::providers::{self, base::Provider};
 #[derive(Debug, Clone, PartialEq)]
 pub enum RouterToolSelectionStrategy {
     Vector,
-    LLM,
+    Llm,
 }
 
 #[async_trait]
@@ -325,7 +325,7 @@ impl RouterToolSelector for LLMToolSelector {
     }
 
     fn selector_type(&self) -> RouterToolSelectionStrategy {
-        RouterToolSelectionStrategy::LLM
+        RouterToolSelectionStrategy::Llm
     }
 }
 
@@ -340,7 +340,7 @@ pub async fn create_tool_selector(
             let selector = VectorToolSelector::new(provider, table_name.unwrap()).await?;
             Ok(Box::new(selector))
         }
-        Some(RouterToolSelectionStrategy::LLM) => {
+        Some(RouterToolSelectionStrategy::Llm) => {
             let selector = LLMToolSelector::new(provider).await?;
             Ok(Box::new(selector))
         }

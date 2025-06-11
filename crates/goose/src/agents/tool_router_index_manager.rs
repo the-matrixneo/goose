@@ -97,11 +97,8 @@ impl ToolRouterIndexManager {
 
     /// Helper to check if vector or llm tool router is enabled
     pub fn is_tool_router_enabled(selector: &Option<Arc<Box<dyn RouterToolSelector>>>) -> bool {
-        if let Some(selector) = selector {
-            selector.selector_type() == RouterToolSelectionStrategy::Vector
-                || selector.selector_type() == RouterToolSelectionStrategy::LLM
-        } else {
-            false
-        }
+        selector.is_some()
+            && (selector.as_ref().unwrap().selector_type() == RouterToolSelectionStrategy::Vector
+                || selector.as_ref().unwrap().selector_type() == RouterToolSelectionStrategy::Llm)
     }
 }
