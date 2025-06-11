@@ -5,6 +5,8 @@ use crate::eval_suites::{EvaluationSuite, ExtensionRequirements};
 use crate::reporting::EvaluationResult;
 use crate::utilities::await_process_exits;
 use anyhow::{bail, Context, Result};
+use polars::prelude::{CsvReadOptions, CsvWriter, DataFrame, LazyFrame, SerReader, SerWriter, Series};
+use rayon::prelude::IntoParallelRefIterator;
 use std::env;
 use std::fs;
 use std::future::Future;
@@ -55,20 +57,83 @@ impl EvalRunner {
         Ok(work_dir)
     }
 
-    pub async fn run<F, Fut>(&mut self, agent_generator: F) -> Result<()>
+    pub async fn run_dataset<F, Fut>(&mut self, agent_generator: F) -> Result<()>
     where
-        F: Fn(ExtensionRequirements, String) -> Fut,
-        Fut: Future<Output = BenchAgent> + Send,
+        F: Fn(ExtensionRequirements, String, bool) -> Fut,
+        Fut: Future<Output=BenchAgent> + Send,
     {
-        let mut work_dir = self
-            .create_work_dir(&self.config)
-            .context("Failed to create evaluation work directory")?;
-
         let bench_eval = self
             .config
             .evals
             .first()
             .context("No evaluations specified in configuration")?;
+
+
+        let df = CsvReadOptions::default()
+            .try_into_reader_with_file_path(bench_eval.dataset_path)
+            .unwrap()
+            .finish()
+            .unwrap();
+
+        let rows: Vec<Series> = df.iter()
+            .cloned()
+            .collect();
+
+        let processed: Vec<Series> = rows.par_iter()
+            .map(async |row| {
+                //  new agent and
+                let now_stamp = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .context("Failed to get current timestamp")?
+                    .as_nanos();
+                let ext_reqs = ExtensionRequirements {
+                    builtin: Vec::new(),
+                    external: Vec::new(),
+                    remote: Vec::new(),
+                };
+                let session_id = format!("{}-{}", bench_eval.selector.clone(), now_stamp);
+                let mut agent = agent_generator(ext_reqs,
+                                                session_id,
+                                                true).await;
+                let override_prompt = row.get("sys")?;
+                agent.session.override_system_prompt(override_prompt).await;
+                
+                // process
+                let prompt = row.get("query")?;
+                let resp = agent.prompt(prompt).await;
+                resp
+            })
+            .collect();
+
+        //  write new dataset
+        let new_df = DataFrame::new(processed)?;
+
+        let mut file = std::fs::File::create("results.csv").unwrap();
+        CsvWriter::new(&mut file).finish(&mut new_df).unwrap();
+
+        tracing::info!("Evaluation completed successfully");
+
+        Ok(())
+    }
+
+    pub async fn run<F, Fut>(&mut self, agent_generator: F) -> Result<()>
+    where
+        F: Fn(ExtensionRequirements, String, bool) -> Fut,
+        Fut: Future<Output=BenchAgent> + Send,
+    {
+        let bench_eval = self
+            .config
+            .evals
+            .first()
+            .context("No evaluations specified in configuration")?;
+
+        if bench_eval.dataset_path.is_some() {
+            return self.run_dataset(agent_generator).await;
+        }
+
+        let mut work_dir = self
+            .create_work_dir(&self.config)
+            .context("Failed to create evaluation work directory")?;
 
         let run_id = &self
             .config
@@ -88,7 +153,9 @@ impl EvalRunner {
                 .as_nanos();
 
             let session_id = format!("{}-{}", bench_eval.selector.clone(), now_stamp);
-            let mut agent = agent_generator(eval.required_extensions(), session_id).await;
+            let mut agent = agent_generator(eval.required_extensions(),
+                                            session_id,
+                                            false).await;
             tracing::info!("Agent created for {}", eval.name());
 
             let mut result = EvaluationResult::new(eval.name().to_string());

@@ -17,8 +17,17 @@ pub struct BenchModel {
     pub parallel_safe: bool,
     pub tool_shim: Option<BenchToolShimOpt>,
 }
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct BenchEnvVar {
+    pub name: String,
+    pub value: String,
+}
+
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct BenchEval {
+    pub env: Vec<BenchEnvVar>,
+    pub dataset_path: Option<PathBuf>,
     pub selector: String,
     pub post_process_cmd: Option<PathBuf>,
     pub parallel_safe: bool,
@@ -57,6 +66,8 @@ impl Default for BenchRunConfig {
                 },
             ],
             evals: vec![BenchEval {
+                env: vec![],
+                dataset_path: None,
                 selector: "core".into(),
                 post_process_cmd: None,
                 parallel_safe: true, // Default to true
