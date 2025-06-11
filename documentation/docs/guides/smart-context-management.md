@@ -141,9 +141,11 @@ Key information has been preserved while reducing context length.
 </Tabs>
 
 ### Token usage
+Goose Desktop and Goose CLI display token usage after sending your first message.
+
 <Tabs>
     <TabItem value="ui" label="Goose Desktop" default>
-    After sending your first message to Goose, a colored circle appears next to the model name at the bottom of the session window. The color provides a visual indicator of your token usage for the session. 
+    The Desktop displays a colored circle next to the model name at the bottom of the session window. The color provides a visual indicator of your token usage for the session. 
       - **Green**: Normal usage - Plenty of context space available
       - **Orange**: Warning state - Approaching limit (80% of capacity)
       - **Red**: Error state - Context limit reached
@@ -156,7 +158,13 @@ Key information has been preserved while reducing context length.
         
     </TabItem>
     <TabItem value="cli" label="Goose CLI">
-        This functionality is not available in the Goose CLI. 
-
+    The CLI displays a Context label above each command prompt, showing:
+      - A visual indicator using dots (●○) and colors to represent your token usage:
+        - **Green**: Below 50% usage
+        - **Yellow**: Between 50-85% usage
+        - **Red**: Above 85% usage
+      - Usage percentage
+      - Current token count and context limit
+    
     </TabItem>
 </Tabs>
