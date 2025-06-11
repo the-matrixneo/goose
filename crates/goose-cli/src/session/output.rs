@@ -12,6 +12,7 @@ use std::io::{self, Error, Write};
 use std::path::Path;
 use std::sync::{atomic, Arc};
 use std::time::Duration;
+use unicode_width::UnicodeWidthStr;
 
 // Re-export theme for use in main
 #[derive(Clone, Copy)]
@@ -984,18 +985,8 @@ fn format_number(n: usize) -> String {
 
 // Helper function to calculate display width accounting for Unicode characters
 fn display_width(s: &str) -> usize {
-    s.chars()
-        .map(|c| {
-            match c {
-                // Emojis and special Unicode chars take 2 display columns
-                '🪿' | '🔧' | '💬' | 'ℹ' | '️' | '↻' | '⚡' | '▶' | '🐛' | '🪱' | '🐍' => {
-                    2
-                }
-                // Most other characters take 1 column
-                _ => 1,
-            }
-        })
-        .sum()
+    // Use the unicode-width crate for proper Unicode width calculation
+    s.width()
 }
 
 // Helper function to calculate padding accounting for display width
