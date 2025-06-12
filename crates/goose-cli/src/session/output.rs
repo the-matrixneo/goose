@@ -388,7 +388,7 @@ fn render_text_editor_request(call: &ToolCall, debug: bool) {
         let path_line_content = format!("path: {}", shorten_path(path, debug));
         let path_padding = calculate_padding(&path_line_content, content_width);
         println!(
-            "│ {}: {}{}│",
+            "  {}: {}{}",
             style("path").dim(),
             style(shorten_path(path, debug)).green(),
             " ".repeat(path_padding)
@@ -419,7 +419,7 @@ fn render_shell_request(call: &ToolCall, debug: bool) {
             let command_line_content = format!("command: {}", s);
             let command_padding = calculate_padding(&command_line_content, content_width);
             println!(
-                "│ {}: {}{}│",
+                " {}: {}{}",
                 style("command").dim(),
                 style(s).green(),
                 " ".repeat(command_padding)
@@ -450,7 +450,7 @@ fn print_tool_header(call: &ToolCall) {
 
     println!();
     println!(
-        "╭─ {} ─────────────────────────────────────────────────────────────────────────╮",
+        "╭─ {} ─────────────────────────────────────────────────────────────────╮",
         style("Tool Call").bold()
     );
 
@@ -459,14 +459,13 @@ fn print_tool_header(call: &ToolCall) {
     let header_padding = calculate_padding(&header_line_content, content_width);
 
     println!(
-        "│ {} {} {} {}{}│",
+        "  {} {} {} {}{}",
         style("🔧").bold(),
         style(extension_name).magenta().bold(),
         style("→").dim(),
         style(&tool_name).cyan().bold(),
         " ".repeat(header_padding)
     );
-    println!("├─────────────────────────────────────────────────────────────────────────────┤");
 }
 
 // Respect NO_COLOR, as https://crates.io/crates/console already does
@@ -509,7 +508,7 @@ fn print_params_boxed(value: &Value, depth: usize, debug: bool) {
                         let nested_padding =
                             calculate_padding(&nested_line_content, content_width - indent_width);
                         println!(
-                            "{}{}{}│",
+                            "{}{}{}",
                             indent,
                             style(key).dim(),
                             " ".repeat(nested_padding)
@@ -521,7 +520,7 @@ fn print_params_boxed(value: &Value, depth: usize, debug: bool) {
                         let array_padding =
                             calculate_padding(&array_line_content, content_width - indent_width);
                         println!(
-                            "{}{}:{}│",
+                            "{}{}:{}",
                             indent,
                             style(key).dim(),
                             " ".repeat(array_padding)
@@ -530,7 +529,7 @@ fn print_params_boxed(value: &Value, depth: usize, debug: bool) {
                             let dash_line_content = "- ";
                             let dash_padding =
                                 calculate_padding(dash_line_content, content_width - indent_width);
-                            println!("{}- {}│", indent, " ".repeat(dash_padding));
+                            println!("{}- {}", indent, " ".repeat(dash_padding));
                             print_params_boxed(item, depth + 2, debug);
                         }
                     }
@@ -542,7 +541,7 @@ fn print_params_boxed(value: &Value, depth: usize, debug: bool) {
                                 content_width - indent_width,
                             );
                             println!(
-                                "{}{}: {}{}│",
+                                "{}{}: {}{}",
                                 indent,
                                 style(key).dim(),
                                 style("...").dim(),
@@ -555,7 +554,7 @@ fn print_params_boxed(value: &Value, depth: usize, debug: bool) {
                                 content_width - indent_width,
                             );
                             println!(
-                                "{}{}: {}{}│",
+                                "{}{}: {}{}",
                                 indent,
                                 style(key).dim(),
                                 style(s).green(),
@@ -568,7 +567,7 @@ fn print_params_boxed(value: &Value, depth: usize, debug: bool) {
                         let number_padding =
                             calculate_padding(&number_line_content, content_width - indent_width);
                         println!(
-                            "{}{}: {}{}│",
+                            "{}{}: {}{}",
                             indent,
                             style(key).dim(),
                             style(n).blue(),
@@ -580,7 +579,7 @@ fn print_params_boxed(value: &Value, depth: usize, debug: bool) {
                         let bool_padding =
                             calculate_padding(&bool_line_content, content_width - indent_width);
                         println!(
-                            "{}{}: {}{}│",
+                            "{}{}: {}{}",
                             indent,
                             style(key).dim(),
                             style(b).blue(),
@@ -592,7 +591,7 @@ fn print_params_boxed(value: &Value, depth: usize, debug: bool) {
                         let null_padding =
                             calculate_padding(&null_line_content, content_width - indent_width);
                         println!(
-                            "{}{}: {}{}│",
+                            "{}{}: {}{}",
                             indent,
                             style(key).dim(),
                             style("null").dim(),
@@ -608,7 +607,7 @@ fn print_params_boxed(value: &Value, depth: usize, debug: bool) {
                 let redacted_padding =
                     calculate_padding(&redacted_content, content_width - indent_width);
                 println!(
-                    "{}{}{}│",
+                    "{}{}{}",
                     indent,
                     style(redacted_content).yellow(),
                     " ".repeat(redacted_padding)
@@ -618,7 +617,7 @@ fn print_params_boxed(value: &Value, depth: usize, debug: bool) {
                 let string_padding =
                     calculate_padding(string_content, content_width - indent_width);
                 println!(
-                    "{}{}{}│",
+                    "{}{}{}",
                     indent,
                     style(s).green(),
                     " ".repeat(string_padding)
@@ -786,7 +785,7 @@ pub fn display_session_info(
     let status_padding = calculate_padding(&status_line_content, content_width);
 
     println!(
-        "│ {}{}│",
+        " {}{}",
         style(format!("{} {}", status_icon, status_text))
             .green()
             .bold(),
@@ -803,7 +802,7 @@ pub fn display_session_info(
             );
             let provider_padding = calculate_padding(&provider_line_content, content_width);
             println!(
-                "│ {} {} {} {}{}│",
+                "  {} {} {} {}{}",
                 style("Provider:").dim(),
                 style(provider).cyan(),
                 style("•").dim(),
@@ -814,7 +813,7 @@ pub fn display_session_info(
             let provider_line_content = format!("Provider: {} • {}", provider, model);
             let provider_padding = calculate_padding(&provider_line_content, content_width);
             println!(
-                "│ {} {} {} {}{}│",
+                "  {} {} {} {}{}",
                 style("Provider:").dim(),
                 style(provider).cyan(),
                 style("•").dim(),
@@ -827,7 +826,7 @@ pub fn display_session_info(
         let provider_line_content = format!("Provider: {} • {}", provider, model);
         let provider_padding = calculate_padding(&provider_line_content, content_width);
         println!(
-            "│ {} {} {} {}{}│",
+            "  {} {} {} {}{}",
             style("Provider:").dim(),
             style(provider).cyan(),
             style("•").dim(),
@@ -846,7 +845,7 @@ pub fn display_session_info(
         let session_line_content = format!("Session: {}", truncated_path);
         let session_padding = calculate_padding(&session_line_content, content_width);
         println!(
-            "│ {} {}{}│",
+            "  {} {}{}",
             style("Session:").dim(),
             style(&truncated_path).cyan().dim(),
             " ".repeat(session_padding)
@@ -862,7 +861,7 @@ pub fn display_session_info(
     let directory_line_content = format!("Directory: {}", truncated_dir);
     let directory_padding = calculate_padding(&directory_line_content, content_width);
     println!(
-        "│ {} {}{}│",
+        "  {} {}{}",
         style("Directory:").dim(),
         style(&truncated_dir).cyan().dim(),
         " ".repeat(directory_padding)
@@ -888,7 +887,7 @@ pub fn display_greeting() {
     let line1_content = "🪿 Goose is ready to assist you!";
     let line1_padding = calculate_padding(line1_content, content_width);
     println!(
-        "│ {}{}│",
+        "  {}{}",
         style(line1_content).bold(),
         " ".repeat(line1_padding)
     );
@@ -896,7 +895,7 @@ pub fn display_greeting() {
     let line2_content = "💬 Enter your instructions or ask what I can do";
     let line2_padding = calculate_padding(line2_content, content_width);
     println!(
-        "│ {}{}│",
+        "  {}{}",
         style(line2_content).dim(),
         " ".repeat(line2_padding)
     );
@@ -904,7 +903,7 @@ pub fn display_greeting() {
     let line3_content = "ℹ️ Type /help for available commands";
     let line3_padding = calculate_padding(line3_content, content_width);
     println!(
-        "│ {}{}│",
+        "  {}{}",
         style(line3_content).dim(),
         " ".repeat(line3_padding)
     );
@@ -960,14 +959,16 @@ pub fn display_context_usage(total_tokens: usize, context_limit: usize) {
     );
     let context_padding = calculate_padding(&context_line_content, content_width);
 
+     
     println!(
-        "│ {} {}% │ {} / {} tokens {}│",
+        " {} {}%  {} / {} tokens {}",
         colored_bar,
         style(format!("{:3}", percentage)).bold(),
         style(&formatted_total).cyan(),
         style(&formatted_limit).dim(),
         " ".repeat(context_padding)
     );
+    
     println!("╰─────────────────────────────────────────────────────────────────────────────╯");
 }
 
