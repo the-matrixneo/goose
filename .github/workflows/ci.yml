@@ -104,21 +104,7 @@ jobs:
       - name: Build and Test
         run: |
           gnome-keyring-daemon --components=secrets --daemonize --unlock <<< 'foobar'
-          source ../bin/activate-hermit && cargo test --workspace --exclude goose-cli
-        working-directory: crates
-
-      - name: Clean intermediate build artifacts
-        run: |
-          echo "Cleaning intermediate build artifacts..."
-          rm -rf target/debug/deps
-          rm -rf target/debug/build
-          rm -rf target/debug/incremental
-          df -h
-
-      - name: Build remaining crates
-        run: |
-          gnome-keyring-daemon --components=secrets --daemonize --unlock <<< 'foobar'
-          source ../bin/activate-hermit && cargo test --package goose-cli
+          source ../bin/activate-hermit && cargo test
         working-directory: crates
 
       - name: Check disk space before cleanup
