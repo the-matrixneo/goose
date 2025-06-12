@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface RecipeExpandableInfoProps {
   infoLabel: string;
@@ -60,22 +61,25 @@ export default function RecipeExpandableInfo({
           </>
         )}
         <div className="mt-4 flex items-center justify-between">
-          <button
+          <Button
             type="button"
             onClick={(e) => {
               e.preventDefault();
               setValueExpanded(true);
               onClickEdit();
             }}
-            className="w-36 px-3 py-3 bg-bgAppInverse text-sm text-textProminentInverse rounded-xl hover:bg-bgStandardInverse transition-colors"
+            variant="default"
+            className="w-36"
           >
             {infoValue ? 'Edit' : 'Add'} {infoLabel.toLowerCase()}
-          </button>
+          </Button>
 
           {infoValue && isClamped && (
-            <button
+            <Button
               type="button"
               onClick={() => setValueExpanded(!isValueExpanded)}
+              variant="ghost"
+              shape="round"
               aria-label={isValueExpanded ? 'Collapse content' : 'Expand content'}
               title={isValueExpanded ? 'Collapse' : 'Expand'}
               className="bg-bgSubtle hover:bg-bgStandard p-2 rounded text-textStandard hover:text-textProminent transition-colors"
@@ -86,7 +90,7 @@ export default function RecipeExpandableInfo({
                 }`}
                 strokeWidth={2.5}
               />
-            </button>
+            </Button>
           )}
         </div>
       </div>
