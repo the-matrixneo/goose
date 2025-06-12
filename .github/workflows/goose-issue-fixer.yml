@@ -52,9 +52,9 @@ jobs:
       
       - name: Run Goose to Fix Issue
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GOOSE_MODEL: gpt-4o
-          GOOSE_PROVIDER: openai
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GOOSE_MODEL: claude-sonnet-4-20250514
+          GOOSE_PROVIDER: anthropic
         run: |
           # Extract issue title and body for context
           ISSUE_TITLE="${{ github.event.issue.title }}"
