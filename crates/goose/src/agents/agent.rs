@@ -42,6 +42,25 @@ use mcp_core::{
     prompt::Prompt, protocol::GetPromptResult, tool::Tool, Content, ToolError, ToolResult,
 };
 
+/// Configuration for repeating tool calls
+#[derive(Debug, Clone)]
+pub struct RepeatConfig {
+    pub count: u32,
+    pub variation_pattern: Option<VariationPattern>,
+    pub delay_ms: Option<u64>,
+}
+
+/// Patterns for varying parameters across repetitions
+#[derive(Debug, Clone)]
+pub enum VariationPattern {
+    /// Use provided list of values for a specific parameter
+    ParameterValues { param_name: String, values: Vec<serde_json::Value> },
+    /// Increment a numeric parameter
+    Increment { param_name: String, start: i64, step: i64 },
+    /// Add iteration context to all parameters
+    IterationContext,
+}
+
 use super::platform_tools;
 use super::router_tools;
 use super::tool_execution::{ToolCallResult, CHAT_MODE_TOOL_SKIPPED_RESPONSE, DECLINED_RESPONSE};
@@ -65,6 +84,143 @@ pub struct Agent {
 pub enum AgentEvent {
     Message(Message),
     McpNotification((String, JsonRpcMessage)),
+}
+
+/// Extract repeat configuration from tool call arguments or name
+fn extract_repeat_config(tool_call: &mcp_core::tool::ToolCall) -> Option<RepeatConfig> {
+    // Strategy 1: Check for repeat parameter in arguments
+    if let Some(repeat_arg) = tool_call.arguments.get("repeat") {
+        if let Ok(repeat_config) = parse_repeat_argument(repeat_arg) {
+            return Some(repeat_config);
+        }
+    }
+    
+    // Strategy 2: Check for repeat pattern in tool name
+    if let Some(repeat_config) = parse_repeat_from_name(&tool_call.name) {
+        return Some(repeat_config);
+    }
+    
+    None
+}
+
+/// Parse repeat configuration from JSON argument
+fn parse_repeat_argument(repeat_arg: &serde_json::Value) -> Result<RepeatConfig, serde_json::Error> {
+    if let Some(count) = repeat_arg.as_u64() {
+        // Simple case: just a number
+        return Ok(RepeatConfig {
+            count: count as u32,
+            variation_pattern: None,
+            delay_ms: None,
+        });
+    }
+    
+    // Complex case: object with configuration
+    let count = repeat_arg.get("count")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(1) as u32;
+    
+    let variation_pattern = if let Some(vary_config) = repeat_arg.get("vary") {
+        parse_variation_pattern(vary_config)?
+    } else {
+        None
+    };
+    
+    let delay_ms = repeat_arg.get("delay_ms")
+        .and_then(|v| v.as_u64());
+    
+    Ok(RepeatConfig {
+        count,
+        variation_pattern,
+        delay_ms,
+    })
+}
+
+/// Parse variation pattern from JSON
+fn parse_variation_pattern(vary_config: &serde_json::Value) -> Result<Option<VariationPattern>, serde_json::Error> {
+    if let Some(param_name) = vary_config.get("parameter").and_then(|v| v.as_str()) {
+        if let Some(values) = vary_config.get("values").and_then(|v| v.as_array()) {
+            return Ok(Some(VariationPattern::ParameterValues {
+                param_name: param_name.to_string(),
+                values: values.clone(),
+            }));
+        }
+        
+        if let (Some(start), Some(step)) = (
+            vary_config.get("start").and_then(|v| v.as_i64()),
+            vary_config.get("step").and_then(|v| v.as_i64())
+        ) {
+            return Ok(Some(VariationPattern::Increment {
+                param_name: param_name.to_string(),
+                start,
+                step,
+            }));
+        }
+    }
+    
+    if vary_config.get("iteration_context").and_then(|v| v.as_bool()).unwrap_or(false) {
+        return Ok(Some(VariationPattern::IterationContext));
+    }
+    
+    Ok(None)
+}
+
+/// Parse repeat configuration from tool name patterns
+fn parse_repeat_from_name(tool_name: &str) -> Option<RepeatConfig> {
+    // Pattern: tool_name_x5, tool_name_repeat5, etc.
+    if let Some(captures) = regex::Regex::new(r"(.+)_x(\d+)$")
+        .ok()?
+        .captures(tool_name) 
+    {
+        if let Ok(count) = captures.get(2)?.as_str().parse::<u32>() {
+            return Some(RepeatConfig {
+                count,
+                variation_pattern: Some(VariationPattern::IterationContext),
+                delay_ms: None,
+            });
+        }
+    }
+    
+    // Pattern: repeat_tool_name
+    if tool_name.starts_with("repeat_") {
+        return Some(RepeatConfig {
+            count: 3, // Default repeat count
+            variation_pattern: Some(VariationPattern::IterationContext),
+            delay_ms: None,
+        });
+    }
+    
+    None
+}
+
+/// Apply variation to tool call arguments for a specific iteration
+fn apply_variation(
+    mut arguments: serde_json::Value,
+    pattern: &VariationPattern,
+    iteration: u32,
+) -> serde_json::Value {
+    match pattern {
+        VariationPattern::ParameterValues { param_name, values } => {
+            if let Some(value) = values.get(iteration as usize) {
+                if let Some(args_obj) = arguments.as_object_mut() {
+                    args_obj.insert(param_name.clone(), value.clone());
+                }
+            }
+        }
+        VariationPattern::Increment { param_name, start, step } => {
+            let new_value = start + (step * iteration as i64);
+            if let Some(args_obj) = arguments.as_object_mut() {
+                args_obj.insert(param_name.clone(), serde_json::Value::Number(new_value.into()));
+            }
+        }
+        VariationPattern::IterationContext => {
+            if let Some(args_obj) = arguments.as_object_mut() {
+                args_obj.insert("_iteration".to_string(), serde_json::Value::Number((iteration + 1).into()));
+                args_obj.insert("_iteration_context".to_string(), 
+                    serde_json::Value::String(format!("Iteration {} of repeated tool call", iteration + 1)));
+            }
+        }
+    }
+    arguments
 }
 
 impl Agent {
@@ -189,6 +345,11 @@ impl Agent {
         tool_call: mcp_core::tool::ToolCall,
         request_id: String,
     ) -> (String, Result<ToolCallResult, ToolError>) {
+        // Check for repeat configuration first
+        if let Some(repeat_config) = extract_repeat_config(&tool_call) {
+            return self.handle_repeated_tool_call(tool_call, repeat_config, request_id).await;
+        }
+
         // Check if this tool call should be allowed based on repetition monitoring
         if let Some(monitor) = self.tool_monitor.lock().await.as_mut() {
             let tool_call_info = ToolCall::new(tool_call.name.clone(), tool_call.arguments.clone());
@@ -255,6 +416,197 @@ impl Agent {
             })
         } else {
             // Clone the result to ensure no references to extension_manager are returned
+            let result = extension_manager
+                .dispatch_tool_call(tool_call.clone())
+                .await;
+            match result {
+                Ok(call_result) => call_result,
+                Err(e) => ToolCallResult::from(Err(ToolError::ExecutionError(e.to_string()))),
+            }
+        };
+
+        (
+            request_id,
+            Ok(ToolCallResult {
+                notification_stream: result.notification_stream,
+                result: Box::new(
+                    result
+                        .result
+                        .map(super::large_response_handler::process_tool_response),
+                ),
+            }),
+        )
+    }
+
+    /// Handle repeated tool calls
+    #[instrument(skip(self, tool_call, repeat_config, request_id))]
+    async fn handle_repeated_tool_call(
+        &self,
+        mut tool_call: mcp_core::tool::ToolCall,
+        repeat_config: RepeatConfig,
+        request_id: String,
+    ) -> (String, Result<ToolCallResult, ToolError>) {
+        let mut all_results = Vec::new();
+        let mut combined_content = Vec::new();
+        
+        // Clean the tool name if it has repeat patterns
+        if let Some(base_name) = self.extract_base_tool_name(&tool_call.name) {
+            tool_call.name = base_name;
+        }
+
+        // Remove repeat parameter from arguments if present
+        if let Some(args_obj) = tool_call.arguments.as_object_mut() {
+            args_obj.remove("repeat");
+        }
+
+        debug!("Executing tool '{}' {} times", tool_call.name, repeat_config.count);
+
+        for iteration in 0..repeat_config.count {
+            // Apply variation pattern if specified
+            let modified_arguments = if let Some(ref pattern) = repeat_config.variation_pattern {
+                apply_variation(tool_call.arguments.clone(), pattern, iteration)
+            } else {
+                tool_call.arguments.clone()
+            };
+
+            // Create modified tool call for this iteration
+            let iteration_tool_call = mcp_core::tool::ToolCall {
+                name: tool_call.name.clone(),
+                arguments: modified_arguments,
+            };
+
+            // Execute the tool call
+            let iteration_request_id = format!("{}_iter_{}", request_id, iteration + 1);
+            let (_, result) = self.dispatch_single_tool_call(iteration_tool_call, iteration_request_id).await;
+
+            match result {
+                Ok(tool_result) => {
+                    // Collect the result
+                    match tool_result.result.await {
+                        Ok(content) => {
+                            combined_content.push(Content::text(format!(
+                                "=== Iteration {} ===", iteration + 1
+                            )));
+                            combined_content.extend(content);
+                            all_results.push(format!("Iteration {}: Success", iteration + 1));
+                        }
+                        Err(e) => {
+                            combined_content.push(Content::text(format!(
+                                "=== Iteration {} === ERROR: {}", iteration + 1, e
+                            )));
+                            all_results.push(format!("Iteration {}: Error - {}", iteration + 1, e));
+                        }
+                    }
+                }
+                Err(e) => {
+                    combined_content.push(Content::text(format!(
+                        "=== Iteration {} === FAILED: {}", iteration + 1, e
+                    )));
+                    all_results.push(format!("Iteration {}: Failed - {}", iteration + 1, e));
+                }
+            }
+
+            // Add delay between iterations if specified
+            if let Some(delay_ms) = repeat_config.delay_ms {
+                if iteration < repeat_config.count - 1 { // Don't delay after last iteration
+                    tokio::time::sleep(tokio::time::Duration::from_millis(delay_ms)).await;
+                }
+            }
+        }
+
+        // Create summary content
+        let summary = Content::text(format!(
+            "Completed {} iterations of tool '{}'. Results:\n{}",
+            repeat_config.count,
+            tool_call.name,
+            all_results.join("\n")
+        ));
+
+        combined_content.insert(0, summary);
+
+        (
+            request_id,
+            Ok(ToolCallResult {
+                notification_stream: None,
+                result: Box::new(futures::future::ready(Ok(combined_content))),
+            }),
+        )
+    }
+
+    /// Extract base tool name from repeat patterns
+    fn extract_base_tool_name(&self, tool_name: &str) -> Option<String> {
+        // Remove _x5, _repeat5 patterns
+        if let Some(captures) = regex::Regex::new(r"(.+)_x\d+$")
+            .ok()
+            .and_then(|re| re.captures(tool_name))
+        {
+            return Some(captures.get(1)?.as_str().to_string());
+        }
+
+        // Remove repeat_ prefix
+        if tool_name.starts_with("repeat_") {
+            return Some(tool_name.strip_prefix("repeat_")?.to_string());
+        }
+
+        None
+    }
+
+    /// Dispatch a single tool call without repeat handling (internal method)
+    async fn dispatch_single_tool_call(
+        &self,
+        tool_call: mcp_core::tool::ToolCall,
+        request_id: String,
+    ) -> (String, Result<ToolCallResult, ToolError>) {
+        // This is the original dispatch logic without repeat handling
+        if tool_call.name == PLATFORM_MANAGE_EXTENSIONS_TOOL_NAME {
+            let extension_name = tool_call
+                .arguments
+                .get("extension_name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let action = tool_call
+                .arguments
+                .get("action")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let (request_id, result) = self
+                .manage_extensions(action, extension_name, request_id)
+                .await;
+
+            return (request_id, Ok(ToolCallResult::from(result)));
+        }
+
+        let extension_manager = self.extension_manager.lock().await;
+        let result: ToolCallResult = if tool_call.name == PLATFORM_READ_RESOURCE_TOOL_NAME {
+            ToolCallResult::from(
+                extension_manager
+                    .read_resource(tool_call.arguments.clone())
+                    .await,
+            )
+        } else if tool_call.name == PLATFORM_LIST_RESOURCES_TOOL_NAME {
+            ToolCallResult::from(
+                extension_manager
+                    .list_resources(tool_call.arguments.clone())
+                    .await,
+            )
+        } else if tool_call.name == PLATFORM_SEARCH_AVAILABLE_EXTENSIONS_TOOL_NAME {
+            ToolCallResult::from(extension_manager.search_available_extensions().await)
+        } else if self.is_frontend_tool(&tool_call.name).await {
+            ToolCallResult::from(Err(ToolError::ExecutionError(
+                "Frontend tool execution required".to_string(),
+            )))
+        } else if tool_call.name == ROUTER_VECTOR_SEARCH_TOOL_NAME {
+            let selector = self.router_tool_selector.lock().await.clone();
+            ToolCallResult::from(if let Some(selector) = selector {
+                selector.select_tools(tool_call.arguments.clone()).await
+            } else {
+                Err(ToolError::ExecutionError(
+                    "Encountered vector search error.".to_string(),
+                ))
+            })
+        } else {
             let result = extension_manager
                 .dispatch_tool_call(tool_call.clone())
                 .await;
