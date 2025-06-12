@@ -959,7 +959,6 @@ pub fn display_context_usage(total_tokens: usize, context_limit: usize) {
     );
     let context_padding = calculate_padding(&context_line_content, content_width);
 
-     
     println!(
         " {} {}%  {} / {} tokens {}",
         colored_bar,
@@ -968,7 +967,7 @@ pub fn display_context_usage(total_tokens: usize, context_limit: usize) {
         style(&formatted_limit).dim(),
         " ".repeat(context_padding)
     );
-    
+
     println!("╰─────────────────────────────────────────────────────────────────────────────╯");
 }
 
