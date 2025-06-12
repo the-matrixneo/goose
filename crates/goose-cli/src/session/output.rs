@@ -920,8 +920,14 @@ pub fn display_greeting() {
 pub fn display_context_usage(total_tokens: usize, context_limit: usize) {
     use console::style;
 
-    // Calculate percentage used
-    let percentage = (total_tokens as f64 / context_limit as f64 * 100.0).round() as usize;
+    if context_limit == 0 {
+        println!("Context: Error - context limit is zero");
+        return;
+    }
+
+    // Calculate percentage used with bounds checking
+    let percentage =
+        (((total_tokens as f64 / context_limit as f64) * 100.0).round() as usize).min(100);
 
     // Create a modern progress bar
     let bar_width = 20;
