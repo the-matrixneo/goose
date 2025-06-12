@@ -45,8 +45,28 @@ jobs:
             /usr/local/share/chromium \
             /usr/local/share/powershell \
             /usr/share/dotnet \
+            /usr/share/swift \
+            /usr/local/share/boost \
+            /opt/ghc \
+            /opt/hostedtoolcache \
+            "$AGENT_TOOLSDIRECTORY" \
+            /usr/local/lib/android \
+            /usr/local/share/powershell \
+            /usr/local/share/chromium \
+            /usr/local/lib/node_modules \
+            /usr/lib/mono \
+            /opt/google/chrome \
+            /opt/microsoft/msedge \
             /usr/share/swift
 
+          # Clean apt cache
+          sudo apt-get clean
+          sudo apt-get autoremove -y
+          
+          # Clean cargo cache
+          rm -rf ~/.cargo/registry/index
+          rm -rf ~/.cargo/git
+          
           df -h
 
       - name: Checkout Code
@@ -84,10 +104,23 @@ jobs:
       - name: Build and Test
         run: |
           gnome-keyring-daemon --components=secrets --daemonize --unlock <<< 'foobar'
-          source ../bin/activate-hermit && cargo test
+          source ../bin/activate-hermit && cargo test --workspace --exclude goose-cli
         working-directory: crates
 
-      # Add disk space cleanup before linting
+      - name: Clean intermediate build artifacts
+        run: |
+          echo "Cleaning intermediate build artifacts..."
+          rm -rf target/debug/deps
+          rm -rf target/debug/build
+          rm -rf target/debug/incremental
+          df -h
+
+      - name: Build remaining crates
+        run: |
+          gnome-keyring-daemon --components=secrets --daemonize --unlock <<< 'foobar'
+          source ../bin/activate-hermit && cargo test --package goose-cli
+        working-directory: crates
+
       - name: Check disk space before cleanup
         run: df -h
 
