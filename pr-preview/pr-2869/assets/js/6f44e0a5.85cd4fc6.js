@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunkgoose=self.webpackChunkgoose||[]).push([[8094],{85626:e=>{e.exports=JSON.parse('{"metadata":{"permalink":"/goose/pr-preview/pr-2869/blog","page":1,"postsPerPage":10,"totalPages":4,"totalCount":40,"nextPage":"/goose/pr-preview/pr-2869/blog/page/2","blogDescription":"Blog","blogTitle":"Blog"}}')}}]);
