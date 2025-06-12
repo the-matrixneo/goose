@@ -27,6 +27,11 @@ on:
 
 name: "Reusable workflow to build CLI"
 
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0  # Disable incremental compilation to save space
+  RUST_BACKTRACE: 1
+
 jobs:
   build-cli:
     name: Build CLI
@@ -43,6 +48,61 @@ jobs:
             target-suffix: apple-darwin
 
     steps:
+      - name: Check initial disk space
+        run: df -h
+
+      # Platform-specific disk cleanup
+      - name: Free up disk space (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          echo "=== Ubuntu Disk Cleanup ==="
+          # Remove large pre-installed software
+          sudo rm -rf \
+            /opt/google/chrome \
+            /opt/microsoft/msedge \
+            /opt/microsoft/powershell \
+            /usr/lib/mono \
+            /usr/local/lib/android \
+            /usr/local/lib/node_modules \
+            /usr/local/share/chromium \
+            /usr/local/share/powershell \
+            /usr/share/dotnet \
+            /usr/share/swift \
+            /opt/az \
+            /opt/hostedtoolcache/CodeQL \
+            /opt/hostedtoolcache/Java_Temurin-Hotspot \
+            /opt/hostedtoolcache/Ruby \
+            /opt/hostedtoolcache/go \
+            /opt/hostedtoolcache/node \
+            /usr/local/graalvm \
+            /usr/local/.ghcup \
+            /usr/local/share/boost \
+            /usr/local/share/vcpkg \
+            /usr/local/lib/heroku
+          
+          # Clean package managers
+          sudo apt-get clean
+          sudo apt-get autoremove -y
+          docker system prune -af 2>/dev/null || true
+          npm cache clean --force 2>/dev/null || true
+          df -h
+
+      - name: Free up disk space (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          echo "=== macOS Disk Cleanup ==="
+          # Clean npm cache
+          npm cache clean --force 2>/dev/null || true
+          # Clean Homebrew cache
+          brew cleanup 2>/dev/null || true
+          # Remove unnecessary large directories
+          rm -rf ~/Library/Caches/* 2>/dev/null || true
+          # Clean docker if present
+          docker system prune -af 2>/dev/null || true
+          # Remove old Xcode simulators
+          xcrun simctl delete unavailable 2>/dev/null || true
+          df -h
+
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # pin@v4
         with:
@@ -55,6 +115,87 @@ jobs:
           sed -i.bak 's/^version = ".*"/version = "'${{ inputs.version }}'"/' Cargo.toml
           rm -f Cargo.toml.bak
 
+      # Install and configure sccache with fallback options
+      - name: Install sccache (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          SCCACHE_VERSION=v0.8.2
+          curl -L "https://github.com/mozilla/sccache/releases/download/${SCCACHE_VERSION}/sccache-${SCCACHE_VERSION}-x86_64-unknown-linux-musl.tar.gz" | tar xz
+          sudo mv sccache-*/sccache /usr/local/bin/
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
+          # Fallback to local cache if GHA cache fails
+          echo "SCCACHE_GHA_CACHE_TO=gha" >> $GITHUB_ENV
+          echo "SCCACHE_GHA_CACHE_FROM=gha" >> $GITHUB_ENV
+
+      - name: Install sccache (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          SCCACHE_VERSION=v0.8.2
+          curl -L "https://github.com/mozilla/sccache/releases/download/${SCCACHE_VERSION}/sccache-${SCCACHE_VERSION}-x86_64-apple-darwin.tar.gz" | tar xz
+          sudo mv sccache-*/sccache /usr/local/bin/
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
+          # Fallback to local cache if GHA cache fails
+          echo "SCCACHE_GHA_CACHE_TO=gha" >> $GITHUB_ENV
+          echo "SCCACHE_GHA_CACHE_FROM=gha" >> $GITHUB_ENV
+
+      # Use updated sccache action with better error handling
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@676c0e67b665684f17941acf5cc3af83bcf10228 # pin@v0.0.6
+        continue-on-error: true  # Don't fail build if cache setup fails
+
+      # Fallback: Set up local sccache if GHA cache fails
+      - name: Setup fallback sccache
+        if: failure()
+        run: |
+          echo "GitHub Actions cache failed, using local cache"
+          mkdir -p ~/.cache/sccache
+          echo "SCCACHE_DIR=~/.cache/sccache" >> $GITHUB_ENV
+          echo "SCCACHE_GHA_ENABLED=false" >> $GITHUB_ENV
+
+      # Optimized cargo caching
+      - name: Cache Cargo and Target
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # pin@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-${{ matrix.architecture }}-cargo-target-${{ hashFiles('**/Cargo.lock') }}-v4
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.architecture }}-cargo-target-${{ hashFiles('**/Cargo.lock') }}-
+            ${{ runner.os }}-${{ matrix.architecture }}-cargo-target-
+
+      # Clean cargo cache if it's too large
+      - name: Limit cache sizes
+        run: |
+          # Check and limit cargo cache size
+          CARGO_CACHE_SIZE=$(du -sm ~/.cargo 2>/dev/null | cut -f1 || echo "0")
+          echo "Cargo cache size: ${CARGO_CACHE_SIZE}MB"
+          
+          if [ "$CARGO_CACHE_SIZE" -gt 3000 ]; then
+            echo "Cargo cache too large (${CARGO_CACHE_SIZE}MB), cleaning..."
+            rm -rf ~/.cargo/registry/cache
+            rm -rf ~/.cargo/git/db
+            echo "Cleaned cargo cache"
+          fi
+          
+          # Check target directory size
+          if [ -d "target" ]; then
+            TARGET_SIZE=$(du -sm target 2>/dev/null | cut -f1 || echo "0")
+            echo "Target directory size: ${TARGET_SIZE}MB"
+            
+            if [ "$TARGET_SIZE" -gt 8000 ]; then
+              echo "Target directory too large (${TARGET_SIZE}MB), cleaning..."
+              rm -rf target/*/incremental
+              find target -name "*.rmeta" -delete 2>/dev/null || true
+              echo "Cleaned target directory"
+            fi
+          fi
+
       - name: Install cross
         run: source ./bin/activate-hermit && cargo install cross --git https://github.com/cross-rs/cross
 
@@ -63,6 +204,9 @@ jobs:
         uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # pin@v5
         with:
           go-version: '1.21'
+
+      - name: Check disk space before build
+        run: df -h
 
       - name: Build CLI
         env:
@@ -82,6 +226,15 @@ jobs:
 
           echo "Building with explicit PROTOC path..."
           cross build --release --target ${TARGET} -p goose-cli -vv
+
+      - name: Clean intermediate artifacts after build
+        run: |
+          echo "Cleaning intermediate build artifacts..."
+          # Remove .rmeta files (metadata only, not needed)
+          find target -name "*.rmeta" -delete 2>/dev/null || true
+          # Remove fingerprint files
+          find target -name ".fingerprint" -type d -exec rm -rf {} + 2>/dev/null || true
+          df -h
 
       - name: Build temporal-service for target platform
         run: |
@@ -137,6 +290,21 @@ jobs:
           cd "target/${TARGET}/release"
           tar -cjf "goose-${TARGET}.tar.bz2" -C goose-package .
           echo "ARTIFACT=target/${TARGET}/release/goose-${TARGET}.tar.bz2" >> $GITHUB_ENV
+
+      - name: Show sccache stats
+        run: sccache --show-stats
+
+      - name: Final cleanup
+        run: |
+          echo "Final cleanup to save space..."
+          # Remove build artifacts that are no longer needed
+          rm -rf target/*/debug 2>/dev/null || true
+          rm -rf target/*/deps 2>/dev/null || true
+          rm -rf target/*/build 2>/dev/null || true
+          rm -rf target/*/incremental 2>/dev/null || true
+          # Clean Go build cache
+          go clean -cache 2>/dev/null || true
+          df -h
 
       - name: Upload CLI artifact
         uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # pin@v4

@@ -10,6 +10,33 @@ license = "Apache-2.0"
 repository = "https://github.com/block/goose"
 description = "An AI agent"
 
+# Profile optimizations for CI disk space management
+[profile.dev]
+debug = 1          # Reduce debug info (0=none, 1=line-tables, 2=full)
+incremental = false # Disable incremental compilation in CI
+split-debuginfo = "unpacked"  # Reduce debug info size on supported platforms
+
+[profile.test]
+debug = 1
+incremental = false
+split-debuginfo = "unpacked"
+
+# Optimize dependencies even in debug mode to reduce build size
+[profile.dev.package."*"]
+opt-level = 1      # Light optimization for dependencies
+debug = false      # No debug info for dependencies
+
+[profile.test.package."*"]
+opt-level = 1
+debug = false
+
+# Release profile optimizations
+[profile.release]
+lto = "thin"       # Link-time optimization
+codegen-units = 1  # Better optimization at cost of compile time
+panic = "abort"    # Smaller binaries
+strip = true       # Remove debug symbols from release builds
+
 # Patch for Windows cross-compilation issue with crunchy
 [patch.crates-io]
 crunchy = { git = "https://github.com/nmathewson/crunchy", branch = "cross-compilation-fix" }

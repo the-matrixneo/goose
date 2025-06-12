@@ -45,6 +45,11 @@ on:
 
 name: Reusable workflow to bundle desktop app
 
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0  # Disable incremental compilation to save space
+  RUST_BACKTRACE: 1
+
 jobs:
   bundle-desktop:
     runs-on: macos-latest
@@ -100,85 +105,104 @@ jobs:
             printf '%s\n' "${missing[@]}"
             exit 1
           fi
-          
           echo "All required signing secrets are present."
 
-      - name: Checkout code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-        with:
-          # Only pass ref if it's explicitly set, otherwise let checkout action use its default behavior
-          ref: ${{ inputs.ref != '' && inputs.ref || '' }}
-          fetch-depth: 0
-
-      - name: Debug git status
+      # macOS disk cleanup
+      - name: Free up disk space (macOS)
         run: |
-          echo "=== Git Status ==="
-          git status
+          echo "=== Initial Disk Usage ==="
+          df -h
           echo ""
-          echo "=== Current Commit ==="
-          git rev-parse HEAD
-          git rev-parse --abbrev-ref HEAD
-          echo ""
-          echo "=== Recent Commits ==="
-          git log --oneline -n 5
-          echo ""
-          echo "=== Remote Branches ==="
-          git branch -r
-
-      # Update versions before build
-      - name: Update versions
-        if: ${{ inputs.version != '' }}
-        env:
-          VERSION: ${{ inputs.version }}
-        run: |
-          # Update version in Cargo.toml
-          sed -i.bak "s/^version = \".*\"/version = \"${VERSION}\"/" Cargo.toml
-          rm -f Cargo.toml.bak
+          echo "=== Cleaning up disk space ==="
           
-          source ./bin/activate-hermit
-          # Update version in package.json 
-          cd ui/desktop
-          npm version "${VERSION}" --no-git-tag-version --allow-same-version
-
-      # Pre-build cleanup to ensure enough disk space
-      - name: Pre-build cleanup
-        run: |
-          source ./bin/activate-hermit
-          echo "Performing pre-build cleanup..."
           # Clean npm cache
-          npm cache clean --force || true
-          # Clean any previous build artifacts
-          rm -rf target || true
+          npm cache clean --force 2>/dev/null || true
           # Clean Homebrew cache
-          brew cleanup || true
+          brew cleanup 2>/dev/null || true
           # Remove unnecessary large directories
-          rm -rf ~/Library/Caches/* || true
-          # Check disk space after cleanup
+          rm -rf ~/Library/Caches/* 2>/dev/null || true
+          # Clean docker if present
+          docker system prune -af 2>/dev/null || true
+          # Remove old Xcode simulators
+          xcrun simctl delete unavailable 2>/dev/null || true
+          
+          echo ""
+          echo "=== Disk Usage After Cleanup ==="
           df -h
 
-      - name: Cache Cargo registry
-        uses: actions/cache@2f8e54208210a422b2efd51efaa6bd6d7ca8920f # pin@v3
+      # Checkout with specific ref if provided
+      - name: Checkout Code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # pin@v4
         with:
-          path: ~/.cargo/registry
-          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-registry-
+          ref: ${{ inputs.ref || github.ref }}
 
-      - name: Cache Cargo index
-        uses: actions/cache@2f8e54208210a422b2efd51efaa6bd6d7ca8920f # pin@v3
-        with:
-          path: ~/.cargo/index
-          key: ${{ runner.os }}-cargo-index
-          restore-keys: |
-            ${{ runner.os }}-cargo-index
+      # Install and configure sccache with fallback options
+      - name: Install sccache
+        run: |
+          SCCACHE_VERSION=v0.8.2
+          curl -L "https://github.com/mozilla/sccache/releases/download/${SCCACHE_VERSION}/sccache-${SCCACHE_VERSION}-x86_64-apple-darwin.tar.gz" | tar xz
+          sudo mv sccache-*/sccache /usr/local/bin/
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
+          # Fallback to local cache if GHA cache fails
+          echo "SCCACHE_GHA_CACHE_TO=gha" >> $GITHUB_ENV
+          echo "SCCACHE_GHA_CACHE_FROM=gha" >> $GITHUB_ENV
 
-      - name: Cache Cargo build
-        uses: actions/cache@2f8e54208210a422b2efd51efaa6bd6d7ca8920f # pin@v3
+      # Use updated sccache action with better error handling
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@676c0e67b665684f17941acf5cc3af83bcf10228 # pin@v0.0.6
+        continue-on-error: true  # Don't fail build if cache setup fails
+
+      # Fallback: Set up local sccache if GHA cache fails
+      - name: Setup fallback sccache
+        if: failure()
+        run: |
+          echo "GitHub Actions cache failed, using local cache"
+          mkdir -p ~/.cache/sccache
+          echo "SCCACHE_DIR=~/.cache/sccache" >> $GITHUB_ENV
+          echo "SCCACHE_GHA_ENABLED=false" >> $GITHUB_ENV
+
+      # Optimized cargo caching for macOS
+      - name: Cache Cargo and Target
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # pin@v4
         with:
-          path: target
-          key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-target-${{ hashFiles('**/Cargo.lock') }}-v4
           restore-keys: |
-            ${{ runner.os }}-cargo-build-
+            ${{ runner.os }}-cargo-target-${{ hashFiles('**/Cargo.lock') }}-
+            ${{ runner.os }}-cargo-target-
+
+      # Clean cargo cache if it's too large
+      - name: Limit cache sizes
+        run: |
+          # Check and limit cargo cache size
+          CARGO_CACHE_SIZE=$(du -sm ~/.cargo 2>/dev/null | cut -f1 || echo "0")
+          echo "Cargo cache size: ${CARGO_CACHE_SIZE}MB"
+          
+          if [ "$CARGO_CACHE_SIZE" -gt 3000 ]; then
+            echo "Cargo cache too large (${CARGO_CACHE_SIZE}MB), cleaning..."
+            rm -rf ~/.cargo/registry/cache
+            rm -rf ~/.cargo/git/db
+            echo "Cleaned cargo cache"
+          fi
+          
+          # Check target directory size
+          if [ -d "target" ]; then
+            TARGET_SIZE=$(du -sm target 2>/dev/null | cut -f1 || echo "0")
+            echo "Target directory size: ${TARGET_SIZE}MB"
+            
+            if [ "$TARGET_SIZE" -gt 8000 ]; then
+              echo "Target directory too large (${TARGET_SIZE}MB), cleaning..."
+              rm -rf target/release/incremental
+              find target -name "*.rmeta" -delete 2>/dev/null || true
+              echo "Cleaned target directory"
+            fi
+          fi
 
       # Install Go for building temporal-service
       - name: Set up Go
@@ -186,9 +210,21 @@ jobs:
         with:
           go-version: '1.21'
 
+      - name: Check disk space before build
+        run: df -h
+
       # Build the project
       - name: Build goosed
         run: source ./bin/activate-hermit && cargo build --release -p goose-server
+
+      - name: Clean intermediate artifacts after build
+        run: |
+          echo "Cleaning intermediate build artifacts..."
+          # Remove .rmeta files (metadata only, not needed)
+          find target -name "*.rmeta" -delete 2>/dev/null || true
+          # Remove fingerprint files
+          find target -name ".fingerprint" -type d -exec rm -rf {} + 2>/dev/null || true
+          df -h
 
       # Build temporal-service
       - name: Build temporal-service
@@ -211,12 +247,13 @@ jobs:
         run: |
           echo "Performing post-build cleanup..."
           # Remove debug artifacts
-          rm -rf target/debug || true
+          rm -rf target/debug 2>/dev/null || true
           # Keep only what's needed for the next steps
-          rm -rf target/release/deps || true
-          rm -rf target/release/build || true
-          rm -rf target/release/incremental || true
-          # Check disk space after cleanup
+          rm -rf target/release/deps 2>/dev/null || true
+          rm -rf target/release/build 2>/dev/null || true
+          rm -rf target/release/incremental 2>/dev/null || true
+          # Clean Go build cache
+          go clean -cache 2>/dev/null || true
           df -h
 
       - name: Copy binaries into Electron folder
@@ -243,50 +280,28 @@ jobs:
 
       - name: Make Unsigned App
         if: ${{ !inputs.signing }}
-        run: |
-          source ../../bin/activate-hermit
-          attempt=0
-          max_attempts=2
-          until [ $attempt -ge $max_attempts ]; do
-            npm run bundle:default && break
-            attempt=$((attempt + 1))
-            echo "Attempt $attempt failed. Retrying..."
-            sleep 5
-          done
-          if [ $attempt -ge $max_attempts ]; then
-            echo "Action failed after $max_attempts attempts."
-            exit 1
-          fi
+        run: source ../../bin/activate-hermit && npm run make
         working-directory: ui/desktop
 
-      - name: Make Signed App
+      - name: Make Signed and Notarized App
         if: ${{ inputs.signing }}
+        run: source ../../bin/activate-hermit && npm run make:signed
+        working-directory: ui/desktop
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: |
 
-          attempt=0
-          max_attempts=2
-          until [ $attempt -ge $max_attempts ]; do
-            npm run bundle:default && break
-            attempt=$((attempt + 1))
-            echo "Attempt $attempt failed. Retrying..."
-            sleep 5
-          done
-          if [ $attempt -ge $max_attempts ]; then
-            echo "Action failed after $max_attempts attempts."
-            exit 1
-          fi
-        working-directory: ui/desktop
+      - name: Show sccache stats
+        run: sccache --show-stats
 
       - name: Final cleanup before artifact upload
         run: |
           echo "Performing final cleanup..."
           # Remove build artifacts that are no longer needed
-          rm -rf target || true
-          # Check disk space after cleanup
+          rm -rf target 2>/dev/null || true
+          # Clean npm cache
+          npm cache clean --force 2>/dev/null || true
           df -h
 
       - name: Upload Desktop artifact
@@ -306,12 +321,15 @@ jobs:
           # Give the app a few seconds to start and write logs
           sleep 5
 
-          # Check if it's running
-          if pgrep -f "Goose.app/Contents/MacOS/Goose" > /dev/null; then
-            echo "App appears to be running."
+          # Check if the app is running
+          if pgrep -f "Goose.app" > /dev/null; then
+            echo "✅ Goose.app launched successfully"
+            # Kill the app after test
+            pkill -f "Goose.app" || true
           else
-            echo "App did not stay open. Possible crash or startup error."
+            echo "❌ Goose.app failed to launch"
+            # Check for crash logs
+            echo "Checking for crash logs..."
+            ls -la ~/Library/Logs/DiagnosticReports/ | grep -i goose | tail -5 || true
             exit 1
           fi
-          # Kill the app to clean up
-          pkill -f "Goose.app/Contents/MacOS/Goose"

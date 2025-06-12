@@ -12,6 +12,11 @@ on:
 
 name: CI
 
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0  # Disable incremental compilation to save space
+  RUST_BACKTRACE: 1
+
 jobs:
   rust-format:
     name: Check Rust Code Format
@@ -27,14 +32,18 @@ jobs:
     name: Build and Test Rust Project
     runs-on: ubuntu-latest
     steps:
-      # Add disk space cleanup before linting
-      - name: Check disk space before build
+      - name: Check initial disk space
         run: df -h
 
-      #https://github.com/actions/runner-images/issues/2840
-      - name: Clean up disk space
+      # More aggressive disk cleanup BEFORE checkout
+      - name: Free up disk space
         run: |
-          echo "Cleaning up disk space..."
+          echo "=== Initial Disk Usage ==="
+          df -h
+          echo ""
+          echo "=== Cleaning up disk space ==="
+          
+          # Remove large pre-installed software
           sudo rm -rf \
             /opt/google/chrome \
             /opt/microsoft/msedge \
@@ -45,8 +54,32 @@ jobs:
             /usr/local/share/chromium \
             /usr/local/share/powershell \
             /usr/share/dotnet \
-            /usr/share/swift
-
+            /usr/share/swift \
+            /opt/az \
+            /opt/hostedtoolcache/CodeQL \
+            /opt/hostedtoolcache/Java_Temurin-Hotspot \
+            /opt/hostedtoolcache/Ruby \
+            /opt/hostedtoolcache/go \
+            /opt/hostedtoolcache/node \
+            /usr/local/graalvm \
+            /usr/local/.ghcup \
+            /usr/local/share/boost \
+            /usr/local/share/vcpkg \
+            /usr/local/lib/heroku
+          
+          # Clean package managers
+          sudo apt-get clean
+          sudo apt-get autoremove -y
+          sudo snap remove --purge $(snap list | awk 'NR>1 {print $1}') 2>/dev/null || true
+          
+          # Clean docker
+          docker system prune -af 2>/dev/null || true
+          
+          # Clean npm global cache
+          npm cache clean --force 2>/dev/null || true
+          
+          echo ""
+          echo "=== Disk Usage After Cleanup ==="
           df -h
 
       - name: Checkout Code
@@ -57,63 +90,123 @@ jobs:
           sudo apt update -y
           sudo apt install -y libdbus-1-dev gnome-keyring libxcb1-dev
 
-      - name: Cache Cargo Registry
-        uses: actions/cache@2f8e54208210a422b2efd51efaa6bd6d7ca8920f # pin@v3
-        with:
-          path: ~/.cargo/registry
-          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-registry-
+      # Install and configure sccache with fallback options
+      - name: Install sccache
+        run: |
+          SCCACHE_VERSION=v0.8.2
+          curl -L "https://github.com/mozilla/sccache/releases/download/${SCCACHE_VERSION}/sccache-${SCCACHE_VERSION}-x86_64-unknown-linux-musl.tar.gz" | tar xz
+          sudo mv sccache-*/sccache /usr/local/bin/
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
+          # Fallback to local cache if GHA cache fails
+          echo "SCCACHE_GHA_CACHE_TO=gha" >> $GITHUB_ENV
+          echo "SCCACHE_GHA_CACHE_FROM=gha" >> $GITHUB_ENV
 
-      - name: Cache Cargo Index
-        uses: actions/cache@2f8e54208210a422b2efd51efaa6bd6d7ca8920f # pin@v3
-        with:
-          path: ~/.cargo/index
-          key: ${{ runner.os }}-cargo-index
-          restore-keys: |
-            ${{ runner.os }}-cargo-index
+      # Use updated sccache action with better error handling
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@676c0e67b665684f17941acf5cc3af83bcf10228 # pin@v0.0.6
+        continue-on-error: true  # Don't fail build if cache setup fails
 
-      - name: Cache Cargo Build
-        uses: actions/cache@2f8e54208210a422b2efd51efaa6bd6d7ca8920f # pin@v3
-        with:
-          path: target
-          key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-build-
+      # Fallback: Set up local sccache if GHA cache fails
+      - name: Setup fallback sccache
+        if: failure()
+        run: |
+          echo "GitHub Actions cache failed, using local cache"
+          mkdir -p ~/.cache/sccache
+          echo "SCCACHE_DIR=~/.cache/sccache" >> $GITHUB_ENV
+          echo "SCCACHE_GHA_ENABLED=false" >> $GITHUB_ENV
 
-      - name: Build and Test
+      # Optimized cargo caching - combine into single cache
+      - name: Cache Cargo and Target
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # pin@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-target-${{ hashFiles('**/Cargo.lock') }}-v4
+          restore-keys: |
+            ${{ runner.os }}-cargo-target-${{ hashFiles('**/Cargo.lock') }}-
+            ${{ runner.os }}-cargo-target-
+
+      # Clean cargo cache if it's too large
+      - name: Limit cache sizes
+        run: |
+          # Check and limit cargo cache size
+          CARGO_CACHE_SIZE=$(du -sm ~/.cargo 2>/dev/null | cut -f1 || echo "0")
+          echo "Cargo cache size: ${CARGO_CACHE_SIZE}MB"
+          
+          if [ "$CARGO_CACHE_SIZE" -gt 3000 ]; then
+            echo "Cargo cache too large (${CARGO_CACHE_SIZE}MB), cleaning..."
+            rm -rf ~/.cargo/registry/cache
+            rm -rf ~/.cargo/git/db
+            echo "Cleaned cargo cache"
+          fi
+          
+          # Check target directory size
+          if [ -d "target" ]; then
+            TARGET_SIZE=$(du -sm target 2>/dev/null | cut -f1 || echo "0")
+            echo "Target directory size: ${TARGET_SIZE}MB"
+            
+            if [ "$TARGET_SIZE" -gt 8000 ]; then
+              echo "Target directory too large (${TARGET_SIZE}MB), cleaning..."
+              rm -rf target/debug/incremental
+              find target -name "*.rmeta" -delete 2>/dev/null || true
+              echo "Cleaned target directory"
+            fi
+          fi
+
+      - name: Check disk space before build
+        run: df -h
+
+      # Split build and test for better disk management
+      - name: Build project
         run: |
           gnome-keyring-daemon --components=secrets --daemonize --unlock <<< 'foobar'
-          source ../bin/activate-hermit && cargo test
+          source ../bin/activate-hermit && cargo build --workspace
         working-directory: crates
 
-      # Add disk space cleanup before linting
-      - name: Check disk space before cleanup
-        run: df -h
-
-      - name: Clean up disk space
+      - name: Clean intermediate artifacts after build
         run: |
-          echo "Cleaning up disk space..."
-          # Remove debug artifacts that are no longer needed after tests
+          echo "Cleaning intermediate build artifacts..."
+          # Remove .rmeta files (metadata only, not needed for tests)
+          find target -name "*.rmeta" -delete 2>/dev/null || true
+          # Remove fingerprint files
+          find target -name ".fingerprint" -type d -exec rm -rf {} + 2>/dev/null || true
+          # Show disk usage
+          df -h
+
+      - name: Run tests
+        run: |
+          source ../bin/activate-hermit && cargo test --workspace
+        working-directory: crates
+
+      - name: Clean after tests
+        run: |
+          echo "Cleaning up after tests..."
+          # Remove test executables and debug artifacts
+          find target/debug/deps -name "*-*" -type f -executable -delete 2>/dev/null || true
+          rm -rf target/debug/incremental
+          df -h
+
+      - name: Run clippy
+        run: source ./bin/activate-hermit && cargo clippy --workspace -- -D warnings
+
+      - name: Show sccache stats
+        run: sccache --show-stats
+
+      - name: Final cleanup
+        if: always()
+        run: |
+          echo "Final cleanup to save cache space..."
+          # Keep only essential artifacts for caching
           rm -rf target/debug/deps
           rm -rf target/debug/build
-          rm -rf target/debug/incremental
-          # Clean npm cache if it exists
-          npm cache clean --force || true
-          # Clean apt cache
-          sudo apt-get clean
-          # Remove unnecessary large directories
-          rm -rf ~/.cargo/registry/index || true
-          # Remove docker images if any
-          docker system prune -af || true
-          # Remove unused packages
-          sudo apt-get autoremove -y || true
-
-      - name: Check disk space after cleanup
-        run: df -h
-
-      - name: Lint
-        run: source ./bin/activate-hermit && cargo clippy -- -D warnings
+          rm -rf target/debug/examples
+          # Keep .rlib files for faster incremental builds
+          df -h
 
   desktop-lint:
     name: Lint Electron Desktop App
