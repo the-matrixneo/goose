@@ -93,4 +93,4 @@ async fn dataset_agent(
     logging::setup_logging(Some("bench"), errors).expect("Failed to initialize logging");
 
     bench_agent
-} 
+}

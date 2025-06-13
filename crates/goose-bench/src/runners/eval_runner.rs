@@ -68,48 +68,42 @@ impl EvalRunner {
             .first()
             .context("No evaluations specified in configuration")?;
 
+        // read dataset
+        // let dataset = vec![]; // TODO: bench_eval.dataset_path;
+        // 
+        // let results = vec![];
+        // for conv in dataset.iter() {
+        //     let processed: Vec<Series> = conv
+        //         .par_iter()
+        //         .map(async |row| {
+        //             //  new agent 
+        //             let now_stamp = SystemTime::now()
+        //                 .duration_since(UNIX_EPOCH)
+        //                 .context("Failed to get current timestamp")?
+        //                 .as_nanos();
+        //             let ext_reqs = ExtensionRequirements {
+        //                 builtin: Vec::new(),
+        //                 external: Vec::new(),
+        //                 remote: Vec::new(),
+        //             };
+        //             let session_id = format!("{}-{}", bench_eval.selector.clone(), now_stamp);
+        //             // agent = ... // TODO: set extensions
+        //             let mut agent = agent_generator(ext_reqs,
+        //                                             session_id,
+        //                                             true).await;
+        //             let override_prompt = row.get("system_prompt")?;
+        //             agent.session.override_system_prompt(override_prompt).await;
+        // 
+        //             // process
+        //             let prompt = row.get("query")?;
+        //             let resp = agent.prompt(prompt).await;
+        //             resp
+        //         })
+        //         .collect();
+        //         results.append(processed);
+        // }
 
-        let df = CsvReadOptions::default()
-            .try_into_reader_with_file_path(bench_eval.dataset_path)
-            .unwrap()
-            .finish()
-            .unwrap();
-
-        let rows: Vec<Series> = df.iter()
-            .cloned()
-            .collect();
-
-        let processed: Vec<Series> = rows.par_iter()
-            .map(async |row| {
-                //  new agent and
-                let now_stamp = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .context("Failed to get current timestamp")?
-                    .as_nanos();
-                let ext_reqs = ExtensionRequirements {
-                    builtin: Vec::new(),
-                    external: Vec::new(),
-                    remote: Vec::new(),
-                };
-                let session_id = format!("{}-{}", bench_eval.selector.clone(), now_stamp);
-                let mut agent = agent_generator(ext_reqs,
-                                                session_id,
-                                                true).await;
-                let override_prompt = row.get("sys")?;
-                agent.session.override_system_prompt(override_prompt).await;
-                
-                // process
-                let prompt = row.get("query")?;
-                let resp = agent.prompt(prompt).await;
-                resp
-            })
-            .collect();
-
-        //  write new dataset
-        let new_df = DataFrame::new(processed)?;
-
-        let mut file = std::fs::File::create("results.csv").unwrap();
-        CsvWriter::new(&mut file).finish(&mut new_df).unwrap();
+        //  TODO: write results as json on disk
 
         tracing::info!("Evaluation completed successfully");
 

@@ -119,7 +119,7 @@ impl Session {
         Session {
             agent,
             messages,
-            session_file,
+             session_file,
             completion_cache: Arc::new(std::sync::RwLock::new(CompletionCache::new())),
             debug,
             run_mode: RunMode::Normal,
