@@ -23,6 +23,7 @@ use serde_json::Value;
 use tokio::sync::{mpsc, Mutex};
 use tracing::{debug, error, instrument};
 
+use crate::agents::a2a::{A2AProtocol, A2AConfig, AgentCard, Capability as A2ACapability};
 use crate::agents::extension::{ExtensionConfig, ExtensionError, ExtensionResult, ToolInfo};
 use crate::agents::extension_manager::{get_parameter_names, ExtensionManager};
 use crate::agents::platform_tools::{
@@ -59,6 +60,7 @@ pub struct Agent {
     pub(super) tool_result_rx: ToolResultReceiver,
     pub(super) tool_monitor: Mutex<Option<ToolMonitor>>,
     pub(super) router_tool_selector: Mutex<Option<Arc<Box<dyn RouterToolSelector>>>>,
+    pub(super) a2a_protocol: Mutex<Option<A2AProtocol>>,
 }
 
 #[derive(Clone, Debug)]
@@ -85,6 +87,7 @@ impl Agent {
             tool_result_rx: Arc::new(Mutex::new(tool_rx)),
             tool_monitor: Mutex::new(None),
             router_tool_selector: Mutex::new(None),
+            a2a_protocol: Mutex::new(None),
         }
     }
 
@@ -1028,5 +1031,105 @@ impl Agent {
             .expect("valid recipe");
 
         Ok(recipe)
+    }
+
+    /// Initialize A2A protocol for this agent
+    pub async fn enable_a2a_protocol(&self, config: A2AConfig) -> Result<()> {
+        let protocol = A2AProtocol::new(config).await?;
+        *self.a2a_protocol.lock().await = Some(protocol);
+        Ok(())
+    }
+
+    /// Disable A2A protocol
+    pub async fn disable_a2a_protocol(&self) -> Result<()> {
+        if let Some(protocol) = self.a2a_protocol.lock().await.take() {
+            protocol.shutdown().await?;
+        }
+        Ok(())
+    }
+
+    /// Check if A2A protocol is enabled
+    pub async fn is_a2a_enabled(&self) -> bool {
+        self.a2a_protocol.lock().await.is_some()
+    }
+
+    /// Get this agent's A2A card
+    pub async fn get_a2a_card(&self) -> Result<Option<AgentCard>> {
+        let protocol = self.a2a_protocol.lock().await;
+        if let Some(ref protocol) = *protocol {
+            Ok(Some(protocol.get_agent_card().await))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Update A2A capabilities based on current extensions
+    pub async fn update_a2a_capabilities(&self) -> Result<()> {
+        let protocol_guard = self.a2a_protocol.lock().await;
+        if let Some(ref protocol) = *protocol_guard {
+            // Get current tools from extension manager
+            let extension_manager = self.extension_manager.lock().await;
+            let tools = extension_manager.get_prefixed_tools(None).await?;
+            
+            // Convert tools to A2A capabilities
+            let mut capabilities = Vec::new();
+            for tool in tools {
+                let capability = A2ACapability::new(
+                    tool.name.clone(),
+                    tool.name.clone(),
+                    tool.description.clone(),
+                )
+                .with_input_schema(tool.input_schema.clone())
+                .with_tag("goose-tool".to_string());
+                
+                capabilities.push(capability);
+            }
+
+            protocol.update_capabilities(capabilities).await?;
+        }
+        Ok(())
+    }
+
+    /// Discover other A2A agents
+    pub async fn discover_a2a_agents(&self, query: Option<String>, capabilities: Option<Vec<String>>) -> Result<Vec<AgentCard>> {
+        let protocol_guard = self.a2a_protocol.lock().await;
+        if let Some(ref protocol) = *protocol_guard {
+            use crate::agents::a2a::discovery::DiscoveryRequest;
+            let request = DiscoveryRequest {
+                query,
+                capabilities,
+                tags: None,
+                limit: None,
+            };
+            protocol.discover_agents(request).await
+        } else {
+            Err(anyhow!("A2A protocol not enabled"))
+        }
+    }
+
+    /// Invoke a capability on another A2A agent
+    pub async fn invoke_a2a_capability(
+        &self,
+        target_agent_id: &str,
+        capability_id: &str,
+        input: Value,
+        streaming: bool,
+    ) -> Result<crate::agents::a2a::protocol::A2AResponse> {
+        let protocol_guard = self.a2a_protocol.lock().await;
+        if let Some(ref protocol) = *protocol_guard {
+            protocol.invoke_capability(target_agent_id, capability_id, input, streaming).await
+        } else {
+            Err(anyhow!("A2A protocol not enabled"))
+        }
+    }
+
+    /// Ping another A2A agent to check availability
+    pub async fn ping_a2a_agent(&self, agent_id: &str) -> Result<bool> {
+        let protocol_guard = self.a2a_protocol.lock().await;
+        if let Some(ref protocol) = *protocol_guard {
+            protocol.ping_agent(agent_id).await
+        } else {
+            Err(anyhow!("A2A protocol not enabled"))
+        }
     }
 }

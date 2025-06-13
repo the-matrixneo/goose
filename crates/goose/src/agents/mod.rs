@@ -1,3 +1,4 @@
+pub mod a2a;
 mod agent;
 mod context;
 pub mod extension;
@@ -13,6 +14,7 @@ mod tool_router_index_manager;
 pub(crate) mod tool_vectordb;
 mod types;
 
+pub use a2a::{A2AProtocol, A2AConfig, AgentCard, AgentDiscovery, A2ACommunication, DiscoveryConfig, CommunicationConfig};
 pub use agent::{Agent, AgentEvent};
 pub use extension::ExtensionConfig;
 pub use extension_manager::ExtensionManager;

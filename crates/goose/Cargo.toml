@@ -45,7 +45,7 @@ indoc = "2.0.5"
 nanoid = "0.4"
 sha2 = "0.10"
 base64 = "0.21"
-url = "2.5"
+url = { version = "2.5", features = ["serde"] }
 axum = "0.8.1"
 webbrowser = "0.8"
 dotenv = "0.15"
@@ -82,6 +82,9 @@ tokio-stream = "0.1.17"
 # Vector database for tool selection
 lancedb = "0.13"
 arrow = "52.2"
+
+# A2A Protocol dependencies
+tokio-tungstenite = { version = "0.24", features = ["rustls-tls-native-roots"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 winapi = { version = "0.3", features = ["wincred"] }
