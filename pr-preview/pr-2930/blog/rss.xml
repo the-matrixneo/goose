@@ -16,7 +16,7 @@
             <description><![CDATA[How Goose uses multiple LLMs within a single task, optimizing for speed, cost, and reliability in AI agent workflows]]></description>
             <content:encoded><![CDATA[<p><img decoding="async" loading="lazy" alt="blog cover" src="https://block.github.io/goose/pr-preview/pr-2930/assets/images/multi-model-ai-agent-d408feaeba3e13cafdbfe9377980bc3d.png" width="1200" height="630" class="img_ev3q"></p>
 <p>Not every task needs a genius. And not every step should cost a fortune.</p>
-<p>That’s something we’ve learned the hard way while scaling Goose, our open source AI agent. The same model that’s great at unpacking a gnarly planning request might totally fumble a basic shell command—or worse, it might burn through your token budget doing it.</p>
+<p>That's something we've learned the hard way while scaling Goose, our open source AI agent. The same model that's great at unpacking a gnarly planning request might totally fumble a basic shell command—or worse, it might burn through your token budget doing it.</p>
 <p>So we asked ourselves: what if we could mix and match models in a single session?</p>
 <p>Not just switching based on user commands, but building Goose with an actual system for routing tasks between different models, each playing to their strengths.</p>
 <p>This is the gap the lead/worker model is designed to fill.</p>
@@ -27,7 +27,7 @@
 <li>Go too premium, and your cost graph starts looking like a ski slope.</li>
 </ul>
 <p>There was no built-in way to adapt on the fly.</p>
-<p>We saw this tension in real usage: agents would start strong, then stall out when the model struggled to follow through. Sometimes users would manually switch models mid-session. But that’s not scalable, and definitely not agent-like.</p>
+<p>We saw this tension in real usage: agents would start strong, then stall out when the model struggled to follow through. Sometimes users would manually switch models mid-session. But that's not scalable, and definitely not agent-like.</p>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="designing-the-leadworker-system">Designing the Lead/Worker System<a href="https://block.github.io/goose/pr-preview/pr-2930/blog/2025/06/16/multi-model-in-goose#designing-the-leadworker-system" class="hash-link" aria-label="Direct link to Designing the Lead/Worker System" title="Direct link to Designing the Lead/Worker System">​</a></h2>
 <p>The core idea is simple:</p>
 <ul>
@@ -35,21 +35,21 @@
 <li>After a few back-and-forths between you and the model (what we call "turns"), hand off to a worker model that's faster and cheaper, but still capable.</li>
 <li>If the worker gets stuck, Goose can detect the failure and temporarily bring the lead back in.</li>
 </ul>
-<p>It’s turn-based, transparent, and automatic.</p>
+<p>It's turn-based, transparent, and automatic.</p>
 <p>You can configure how many turns the lead handles upfront (<code>GOOSE_LEAD_TURNS</code>), how many consecutive failures trigger fallback (<code>GOOSE_LEAD_FAILURE_THRESHOLD</code>), and how long the fallback lasts before Goose retries the worker.</p>
 <p>This gives you a flexible, resilient setup where each model gets used where it shines.</p>
 <p>One of the trickiest parts of this feature was defining what failure looks like.</p>
-<p>We didn’t want Goose to swap models just because an API timed out. Instead, we focused on real task failures:</p>
+<p>We didn't want Goose to swap models just because an API timed out. Instead, we focused on real task failures:</p>
 <ul>
 <li>Tool execution errors</li>
 <li>Syntax mistakes in generated code</li>
 <li>File not found or permission errors</li>
-<li>User corrections like "that’s wrong" or "try again"</li>
+<li>User corrections like "that's wrong" or "try again"</li>
 </ul>
 <p>Goose tracks these signals and knows when to escalate. And once the fallback model stabilizes things, it switches back without missing a beat.</p>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="the-value-of-multi-model-design">The Value of Multi-Model Design<a href="https://block.github.io/goose/pr-preview/pr-2930/blog/2025/06/16/multi-model-in-goose#the-value-of-multi-model-design" class="hash-link" aria-label="Direct link to The Value of Multi-Model Design" title="Direct link to The Value of Multi-Model Design">​</a></h2>
 <p>Cost savings are a nice side effect, but the real value is in how this shifts the mental model: treating AI models like tools in a toolbox, each with its own role to play. Some are built for strategy. Some are built for speed. The more your agent can switch between them intelligently, the closer it gets to feeling like a true collaborator.</p>
-<p>We’ve found that this multi-model design unlocks new workflows:</p>
+<p>We've found that this multi-model design unlocks new workflows:</p>
 <ul>
 <li><strong>Long dev sessions</strong> where planning and execution ebb and flow</li>
 <li><strong>Cross-provider setups</strong> (Claude for planning, OpenAI for execution)</li>
@@ -60,9 +60,9 @@
 <p><a href="https://block.github.io/goose/pr-preview/pr-2930/docs/tutorials/lead-worker">Lead/worker mode</a> is already available in Goose.  To enable, simply export these variables with two models that have already been configured in Goose:</p>
 <div class="language-bash codeBlockContainer_Ckt0 theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_biex"><pre tabindex="0" class="prism-code language-bash codeBlock_bY9V thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_e6Vv"><span class="token-line" style="color:#393A34"><span class="token plain">export GOOSE_LEAD_MODEL="gpt-4o"</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain">export GOOSE_MODEL="claude-4-sonnet"</span><br></span></code></pre><div class="buttonGroup__atx"><button type="button" aria-label="Copy code to clipboard" title="Copy" class="clean-btn"><span class="copyButtonIcons_eSgA" aria-hidden="true"><svg viewBox="0 0 24 24" class="copyButtonIcon_y97N"><path fill="currentColor" d="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z"></path></svg><svg viewBox="0 0 24 24" class="copyButtonSuccessIcon_LjdS"><path fill="currentColor" d="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z"></path></svg></span></button></div></div></div>
 <p>From there, Goose takes care of the hand off, the fallback, and the recovery. You just... keep vibing.</p>
-<p>If you're curious how it all works under the hood, we’ve got a <a href="https://block.github.io/goose/pr-preview/pr-2930/docs/tutorials/lead-worker">full tutorial</a>.</p>
+<p>If you're curious how it all works under the hood, we've got a <a href="https://block.github.io/goose/pr-preview/pr-2930/docs/tutorials/lead-worker">full tutorial</a>.</p>
 <hr>
-<p>We’ll keep sharing what we’re learning as we build toward more dynamic, more useful AI agents. If you're experimenting with multi-model setups, we’d love to hear what’s working—and what isn't.</p>
+<p>We'll keep sharing what we're learning as we build toward more dynamic useful AI agents. If you're experimenting with multi-model setups, we'd love to hear what's working—and what isn't.</p>
 ]]></content:encoded>
         </item>
         <item>
