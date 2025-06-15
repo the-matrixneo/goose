@@ -27,7 +27,7 @@
 <li>Go too premium, and your cost graph starts looking like a ski slope.</li>
 </ul>
 <p>There was no built-in way to adapt on the fly.</p>
-<p>We saw this tension in real usage: agents would start strong, then stall out when the model struggled to follow through. Sometimes users would manually switch models mid-session. But that's not scalable, and definitely not agent-like.</p>
+<p>We saw this tension in real usage: agents would start strong, then stall out when the model struggled to follow through. Sometimes users would manually switch models mid-session. But that's not scalable, and definitely not agent like.</p>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="designing-the-leadworker-system">Designing the Lead/Worker System<a href="https://block.github.io/goose/pr-preview/pr-2930/blog/2025/06/16/multi-model-in-goose#designing-the-leadworker-system" class="hash-link" aria-label="Direct link to Designing the Lead/Worker System" title="Direct link to Designing the Lead/Worker System">​</a></h2>
 <p>The core idea is simple:</p>
 <ul>
@@ -62,7 +62,7 @@
 <p>From there, Goose takes care of the hand off, the fallback, and the recovery. You just... keep vibing.</p>
 <p>If you're curious how it all works under the hood, we've got a <a href="https://block.github.io/goose/pr-preview/pr-2930/docs/tutorials/lead-worker">full tutorial</a>.</p>
 <hr>
-<p>We'll keep sharing what we're learning as we build toward more dynamic useful AI agents. If you're experimenting with multi-model setups, we'd love to hear what's working—and what isn't.</p>
+<p>We'll keep sharing what we're learning as we build toward more dynamic useful AI agents. If you're experimenting with multi-model setups, <a href="https://discord.gg/block-opensource" target="_blank" rel="noopener noreferrer">share</a> what's working and what isn't.</p>
 ]]></content:encoded>
         </item>
         <item>
