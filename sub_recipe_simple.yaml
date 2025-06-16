@@ -3,11 +3,11 @@ title: top recipes
 author:
   contact: douwe
 description: Will do multiple things
-instructions: Your job is to do multiple things, use multi-task tool to do it
+instructions: Your job is to do multiple things, use sub-recipe multi_task_plan tool to do it
 prompt: |
-  can you find the multi-task tool?
-  use sub recipe tool to say greeting to Alice 
+  can you find the sub recipe tool?
   find the file number under the current directory
+  find the file size under the current directory for the first file
 extensions:
 - type: builtin
   name: developer
@@ -15,7 +15,7 @@ extensions:
   timeout: 300
   bundled: true
 - type: builtin
-  name: multi-task
-  display_name: multi-task
+  name: sub-recipe
+  display_name: sub-recipe
   timeout: 300
   bundled: true

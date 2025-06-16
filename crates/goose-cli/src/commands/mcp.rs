@@ -33,7 +33,6 @@ pub async fn run_server(name: &str) -> Result<()> {
         "memory" => Some(Box::new(RouterService(MemoryRouter::new()))),
         "tutorial" => Some(Box::new(RouterService(TutorialRouter::new()))),
         "sub-recipe" => Some(Box::new(RouterService(SubRecipeRouter::new()))),
-        "multi-task" => Some(Box::new(RouterService(MultiTaskRouter::new()))),
         _ => None,
     };
 
