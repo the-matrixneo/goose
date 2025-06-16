@@ -30,6 +30,7 @@ pub struct BenchEvalDataset {
     pub prompt_column: String,
     pub tools_column: Option<String>,
     pub llm_output_column: String,
+    pub output_dataset_file_name: String,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
