@@ -546,7 +546,7 @@ function ChatContent({
               />
             </div>
             <div
-              className="flex flex-col flex-1 rounded-none h-[calc(100vh-95px)] w-full bg-bgApp mt-0 border-none relative"
+              className="flex flex-col flex-1 rounded-none w-full bg-bgApp mt-0 border-none relative"
               onDrop={handleDrop}
               onDragOver={handleDragOver}
             >
@@ -573,7 +573,7 @@ function ChatContent({
                   title={recipeConfig?.title}
                 />
               ) : (
-                <ScrollArea ref={scrollRef} className="flex-1" autoScroll>
+                <ScrollArea ref={scrollRef} className="flex-1 h-[calc(100vh-95px)]" autoScroll>
                   <SearchView>
                     {filteredMessages.map((message, index) => (
                       <div

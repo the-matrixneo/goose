@@ -2,7 +2,7 @@ import { useTextAnimator } from '@/hooks/use-text-animator';
 import { Card } from '../ui/card';
 import { useState, useEffect } from 'react';
 import { gsap } from 'gsap';
-import { SessionInsights } from './SessionInsights';
+import { SessionInsights } from '../sessions/SessionInsights';
 
 // Register GSAP plugins
 gsap.registerPlugin();
