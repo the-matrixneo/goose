@@ -1,4 +1,5 @@
 mod multi_task_plan;
+mod multi_task_plan_description;
 
 use anyhow::Result;
 use mcp_core::{
@@ -20,11 +21,12 @@ use std::{
 };
 use tokio::{sync::mpsc};
 
-use crate::sub_recipe::multi_task_plan::{format_thought, validate_thought_data, SequentialThinkingState};
+use crate::sub_recipe::multi_task_plan::{format_task, validate_task_data, TasksState};
+use crate::sub_recipe::multi_task_plan_description::MULTI_TASK_PLAN_DESCRIPTION;
 
 pub struct SubRecipeRouter {
     tools: Vec<Tool>,
-    state: Arc<Mutex<SequentialThinkingState>>,
+    state: Arc<Mutex<TasksState>>,
 }
 
 impl Default for SubRecipeRouter {
@@ -35,128 +37,124 @@ impl Default for SubRecipeRouter {
 
 impl SubRecipeRouter {
     pub fn new() -> Self {
-        // Create the sequential thinking tool
-        let sequential_thinking_tool = Tool::new(
+        let multi_task_plan_tool = Tool::new(
             "multi_task_plan".to_string(),
-            r#"A detailed tool for dynamic and reflective problem-solving through thoughts.
-This tool helps analyze problems through a flexible thinking process that can adapt and evolve.
-Each thought can build on, question, or revise previous insights as understanding deepens.
-
-When to use this tool:
-- Breaking down complex problems into steps
-- Planning and design with room for revision
-- Analysis that might need course correction
-- Problems where the full scope might not be clear initially
-- Problems that require a multi-step solution
-- Tasks that need to maintain context over multiple steps
-- Situations where irrelevant information needs to be filtered out
-
-Key features:
-- You can adjust total_thoughts up or down as you progress
-- You can question or revise previous thoughts
-- You can add more thoughts even after reaching what seemed like the end
-- You can express uncertainty and explore alternative approaches
-- Not every thought needs to build linearly - you can branch or backtrack
-- Generates a solution hypothesis
-- Verifies the hypothesis based on the Chain of Thought steps
-- Repeats the process until satisfied
-- Provides a correct answer"#.to_string(),
+            MULTI_TASK_PLAN_DESCRIPTION.to_string(),
             json!({
                 "type": "object",
                 "properties": {
-                    "thought": {
+                    "task": {
                         "type": "string",
                         "description": "Your current thinking step"
                     },
-                    "next_thought_needed": {
-                        "type": "boolean",
-                        "description": "Whether another thought step is needed"
+                    "task_id": {
+                        "type": "string",
+                        "description": "A unique ID for the task"
                     },
-                    "thought_number": {
+                    "next_task_needed": {
+                        "type": "boolean",
+                        "description": "Whether another task step is needed"
+                    },
+                    "task_number": {
                         "type": "integer",
-                        "description": "Current thought number",
+                        "description": "Current task number",
                         "minimum": 1
                     },
-                    "total_thoughts": {
+                    "total_tasks": {
                         "type": "integer",
-                        "description": "Estimated total thoughts needed",
+                        "description": "Estimated total tasks needed",
                         "minimum": 1
                     },
                     "is_revision": {
                         "type": "boolean",
                         "description": "Whether this revises previous thinking"
                     },
-                    "revises_thought": {
+                    "revises_task": {
                         "type": "integer",
-                        "description": "Which thought is being reconsidered",
+                        "description": "Which task is being reconsidered",
                         "minimum": 1
                     },
-                    "branch_from_thought": {
+                    "branch_from_task": {
                         "type": "integer",
-                        "description": "Branching point thought number",
+                        "description": "Branching point task number",
                         "minimum": 1
                     },
                     "branch_id": {
                         "type": "string",
                         "description": "Branch identifier"
                     },
-                    "needs_more_thoughts": {
+                    "needs_more_tasks": {
                         "type": "boolean",
-                        "description": "If more thoughts are needed"
-                    }
+                        "description": "If more tasks are needed"
+                    },
+                    "depends_on": {
+                        "type": "array",
+                        "description": "Task IDs this task depends on. If not provided, the task is independent.",
+                        "items": { "type": "string" }
+                    },
+                    "execution_id": {
+                        "type": "string",
+                        "description": "A unique ID for the execution attempt for the task"
+                    },
+                    "execution_status": {
+                        "type": "string",
+                        "enum": ["pending", "running", "completed", "failed"],
+                        "description": "Task execution status"
+                    },
                 },
-                "required": ["thought", "next_thought_needed", "thought_number", "total_thoughts"]
+                "required": ["task", "next_task_needed", "task_number", "total_tasks"]
             }),
             Some(ToolAnnotations {
-                title: Some("Sequential Thinking".to_string()),
+                title: Some("Multi-Task Planning".to_string()),
                 read_only_hint: false,
                 destructive_hint: false,
-                idempotent_hint: false,
+                idempotent_hint: true,
                 open_world_hint: false,
             }),
         );
 
         Self {
-            tools: vec![sequential_thinking_tool],
-            state: Arc::new(Mutex::new(SequentialThinkingState {
-                thought_history: Vec::new(),
+            tools: vec![multi_task_plan_tool],
+            state: Arc::new(Mutex::new(TasksState {
+                task_history: Vec::new(),
                 branches: HashMap::new(),
             })),
         }
     }
 
-    async fn sequential_thinking(&self, params: Value) -> Result<Vec<Content>, ToolError> {
-        // Validate and parse the thought data
-        let mut thought_data = validate_thought_data(params)?;
+    async fn multi_task_planning(&self, params: Value) -> Result<Vec<Content>, ToolError> {
+        let mut task_data = validate_task_data(params)?;
         
-        // Adjust total thoughts if needed
-        if thought_data.thought_number > thought_data.total_thoughts {
-            thought_data.total_thoughts = thought_data.thought_number;
+        if task_data.task_number > task_data.total_tasks {
+            task_data.total_tasks = task_data.task_number;
         }
         
-        // Format and print the thought
-        let formatted_thought = format_thought(&thought_data);
-        eprintln!("{}", formatted_thought);
+        let formatted_task = format_task(&task_data);
+        eprintln!("{}", formatted_task);
         
-        // Store the thought in history
         let mut state = self.state.lock().unwrap();
+
         
-        state.thought_history.push(thought_data.clone());
+        state.task_history.push(task_data.clone());
+        println!("task_history: {:?}", state.task_history);
         
         // Handle branch storage
-        if let (Some(_branch_from), Some(branch_id)) = (thought_data.branch_from_thought, thought_data.branch_id.clone()) {
+        if let (Some(_branch_from), Some(branch_id)) = (task_data.branch_from_task, task_data.branch_id.clone()) {
             state.branches.entry(branch_id.clone())
                 .or_insert_with(Vec::new)
-                .push(thought_data.clone());
+                .push(task_data.clone());
         }
         
         // Prepare response
         let response = json!({
-            "thought_number": thought_data.thought_number,
-            "total_thoughts": thought_data.total_thoughts,
-            "next_thought_needed": thought_data.next_thought_needed,
+            "task_number": task_data.task_number,
+            "total_tasks": task_data.total_tasks,
+            "next_task_needed": task_data.next_task_needed,
             "branches": state.branches.keys().collect::<Vec<_>>(),
-            "thought_history_length": state.thought_history.len()
+            "task_history_length": state.task_history.len(),
+            "depends_on": task_data.depends_on,
+            "execution_id": task_data.execution_id,
+            "execution_status": task_data.execution_status,
         });
         
         // Return the response
@@ -196,7 +194,7 @@ impl Router for SubRecipeRouter {
         
         Box::pin(async move {
             match tool_name.as_str() {
-                "multi_task_plan" => this.sequential_thinking(arguments).await,
+                "multi_task_plan" => this.multi_task_planning(arguments).await,
                 _ => Err(ToolError::NotFound(format!("Tool {} not found", tool_name))),
             }
         })

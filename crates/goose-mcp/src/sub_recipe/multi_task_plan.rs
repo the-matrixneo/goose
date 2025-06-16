@@ -9,85 +9,88 @@ use mcp_core::
 ;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ThoughtData {
-    pub thought: String,
-    pub thought_number: u32,
-    pub total_thoughts: u32,
-    pub next_thought_needed: bool,
+pub struct TaskData {
+    pub task: String,
+    pub task_number: u32,
+    pub total_tasks: u32,
+    pub next_task_needed: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub is_revision: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub revises_thought: Option<u32>,
+    pub revises_task: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub branch_from_thought: Option<u32>,
+    pub branch_from_task: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub branch_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub needs_more_thoughts: Option<bool>,
+    pub needs_more_tasks: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub depends_on: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub execution_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub execution_status: Option<String>,
 }
 
-pub struct SequentialThinkingState {
-    pub thought_history: Vec<ThoughtData>,
-    pub branches: HashMap<String, Vec<ThoughtData>>,
+pub struct TasksState {
+    pub task_history: Vec<TaskData>,
+    pub branches: HashMap<String, Vec<TaskData>>,
 }
 
-pub fn validate_thought_data(params: Value) -> Result<ThoughtData, ToolError> {
-    // Parse the JSON data into ThoughtData
-    let thought_data: ThoughtData = serde_json::from_value(params)
-        .map_err(|e| ToolError::InvalidParameters(format!("Invalid thought data: {}", e)))?;
+pub fn validate_task_data(params: Value) -> Result<TaskData, ToolError> {
+    let task_data: TaskData = serde_json::from_value(params)
+        .map_err(|e| ToolError::InvalidParameters(format!("Invalid task data: {}", e)))?;
 
-    // Validate required fields
-    if thought_data.thought.is_empty() {
+    if task_data.task.is_empty() {
         return Err(ToolError::InvalidParameters(
-            "Invalid thought: must be a non-empty string".into(),
+            "Invalid task: must be a non-empty string".into(),
         ));
     }
 
-    if thought_data.thought_number == 0 {
+    if task_data.task_number == 0 {
         return Err(ToolError::InvalidParameters(
-            "Invalid thoughtNumber: must be a positive number".into(),
+            "Invalid taskNumber: must be a positive number".into(),
         ));
     }
 
-    if thought_data.total_thoughts == 0 {
+    if task_data.total_tasks == 0 {
         return Err(ToolError::InvalidParameters(
-            "Invalid totalThoughts: must be a positive number".into(),
+            "Invalid totalTasks: must be a positive number".into(),
         ));
     }
 
-    Ok(thought_data)
+    Ok(task_data)
 }
 
-// Format thought for display
-pub fn format_thought(thought_data: &ThoughtData) -> String {
-    let (prefix, context) = if thought_data.is_revision.unwrap_or(false) {
+pub fn format_task(task_data: &TaskData) -> String {
+    let (prefix, context) = if task_data.is_revision.unwrap_or(false) {
         (
             "🔄 Revision",
             format!(
-                " (revising thought {})",
-                thought_data.revises_thought.unwrap_or(0)
+                " (revising task {})",
+                task_data.revises_task.unwrap_or(0)
             ),
         )
-    } else if thought_data.branch_from_thought.is_some() {
+    } else if task_data.branch_from_task.is_some() {
         (
             "🌿 Branch",
             format!(
-                " (from thought {}, ID: {})",
-                thought_data.branch_from_thought.unwrap_or(0),
-                thought_data.branch_id.as_deref().unwrap_or("unknown")
+                " (from task {}, ID: {})",
+                task_data.branch_from_task.unwrap_or(0),
+                task_data.branch_id.as_deref().unwrap_or("unknown")
             ),
         )
     } else {
-        ("💭 Thought", String::new())
+        ("💭 Task", String::new())
     };
 
     let header = format!(
         "{} {}/{}{}",
-        prefix, thought_data.thought_number, thought_data.total_thoughts, context
+        prefix, task_data.task_number, task_data.total_tasks, context
     );
     
-    let thought_len = thought_data.thought.len();
-    let border_len = std::cmp::max(100, thought_len) + 4;
+    let task_len = task_data.task.len();
+    let border_len = std::cmp::max(100, task_len) + 4;
     let border = "─".repeat(border_len);
 
     format!(
@@ -95,7 +98,7 @@ pub fn format_thought(thought_data: &ThoughtData) -> String {
         border,
         header,
         border,
-        format!("{:<width$}", thought_data.thought, width = border_len - 2),
+        format!("{:<width$}", task_data.task, width = border_len - 2),
         border
     )
     
