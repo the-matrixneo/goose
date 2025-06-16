@@ -37,10 +37,18 @@ import * as yaml from 'yaml';
 import windowStateKeeper from 'electron-window-state';
 import {
   setupAutoUpdater,
+  registerUpdateIpcHandlers,
   setTrayRef,
   updateTrayMenu,
   getUpdateAvailable,
 } from './utils/autoUpdater';
+import { UPDATES_ENABLED } from './updates';
+
+// Updater functions (moved here to keep updates.ts minimal for release replacement)
+function shouldSetupUpdater(): boolean {
+  // Setup updater if either the flag is enabled OR dev updates are enabled
+  return UPDATES_ENABLED || process.env.ENABLE_DEV_UPDATES === 'true';
+}
 
 // Define temp directory for pasted images
 const gooseTempDir = path.join(app.getPath('temp'), 'goose-pasted-images');
@@ -1156,8 +1164,11 @@ const registerGlobalHotkey = (accelerator: string) => {
 };
 
 app.whenReady().then(async () => {
-  // Setup auto-updater
-  setupAutoUpdater();
+  // Register update IPC handlers once
+  registerUpdateIpcHandlers();
+
+  // Setup auto-updater if enabled
+  shouldSetupUpdater() && setupAutoUpdater();
 
   // Add CSP headers to all sessions
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
