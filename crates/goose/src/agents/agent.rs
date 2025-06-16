@@ -16,7 +16,7 @@ use crate::permission::permission_judge::check_tool_permissions;
 use crate::permission::PermissionConfirmation;
 use crate::providers::base::Provider;
 use crate::providers::errors::ProviderError;
-use crate::recipe::{Author, Recipe};
+use crate::recipe::{Author, Recipe, Settings};
 use crate::tool_monitor::{ToolCall, ToolMonitor};
 use regex::Regex;
 use serde_json::Value;
@@ -248,13 +248,29 @@ impl Agent {
             || tool_call.name == ROUTER_LLM_SEARCH_TOOL_NAME
         {
             let selector = self.router_tool_selector.lock().await.clone();
-            ToolCallResult::from(if let Some(selector) = selector {
-                selector.select_tools(tool_call.arguments.clone()).await
-            } else {
-                Err(ToolError::ExecutionError(
-                    "Encountered vector search error.".to_string(),
-                ))
-            })
+            let selected_tools = match selector.as_ref() {
+                Some(selector) => match selector.select_tools(tool_call.arguments.clone()).await {
+                    Ok(tools) => tools,
+                    Err(e) => {
+                        return (
+                            request_id,
+                            Err(ToolError::ExecutionError(format!(
+                                "Failed to select tools: {}",
+                                e
+                            ))),
+                        )
+                    }
+                },
+                None => {
+                    return (
+                        request_id,
+                        Err(ToolError::ExecutionError(
+                            "No tool selector available".to_string(),
+                        )),
+                    )
+                }
+            };
+            ToolCallResult::from(Ok(selected_tools))
         } else {
             // Clone the result to ensure no references to extension_manager are returned
             let result = extension_manager
@@ -987,12 +1003,26 @@ impl Agent {
             metadata: None,
         };
 
+        // Ideally we'd get the name of the provider we are using from the provider itself
+        // but it doesn't know and the plumbing looks complicated.
+        let config = Config::global();
+        let provider_name: String = config
+            .get_param("GOOSE_PROVIDER")
+            .expect("No provider configured. Run 'goose configure' first");
+
+        let settings = Settings {
+            goose_provider: Some(provider_name.clone()),
+            goose_model: Some(model_name.clone()),
+            temperature: Some(model_config.temperature.unwrap_or(0.0)),
+        };
+
         let recipe = Recipe::builder()
             .title("Custom recipe from chat")
             .description("a custom recipe instance from this chat session")
             .instructions(instructions)
             .activities(activities)
             .extensions(extension_configs)
+            .settings(settings)
             .author(author)
             .build()
             .expect("valid recipe");

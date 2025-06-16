@@ -25,7 +25,7 @@ pub enum RouterToolSelectionStrategy {
 #[async_trait]
 pub trait RouterToolSelector: Send + Sync {
     async fn select_tools(&self, params: Value) -> Result<Vec<Content>, ToolError>;
-    async fn index_tools(&self, tools: &[Tool]) -> Result<(), ToolError>;
+    async fn index_tools(&self, tools: &[Tool], extension_name: &str) -> Result<(), ToolError>;
     async fn remove_tool(&self, tool_name: &str) -> Result<(), ToolError>;
     async fn record_tool_call(&self, tool_name: &str) -> Result<(), ToolError>;
     async fn get_recent_tool_calls(&self, limit: usize) -> Result<Vec<String>, ToolError>;
@@ -79,6 +79,9 @@ impl RouterToolSelector for VectorToolSelector {
 
         let k = params.get("k").and_then(|v| v.as_u64()).unwrap_or(5) as usize;
 
+        // Extract extension_name from params if present
+        let extension_name = params.get("extension_name").and_then(|v| v.as_str());
+
         // Check if provider supports embeddings
         if !self.embedding_provider.supports_embeddings() {
             return Err(ToolError::ExecutionError(
@@ -101,7 +104,7 @@ impl RouterToolSelector for VectorToolSelector {
 
         let vector_db = self.vector_db.read().await;
         let tools = vector_db
-            .search_tools(query_embedding, k)
+            .search_tools(query_embedding, k, extension_name)
             .await
             .map_err(|e| ToolError::ExecutionError(format!("Failed to search tools: {}", e)))?;
 
@@ -122,7 +125,7 @@ impl RouterToolSelector for VectorToolSelector {
         Ok(selected_tools)
     }
 
-    async fn index_tools(&self, tools: &[Tool]) -> Result<(), ToolError> {
+    async fn index_tools(&self, tools: &[Tool], extension_name: &str) -> Result<(), ToolError> {
         let texts_to_embed: Vec<String> = tools
             .iter()
             .map(|tool| {
@@ -158,6 +161,7 @@ impl RouterToolSelector for VectorToolSelector {
                     description: tool.description.clone(),
                     schema: schema_str,
                     vector,
+                    extension_name: extension_name.to_string(),
                 }
             })
             .collect();
@@ -278,7 +282,7 @@ impl RouterToolSelector for LLMToolSelector {
         }
     }
 
-    async fn index_tools(&self, tools: &[Tool]) -> Result<(), ToolError> {
+    async fn index_tools(&self, tools: &[Tool], _extension_name: &str) -> Result<(), ToolError> {
         let mut tool_strings = self.tool_strings.write().await;
 
         for tool in tools {

@@ -17,18 +17,20 @@ pub fn vector_search_tool() -> Tool {
             Format a query to search for the most relevant tools based on the user's messages.
             Pay attention to the keywords in the user's messages, especially the last message and potential tools they are asking for.
             This tool should be invoked when the user's messages suggest they are asking for a tool to be run.
-            Examples:
-            - {"User": "what is the weather in Tokyo?", "Query": "weather in Tokyo"}
-            - {"User": "read this pdf file for me", "Query": "read pdf file"}
-            - {"User": "run this command ls -l in the terminal", "Query": "run command in terminal ls -l"}
+            You have the list of extension names available to you in your system prompt.
+            Use the extension_name parameter to filter tools by the appropriate extension.
+            For example, if the user is asking to list the files in the current directory, you filter for the "developer" extension.
+            Example: {"User": "list the files in the current directory", "Query": "list files in current directory", "Extension Name": "developer", "k": 5}
+            Extension name is not optional, it is required.
         "#}
         .to_string(),
         json!({
             "type": "object",
-            "required": ["query"],
+            "required": ["query", "extension_name"],
             "properties": {
                 "query": {"type": "string", "description": "The query to search for the most relevant tools based on the user's messages"},
-                "k": {"type": "integer", "description": "The number of tools to retrieve (defaults to 5)", "default": 5}
+                "k": {"type": "integer", "description": "The number of tools to retrieve (defaults to 5)", "default": 5},
+                "extension_name": {"type": "string", "description": "Name of the extension to filter tools by"}
             }
         }),
         Some(ToolAnnotations {
@@ -43,7 +45,7 @@ pub fn vector_search_tool() -> Tool {
 
 pub fn vector_search_tool_prompt() -> String {
     r#"# Tool Selection Instructions
-    Imporant: the user has opted to dynamically enable tools, so although an extension could be enabled, \
+    Important: the user has opted to dynamically enable tools, so although an extension could be enabled, \
     please invoke the vector search tool to actually retrieve the most relevant tools to use according to the user's messages.
     For example, if the user has 3 extensions enabled, but they are asking for a tool to read a pdf file, \
     you would invoke the vector_search tool to find the most relevant read pdf tool.

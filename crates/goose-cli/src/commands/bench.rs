@@ -59,6 +59,7 @@ async fn standard_agent(
         builtins: requirements.builtin,
         extensions_override: None,
         additional_system_prompt: None,
+        settings: None,
         debug: false,
         max_tool_repetitions: None,
         interactive: false, // Benchmarking is non-interactive

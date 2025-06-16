@@ -716,6 +716,7 @@ dependencies = [
  "aws-credential-types",
  "aws-sigv4",
  "aws-smithy-async",
+ "aws-smithy-eventstream",
  "aws-smithy-http 0.60.12",
  "aws-smithy-runtime",
  "aws-smithy-runtime-api",
@@ -773,6 +774,29 @@ dependencies = [
  "aws-types",
  "bytes",
  "fastrand",
+ "http 0.2.12",
+ "once_cell",
+ "regex-lite",
+ "tracing",
+]
+
+[[package]]
+name = "aws-sdk-sagemakerruntime"
+version = "1.63.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8c3188bb9f962a9e1781c917dbe7f016ab9430e4bd81ba7daf422e58d86a3595"
+dependencies = [
+ "aws-credential-types",
+ "aws-runtime",
+ "aws-smithy-async",
+ "aws-smithy-eventstream",
+ "aws-smithy-http 0.61.1",
+ "aws-smithy-json",
+ "aws-smithy-runtime",
+ "aws-smithy-runtime-api",
+ "aws-smithy-types",
+ "aws-types",
+ "bytes",
  "http 0.2.12",
  "once_cell",
  "regex-lite",
@@ -853,6 +877,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9bfe75fad52793ce6dec0dc3d4b1f388f038b5eb866c8d4d7f3a8e21b5ea5051"
 dependencies = [
  "aws-credential-types",
+ "aws-smithy-eventstream",
  "aws-smithy-http 0.60.12",
  "aws-smithy-runtime-api",
  "aws-smithy-types",
@@ -3733,7 +3758,7 @@ dependencies = [
 
 [[package]]
 name = "goose"
-version = "1.0.27"
+version = "1.0.28"
 dependencies = [
  "anyhow",
  "arrow",
@@ -3741,6 +3766,7 @@ dependencies = [
  "async-trait",
  "aws-config",
  "aws-sdk-bedrockruntime",
+ "aws-sdk-sagemakerruntime",
  "aws-smithy-types",
  "axum",
  "base64 0.21.7",
@@ -3794,7 +3820,7 @@ dependencies = [
 
 [[package]]
 name = "goose-bench"
-version = "1.0.27"
+version = "1.0.28"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3821,7 +3847,7 @@ dependencies = [
 
 [[package]]
 name = "goose-cli"
-version = "1.0.27"
+version = "1.0.28"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3871,7 +3897,7 @@ dependencies = [
 
 [[package]]
 name = "goose-ffi"
-version = "1.0.27"
+version = "1.0.28"
 dependencies = [
  "cbindgen",
  "futures",
@@ -3885,7 +3911,7 @@ dependencies = [
 
 [[package]]
 name = "goose-llm"
-version = "1.0.27"
+version = "1.0.28"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3914,7 +3940,7 @@ dependencies = [
 
 [[package]]
 name = "goose-mcp"
-version = "1.0.27"
+version = "1.0.28"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3980,7 +4006,7 @@ dependencies = [
 
 [[package]]
 name = "goose-server"
-version = "1.0.27"
+version = "1.0.28"
 dependencies = [
  "anyhow",
  "async-trait",
