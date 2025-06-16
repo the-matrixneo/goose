@@ -1,6 +1,8 @@
 mod multi_task_plan;
 mod multi_task_plan_description;
 mod shell_command_job;
+mod break_down_recipe_description;
+mod break_down_recipe;
 
 use anyhow::Result;
 use mcp_core::{
@@ -23,10 +25,10 @@ use std::{
 use tokio::sync::mpsc;
 use uuid::Uuid;
 
-use crate::sub_recipe::shell_command_job::{
+use crate::sub_recipe::{break_down_recipe::{RecipeTaskData, RecipeTasks}, break_down_recipe_description::{BREAK_DOWN_TASK_DESCRIPTION, BREAK_DOWN_TASK_SCHEMA}, shell_command_job::{
     start_dispatcher, submit_job, validate_shell_job_params, JobSender,
     SHELL_COMMAND_JOB_DESCRIPTION, SHELL_COMMAND_JOB_SCHEMA,
-};
+}};
 
 use crate::sub_recipe::multi_task_plan::{format_task, validate_task_data, TasksState};
 use crate::sub_recipe::multi_task_plan_description::{
@@ -49,12 +51,24 @@ impl Default for SubRecipeRouter {
 
 impl SubRecipeRouter {
     pub fn new() -> Self {
-        let multi_task_plan_tool = Tool::new(
-            "multi_task_plan".to_string(),
-            MULTI_TASK_PLAN_DESCRIPTION.to_string(),
-            serde_json::from_str(MULTI_TASK_PLAN_SCHEMA).unwrap(),
+        // let multi_task_plan_tool = Tool::new(
+        //     "multi_task_plan".to_string(),
+        //     MULTI_TASK_PLAN_DESCRIPTION.to_string(),
+        //     serde_json::from_str(MULTI_TASK_PLAN_SCHEMA).unwrap(),
+        //     Some(ToolAnnotations {
+        //         title: Some("Multi-Task Planning".to_string()),
+        //         read_only_hint: false,
+        //         destructive_hint: false,
+        //         idempotent_hint: true,
+        //         open_world_hint: false,
+        //     }),
+        // );
+        let break_down_task_tool = Tool::new(
+            "break_down_task".to_string(),
+            BREAK_DOWN_TASK_DESCRIPTION.to_string(),
+            serde_json::from_str(BREAK_DOWN_TASK_SCHEMA).unwrap(),
             Some(ToolAnnotations {
-                title: Some("Multi-Task Planning".to_string()),
+                title: Some("break down recipe".to_string()),
                 read_only_hint: false,
                 destructive_hint: false,
                 idempotent_hint: true,
@@ -85,7 +99,7 @@ impl SubRecipeRouter {
         });
 
         Self {
-            tools: vec![multi_task_plan_tool, shell_command_job_tool],
+            tools: vec![shell_command_job_tool, break_down_task_tool],
             state: Arc::new(Mutex::new(TasksState {
                 task_history: Vec::new(),
                 branches: HashMap::new(),
@@ -129,6 +143,26 @@ impl SubRecipeRouter {
             "depends_on": task_data.depends_on,
             "execution_id": task_data.execution_id,
             "execution_status": task_data.execution_status,
+        });
+
+        // Return the response
+        Ok(vec![Content::text(
+            serde_json::to_string_pretty(&response).unwrap(),
+        )
+        .with_audience(vec![Role::Assistant])])
+    }
+
+    async fn break_down_task(&self, params: Value) -> Result<Vec<Content>, ToolError> {
+        let recipe_tasks: RecipeTasks = serde_json::from_value(params)
+        .map_err(|e| {
+            println!("error: {:?}", e);
+            ToolError::InvalidParameters(format!("========Invalid task data: {}", e))
+        })?;
+
+        // println!("task_data: {:?}", &task_data);
+
+        let response = json!({
+            "tasks": recipe_tasks.tasks
         });
 
         // Return the response
@@ -248,8 +282,9 @@ impl Router for SubRecipeRouter {
 
         Box::pin(async move {
             match tool_name.as_str() {
-                "multi_task_plan" => this.multi_task_planning(arguments).await,
+                // "multi_task_plan" => this.multi_task_planning(arguments).await,
                 "sub_recipe_run" => this.shell_command_job(arguments).await,
+                "break_down_task" => this.break_down_task(arguments).await,
                 _ => Err(ToolError::NotFound(format!("Tool {} not found", tool_name))),
             }
         })

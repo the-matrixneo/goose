@@ -3,7 +3,7 @@ title: top recipes
 author:
   contact: douwe
 description: Will do multiple things
-instructions: Your job is to do multiple things
+instructions: Your job is to do multiple things. use break down task tool to break down the recipe into smaller tasks
 prompt: |
   1. use weather recipe to get the weather for {{city}}
   2. write the weather to a file
