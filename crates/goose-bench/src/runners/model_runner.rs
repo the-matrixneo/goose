@@ -213,7 +213,7 @@ impl ModelRunner {
             .evals
             .clone()
             .into_iter()
-            .partition(|eval| eval.dataset_path.is_some());
+            .partition(|eval| eval.dataset.is_some());
         
         result.insert("dataset_evals".to_string(),dataset_evals.clone());
 

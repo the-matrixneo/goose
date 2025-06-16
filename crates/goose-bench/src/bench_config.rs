@@ -25,9 +25,17 @@ pub struct BenchEnvVar {
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct BenchEvalDataset {
+    pub path: PathBuf,
+    pub prompt_column: String,
+    pub tools_column: Option<String>,
+    pub llm_output_column: String,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct BenchEval {
     pub env: Vec<BenchEnvVar>,
-    pub dataset_path: Option<PathBuf>,
+    pub dataset: Option<BenchEvalDataset>,
     pub selector: String,
     pub post_process_cmd: Option<PathBuf>,
     pub parallel_safe: bool,
@@ -67,7 +75,7 @@ impl Default for BenchRunConfig {
             ],
             evals: vec![BenchEval {
                 env: vec![],
-                dataset_path: None,
+                dataset: None,
                 selector: "core".into(),
                 post_process_cmd: None,
                 parallel_safe: true, // Default to true

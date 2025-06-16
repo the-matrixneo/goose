@@ -5,8 +5,9 @@ use crate::eval_suites::{EvaluationSuite, ExtensionRequirements};
 use crate::reporting::EvaluationResult;
 use crate::utilities::await_process_exits;
 use anyhow::{bail, Context, Result};
-use polars::prelude::{CsvReadOptions, CsvWriter, DataFrame, LazyFrame, SerReader, SerWriter, Series};
-use rayon::prelude::IntoParallelRefIterator;
+use mcp_core::Tool;
+use rayon::prelude::*;
+use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::future::Future;
@@ -59,7 +60,7 @@ impl EvalRunner {
 
     pub async fn run_dataset<F, Fut>(&mut self, agent_generator: F) -> Result<()>
     where
-        F: Fn(ExtensionRequirements, String, bool) -> Fut,
+        F: Fn(ExtensionRequirements, String, bool, Option<HashMap<String, Vec<Tool>>>) -> Fut,
         Fut: Future<Output=BenchAgent> + Send,
     {
         let bench_eval = self
@@ -68,51 +69,69 @@ impl EvalRunner {
             .first()
             .context("No evaluations specified in configuration")?;
 
-        // read dataset
-        // let dataset = vec![]; // TODO: bench_eval.dataset_path;
-        // 
-        // let results = vec![];
-        // for conv in dataset.iter() {
-        //     let processed: Vec<Series> = conv
-        //         .par_iter()
-        //         .map(async |row| {
-        //             //  new agent 
-        //             let now_stamp = SystemTime::now()
-        //                 .duration_since(UNIX_EPOCH)
-        //                 .context("Failed to get current timestamp")?
-        //                 .as_nanos();
-        //             let ext_reqs = ExtensionRequirements {
-        //                 builtin: Vec::new(),
-        //                 external: Vec::new(),
-        //                 remote: Vec::new(),
-        //             };
-        //             let session_id = format!("{}-{}", bench_eval.selector.clone(), now_stamp);
-        //             // agent = ... // TODO: set extensions
-        //             let mut agent = agent_generator(ext_reqs,
-        //                                             session_id,
-        //                                             true).await;
-        //             let override_prompt = row.get("system_prompt")?;
-        //             agent.session.override_system_prompt(override_prompt).await;
-        // 
-        //             // process
-        //             let prompt = row.get("query")?;
-        //             let resp = agent.prompt(prompt).await;
-        //             resp
-        //         })
-        //         .collect();
-        //         results.append(processed);
-        // }
+        if let Some(dataset) = &bench_eval.dataset {
+            let mut results = Vec::new();
+            let dataset: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&dataset.path)?)?;
 
-        //  TODO: write results as json on disk
+            if let Some(conversations) = dataset.as_array() {
+                for conv in conversations {
+                    if let Some(rows) = conv.as_array() {
+                        let processed: Vec<_> = rows
+                            .par_iter()
+                            .map(|row| {
+                                let session_id = row.get("source_id")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or("default")
+                                    .to_string();
+                                let available_extensions = HashMap::new(); // Extract from row.get("extensions") when needed
+                                let override_prompt = row.get("system_prompt").and_then(|v| v.as_str()).map(|s| s.to_string());
+                                let prompt = row.get("query").and_then(|v| v.as_str()).map(|s| s.to_string());
+                                (session_id, available_extensions, override_prompt, prompt)
+                            })
+                            .collect();
 
-        tracing::info!("Evaluation completed successfully");
+                        // Process async operations sequentially but with parallel data preparation
+                        for (session_id, available_extensions, override_prompt, prompt) in processed {
+                            let mut agent = agent_generator(
+                                ExtensionRequirements::default(),
+                                session_id,
+                                true,
+                                Some(available_extensions),
+                            ).await;
+
+                            if let Some(override_prompt) = override_prompt {
+                                agent.session.override_system_prompt(override_prompt).await;
+                            }
+
+                            if let Some(prompt) = prompt {
+                                match agent.prompt(prompt).await {
+                                    Ok(messages) => results.push(serde_json::json!({"success": true, "messages": messages})),
+                                    Err(e) => results.push(serde_json::json!({"success": false, "error": e.to_string()})),
+                                }
+                            } else {
+                                results.push(serde_json::json!({"success": false, "error": "No query found"}));
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Write results
+            let results_path = format!("{}_results.json", bench_eval.selector);
+            std::fs::write(
+                &results_path,
+                serde_json::to_string_pretty(&results)?,
+            )?;
+
+            tracing::info!("Wrote dataset evaluation results to {}", results_path);
+        }
 
         Ok(())
     }
 
     pub async fn run<F, Fut>(&mut self, agent_generator: F) -> Result<()>
     where
-        F: Fn(ExtensionRequirements, String, bool) -> Fut,
+        F: Fn(ExtensionRequirements, String, bool, Option<HashMap<String, Vec<Tool>>>) -> Fut,
         Fut: Future<Output=BenchAgent> + Send,
     {
         let bench_eval = self
@@ -121,7 +140,7 @@ impl EvalRunner {
             .first()
             .context("No evaluations specified in configuration")?;
 
-        if bench_eval.dataset_path.is_some() {
+        if bench_eval.dataset.is_some() {
             return self.run_dataset(agent_generator).await;
         }
 
@@ -149,7 +168,8 @@ impl EvalRunner {
             let session_id = format!("{}-{}", bench_eval.selector.clone(), now_stamp);
             let mut agent = agent_generator(eval.required_extensions(),
                                             session_id,
-                                            false).await;
+                                            false,
+                                            None).await;
             tracing::info!("Agent created for {}", eval.name());
 
             let mut result = EvaluationResult::new(eval.name().to_string());
