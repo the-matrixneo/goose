@@ -11,6 +11,10 @@ use crate::types::core::{Content, ImageContent, TextContent, ToolCall, ToolResul
 pub struct ToolRequestToolCall(#[serde(with = "tool_result_serde")] pub ToolResult<ToolCall>);
 
 impl ToolRequestToolCall {
+    pub fn new(tool_call: ToolCall) -> Self {
+        ToolRequestToolCall(Ok(tool_call))
+    }
+
     pub fn as_result(&self) -> &ToolResult<ToolCall> {
         &self.0
     }
@@ -33,6 +37,10 @@ pub struct ToolResponseToolResult(
 );
 
 impl ToolResponseToolResult {
+    pub fn new(contents: Vec<Content>) -> Self {
+        ToolResponseToolResult(Ok(contents))
+    }
+    
     pub fn as_result(&self) -> &ToolResult<Vec<Content>> {
         &self.0
     }
