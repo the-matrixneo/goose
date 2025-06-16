@@ -13,6 +13,8 @@ pub mod google_drive;
 mod jetbrains;
 mod memory;
 mod tutorial;
+mod sub_recipe;
+mod multi_task;
 
 pub use computercontroller::ComputerControllerRouter;
 pub use developer::DeveloperRouter;
@@ -20,3 +22,5 @@ pub use google_drive::GoogleDriveRouter;
 pub use jetbrains::JetBrainsRouter;
 pub use memory::MemoryRouter;
 pub use tutorial::TutorialRouter;
+pub use sub_recipe::SubRecipeRouter;
+pub use multi_task::MultiTaskRouter;

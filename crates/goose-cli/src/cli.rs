@@ -18,7 +18,7 @@ use crate::commands::schedule::{
 use crate::commands::session::{handle_session_list, handle_session_remove};
 use crate::logging::setup_logging;
 use crate::recipes::recipe::{explain_recipe_with_parameters, load_recipe_as_template};
-use crate::recipes::sub_recipe_command::create_sub_recipe_instructions;
+use crate::recipes::sub_recipe_command::{create_sub_recipe_instructions, recipe_runner_instructions};
 use crate::session;
 use crate::session::{build_session, SessionBuilderConfig, SessionSettings};
 use goose_bench::bench_config::BenchRunConfig;
@@ -731,12 +731,12 @@ pub async fn cli() -> Result<()> {
                             eprintln!("{}: {}", console::style("Error").red().bold(), err);
                             std::process::exit(1);
                         });
-                    let sub_recipe_instructions = create_sub_recipe_instructions(&recipe);
+                    let recipe_runner_instructions_str = create_sub_recipe_instructions(&recipe);
                     (
                         InputConfig {
                             contents: recipe.prompt,
                             extensions_override: recipe.extensions,
-                            additional_system_prompt: Some(recipe.instructions.unwrap_or_default() + &sub_recipe_instructions),
+                            additional_system_prompt: Some(recipe.instructions.unwrap_or_default() + &recipe_runner_instructions_str),
                         },
                         recipe.settings.map(|s| SessionSettings {
                             goose_provider: s.goose_provider,
