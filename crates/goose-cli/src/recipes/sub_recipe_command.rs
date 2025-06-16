@@ -5,7 +5,7 @@ pub fn create_sub_recipe_instructions(recipe: &Recipe) -> String {
     if let Some(sub_recipes) = &recipe.sub_recipes {
         for sub_recipe in sub_recipes {
             let sub_recipe_command = create_sub_recipe_command(sub_recipe);
-            instructions.push_str(&format!("if {} is required to run, then run command: {} \n", sub_recipe.name, sub_recipe_command));
+            instructions.push_str(&format!("if {} is required to run, then use sub_recipe_run tool to run the command: {} \n", sub_recipe.name, sub_recipe_command));
         }
     }
     instructions

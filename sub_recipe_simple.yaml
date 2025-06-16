@@ -3,11 +3,23 @@ title: top recipes
 author:
   contact: douwe
 description: Will do multiple things
-instructions: Your job is to do multiple things, use sub-recipe multi_task_plan tool to do it
+instructions: Your job is to do multiple things
 prompt: |
-  can you find the sub recipe tool?
-  find the file number under the current directory
-  find the file size under the current directory for the first file
+  1. use weather recipe to get the weather for {{city}}
+  2. write the weather to a file
+  3. use joke-of-the-day recipe
+  4. write the joke to a file
+sub_recipes:
+- name: joke-of-the-day
+  file: "{{recipe_dir}}/joke-of-the-day.yaml"
+  params:
+    - name: date
+      value: "{{date}}"
+- name: whether
+  file: "{{recipe_dir}}/weather.yaml"
+  params:
+    - name: city
+      value: "{{city}}"
 extensions:
 - type: builtin
   name: developer
@@ -19,3 +31,12 @@ extensions:
   display_name: sub-recipe
   timeout: 300
   bundled: true
+parameters:
+- key: date
+  input_type: string
+  requirement: required
+  description: date provided by the user
+- key: city
+  input_type: string
+  requirement: required
+  description: city provided by the user

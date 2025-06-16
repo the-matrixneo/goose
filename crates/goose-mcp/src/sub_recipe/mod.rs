@@ -1,11 +1,12 @@
 mod multi_task_plan;
 mod multi_task_plan_description;
+mod shell_command_job;
 
 use anyhow::Result;
 use mcp_core::{
     handler::{PromptError, ResourceError, ToolError},
-    protocol::{JsonRpcMessage, ServerCapabilities},
     prompt::Prompt,
+    protocol::{JsonRpcMessage, ServerCapabilities},
     resource::Resource,
     role::Role,
     tool::{Tool, ToolAnnotations},
@@ -19,14 +20,24 @@ use std::{
     pin::Pin,
     sync::{Arc, Mutex},
 };
-use tokio::{sync::mpsc};
+use tokio::sync::mpsc;
+use uuid::Uuid;
+
+use crate::sub_recipe::shell_command_job::{
+    start_dispatcher, submit_job, validate_shell_job_params, JobSender,
+    SHELL_COMMAND_JOB_DESCRIPTION, SHELL_COMMAND_JOB_SCHEMA,
+};
 
 use crate::sub_recipe::multi_task_plan::{format_task, validate_task_data, TasksState};
-use crate::sub_recipe::multi_task_plan_description::MULTI_TASK_PLAN_DESCRIPTION;
+use crate::sub_recipe::multi_task_plan_description::{
+    MULTI_TASK_PLAN_DESCRIPTION, MULTI_TASK_PLAN_SCHEMA,
+};
 
 pub struct SubRecipeRouter {
     tools: Vec<Tool>,
     state: Arc<Mutex<TasksState>>,
+    job_map: Arc<tokio::sync::Mutex<HashMap<Uuid, shell_command_job::JobStatus>>>,
+    job_sender: Option<JobSender>,
 }
 
 impl Default for SubRecipeRouter {
@@ -34,76 +45,14 @@ impl Default for SubRecipeRouter {
         Self::new()
     }
 }
+// sub_recipe_run
 
 impl SubRecipeRouter {
     pub fn new() -> Self {
         let multi_task_plan_tool = Tool::new(
             "multi_task_plan".to_string(),
             MULTI_TASK_PLAN_DESCRIPTION.to_string(),
-            json!({
-                "type": "object",
-                "properties": {
-                    "task": {
-                        "type": "string",
-                        "description": "Your current thinking step"
-                    },
-                    "task_id": {
-                        "type": "string",
-                        "description": "A unique ID for the task"
-                    },
-                    "next_task_needed": {
-                        "type": "boolean",
-                        "description": "Whether another task step is needed"
-                    },
-                    "task_number": {
-                        "type": "integer",
-                        "description": "Current task number",
-                        "minimum": 1
-                    },
-                    "total_tasks": {
-                        "type": "integer",
-                        "description": "Estimated total tasks needed",
-                        "minimum": 1
-                    },
-                    "is_revision": {
-                        "type": "boolean",
-                        "description": "Whether this revises previous thinking"
-                    },
-                    "revises_task": {
-                        "type": "integer",
-                        "description": "Which task is being reconsidered",
-                        "minimum": 1
-                    },
-                    "branch_from_task": {
-                        "type": "integer",
-                        "description": "Branching point task number",
-                        "minimum": 1
-                    },
-                    "branch_id": {
-                        "type": "string",
-                        "description": "Branch identifier"
-                    },
-                    "needs_more_tasks": {
-                        "type": "boolean",
-                        "description": "If more tasks are needed"
-                    },
-                    "depends_on": {
-                        "type": "array",
-                        "description": "Task IDs this task depends on. If not provided, the task is independent.",
-                        "items": { "type": "string" }
-                    },
-                    "execution_id": {
-                        "type": "string",
-                        "description": "A unique ID for the execution attempt for the task"
-                    },
-                    "execution_status": {
-                        "type": "string",
-                        "enum": ["pending", "running", "completed", "failed"],
-                        "description": "Task execution status"
-                    },
-                },
-                "required": ["task", "next_task_needed", "task_number", "total_tasks"]
-            }),
+            serde_json::from_str(MULTI_TASK_PLAN_SCHEMA).unwrap(),
             Some(ToolAnnotations {
                 title: Some("Multi-Task Planning".to_string()),
                 read_only_hint: false,
@@ -113,39 +62,64 @@ impl SubRecipeRouter {
             }),
         );
 
+        let shell_command_job_tool = Tool::new(
+            "sub_recipe_run".to_string(),
+            SHELL_COMMAND_JOB_DESCRIPTION.to_string(),
+            serde_json::from_str(SHELL_COMMAND_JOB_SCHEMA).unwrap(),
+            Some(ToolAnnotations {
+                title: Some("Shell Command Job System".to_string()),
+                read_only_hint: false,
+                destructive_hint: true,
+                idempotent_hint: false,
+                open_world_hint: false,
+            }),
+        );
+
+        let job_map = Arc::new(tokio::sync::Mutex::new(HashMap::new()));
+        let (job_sender, job_receiver) = mpsc::channel(100);
+
+        // Start the job dispatcher
+        let job_map_clone = job_map.clone();
+        tokio::spawn(async move {
+            start_dispatcher(job_receiver, job_map_clone, 5).await;
+        });
+
         Self {
-            tools: vec![multi_task_plan_tool],
+            tools: vec![multi_task_plan_tool, shell_command_job_tool],
             state: Arc::new(Mutex::new(TasksState {
                 task_history: Vec::new(),
                 branches: HashMap::new(),
             })),
+            job_map,
+            job_sender: Some(job_sender),
         }
     }
 
     async fn multi_task_planning(&self, params: Value) -> Result<Vec<Content>, ToolError> {
         let mut task_data = validate_task_data(params)?;
-        
+
         if task_data.task_number > task_data.total_tasks {
             task_data.total_tasks = task_data.task_number;
         }
-        
+
         let formatted_task = format_task(&task_data);
         eprintln!("{}", formatted_task);
-        
+
         let mut state = self.state.lock().unwrap();
 
-        
         state.task_history.push(task_data.clone());
         println!("task_history: {:?}", state.task_history);
-        
-        // Handle branch storage
-        if let (Some(_branch_from), Some(branch_id)) = (task_data.branch_from_task, task_data.branch_id.clone()) {
-            state.branches.entry(branch_id.clone())
-                .or_insert_with(Vec::new)
+
+        if let (Some(_branch_from), Some(branch_id)) =
+            (task_data.branch_from_task, task_data.branch_id.clone())
+        {
+            state
+                .branches
+                .entry(branch_id.clone())
+                .or_default()
                 .push(task_data.clone());
         }
-        
-        // Prepare response
+
         let response = json!({
             "task_number": task_data.task_number,
             "total_tasks": task_data.total_tasks,
@@ -156,10 +130,90 @@ impl SubRecipeRouter {
             "execution_id": task_data.execution_id,
             "execution_status": task_data.execution_status,
         });
-        
+
         // Return the response
-        Ok(vec![Content::text(serde_json::to_string_pretty(&response).unwrap())
-            .with_audience(vec![Role::Assistant])])
+        Ok(vec![Content::text(
+            serde_json::to_string_pretty(&response).unwrap(),
+        )
+        .with_audience(vec![Role::Assistant])])
+    }
+
+    async fn shell_command_job(&self, params: Value) -> Result<Vec<Content>, ToolError> {
+        let (action, command, job_id_str) =
+            validate_shell_job_params(params).map_err(ToolError::InvalidParameters)?;
+
+        match action.as_str() {
+            "submit" => {
+                let command = command.unwrap();
+                let sender = self.job_sender.as_ref().ok_or_else(|| {
+                    ToolError::ExecutionError("Job sender not initialized".to_string())
+                })?;
+
+                let job_id = submit_job(command.clone(), sender, &self.job_map).await;
+
+                let response = json!({
+                    "job_id": job_id.to_string(),
+                    "command": command,
+                    "status": "queued"
+                });
+
+                Ok(vec![Content::text(
+                    serde_json::to_string_pretty(&response).unwrap(),
+                )
+                .with_audience(vec![Role::Assistant])])
+            }
+            "status" => {
+                let job_id_str = job_id_str.unwrap(); // Safe because validate_shell_job_params ensures it's present
+                let job_id = Uuid::parse_str(&job_id_str).map_err(|_| {
+                    ToolError::InvalidParameters(format!("Invalid job ID: {}", job_id_str))
+                })?;
+
+                let status = {
+                    let map = self.job_map.lock().await;
+                    map.get(&job_id).cloned()
+                };
+
+                if let Some(status) = status {
+                    let response = json!({
+                        "job_id": job_id.to_string(),
+                        "status": status
+                    });
+
+                    Ok(vec![Content::text(
+                        serde_json::to_string_pretty(&response).unwrap(),
+                    )
+                    .with_audience(vec![Role::Assistant])])
+                } else {
+                    Err(ToolError::NotFound(format!(
+                        "Job with ID {} not found",
+                        job_id
+                    )))
+                }
+            }
+            "list" => {
+                let jobs = {
+                    let map = self.job_map.lock().await;
+                    let mut jobs = HashMap::new();
+                    for (id, status) in map.iter() {
+                        jobs.insert(id.to_string(), status.clone());
+                    }
+                    jobs
+                };
+
+                let response = json!({
+                    "jobs": jobs
+                });
+
+                Ok(vec![Content::text(
+                    serde_json::to_string_pretty(&response).unwrap(),
+                )
+                .with_audience(vec![Role::Assistant])])
+            }
+            _ => Err(ToolError::InvalidParameters(format!(
+                "Unknown action: {}",
+                action
+            ))),
+        }
     }
 }
 
@@ -191,15 +245,16 @@ impl Router for SubRecipeRouter {
     ) -> Pin<Box<dyn Future<Output = Result<Vec<Content>, ToolError>> + Send + 'static>> {
         let this = self.clone();
         let tool_name = tool_name.to_string();
-        
+
         Box::pin(async move {
             match tool_name.as_str() {
                 "multi_task_plan" => this.multi_task_planning(arguments).await,
+                "sub_recipe_run" => this.shell_command_job(arguments).await,
                 _ => Err(ToolError::NotFound(format!("Tool {} not found", tool_name))),
             }
         })
     }
-    
+
     // Implement the required resource-related methods
     fn list_resources(&self) -> Vec<Resource> {
         Vec::new() // No resources for this MCP
@@ -210,7 +265,9 @@ impl Router for SubRecipeRouter {
         _uri: &str,
     ) -> Pin<Box<dyn Future<Output = Result<String, ResourceError>> + Send + 'static>> {
         Box::pin(async move {
-            Err(ResourceError::NotFound("No resources available".to_string()))
+            Err(ResourceError::NotFound(
+                "No resources available".to_string(),
+            ))
         })
     }
 
@@ -225,7 +282,10 @@ impl Router for SubRecipeRouter {
     ) -> Pin<Box<dyn Future<Output = Result<String, PromptError>> + Send + 'static>> {
         let prompt_name = prompt_name.to_string(); // Clone the string to own it
         Box::pin(async move {
-            Err(PromptError::NotFound(format!("Prompt '{}' not found", prompt_name)))
+            Err(PromptError::NotFound(format!(
+                "Prompt '{}' not found",
+                prompt_name
+            )))
         })
     }
 }
@@ -235,6 +295,8 @@ impl Clone for SubRecipeRouter {
         Self {
             tools: self.tools.clone(),
             state: Arc::clone(&self.state),
+            job_map: Arc::clone(&self.job_map),
+            job_sender: self.job_sender.clone(),
         }
     }
 }

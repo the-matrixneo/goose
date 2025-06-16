@@ -6,6 +6,7 @@ When to use this tool:
 - Breaking down complex problems into tasks
 - Planning and design with room for revision
 - Analysis that might need course correction
+- Analysis that task depends on other tasks
 - Problems where the full scope might not be clear initially
 - Problems that require a multi-step solution
 - Tasks that need to maintain context over multiple tasks
@@ -32,6 +33,7 @@ Parameters explained:
 * Hypothesis generation
 * Hypothesis verification
 - next_task_needed: True if you need more tasks, even if at what seemed like the end
+- task_id: A unique ID for the task
 - task_number: Current number in sequence (can go beyond initial total if needed)
 - total_tasks: Current estimate of tasks needed (can be adjusted up/down)
 - is_revision: A boolean indicating if this task revises previous task
@@ -45,17 +47,18 @@ Parameters explained:
 
 You should:
 1. Start with an initial estimate of needed tasks, but be ready to adjust
-2. Feel free to question or revise previous tasks
-3. Don't hesitate to add more tasks if needed, even at the "end"
-4. Express uncertainty when present
-5. Mark tasks that revise previous tasks or branch into new paths
-6. Ignore information that is irrelevant to the current task
-7. Generate a solution hypothesis when appropriate
-8. Verify the hypothesis based on the Chain of Thought tasks
-9. Repeat the process until satisfied with the solution
-10. Provide a single, ideally correct answer as the final output
-11. Only set next_task_needed to false when truly done and a satisfactory answer is reached
-12. Track the execution status of each task
+2. If a task depends on other tasks, use the depends_on parameter to indicate the task IDs that the current task depends on.
+3. Feel free to question or revise previous tasks
+4. Don't hesitate to add more tasks if needed, even at the "end"
+5. Express uncertainty when present
+6. Mark tasks that revise previous tasks or branch into new paths
+7. Ignore information that is irrelevant to the current task
+8. Generate a solution hypothesis when appropriate
+9. Verify the hypothesis based on the Chain of Thought tasks
+10. Repeat the process until satisfied with the solution
+11. Provide a single, ideally correct answer as the final output
+12. Only set next_task_needed to false when truly done and a satisfactory answer is reached
+13. Track the execution status of each task
     - Set "execution_status" to "pending" initially
     - Then update it to "running", "completed", or "failed"
     Example:
@@ -70,4 +73,70 @@ You should:
         "task": "Perform task 1",
         "execution_status": "completed",
     }
+14. Optimize sub-recipe execution by checking the dependencies of the task. If the sub recipe task does not depend on any other task, then run it immediately.
 "#;
+
+pub const MULTI_TASK_PLAN_SCHEMA: &str = r#"{
+    "type": "object",
+    "properties": {
+        "task": {
+            "type": "string",
+            "description": "Your current thinking step"
+        },
+        "task_id": {
+            "type": "string",
+            "description": "A unique ID for the task"
+        },
+        "next_task_needed": {
+            "type": "boolean",
+            "description": "Whether another task step is needed"
+        },
+        "task_number": {
+            "type": "integer",
+            "description": "Current task number",
+            "minimum": 1
+        },
+        "total_tasks": {
+            "type": "integer",
+            "description": "Estimated total tasks needed",
+            "minimum": 1
+        },
+        "is_revision": {
+            "type": "boolean",
+            "description": "Whether this revises previous thinking"
+        },
+        "revises_task": {
+            "type": "integer",
+            "description": "Which task is being reconsidered",
+            "minimum": 1
+        },
+        "branch_from_task": {
+            "type": "integer",
+            "description": "Branching point task number",
+            "minimum": 1
+        },
+        "branch_id": {
+            "type": "string",
+            "description": "Branch identifier"
+        },
+        "needs_more_tasks": {
+            "type": "boolean",
+            "description": "If more tasks are needed"
+        },
+        "depends_on": {
+            "type": "array",
+            "description": "Task IDs this task depends on. If not provided, the task is independent.",
+            "items": { "type": "string" }
+        },
+        "execution_id": {
+            "type": "string",
+            "description": "A unique ID for the execution attempt for the task"
+        },
+        "execution_status": {
+            "type": "string",
+            "enum": ["pending", "running", "completed", "failed"],
+            "description": "Task execution status"
+        }
+    },
+    "required": ["task", "next_task_needed", "task_number", "total_tasks", "task_id"]
+}"#;
