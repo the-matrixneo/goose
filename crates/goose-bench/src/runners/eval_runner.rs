@@ -70,7 +70,14 @@ impl EvalRunner {
             .context("No evaluations specified in configuration")?;
 
         if let Some(dataset) = &bench_eval.dataset {
+            let prompt_column = dataset.prompt_column.clone();
+            if prompt_column.is_empty() {
+                return Ok(()); // TODO MARCELLE: not ok err?
+            }
+
             let mut results = Vec::new();
+            let system_prompt_column = dataset.system_prompt_column.clone();
+            let tools_column = dataset.tools_column.clone();
             let dataset: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&dataset.path)?)?;
 
             if let Some(conversations) = dataset.as_array() {
@@ -78,40 +85,38 @@ impl EvalRunner {
                     if let Some(rows) = conv.as_array() {
                         let processed: Vec<_> = rows
                             .par_iter()
-                            .map(|row| {
-                                let session_id = row.get("source_id")
-                                    .and_then(|v| v.as_str())
-                                    .unwrap_or("default")
-                                    .to_string();
-                                let available_extensions = HashMap::new(); // Extract from row.get("extensions") when needed
-                                let override_prompt = row.get("system_prompt").and_then(|v| v.as_str()).map(|s| s.to_string());
+                            .map(async |row| {
+                                let mut available_extensions = HashMap::new();
+                                if let Some(tools_col) = tools_column.as_ref() {
+                                    let exts = row.get(tools_col).and_then(|v| v.as_str()).map(|s| s.to_string());
+                                    if let Some(exts) = exts.as_ref() {
+                                        available_extensions = serde_json::from_str::<HashMap<String, Vec<Tool>>>(exts.as_str())?;
+                                    }
+                                }
+
+                                let mut agent = agent_generator(
+                                    ExtensionRequirements::default(),
+                                    "".to_string(),
+                                    true,
+                                    Some(available_extensions),
+                                ).await;
+
+                                if let Some(system_prompt_col) = system_prompt_column.as_ref() {
+                                    let override_prompt = row.get(system_prompt_col).and_then(|v| v.as_str()).map(|s| s.to_string());
+                                    if let Some(override_prompt) = override_prompt {
+                                        agent.session.override_system_prompt(override_prompt).await;
+                                    }
+                                }
+
                                 let prompt = row.get("query").and_then(|v| v.as_str()).map(|s| s.to_string());
-                                (session_id, available_extensions, override_prompt, prompt)
+                                agent.prompt(prompt.unwrap()).await
                             })
                             .collect();
-
-                        // Process async operations sequentially but with parallel data preparation
-                        for (session_id, available_extensions, override_prompt, prompt) in processed {
-                            let mut agent = agent_generator(
-                                ExtensionRequirements::default(),
-                                session_id,
-                                true,
-                                Some(available_extensions),
-                            ).await;
-
-                            if let Some(override_prompt) = override_prompt {
-                                agent.session.override_system_prompt(override_prompt).await;
-                            }
-
-                            if let Some(prompt) = prompt {
-                                match agent.prompt(prompt).await {
-                                    Ok(messages) => results.push(serde_json::json!({"success": true, "messages": messages})),
-                                    Err(e) => results.push(serde_json::json!({"success": false, "error": e.to_string()})),
-                                }
-                            } else {
-                                results.push(serde_json::json!({"success": false, "error": "No query found"}));
-                            }
-                        }
+                        results.push(processed);
+                        // match agent.prompt(prompt).await {
+                        // Ok(messages) => results.push(serde_json::json!({"success": true, "messages": messages})),
+                        // Err(e) => results.push(serde_json::json!({"success": false, "error": e.to_string()})),
+                        // }
                     }
                 }
             }
