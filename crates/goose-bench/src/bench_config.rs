@@ -28,6 +28,7 @@ pub struct BenchEnvVar {
 pub struct BenchEvalDataset {
     pub path: PathBuf,
     pub prompt_column: String,
+    pub system_prompt_column: Option<String>,
     pub tools_column: Option<String>,
     pub llm_output_column: String,
     pub output_dataset_file_name: String,
