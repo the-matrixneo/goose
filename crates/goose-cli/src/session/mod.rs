@@ -879,6 +879,7 @@ impl Session {
                                 match method.as_str() {
                                     "notifications/message" => {
                                         let data = o.get("data").unwrap_or(&Value::Null);
+                                        let show_message_history = data.get("show_message_history").and_then(|v| v.as_bool()).unwrap_or(false);
                                         let message = match data {
                                             Value::String(s) => s.clone(),
                                             Value::Object(o) => {
@@ -895,7 +896,7 @@ impl Session {
                                         if interactive {
                                             output::set_thinking_message(&message);
                                         } else {
-                                            progress_bars.log(&message);
+                                            progress_bars.log(&message, show_message_history);
                                         }
                                     },
                                     "notifications/progress" => {

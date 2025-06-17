@@ -84,27 +84,14 @@ impl SubRecipeRouter {
         }
     }
 
-    async fn run_sub_recipe(&self, _params: Value) -> Result<Vec<Content>, ToolError> {
+    async fn run_sub_recipe(&self, _params: Value, notifier: mpsc::Sender<JsonRpcMessage>) -> Result<Vec<Content>, ToolError> {
         // let sub_recipe_attributes: SubRecipeAttributes =
         //     serde_json::from_value(params).map_err(|e| {
         //         ToolError::InvalidParameters(format!("Invalid sub-recipe attributes: {}", e))
         //     })?;
         let run_attributes = self.sub_recipe_attributes.as_ref().unwrap();
 
-        let output = run_sub_recipe_command(run_attributes).map_err(|e| {
-            ToolError::ExecutionError(format!("Sub-recipe execution failed: {}", e))
-        })?;
-        let response = json!({
-            "recipe_name": run_attributes.name,
-            "recipe_path": run_attributes.path,
-            "parameters": run_attributes.params,
-            "output": output,
-        });
-
-        Ok(vec![Content::text(
-            serde_json::to_string_pretty(&response).unwrap(),
-        )
-        .with_audience(vec![Role::Assistant])])
+        run_sub_recipe_command(run_attributes, notifier).await
     }
 }
 
@@ -132,7 +119,7 @@ impl Router for SubRecipeRouter {
         &self,
         tool_name: &str,
         arguments: Value,
-        _notifier: mpsc::Sender<JsonRpcMessage>,
+        notifier: mpsc::Sender<JsonRpcMessage>,
     ) -> Pin<Box<dyn Future<Output = Result<Vec<Content>, ToolError>> + Send + 'static>> {
         let this = self.clone();
         let tool_name = tool_name.to_string();
@@ -141,7 +128,7 @@ impl Router for SubRecipeRouter {
         let tool_name_str = format!("sub_recipe_run_{}", sub_recipe_name);
         Box::pin(async move {
             match tool_name.as_str() {
-                t if t == tool_name_str => this.run_sub_recipe(arguments).await,
+                t if t == tool_name_str => this.run_sub_recipe(arguments, notifier).await,
                 _ => Err(ToolError::NotFound(format!("Tool {} not found", tool_name))),
             }
         })
