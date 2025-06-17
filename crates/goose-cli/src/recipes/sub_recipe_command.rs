@@ -1,5 +1,7 @@
-use goose::{config::ExtensionConfig, recipe::{Recipe, SubRecipe}};
-use serde_json::json;
+use goose::{
+    config::ExtensionConfig,
+    recipe::{Recipe, SubRecipe},
+};
 
 pub fn create_sub_recipe_extensions(recipe: &Recipe) -> Vec<ExtensionConfig> {
     let mut extensions: Vec<ExtensionConfig> = Vec::new();
@@ -10,7 +12,6 @@ pub fn create_sub_recipe_extensions(recipe: &Recipe) -> Vec<ExtensionConfig> {
                 params: sub_recipe.params.clone(),
                 name: sub_recipe.name.clone(),
             };
-            println!("======= Sub recipe attributes: {:?}", &sub_recipe_attributes);
             let args = serde_json::to_string(&sub_recipe_attributes).unwrap_or_default();
 
             let extension = ExtensionConfig::Builtin {
@@ -36,15 +37,4 @@ pub fn create_sub_recipe_instructions(recipe: &Recipe) -> String {
         }
     }
     instructions
-}
-
-fn create_sub_recipe_command(sub_recipe: &SubRecipe) -> String {
-    let mut command = String::new();
-    command.push_str(&format!("goose run --recipe {} ", sub_recipe.path));
-    if let Some(params) = &sub_recipe.params {
-        for param in params {
-            command.push_str(&format!(" --params {}={}", param.name, param.value));
-        }
-    }
-    return command;
 }

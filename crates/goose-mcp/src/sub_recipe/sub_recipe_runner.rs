@@ -17,15 +17,12 @@ pub struct SubRecipeAttributes {
 pub fn run_sub_recipe_command(
     sub_recipe_attributes: &SubRecipeAttributes,
 ) -> Result<String, String> {
-    println!("Running sub-recipe");
-    println!("========== Params: {:?}", sub_recipe_attributes);
     let mut command = Command::new("goose");
     command
         .arg("run")
         .arg("--recipe")
         .arg(&sub_recipe_attributes.name);
 
-    // Add each parameter individually
     for param in &sub_recipe_attributes.params {
         command.arg(format!("--params={}={}", param.name, param.value));
     }

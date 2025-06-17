@@ -18,7 +18,9 @@ use crate::commands::schedule::{
 use crate::commands::session::{handle_session_list, handle_session_remove};
 use crate::logging::setup_logging;
 use crate::recipes::recipe::{explain_recipe_with_parameters, load_recipe_as_template};
-use crate::recipes::sub_recipe_command::{create_sub_recipe_extensions, create_sub_recipe_instructions};
+use crate::recipes::sub_recipe_command::{
+    create_sub_recipe_extensions, create_sub_recipe_instructions,
+};
 use crate::session;
 use crate::session::{build_session, SessionBuilderConfig, SessionSettings};
 use goose_bench::bench_config::BenchRunConfig;
@@ -263,13 +265,13 @@ enum Command {
 
     /// Manage system prompts and behaviors
     #[command(about = "Run one of the mcp servers bundled with goose")]
-    Mcp { 
+    Mcp {
         name: String,
-        
+
         #[arg(
             long = "extra-args",
             help = "Extra arguments to pass to the mcp server",
-            long_help = "Extra arguments in json format to pass to the mcp server. Format: '{\"arg1\": \"value1\", \"arg2\": \"value2\"}'",
+            long_help = "Extra arguments in json format to pass to the mcp server. Format: '{\"arg1\": \"value1\", \"arg2\": \"value2\"}'"
         )]
         extra_args: Option<String>,
     },
@@ -748,7 +750,10 @@ pub async fn cli() -> Result<()> {
                         InputConfig {
                             contents: recipe.prompt,
                             extensions_override: Some(recipe_extensions),
-                            additional_system_prompt: Some(recipe.instructions.unwrap_or_default() + &recipe_runner_instructions_str),
+                            additional_system_prompt: Some(
+                                recipe.instructions.unwrap_or_default()
+                                    + &recipe_runner_instructions_str,
+                            ),
                         },
                         recipe.settings.map(|s| SessionSettings {
                             goose_provider: s.goose_provider,

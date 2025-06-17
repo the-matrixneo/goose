@@ -1,12 +1,4 @@
-#[allow(dead_code)]
-mod break_down_recipe;
-#[allow(dead_code)]
-mod break_down_recipe_description;
-#[allow(dead_code)]
-mod multi_task_plan;
-#[allow(dead_code)]
-mod multi_task_plan_description;
-mod shell_command_job;
+mod sub_recipe_runner;
 
 use anyhow::Result;
 use mcp_core::{
@@ -23,7 +15,7 @@ use serde_json::{json, Value};
 use std::{future::Future, pin::Pin};
 use tokio::sync::mpsc;
 
-use crate::sub_recipe::shell_command_job::{
+use crate::sub_recipe::sub_recipe_runner::{
     run_sub_recipe_command, SubRecipeAttributes, SUB_RECIPE_RUN_DESCRIPTION, SUB_RECIPE_RUN_SCHEMA,
 };
 
@@ -93,10 +85,6 @@ impl SubRecipeRouter {
     }
 
     async fn run_sub_recipe(&self, _params: Value) -> Result<Vec<Content>, ToolError> {
-        println!(
-            "======= Sub recipe attributes: {:?}",
-            self.sub_recipe_attributes
-        );
         // let sub_recipe_attributes: SubRecipeAttributes =
         //     serde_json::from_value(params).map_err(|e| {
         //         ToolError::InvalidParameters(format!("Invalid sub-recipe attributes: {}", e))
@@ -106,7 +94,6 @@ impl SubRecipeRouter {
         let output = run_sub_recipe_command(run_attributes).map_err(|e| {
             ToolError::ExecutionError(format!("Sub-recipe execution failed: {}", e))
         })?;
-        println!("======= Output: {:?}", output);
         let response = json!({
             "recipe_name": run_attributes.name,
             "recipe_path": run_attributes.path,
@@ -160,7 +147,6 @@ impl Router for SubRecipeRouter {
         })
     }
 
-    // Implement the required resource-related methods
     fn list_resources(&self) -> Vec<Resource> {
         Vec::new() // No resources for this MCP
     }
@@ -176,7 +162,6 @@ impl Router for SubRecipeRouter {
         })
     }
 
-    // Implement the required prompt-related methods
     fn list_prompts(&self) -> Vec<Prompt> {
         Vec::new() // No prompts for this MCP
     }

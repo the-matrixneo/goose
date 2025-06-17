@@ -686,10 +686,10 @@ impl McpSpinners {
             bar.enable_steady_tick(Duration::from_millis(100));
             bar
         });
-    
+
         spinner.set_message(message.to_string());
         spinner.inc(0); // poke redraw if needed
-    
+
         // // Also print log line directly below spinner
         let _ = self.multi_bar.println(message); // ensures output is shown immediately
     }

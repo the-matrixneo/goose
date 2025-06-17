@@ -1,6 +1,7 @@
 use anyhow::Result;
 use goose_mcp::{
-    ComputerControllerRouter, DeveloperRouter, GoogleDriveRouter, JetBrainsRouter, MemoryRouter, SubRecipeRouter, TutorialRouter
+    ComputerControllerRouter, DeveloperRouter, GoogleDriveRouter, JetBrainsRouter, MemoryRouter,
+    SubRecipeRouter, TutorialRouter,
 };
 use mcp_server::router::RouterService;
 use mcp_server::{BoundedService, ByteTransport, Server};
@@ -33,7 +34,9 @@ pub async fn run_server(name: &str, extra_args: Option<String>) -> Result<()> {
         }
         "memory" => Some(Box::new(RouterService(MemoryRouter::new()))),
         "tutorial" => Some(Box::new(RouterService(TutorialRouter::new()))),
-        name if name.starts_with("sub-recipe") => Some(Box::new(RouterService(SubRecipeRouter::new(extra_args)))),
+        name if name.starts_with("sub-recipe") => {
+            Some(Box::new(RouterService(SubRecipeRouter::new(extra_args))))
+        }
         _ => None,
     };
 
