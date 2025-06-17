@@ -1086,10 +1086,10 @@ impl Session {
         self.messages.clone()
     }
 
-    pub async fn override_system_prompt(&self, override_prompt: String)  {
+    pub async fn override_system_prompt(&self, override_prompt: String) {
         self.agent.override_system_prompt(override_prompt).await
     }
-    
+
     /// Render all past messages from the session history
     pub fn render_message_history(&self) {
         if self.messages.is_empty() {

@@ -1,8 +1,8 @@
-use std::io::{self, BufRead, Write, BufWriter};
-use serde_json::{json, Value};
-use mcp_core::Tool;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine;
+use mcp_core::Tool;
+use serde_json::{json, Value};
+use std::io::{self, BufRead, BufWriter, Write};
 
 #[derive(Clone)]
 struct MockMcpServer {
@@ -34,7 +34,7 @@ impl MockMcpServer {
                 }
             }),
             "tools/list" => json!({
-                "jsonrpc": "2.0", 
+                "jsonrpc": "2.0",
                 "id": id,
                 "result": {
                     "tools": self.tools
@@ -44,7 +44,7 @@ impl MockMcpServer {
                 let tool_name = request["params"]["name"].as_str().unwrap_or("unknown");
                 json!({
                     "jsonrpc": "2.0",
-                    "id": id, 
+                    "id": id,
                     "result": {
                         "content": [{
                             "type": "text",
@@ -60,7 +60,7 @@ impl MockMcpServer {
                     "code": -32601,
                     "message": "Method not found"
                 }
-            })
+            }),
         }
     }
 }
@@ -69,38 +69,35 @@ fn create_fallback_tools(extension_name: &str) -> Vec<Tool> {
     vec![
         Tool::new(
             format!("{}_tool_1", extension_name),
-            &format!("Mock tool 1 for {}", extension_name),
+            format!("Mock tool 1 for {}", extension_name),
             json!({"type": "object", "properties": {}}),
-            None
+            None,
         ),
         Tool::new(
-            format!("{}_tool_2", extension_name), 
-            &format!("Mock tool 2 for {}", extension_name),
+            format!("{}_tool_2", extension_name),
+            format!("Mock tool 2 for {}", extension_name),
             json!({"type": "object", "properties": {}}),
-            None
+            None,
         ),
     ]
 }
 
 fn main() -> io::Result<()> {
     // Get extension name from environment variable
-    let extension_name = std::env::var("EXTENSION_NAME").unwrap_or_else(|_| "mock_extension".to_string());
-    
+    let extension_name =
+        std::env::var("EXTENSION_NAME").unwrap_or_else(|_| "mock_extension".to_string());
+
     // Get actual tools from environment variable or create mock tools
     let tools = if let Ok(tools_base64) = std::env::var("EXTENSION_TOOLS") {
         // Decode and deserialize the actual tools from the dataset
         match BASE64_STANDARD.decode(tools_base64) {
-            Ok(tools_json_bytes) => {
-                match std::str::from_utf8(&tools_json_bytes) {
-                    Ok(tools_json) => {
-                        match serde_json::from_str::<Vec<Tool>>(tools_json) {
-                            Ok(tools) => tools,
-                            Err(_) => create_fallback_tools(&extension_name),
-                        }
-                    }
+            Ok(tools_json_bytes) => match std::str::from_utf8(&tools_json_bytes) {
+                Ok(tools_json) => match serde_json::from_str::<Vec<Tool>>(tools_json) {
+                    Ok(tools) => tools,
                     Err(_) => create_fallback_tools(&extension_name),
-                }
-            }
+                },
+                Err(_) => create_fallback_tools(&extension_name),
+            },
             Err(_) => create_fallback_tools(&extension_name),
         }
     } else {
