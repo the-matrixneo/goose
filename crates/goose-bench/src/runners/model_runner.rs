@@ -105,13 +105,9 @@ impl ModelRunner {
                     let cfg = config_copy
                         .to_string()
                         .context("Failed to serialize configuration")?;
-                    let mut eval_envs: Vec<_> = (*eval_selector)
-                        .env
-                        .iter()
-                        .map(|e| (e.name.clone(), e.value.clone()))
-                        .collect();
+                    let mut eval_envs: Vec<_> = (*eval_selector).env.clone();
                     eval_envs.extend(envs.clone());
-                        let handle = parallel_bench_cmd("exec-eval".to_string(), cfg, eval_envs);
+                    let handle = parallel_bench_cmd("exec-eval".to_string(), cfg, eval_envs);
                     results_handles.get_mut(suite).unwrap().push(handle);
                 }
             }
@@ -214,8 +210,8 @@ impl ModelRunner {
             .clone()
             .into_iter()
             .partition(|eval| eval.dataset.is_some());
-        
-        result.insert("dataset_evals".to_string(),dataset_evals.clone());
+
+        result.insert("dataset_evals".to_string(), dataset_evals.clone());
 
         // convert suites map {suite_name => [eval_selector_str] to map suite_name => [BenchEval]
         for eval in standard_evals.iter() {

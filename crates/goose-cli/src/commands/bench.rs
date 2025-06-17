@@ -81,37 +81,37 @@ async fn dataset_agent(
 ) -> BenchAgent {
     let identifier = Some(Identifier::Name(session_id));
 
-    let mut base_session = build_session(SessionBuilderConfig {
+    // Prepare mock extension commands to be loaded during session building
+    let mock_extension_commands: Vec<String> = if let Some(extensions) = available_extensions {
+        extensions.into_iter().map(|(ext_name, tools)| {
+            // Serialize the actual tools to pass to mock server
+            let tools_json = serde_json::to_string(&tools).expect("Failed to serialize tools");
+            let tools_base64 = BASE64_STANDARD.encode(tools_json);
+            
+            // Create command string for mock MCP server with actual tools
+            format!(
+                "EXTENSION_NAME={} EXTENSION_TOOLS={} cargo run -p goose-bench --bin mock_mcp_server",
+                ext_name, tools_base64
+            )
+        }).collect()
+    } else {
+        vec![]
+    };
+
+    let base_session = build_session(SessionBuilderConfig {
         identifier,
         resume: false,
         no_session: true,
-        extensions: vec![],
+        extensions: mock_extension_commands, // Add mock extensions via the proper channel
         remote_extensions: vec![],
         builtins: vec![],
-        extensions_override: None,
+        extensions_override: Some(vec![]), // Override to prevent loading real extensions
         additional_system_prompt: None,
         settings: None,
         debug: false,
         max_tool_repetitions: None,
         interactive: false, // Benchmarking is non-interactive
     }).await;
-
-    if let Some(extensions) = available_extensions {
-        // Add each extension's tools as stdio extensions using mock MCP server for evaluation
-        for (ext_name, tools) in extensions {
-            // Serialize the actual tools to pass to mock server
-            let tools_json = serde_json::to_string(&tools).expect("Failed to serialize tools");
-            let tools_base64 = BASE64_STANDARD.encode(tools_json);
-            
-            // Create command string for mock MCP server with actual tools
-            let extension_command = format!(
-                "EXTENSION_NAME={} EXTENSION_TOOLS={} cargo run -p goose-bench --bin mock_mcp_server",
-                ext_name, tools_base64
-            );
-            
-            base_session.add_extension(extension_command).await.expect("Failed to add mock stdio extension");
-        }
-    }
     
     // package session obj into benchmark-compatible struct
     let bench_agent = BenchAgent::new(Box::new(base_session));

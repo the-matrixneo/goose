@@ -19,12 +19,6 @@ pub struct BenchModel {
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct BenchEnvVar {
-    pub name: String,
-    pub value: String,
-}
-
-#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct BenchDataset {
     pub path: PathBuf,
     pub prompt_column: String,
@@ -36,7 +30,7 @@ pub struct BenchDataset {
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct BenchEval {
-    pub env: Vec<BenchEnvVar>,
+    pub env: Vec<(String, String)>,
     pub dataset: Option<BenchDataset>,
     pub selector: String,
     pub post_process_cmd: Option<PathBuf>,

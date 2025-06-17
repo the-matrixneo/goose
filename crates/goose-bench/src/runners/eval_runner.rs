@@ -5,8 +5,8 @@ use crate::eval_suites::{EvaluationSuite, ExtensionRequirements};
 use crate::reporting::EvaluationResult;
 use crate::utilities::await_process_exits;
 use anyhow::{bail, Context, Result};
+use futures::future::join_all;
 use mcp_core::Tool;
-use rayon::prelude::*;
 use std::collections::HashMap;
 use std::env;
 use std::fs;
@@ -58,85 +58,9 @@ impl EvalRunner {
         Ok(work_dir)
     }
 
-    pub async fn run_dataset<F, Fut>(&mut self, agent_generator: F) -> Result<()>
-    where
-        F: Fn(ExtensionRequirements, String, bool, Option<HashMap<String, Vec<Tool>>>) -> Fut,
-        Fut: Future<Output=BenchAgent> + Send,
-    {
-        let bench_eval = self
-            .config
-            .evals
-            .first()
-            .context("No evaluations specified in configuration")?;
-
-        if let Some(dataset) = &bench_eval.dataset {
-            let prompt_column = dataset.prompt_column.clone();
-            if prompt_column.is_empty() {
-                return Ok(()); // TODO MARCELLE: not ok err?
-            }
-
-            let mut results = Vec::new();
-            let system_prompt_column = dataset.system_prompt_column.clone();
-            let tools_column = dataset.tools_column.clone();
-            let dataset: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&dataset.path)?)?;
-
-            if let Some(conversations) = dataset.as_array() {
-                for conv in conversations {
-                    if let Some(rows) = conv.as_array() {
-                        let processed: Vec<_> = rows
-                            .par_iter()
-                            .map(async |row| {
-                                let mut available_extensions = HashMap::new();
-                                if let Some(tools_col) = tools_column.as_ref() {
-                                    let exts = row.get(tools_col).and_then(|v| v.as_str()).map(|s| s.to_string());
-                                    if let Some(exts) = exts.as_ref() {
-                                        available_extensions = serde_json::from_str::<HashMap<String, Vec<Tool>>>(exts.as_str())?;
-                                    }
-                                }
-
-                                let mut agent = agent_generator(
-                                    ExtensionRequirements::default(),
-                                    "".to_string(),
-                                    true,
-                                    Some(available_extensions),
-                                ).await;
-
-                                if let Some(system_prompt_col) = system_prompt_column.as_ref() {
-                                    let override_prompt = row.get(system_prompt_col).and_then(|v| v.as_str()).map(|s| s.to_string());
-                                    if let Some(override_prompt) = override_prompt {
-                                        agent.session.override_system_prompt(override_prompt).await;
-                                    }
-                                }
-
-                                let prompt = row.get("query").and_then(|v| v.as_str()).map(|s| s.to_string());
-                                agent.prompt(prompt.unwrap()).await
-                            })
-                            .collect();
-                        results.push(processed);
-                        // match agent.prompt(prompt).await {
-                        // Ok(messages) => results.push(serde_json::json!({"success": true, "messages": messages})),
-                        // Err(e) => results.push(serde_json::json!({"success": false, "error": e.to_string()})),
-                        // }
-                    }
-                }
-            }
-
-            // Write results
-            let results_path = format!("{}_results.json", bench_eval.selector);
-            std::fs::write(
-                &results_path,
-                serde_json::to_string_pretty(&results)?,
-            )?;
-
-            tracing::info!("Wrote dataset evaluation results to {}", results_path);
-        }
-
-        Ok(())
-    }
-
     pub async fn run<F, Fut>(&mut self, agent_generator: F) -> Result<()>
     where
-        F: Fn(ExtensionRequirements, String, bool, Option<HashMap<String, Vec<Tool>>>) -> Fut,
+        F: Fn(ExtensionRequirements, String, bool, Option<HashMap<String, Vec<Tool>>>) -> Fut + Clone,
         Fut: Future<Output=BenchAgent> + Send,
     {
         let bench_eval = self
@@ -252,6 +176,151 @@ impl EvalRunner {
 
         Ok(())
     }
+    pub async fn run_dataset<F, Fut>(&mut self, agent_generator: F) -> Result<()>
+    where
+        F: Fn(ExtensionRequirements, String, bool, Option<HashMap<String, Vec<Tool>>>) -> Fut + Clone,
+        Fut: Future<Output=BenchAgent> + Send,
+    {
+        let bench_eval = self.config.evals.first().context("No evaluations specified")?;
+        let dataset_config = bench_eval.dataset.as_ref().context("No dataset specified")?;
+
+        if dataset_config.prompt_column.is_empty() {
+            bail!("Prompt column cannot be empty");
+        }
+
+        let dataset: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&dataset_config.path)?)?;
+        let conversations = dataset.as_array().context("Dataset must be an array")?;
+
+        let mut work_dir = self
+            .create_work_dir(&self.config)
+            .context("Failed to create evaluation work directory")?;
+
+        let run_id = &self
+            .config
+            .run_id
+            .clone()
+            .unwrap_or_else(|| "run-0".to_string());
+        let run_id = format!("run-{}", run_id.clone());
+
+        // create entire dir subtree for eval and cd into dir for running eval
+        work_dir.set_eval(&bench_eval.selector, run_id);
+        tracing::info!("Set evaluation directory for {}", bench_eval.selector);
+
+
+        let mut all_results = Vec::new();
+        for conv in conversations {
+            let rows = conv.as_array().context("Conversation must be an array")?;
+            let processed = self.run_dataset_rows(rows, &agent_generator, dataset_config).await;
+            all_results.push(processed);
+        }
+
+        self.write_dataset_results(&bench_eval.selector, all_results).await
+    }
+
+    async fn run_dataset_rows<F, Fut>(
+        &self,
+        rows: &[serde_json::Value],
+        agent_generator: &F,
+        dataset_config: &crate::bench_config::BenchDataset,
+    ) -> Vec<serde_json::Value>
+    where
+        F: Fn(ExtensionRequirements, String, bool, Option<HashMap<String, Vec<Tool>>>) -> Fut + Clone,
+        Fut: Future<Output=BenchAgent> + Send,
+    {
+        let futures: Vec<_> = rows
+            .iter()
+            .enumerate()
+            .map(|(idx, row)| {
+                self.process_single_dataset_row(
+                    idx,
+                    row.clone(),
+                    agent_generator.clone(),
+                    dataset_config,
+                )
+            })
+            .collect();
+
+        join_all(futures).await
+    }
+
+    async fn process_single_dataset_row<F, Fut>(
+        &self,
+        idx: usize,
+        row: serde_json::Value,
+        agent_generator: F,
+        dataset_config: &crate::bench_config::BenchDataset,
+    ) -> serde_json::Value
+    where
+        F: Fn(ExtensionRequirements, String, bool, Option<HashMap<String, Vec<Tool>>>) -> Fut,
+        Fut: Future<Output=BenchAgent> + Send,
+    {
+        let result = async {
+            let now_stamp = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .context("Failed to get current timestamp")?
+                .as_nanos();
+
+            let bench_eval = self.config.evals.first().context("No evaluations specified")?;
+            let session_id = format!("{}-{}", bench_eval.selector.clone(), now_stamp);
+
+            let extensions = self.parse_extensions(&row, &dataset_config.tools_column)?;
+            let mut agent = agent_generator(ExtensionRequirements::default(), session_id, true, Some(extensions)).await;
+
+            if let Some(system_prompt) = self.get_dataset_system_prompt(&row, &dataset_config.system_prompt_column) {
+                agent.session.override_system_prompt(system_prompt).await;
+            }
+
+            let prompt = row.get(&dataset_config.prompt_column).and_then(|v| v.as_str()).context("Missing prompt field")?;
+            agent.prompt(prompt.to_string()).await
+        }.await;
+
+        self.create_dataset_result_row(row, result, idx)
+    }
+
+    fn parse_extensions(&self, row: &serde_json::Value, tools_column: &Option<String>) -> Result<HashMap<String, Vec<Tool>>> {
+        let mut extensions = HashMap::new();
+        if let Some(tools_col) = tools_column {
+            if let Some(tools_str) = row.get(tools_col).and_then(|v| v.as_str()) {
+                extensions = serde_json::from_str(tools_str)?;
+            }
+        }
+        Ok(extensions)
+    }
+
+    fn get_dataset_system_prompt(&self, row: &serde_json::Value, system_prompt_column: &Option<String>) -> Option<String> {
+        system_prompt_column.as_ref()
+            .and_then(|col| row.get(col))
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
+    }
+
+    fn create_dataset_result_row(&self, mut row: serde_json::Value, result: Result<Vec<goose::message::Message>>, idx: usize) -> serde_json::Value {
+        let obj = row.as_object_mut().unwrap();
+
+        match result {
+            Ok(messages) => {
+                obj.insert("output".to_string(), serde_json::to_value(messages).unwrap());
+                obj.insert("error".to_string(), serde_json::Value::Null);
+                obj.insert("success".to_string(), serde_json::Value::Bool(true));
+            }
+            Err(e) => {
+                obj.insert("output".to_string(), serde_json::Value::Null);
+                obj.insert("error".to_string(), serde_json::Value::String(e.to_string()));
+                obj.insert("success".to_string(), serde_json::Value::Bool(false));
+            }
+        }
+
+        obj.insert("row_index".to_string(), serde_json::Value::Number(serde_json::Number::from(idx)));
+        row
+    }
+
+    async fn write_dataset_results(&self, selector: &str, results: Vec<Vec<serde_json::Value>>) -> Result<()> {
+        let results_path = format!("{}_results.json", selector);
+        std::fs::write(&results_path, serde_json::to_string_pretty(&results)?)?;
+        tracing::info!("Wrote dataset evaluation results to {}", results_path);
+        Ok(())
+    }
+
 
     pub fn path_for_eval(model: &BenchModel, eval: &BenchEval, run_id: String) -> PathBuf {
         let provider = model.provider.clone();
