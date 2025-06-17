@@ -5,7 +5,6 @@ use crate::eval_suites::{EvaluationSuite, ExtensionRequirements};
 use crate::reporting::EvaluationResult;
 use crate::utilities::await_process_exits;
 use anyhow::{bail, Context, Result};
-use futures::future::join_all;
 use mcp_core::Tool;
 use std::collections::HashMap;
 use std::env;
@@ -13,8 +12,118 @@ use std::fs;
 use std::future::Future;
 use std::path::PathBuf;
 use std::process::Command;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, UNIX_EPOCH, Duration};
 use tracing;
+use tokio::sync::Mutex;
+use std::sync::Arc;
+
+// Stateless functions for parallel processing
+async fn process_single_dataset_row_stateless<F, Fut>(
+    idx: usize,
+    row: serde_json::Value,
+    agent_generator: F,
+    dataset_config: &crate::bench_config::BenchDataset,
+    selector: &str,
+    request_delay_ms: Option<u64>,
+    agent_creation_mutex: Arc<Mutex<()>>,
+    agent_timeout_seconds: Option<u64>,
+) -> serde_json::Value
+where
+    F: Fn(ExtensionRequirements, String, bool, Option<HashMap<String, Vec<Tool>>>) -> Fut,
+    Fut: Future<Output=BenchAgent> + Send,
+{
+    let (result, timed_out) = async {
+        let now_stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .context("Failed to get current timestamp")?
+            .as_nanos();
+
+        // Use high precision timestamp + index to ensure uniqueness across parallel executions
+        let session_id = format!("{}-{}-row{}", selector, now_stamp, idx);
+
+        let extensions = parse_extensions_stateless(&row, &dataset_config.tools_column)?;
+        
+        // Serialize agent creation to prevent database table conflicts
+        let mut agent = {
+            let _lock = agent_creation_mutex.lock().await;
+            agent_generator(ExtensionRequirements::default(), session_id, true, Some(extensions)).await
+        };
+
+        if let Some(system_prompt) = get_dataset_system_prompt_stateless(&row, &dataset_config.system_prompt_column) {
+            agent.session.override_system_prompt(system_prompt).await;
+        }
+
+        let prompt = row.get(&dataset_config.prompt_column).and_then(|v| v.as_str()).context("Missing prompt field")?;
+        
+        // Add delay before LLM call to respect rate limits
+        if let Some(delay) = request_delay_ms {
+            tokio::time::sleep(Duration::from_millis(delay)).await;
+        }
+        
+        // Use timeout to prevent hanging on user input requests
+        let timeout_duration = Duration::from_secs(agent_timeout_seconds.unwrap_or(30));
+        let (result, timed_out) = match tokio::time::timeout(timeout_duration, agent.prompt(prompt.to_string())).await {
+            Ok(result) => (result, false),
+            Err(_) => {
+                tracing::warn!("Agent prompt timed out after {}s for row {}, collecting partial results", timeout_duration.as_secs(), idx);
+                // Instead of failing, collect the agent's message history up to the timeout
+                (Ok(agent.session.message_history()), true)
+            }
+        };
+        
+        Ok::<(Result<Vec<goose::message::Message>>, bool), anyhow::Error>((result, timed_out))
+    }.await.unwrap_or_else(|e: anyhow::Error| {
+        // If there's an error in the async block, treat it as a regular error
+        (Err(e), false)
+    });
+
+    create_dataset_result_row_stateless(row, result, idx, timed_out)
+}
+
+fn parse_extensions_stateless(row: &serde_json::Value, tools_column: &Option<String>) -> Result<HashMap<String, Vec<Tool>>> {
+    let mut extensions = HashMap::new();
+    if let Some(tools_col) = tools_column {
+        if let Some(tools_str) = row.get(tools_col).and_then(|v| v.as_str()) {
+            extensions = serde_json::from_str(tools_str)?;
+        }
+    }
+    Ok(extensions)
+}
+
+fn get_dataset_system_prompt_stateless(row: &serde_json::Value, system_prompt_column: &Option<String>) -> Option<String> {
+    system_prompt_column.as_ref()
+        .and_then(|col| row.get(col))
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+}
+
+fn create_dataset_result_row_stateless(mut row: serde_json::Value, result: Result<Vec<goose::message::Message>>, idx: usize, timed_out: bool) -> serde_json::Value {
+    let obj = row.as_object_mut().unwrap();
+
+    match result {
+        Ok(messages) => {
+            obj.insert("output".to_string(), serde_json::to_value(messages).unwrap());
+            obj.insert("error".to_string(), serde_json::Value::Null);
+            obj.insert("success".to_string(), serde_json::Value::Bool(!timed_out)); // False if timed out
+        }
+        Err(e) => {
+            obj.insert("output".to_string(), serde_json::Value::Null);
+            obj.insert("error".to_string(), serde_json::Value::String(e.to_string()));
+            obj.insert("success".to_string(), serde_json::Value::Bool(false));
+        }
+    }
+
+    obj.insert("row_index".to_string(), serde_json::Value::Number(serde_json::Number::from(idx)));
+    obj.insert("timed_out".to_string(), serde_json::Value::Bool(timed_out));
+    
+    if timed_out {
+        obj.insert("completion_status".to_string(), serde_json::Value::String("partial".to_string()));
+    } else {
+        obj.insert("completion_status".to_string(), serde_json::Value::String("complete".to_string()));
+    }
+    
+    row
+}
 
 #[derive(Clone)]
 pub struct EvalRunner {
@@ -189,14 +298,16 @@ impl EvalRunner {
         }
 
         let dataset: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&dataset_config.path)?)?;
-        let mut conversations = dataset.as_array().context("Dataset must be an array")?.clone();
+        let mut rows = dataset.as_array().context("Dataset must be an array")?.clone();
         
         // Apply debug_size limit if specified
-        if let Some(debug_size) = dataset_config.debug_size {
-            if debug_size > 0 {
-                let limit = debug_size as usize;
-                conversations.truncate(limit);
-                tracing::info!("Limited dataset to {} conversations due to debug_size setting", limit);
+        if let Some(dataset_cfg) = &self.config.dataset_config {
+            if let Some(debug_size) = dataset_cfg.debug_size {
+                if debug_size > 0 {
+                    let limit = debug_size as usize;
+                    rows.truncate(limit);
+                    tracing::info!("Limited dataset to {} rows due to debug_size setting", limit);
+                }
             }
         }
 
@@ -216,111 +327,80 @@ impl EvalRunner {
         tracing::info!("Set evaluation directory for {}", bench_eval.selector);
 
 
+        // Process all rows with maximum parallelism using chunked approach
+        let max_concurrent = self.config.dataset_config
+            .as_ref()
+            .map(|dc| dc.max_concurrent)
+            .unwrap_or(10);
+
+        tracing::info!("Processing {} rows with max concurrency {}", rows.len(), max_concurrent);
+
+        // Process rows in parallel with rate limiting
+        let bench_eval = self.config.evals.first().context("No evaluations specified")?;
+        let selector = bench_eval.selector.clone();
+        
+        // Calculate delay between requests based on requests_per_second
+        let request_delay_ms = self.config.dataset_config.as_ref()
+            .and_then(|dc| dc.requests_per_second)
+            .map(|rps| (1000.0 / rps) as u64);
+        
+        // Get chunk delay (pause between processing chunks)
+        let chunk_delay_ms = self.config.dataset_config.as_ref()
+            .and_then(|dc| dc.chunk_delay_ms)
+            .unwrap_or(0);
+            
+        // Get agent timeout
+        let agent_timeout_seconds = self.config.dataset_config.as_ref()
+            .and_then(|dc| dc.agent_timeout_seconds);
+        
+        // Create mutex to serialize agent creation and prevent database conflicts
+        let agent_creation_mutex = Arc::new(Mutex::new(()));
+        
+        // Process in chunks to control overall throughput
         let mut all_results = Vec::new();
-        for conv in &conversations {
-            let rows = conv.as_array().context("Conversation must be an array")?;
-            let processed = self.run_dataset_rows(rows, &agent_generator, dataset_config).await;
-            all_results.push(processed);
+        let chunk_size = max_concurrent;
+        
+        tracing::info!("Processing {} rows in chunks of {} with rate limiting and serialized agent creation", rows.len(), chunk_size);
+        if let Some(delay) = request_delay_ms {
+            tracing::info!("Request delay: {}ms", delay);
         }
-
-        self.write_dataset_results(&bench_eval.selector, all_results).await
-    }
-
-    async fn run_dataset_rows<F, Fut>(
-        &self,
-        rows: &[serde_json::Value],
-        agent_generator: &F,
-        dataset_config: &crate::bench_config::BenchDataset,
-    ) -> Vec<serde_json::Value>
-    where
-        F: Fn(ExtensionRequirements, String, bool, Option<HashMap<String, Vec<Tool>>>) -> Fut + Clone,
-        Fut: Future<Output=BenchAgent> + Send,
-    {
-        let futures: Vec<_> = rows
-            .iter()
-            .enumerate()
-            .map(|(idx, row)| {
-                self.process_single_dataset_row(
-                    idx,
-                    row.clone(),
-                    agent_generator.clone(),
-                    dataset_config,
-                )
-            })
-            .collect();
-
-        join_all(futures).await
-    }
-
-    async fn process_single_dataset_row<F, Fut>(
-        &self,
-        idx: usize,
-        row: serde_json::Value,
-        agent_generator: F,
-        dataset_config: &crate::bench_config::BenchDataset,
-    ) -> serde_json::Value
-    where
-        F: Fn(ExtensionRequirements, String, bool, Option<HashMap<String, Vec<Tool>>>) -> Fut,
-        Fut: Future<Output=BenchAgent> + Send,
-    {
-        let result = async {
-            let now_stamp = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .context("Failed to get current timestamp")?
-                .as_nanos();
-
-            let bench_eval = self.config.evals.first().context("No evaluations specified")?;
-            let session_id = format!("{}-{}", bench_eval.selector.clone(), now_stamp);
-
-            let extensions = self.parse_extensions(&row, &dataset_config.tools_column)?;
-            let mut agent = agent_generator(ExtensionRequirements::default(), session_id, true, Some(extensions)).await;
-
-            if let Some(system_prompt) = self.get_dataset_system_prompt(&row, &dataset_config.system_prompt_column) {
-                agent.session.override_system_prompt(system_prompt).await;
-            }
-
-            let prompt = row.get(&dataset_config.prompt_column).and_then(|v| v.as_str()).context("Missing prompt field")?;
-            agent.prompt(prompt.to_string()).await
-        }.await;
-
-        self.create_dataset_result_row(row, result, idx)
-    }
-
-    fn parse_extensions(&self, row: &serde_json::Value, tools_column: &Option<String>) -> Result<HashMap<String, Vec<Tool>>> {
-        let mut extensions = HashMap::new();
-        if let Some(tools_col) = tools_column {
-            if let Some(tools_str) = row.get(tools_col).and_then(|v| v.as_str()) {
-                extensions = serde_json::from_str(tools_str)?;
-            }
+        if chunk_delay_ms > 0 {
+            tracing::info!("Chunk delay: {}ms", chunk_delay_ms);
         }
-        Ok(extensions)
-    }
-
-    fn get_dataset_system_prompt(&self, row: &serde_json::Value, system_prompt_column: &Option<String>) -> Option<String> {
-        system_prompt_column.as_ref()
-            .and_then(|col| row.get(col))
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string())
-    }
-
-    fn create_dataset_result_row(&self, mut row: serde_json::Value, result: Result<Vec<goose::message::Message>>, idx: usize) -> serde_json::Value {
-        let obj = row.as_object_mut().unwrap();
-
-        match result {
-            Ok(messages) => {
-                obj.insert("output".to_string(), serde_json::to_value(messages).unwrap());
-                obj.insert("error".to_string(), serde_json::Value::Null);
-                obj.insert("success".to_string(), serde_json::Value::Bool(true));
-            }
-            Err(e) => {
-                obj.insert("output".to_string(), serde_json::Value::Null);
-                obj.insert("error".to_string(), serde_json::Value::String(e.to_string()));
-                obj.insert("success".to_string(), serde_json::Value::Bool(false));
+        
+        for (chunk_num, chunk) in rows.chunks(chunk_size).enumerate() {
+            tracing::debug!("Processing chunk {} with {} rows", chunk_num, chunk.len());
+            
+            let futures: Vec<_> = chunk
+                .iter()
+                .enumerate()
+                .map(|(chunk_idx, row)| {
+                    let global_idx = chunk_num * chunk_size + chunk_idx;
+                    let mutex_clone = Arc::clone(&agent_creation_mutex);
+                    process_single_dataset_row_stateless(
+                        global_idx,
+                        row.clone(),
+                        agent_generator.clone(),
+                        dataset_config,
+                        &selector,
+                        request_delay_ms,
+                        mutex_clone,
+                        agent_timeout_seconds,
+                    )
+                })
+                .collect();
+            
+            let chunk_results = futures::future::join_all(futures).await;
+            all_results.extend(chunk_results);
+            
+            // Pause between chunks if configured
+            if chunk_delay_ms > 0 && chunk_num < rows.len() / chunk_size {
+                tracing::debug!("Waiting {}ms before next chunk", chunk_delay_ms);
+                tokio::time::sleep(Duration::from_millis(chunk_delay_ms)).await;
             }
         }
 
-        obj.insert("row_index".to_string(), serde_json::Value::Number(serde_json::Number::from(idx)));
-        row
+        self.write_dataset_results(&bench_eval.selector, vec![all_results]).await
     }
 
     async fn write_dataset_results(&self, selector: &str, results: Vec<Vec<serde_json::Value>>) -> Result<()> {

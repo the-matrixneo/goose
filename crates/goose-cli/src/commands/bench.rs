@@ -9,9 +9,39 @@ use goose::agents::extension::{ExtensionConfig, Envs};
 use goose_bench::bench_session::{BenchAgent, BenchBaseSession};
 use goose_bench::eval_suites::ExtensionRequirements;
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock, Mutex as StdMutex};
 use tokio::sync::Mutex;
 use mcp_core::Tool;
+
+// Cache for mock MCP tools to avoid repeated serialization
+static TOOLS_CACHE: OnceLock<StdMutex<HashMap<String, String>>> = OnceLock::new();
+static BINARY_PATH_CACHE: OnceLock<String> = OnceLock::new();
+
+fn get_cached_tools_base64(ext_name: &str, tools: &[Tool]) -> String {
+    let cache = TOOLS_CACHE.get_or_init(|| StdMutex::new(HashMap::new()));
+    let mut cache_lock = cache.lock().unwrap();
+    
+    if let Some(cached) = cache_lock.get(ext_name) {
+        return cached.clone();
+    }
+    
+    let tools_json = serde_json::to_string(tools).expect("Failed to serialize tools");
+    let tools_base64 = base64::engine::general_purpose::STANDARD.encode(tools_json);
+    cache_lock.insert(ext_name.to_string(), tools_base64.clone());
+    tools_base64
+}
+
+fn get_cached_binary_path() -> String {
+    BINARY_PATH_CACHE.get_or_init(|| {
+        std::env::current_exe()
+            .expect("Failed to get current executable path")
+            .parent()
+            .expect("Failed to get parent directory")
+            .join("mock_mcp_server")
+            .to_string_lossy()
+            .to_string()
+    }).clone()
+}
 
 // allow session obj to be used in benchmarking
 #[async_trait]
@@ -85,18 +115,9 @@ async fn dataset_agent(
     // Prepare mock extensions as Stdio MCP extensions
     let mock_extensions: Vec<ExtensionConfig> = if let Some(extensions) = available_extensions {
         extensions.into_iter().map(|(ext_name, tools)| {
-            // Serialize the actual tools to pass to mock server
-            let tools_json = serde_json::to_string(&tools).expect("Failed to serialize tools");
-            let tools_base64 = base64::engine::general_purpose::STANDARD.encode(tools_json);
-            
-            // Use pre-compiled binary path for better performance
-            let binary_path = std::env::current_exe()
-                .expect("Failed to get current executable path")
-                .parent()
-                .expect("Failed to get parent directory")
-                .join("mock_mcp_server")
-                .to_string_lossy()
-                .to_string();
+            // Use cached serialization and binary path for better performance
+            let tools_base64 = get_cached_tools_base64(&ext_name, &tools);
+            let binary_path = get_cached_binary_path();
             
             // Fallback to cargo run if binary doesn't exist
             let (cmd, args) = if std::path::Path::new(&binary_path).exists() {

@@ -1,4 +1,4 @@
-use std::io::{self, BufRead, Write};
+use std::io::{self, BufRead, Write, BufWriter};
 use serde_json::{json, Value};
 use mcp_core::Tool;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
@@ -109,7 +109,8 @@ fn main() -> io::Result<()> {
 
     let server = MockMcpServer::new(tools);
     let stdin = io::stdin();
-    let mut stdout = io::stdout();
+    let stdout = io::stdout();
+    let mut writer = BufWriter::new(stdout);
 
     for line in stdin.lock().lines() {
         let line = line?;
@@ -120,8 +121,8 @@ fn main() -> io::Result<()> {
         if let Ok(request) = serde_json::from_str::<Value>(&line) {
             let response = server.handle_request(request);
             let response_str = serde_json::to_string(&response).unwrap();
-            writeln!(stdout, "{}", response_str)?;
-            stdout.flush()?;
+            writeln!(writer, "{}", response_str)?;
+            writer.flush()?;
         }
     }
 

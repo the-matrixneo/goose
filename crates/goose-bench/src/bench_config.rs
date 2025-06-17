@@ -19,6 +19,15 @@ pub struct BenchModel {
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct BenchDatasetConfig {
+    pub max_concurrent: usize,
+    pub debug_size: Option<isize>,
+    pub requests_per_second: Option<f64>, // Rate limiting: e.g., 0.5 = one request every 2 seconds
+    pub chunk_delay_ms: Option<u64>,      // Delay between chunks in milliseconds
+    pub agent_timeout_seconds: Option<u64>, // Timeout for agent responses to prevent hanging
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct BenchDataset {
     pub path: PathBuf,
     pub prompt_column: String,
@@ -26,7 +35,6 @@ pub struct BenchDataset {
     pub tools_column: Option<String>,
     pub llm_output_column: String,
     pub output_dataset_file_name: String,
-    pub debug_size: Option<isize>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -48,6 +56,7 @@ pub struct BenchRunConfig {
     pub eval_result_filename: String,
     pub run_summary_filename: String,
     pub env_file: Option<PathBuf>,
+    pub dataset_config: Option<BenchDatasetConfig>,
 }
 
 impl Default for BenchRunConfig {
@@ -84,6 +93,7 @@ impl Default for BenchRunConfig {
             eval_result_filename: "eval-results.json".to_string(),
             run_summary_filename: "run-results-summary.json".to_string(),
             env_file: None,
+            dataset_config: None,
         }
     }
 }
