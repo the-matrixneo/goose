@@ -18,7 +18,7 @@ use crate::commands::schedule::{
 use crate::commands::session::{handle_session_list, handle_session_remove};
 use crate::logging::setup_logging;
 use crate::recipes::recipe::{explain_recipe_with_parameters, load_recipe_as_template};
-use crate::recipes::sub_recipe_command::create_sub_recipe_instructions;
+use crate::recipes::sub_recipe_command::{create_sub_recipe_extensions, create_sub_recipe_instructions};
 use crate::session;
 use crate::session::{build_session, SessionBuilderConfig, SessionSettings};
 use goose_bench::bench_config::BenchRunConfig;
@@ -265,6 +265,7 @@ enum Command {
     #[command(about = "Run one of the mcp servers bundled with goose")]
     Mcp { 
         name: String,
+        
         #[arg(
             long = "extra-args",
             help = "Extra arguments to pass to the mcp server",
@@ -740,10 +741,13 @@ pub async fn cli() -> Result<()> {
                             std::process::exit(1);
                         });
                     let recipe_runner_instructions_str = create_sub_recipe_instructions(&recipe);
+                    let sub_recipe_extensions = create_sub_recipe_extensions(&recipe);
+                    let mut recipe_extensions = recipe.extensions.unwrap_or_default();
+                    recipe_extensions.extend(sub_recipe_extensions);
                     (
                         InputConfig {
                             contents: recipe.prompt,
-                            extensions_override: recipe.extensions,
+                            extensions_override: Some(recipe_extensions),
                             additional_system_prompt: Some(recipe.instructions.unwrap_or_default() + &recipe_runner_instructions_str),
                         },
                         recipe.settings.map(|s| SessionSettings {

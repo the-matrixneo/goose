@@ -242,7 +242,7 @@ impl ExtensionManager {
                     {
                         let mut args = vec!["mcp".to_string(), name.clone()];
                         if !args_json.is_empty() {
-                            args.extend(vec!["extra_args".to_string(), args_json.clone()]);
+                            args.extend(vec!["--extra-args".to_string(), args_json.clone()]);
                         }
                         args
                     },

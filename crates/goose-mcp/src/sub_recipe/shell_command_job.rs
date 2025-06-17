@@ -1,6 +1,5 @@
-use std::process::Command;
-
 use serde::{Deserialize, Serialize};
+use std::process::Command;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SubRecipeParameter {
@@ -10,9 +9,9 @@ pub struct SubRecipeParameter {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SubRecipeAttributes {
-    pub recipe_path: String,
-    pub parameters: Vec<SubRecipeParameter>,
-    pub recipe_name: String,
+    pub path: String,
+    pub params: Vec<SubRecipeParameter>,
+    pub name: String,
 }
 
 pub fn run_sub_recipe_command(
@@ -24,10 +23,10 @@ pub fn run_sub_recipe_command(
     command
         .arg("run")
         .arg("--recipe")
-        .arg(&sub_recipe_attributes.recipe_path);
+        .arg(&sub_recipe_attributes.name);
 
     // Add each parameter individually
-    for param in &sub_recipe_attributes.parameters {
+    for param in &sub_recipe_attributes.params {
         command.arg(format!("--params={}={}", param.name, param.value));
     }
 
@@ -45,17 +44,9 @@ pub fn run_sub_recipe_command(
 pub const SUB_RECIPE_RUN_SCHEMA: &str = r#"{
     "type": "object",
     "properties": {
-        "recipe_path": {
-            "type": "string",
-            "description": "Path to the sub-recipe file (required)"
-        },
-        "recipe_name": {
-            "type": "string",
-            "description": "Name of the sub-recipe to run (required)"
-        },
-        "parameters": {
+        "params": {
             "type": "array",
-            "description": "Parameters to fill in the sub-recipe",
+            "description": "Parameters to override the existing parameters the sub-recipe",
             "items": {
                 "type": "object",
                 "properties": {
@@ -64,8 +55,7 @@ pub const SUB_RECIPE_RUN_SCHEMA: &str = r#"{
                 }
             }
         }
-    },
-    "required": ["recipe_path", "recipe_name"]
+    }
 }"#;
 
 pub const SUB_RECIPE_RUN_DESCRIPTION: &str = r#"
@@ -74,5 +64,5 @@ When you are given a sub-recipe, you should first read the sub-recipe file and u
 Using params section of the sub-recipe in the main recipe as parameters to run the sub-recipe. If the required parameters of the sub-recipe are not provided, use the context to fill in the parameters.
 
 Example usage:
-Run a sub-recipe: {"recipe_name": "joke-of-the-day", "recipe_path": "path/to/sub-recipe.yaml", "parameters": [{"name": "date", "value": "2025-06-17"}]}
+Run a sub-recipe: {"parameters": [{"name": "date", "value": "2025-06-17"}]}
 "#;

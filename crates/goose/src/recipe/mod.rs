@@ -115,14 +115,14 @@ pub struct Settings {
     pub temperature: Option<f32>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SubRecipe {
     pub name: String,
     pub path: String,
     pub params: Option<Vec<SubRecipeParams>>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SubRecipeParams {
     pub name: String,
     pub value: String,

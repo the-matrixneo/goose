@@ -29,25 +29,53 @@ use crate::sub_recipe::shell_command_job::{
 
 pub struct SubRecipeRouter {
     tools: Vec<Tool>,
+    sub_recipe_attributes: Option<SubRecipeAttributes>,
 }
 
 impl Clone for SubRecipeRouter {
     fn clone(&self) -> Self {
         Self {
             tools: self.tools.clone(),
+            sub_recipe_attributes: self.sub_recipe_attributes.clone(),
         }
     }
 }
 
 impl Default for SubRecipeRouter {
     fn default() -> Self {
-        Self::new()
+        Self::new(None)
     }
 }
 impl SubRecipeRouter {
-    pub fn new() -> Self {
+    pub fn new(extra_args: Option<String>) -> Self {
+        let extra_args_vec: Option<Vec<String>> =
+            extra_args.and_then(|args| serde_json::from_str(&args).ok());
+        let sub_recipe_attribute_in_json = if let Some(args) = extra_args_vec {
+            if !args.is_empty() {
+                args.first().cloned()
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        if sub_recipe_attribute_in_json.is_none() {
+            return Self {
+                tools: vec![],
+                sub_recipe_attributes: None,
+            };
+        }
+        let sub_recipe_attributes: Option<SubRecipeAttributes> =
+            serde_json::from_str(&sub_recipe_attribute_in_json.unwrap()).ok();
+        if sub_recipe_attributes.is_none() {
+            return Self {
+                tools: vec![],
+                sub_recipe_attributes: None,
+            };
+        }
+        let sub_recipe_name = sub_recipe_attributes.as_ref().unwrap().name.clone();
         let sub_recipe_run = Tool::new(
-            "sub_recipe_run".to_string(),
+            format!("sub_recipe_run_{}", sub_recipe_name).to_string(),
             SUB_RECIPE_RUN_DESCRIPTION.to_string(),
             serde_json::from_str(SUB_RECIPE_RUN_SCHEMA).unwrap(),
             Some(ToolAnnotations {
@@ -58,26 +86,31 @@ impl SubRecipeRouter {
                 open_world_hint: false,
             }),
         );
-
         Self {
             tools: vec![sub_recipe_run],
+            sub_recipe_attributes,
         }
     }
 
-    async fn run_sub_recipe(params: Value) -> Result<Vec<Content>, ToolError> {
-        let sub_recipe_attributes: SubRecipeAttributes =
-            serde_json::from_value(params).map_err(|e| {
-                ToolError::InvalidParameters(format!("Invalid sub-recipe attributes: {}", e))
-            })?;
+    async fn run_sub_recipe(&self, _params: Value) -> Result<Vec<Content>, ToolError> {
+        println!(
+            "======= Sub recipe attributes: {:?}",
+            self.sub_recipe_attributes
+        );
+        // let sub_recipe_attributes: SubRecipeAttributes =
+        //     serde_json::from_value(params).map_err(|e| {
+        //         ToolError::InvalidParameters(format!("Invalid sub-recipe attributes: {}", e))
+        //     })?;
+        let run_attributes = self.sub_recipe_attributes.as_ref().unwrap();
 
-        let output = run_sub_recipe_command(&sub_recipe_attributes).map_err(|e| {
+        let output = run_sub_recipe_command(run_attributes).map_err(|e| {
             ToolError::ExecutionError(format!("Sub-recipe execution failed: {}", e))
         })?;
-
+        println!("======= Output: {:?}", output);
         let response = json!({
-            "recipe_name": sub_recipe_attributes.recipe_name,
-            "recipe_path": sub_recipe_attributes.recipe_path,
-            "parameters": sub_recipe_attributes.parameters,
+            "recipe_name": run_attributes.name,
+            "recipe_path": run_attributes.path,
+            "parameters": run_attributes.params,
             "output": output,
         });
 
@@ -114,12 +147,14 @@ impl Router for SubRecipeRouter {
         arguments: Value,
         _notifier: mpsc::Sender<JsonRpcMessage>,
     ) -> Pin<Box<dyn Future<Output = Result<Vec<Content>, ToolError>> + Send + 'static>> {
+        let this = self.clone();
         let tool_name = tool_name.to_string();
         let arguments = arguments.clone();
-
+        let sub_recipe_name = this.sub_recipe_attributes.as_ref().unwrap().name.clone();
+        let tool_name_str = format!("sub_recipe_run_{}", sub_recipe_name);
         Box::pin(async move {
             match tool_name.as_str() {
-                "sub_recipe_run" => SubRecipeRouter::run_sub_recipe(arguments).await,
+                t if t == tool_name_str => this.run_sub_recipe(arguments).await,
                 _ => Err(ToolError::NotFound(format!("Tool {} not found", tool_name))),
             }
         })
