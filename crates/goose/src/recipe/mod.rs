@@ -118,7 +118,7 @@ pub struct Settings {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SubRecipe {
     pub name: String,
-    pub file: String,
+    pub path: String,
     pub params: Option<Vec<SubRecipeParams>>,
 }
 

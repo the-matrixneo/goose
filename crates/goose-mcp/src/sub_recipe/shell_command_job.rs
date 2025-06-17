@@ -1,56 +1,38 @@
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
-use std::sync::Arc;
-use std::{collections::HashMap, process::Stdio};
-use tokio::{
-    process::Command,
-    sync::{mpsc, Mutex, Semaphore},
-};
-use uuid::Uuid;
+use std::process::Command;
 
-// Define job and status types
-#[derive(Debug)]
-pub struct Job {
-    id: Uuid,
-    command: String,
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SubRecipeParameter {
+    pub name: String,
+    pub value: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "status", content = "data")]
-pub enum JobStatus {
-    Queued,
-    Running,
-    Completed { output: String },
-    Failed { error: String },
+pub struct SubRecipeAttributes {
+    pub recipe_path: String,
+    pub parameters: Vec<SubRecipeParameter>,
+    pub recipe_name: String,
 }
 
-// Type aliases for convenience
-pub type JobMap = Arc<Mutex<HashMap<Uuid, JobStatus>>>;
-pub type JobSender = mpsc::Sender<Job>;
+pub fn run_sub_recipe_command(
+    sub_recipe_attributes: &SubRecipeAttributes,
+) -> Result<String, String> {
+    println!("Running sub-recipe");
+    println!("========== Params: {:?}", sub_recipe_attributes);
+    let mut command = Command::new("goose");
+    command
+        .arg("run")
+        .arg("--recipe")
+        .arg(&sub_recipe_attributes.recipe_path);
 
-/// Submit a new job into the system
-pub async fn submit_job(command: String, sender: &JobSender, job_map: &JobMap) -> Uuid {
-    let job_id = Uuid::new_v4();
-    let job = Job {
-        id: job_id,
-        command,
-    };
+    // Add each parameter individually
+    for param in &sub_recipe_attributes.parameters {
+        command.arg(format!("--params={}={}", param.name, param.value));
+    }
 
-    job_map.lock().await.insert(job_id, JobStatus::Queued);
-    sender.send(job).await.unwrap(); // Ignore send errors for now
-
-    job_id
-}
-
-/// Run the command and capture result
-async fn run_shell_command(cmd: String) -> Result<String, String> {
-    let output = Command::new("sh")
-        .arg("-c")
-        .arg(cmd)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+    let output = command
         .output()
-        .await
         .map_err(|e| format!("Failed to execute: {e}"))?;
 
     if output.status.success() {
@@ -60,112 +42,37 @@ async fn run_shell_command(cmd: String) -> Result<String, String> {
     }
 }
 
-/// Start the central dispatcher
-pub async fn start_dispatcher(
-    mut receiver: mpsc::Receiver<Job>,
-    job_map: JobMap,
-    max_concurrent_jobs: usize,
-) {
-    let semaphore = Arc::new(Semaphore::new(max_concurrent_jobs));
-
-    tokio::spawn(async move {
-        while let Some(job) = receiver.recv().await {
-            let permit = semaphore.clone().acquire_owned().await.unwrap();
-            let job_map = job_map.clone();
-
-            // Mark as running
-            {
-                let mut map = job_map.lock().await;
-                map.insert(job.id, JobStatus::Running);
-            }
-
-            // Spawn a task per job
-            tokio::spawn(async move {
-                let result = run_shell_command(job.command).await;
-
-                let mut map = job_map.lock().await;
-                match result {
-                    Ok(output) => {
-                        map.insert(job.id, JobStatus::Completed { output });
-                    }
-                    Err(error) => {
-                        map.insert(job.id, JobStatus::Failed { error });
-                    }
-                }
-
-                // Drop the permit to allow another job to run
-                drop(permit);
-            });
-        }
-    });
-}
-
-// Schema for the shell command job tool
-pub const SHELL_COMMAND_JOB_SCHEMA: &str = r#"{
+pub const SUB_RECIPE_RUN_SCHEMA: &str = r#"{
     "type": "object",
     "properties": {
-        "action": {
+        "recipe_path": {
             "type": "string",
-            "enum": ["submit", "status", "list"],
-            "description": "Action to perform: submit a new job, check status of a job, or list all jobs"
+            "description": "Path to the sub-recipe file (required)"
         },
-        "command": {
+        "recipe_name": {
             "type": "string",
-            "description": "Shell command to execute (required when action is 'submit')"
+            "description": "Name of the sub-recipe to run (required)"
         },
-        "job_id": {
-            "type": "string",
-            "description": "UUID of the job to check (required when action is 'status')"
-        },
-        "task_id": {
-            "type": "string",
-            "description": "ID of the task to run the command for"
+        "parameters": {
+            "type": "array",
+            "description": "Parameters to fill in the sub-recipe",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": { "type": "string" },
+                    "value": { "type": "string" }
+                }
+            }
         }
     },
-    "required": ["action"],
-    "additionalProperties": false
+    "required": ["recipe_path", "recipe_name"]
 }"#;
 
-// Description for the shell command job tool
-pub const SHELL_COMMAND_JOB_DESCRIPTION: &str = r#"
-A tool for running shell commands asynchronously as jobs. You can submit commands to be executed,
-check the status of running jobs, and list all jobs in the system.
-
-- Use 'submit' action with a 'command' parameter and an optional 'task_id' parameter to run a shell command
-- Use 'status' action with a 'job_id' parameter to check a specific job's status
-- Use 'list' action to see all jobs in the system
+pub const SUB_RECIPE_RUN_DESCRIPTION: &str = r#"
+A tool for running a sub-recipe.
+When you are given a sub-recipe, you should first read the sub-recipe file and understand the parameters that are required to run the sub-recipe.
+Using params section of the sub-recipe in the main recipe as parameters to run the sub-recipe. If the required parameters of the sub-recipe are not provided, use the context to fill in the parameters.
 
 Example usage:
-1. Submit a job: {"action": "submit", "command": "sleep 5 && echo 'Hello world'", "task_id": "first_task"}
-2. Check status: {"action": "status", "job_id": "123e4567-e89b-12d3-a456-426614174000"}
-3. List all jobs: {"action": "list"}
+Run a sub-recipe: {"recipe_name": "joke-of-the-day", "recipe_path": "path/to/sub-recipe.yaml", "parameters": [{"name": "date", "value": "2025-06-17"}]}
 "#;
-
-pub fn validate_shell_job_params(
-    params: Value,
-) -> Result<(String, Option<String>, Option<String>), String> {
-    let action = params["action"]
-        .as_str()
-        .ok_or_else(|| "Missing 'action' parameter".to_string())?
-        .to_string();
-
-    let command = params["command"].as_str().map(|s| s.to_string());
-    let job_id = params["job_id"].as_str().map(|s| s.to_string());
-
-    match action.as_str() {
-        "submit" => {
-            if command.is_none() {
-                return Err("'command' parameter is required for 'submit' action".to_string());
-            }
-        }
-        "status" => {
-            if job_id.is_none() {
-                return Err("'job_id' parameter is required for 'status' action".to_string());
-            }
-        }
-        "list" => {} // No additional parameters needed
-        _ => return Err(format!("Unknown action: {}", action)),
-    }
-
-    Ok((action, command, job_id))
-}

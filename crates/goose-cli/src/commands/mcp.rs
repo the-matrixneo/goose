@@ -16,11 +16,12 @@ use nix::unistd::getpgrp;
 #[cfg(unix)]
 use nix::unistd::Pid;
 
-pub async fn run_server(name: &str) -> Result<()> {
+pub async fn run_server(name: &str, extra_args: Option<String>) -> Result<()> {
     // Initialize logging
     crate::logging::setup_logging(Some(&format!("mcp-{name}")), None)?;
 
     tracing::info!("Starting MCP server");
+    println!("=======Extra args: {:?}", extra_args);
 
     let router: Option<Box<dyn BoundedService>> = match name {
         "developer" => Some(Box::new(RouterService(DeveloperRouter::new()))),

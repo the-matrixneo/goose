@@ -90,13 +90,9 @@ pub fn format_task(task_data: &TaskData) -> String {
     let border = "─".repeat(border_len);
 
     let task_content = format!("{:<width$}", task_data.task, width = border_len - 2);
-    
+
     format!(
         "\n┌{}┐\n│ {} │\n├{}┤\n│ {} │\n└{}┘",
-        border,
-        header,
-        border,
-        task_content,
-        border
+        border, header, border, task_content, border
     )
 }

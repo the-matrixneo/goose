@@ -3,40 +3,28 @@ title: top recipes
 author:
   contact: douwe
 description: Will do multiple things
-instructions: Your job is to do multiple things. use break down task tool to break down the recipe into smaller tasks
+instructions: Your job is to do multiple things. For sub recipes make sure to use sub_recipe_run tool to run sub recipes
 prompt: |
-  1. use weather recipe to get the weather for {{city}}
+  1. use weather recipe to get the weather for my current location
   2. write the weather to a file
-  3. use joke-of-the-day recipe
+  3. use joke-of-the-day recipe for yesterday
   4. write the joke to a file
 sub_recipes:
 - name: joke-of-the-day
-  file: "{{recipe_dir}}/joke-of-the-day.yaml"
-  params:
-    - name: date
-      value: "{{date}}"
+  path: "{{recipe_dir}}/joke-of-the-day.yaml"
 - name: whether
-  file: "{{recipe_dir}}/weather.yaml"
-  params:
-    - name: city
-      value: "{{city}}"
+  path: "{{recipe_dir}}/weather.yaml"
 extensions:
 - type: builtin
   name: developer
   display_name: Developer
   timeout: 300
   bundled: true
+  args:
+    - "joke-of-the-day"
+    - "yesterday"
 - type: builtin
   name: sub-recipe
   display_name: sub-recipe
   timeout: 300
   bundled: true
-parameters:
-- key: date
-  input_type: string
-  requirement: required
-  description: date provided by the user
-- key: city
-  input_type: string
-  requirement: required
-  description: city provided by the user

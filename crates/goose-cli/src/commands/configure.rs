@@ -80,6 +80,7 @@ pub async fn handle_configure() -> Result<(), Box<dyn Error>> {
                         display_name: Some(goose::config::DEFAULT_DISPLAY_NAME.to_string()),
                         timeout: Some(goose::config::DEFAULT_EXTENSION_TIMEOUT),
                         bundled: Some(true),
+                        args: None,
                     },
                 })?;
             }
@@ -549,6 +550,7 @@ pub fn configure_extensions_dialog() -> Result<(), Box<dyn Error>> {
                     display_name: Some(display_name),
                     timeout: Some(timeout),
                     bundled: Some(true),
+                    args: None,
                 },
             })?;
 
