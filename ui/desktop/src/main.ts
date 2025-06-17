@@ -15,6 +15,7 @@ import {
 import type { OpenDialogReturnValue } from 'electron';
 import { Buffer } from 'node:buffer';
 import fs from 'node:fs/promises';
+import fsSync from 'node:fs';
 import started from 'electron-squirrel-startup';
 import path from 'node:path';
 import { spawn } from 'child_process';
@@ -681,9 +682,23 @@ const openDirectoryDialog = async (
   })) as unknown as OpenDialogReturnValue;
 
   if (!result.canceled && result.filePaths.length > 0) {
-    addRecentDir(result.filePaths[0]);
+    const selectedPath = result.filePaths[0];
+
+    // If a file was selected, use its parent directory
+    let dirToAdd = selectedPath;
+    try {
+      const stats = fsSync.statSync(selectedPath);
+      if (stats.isFile()) {
+        dirToAdd = path.dirname(selectedPath);
+      }
+    } catch (error) {
+      console.warn(`Could not stat selected path: ${selectedPath}`, error);
+      dirToAdd = path.dirname(selectedPath); // Fallback to parent directory
+    }
+
+    addRecentDir(dirToAdd);
     const currentWindow = BrowserWindow.getFocusedWindow();
-    await createChat(app, undefined, result.filePaths[0]);
+    await createChat(app, undefined, dirToAdd);
     if (replaceWindow && currentWindow) {
       currentWindow.close();
     }
