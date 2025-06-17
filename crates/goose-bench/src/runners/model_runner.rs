@@ -120,8 +120,10 @@ impl ModelRunner {
                 let cfg = config_copy
                     .to_string()
                     .context("Failed to serialize configuration")?;
+                let mut eval_envs: Vec<_> = (*eval_selector).env.clone();
+                eval_envs.extend(envs.clone());
 
-                let handle = parallel_bench_cmd("exec-eval".to_string(), cfg, envs.clone());
+                let handle = parallel_bench_cmd("exec-eval".to_string(), cfg, eval_envs);
 
                 // Wait for this process to complete before starting the next one
                 let mut child_procs = vec![handle];

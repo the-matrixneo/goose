@@ -2,10 +2,10 @@ use std::collections::HashMap;
 use crate::session::{Session, build_session, SessionBuilderConfig};
 use crate::logging;
 use async_trait::async_trait;
-use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine;
 use goose::message::Message;
 use goose::session::Identifier;
+use goose::agents::extension::{ExtensionConfig, Envs};
 use goose_bench::bench_session::{BenchAgent, BenchBaseSession};
 use goose_bench::eval_suites::ExtensionRequirements;
 use std::path::PathBuf;
@@ -81,18 +81,49 @@ async fn dataset_agent(
 ) -> BenchAgent {
     let identifier = Some(Identifier::Name(session_id));
 
-    // Prepare mock extension commands to be loaded during session building
-    let mock_extension_commands: Vec<String> = if let Some(extensions) = available_extensions {
+
+    // Prepare mock extensions as Stdio MCP extensions
+    let mock_extensions: Vec<ExtensionConfig> = if let Some(extensions) = available_extensions {
         extensions.into_iter().map(|(ext_name, tools)| {
             // Serialize the actual tools to pass to mock server
             let tools_json = serde_json::to_string(&tools).expect("Failed to serialize tools");
-            let tools_base64 = BASE64_STANDARD.encode(tools_json);
+            let tools_base64 = base64::engine::general_purpose::STANDARD.encode(tools_json);
             
-            // Create command string for mock MCP server with actual tools
-            format!(
-                "EXTENSION_NAME={} EXTENSION_TOOLS={} cargo run -p goose-bench --bin mock_mcp_server",
-                ext_name, tools_base64
-            )
+            // Use pre-compiled binary path for better performance
+            let binary_path = std::env::current_exe()
+                .expect("Failed to get current executable path")
+                .parent()
+                .expect("Failed to get parent directory")
+                .join("mock_mcp_server")
+                .to_string_lossy()
+                .to_string();
+            
+            // Fallback to cargo run if binary doesn't exist
+            let (cmd, args) = if std::path::Path::new(&binary_path).exists() {
+                (binary_path, vec![])
+            } else {
+                ("cargo".to_string(), vec![
+                    "run".to_string(),
+                    "-p".to_string(),
+                    "goose-bench".to_string(),
+                    "--bin".to_string(),
+                    "mock_mcp_server".to_string(),
+                ])
+            };
+            
+            ExtensionConfig::Stdio {
+                name: ext_name.clone(),
+                cmd,
+                args,
+                envs: Envs::new(HashMap::from([
+                    ("EXTENSION_NAME".to_string(), ext_name),
+                    ("EXTENSION_TOOLS".to_string(), tools_base64),
+                ])),
+                env_keys: vec![],
+                timeout: None,
+                bundled: None,
+                description: None,
+            }
         }).collect()
     } else {
         vec![]
@@ -102,10 +133,10 @@ async fn dataset_agent(
         identifier,
         resume: false,
         no_session: true,
-        extensions: mock_extension_commands, // Add mock extensions via the proper channel
+        extensions: vec![], // Not used when extensions_override is set
         remote_extensions: vec![],
         builtins: vec![],
-        extensions_override: Some(vec![]), // Override to prevent loading real extensions
+        extensions_override: Some(mock_extensions), // Use mock extensions and prevent loading real ones
         additional_system_prompt: None,
         settings: None,
         debug: false,

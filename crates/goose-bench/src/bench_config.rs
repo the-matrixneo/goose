@@ -26,6 +26,7 @@ pub struct BenchDataset {
     pub tools_column: Option<String>,
     pub llm_output_column: String,
     pub output_dataset_file_name: String,
+    pub debug_size: Option<isize>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]

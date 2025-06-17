@@ -189,7 +189,16 @@ impl EvalRunner {
         }
 
         let dataset: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&dataset_config.path)?)?;
-        let conversations = dataset.as_array().context("Dataset must be an array")?;
+        let mut conversations = dataset.as_array().context("Dataset must be an array")?.clone();
+        
+        // Apply debug_size limit if specified
+        if let Some(debug_size) = dataset_config.debug_size {
+            if debug_size > 0 {
+                let limit = debug_size as usize;
+                conversations.truncate(limit);
+                tracing::info!("Limited dataset to {} conversations due to debug_size setting", limit);
+            }
+        }
 
         let mut work_dir = self
             .create_work_dir(&self.config)
@@ -208,7 +217,7 @@ impl EvalRunner {
 
 
         let mut all_results = Vec::new();
-        for conv in conversations {
+        for conv in &conversations {
             let rows = conv.as_array().context("Conversation must be an array")?;
             let processed = self.run_dataset_rows(rows, &agent_generator, dataset_config).await;
             all_results.push(processed);
