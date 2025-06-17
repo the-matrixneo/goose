@@ -18,11 +18,21 @@ export function loadRecentDirs(): string[] {
       // Filter out invalid directories (non-existent or not directories)
       const validDirs = recentDirs.dirs.filter((dir) => {
         try {
-          const stats = fs.statSync(dir);
+          // Use lstat to detect symlinks and validate path structure
+          const stats = fs.lstatSync(dir);
+
+          // Reject symlinks for security
+          if (stats.isSymbolicLink()) {
+            console.warn(
+              `Removing symlink from recent directories for security: ${path.basename(dir)}`
+            );
+            return false;
+          }
+
           return stats.isDirectory();
         } catch (error) {
-          // Directory doesn't exist or can't be accessed
-          console.warn(`Removing invalid recent directory: ${dir}`);
+          // Directory doesn't exist or can't be accessed - don't log full path for security
+          console.warn(`Removing inaccessible recent directory`);
           return false;
         }
       });
@@ -44,13 +54,20 @@ export function addRecentDir(dir: string): void {
   try {
     // Validate that the path is actually a directory before adding it
     try {
-      const stats = fs.statSync(dir);
+      const stats = fs.lstatSync(dir);
+
+      // Reject symlinks for security
+      if (stats.isSymbolicLink()) {
+        console.warn(`Cannot add recent directory: symlinks not allowed for security`);
+        return;
+      }
+
       if (!stats.isDirectory()) {
-        console.warn(`Cannot add recent directory: ${dir} is not a directory`);
+        console.warn(`Cannot add recent directory: not a directory`);
         return;
       }
     } catch (error) {
-      console.warn(`Cannot add recent directory: ${dir} does not exist or cannot be accessed`);
+      console.warn(`Cannot add recent directory: path does not exist or cannot be accessed`);
       return;
     }
 

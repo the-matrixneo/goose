@@ -687,12 +687,17 @@ const openDirectoryDialog = async (
     // If a file was selected, use its parent directory
     let dirToAdd = selectedPath;
     try {
-      const stats = fsSync.statSync(selectedPath);
-      if (stats.isFile()) {
+      const stats = fsSync.lstatSync(selectedPath);
+
+      // Reject symlinks for security
+      if (stats.isSymbolicLink()) {
+        console.warn(`Selected path is a symlink, using parent directory for security`);
+        dirToAdd = path.dirname(selectedPath);
+      } else if (stats.isFile()) {
         dirToAdd = path.dirname(selectedPath);
       }
     } catch (error) {
-      console.warn(`Could not stat selected path: ${selectedPath}`, error);
+      console.warn(`Could not stat selected path, using parent directory`);
       dirToAdd = path.dirname(selectedPath); // Fallback to parent directory
     }
 

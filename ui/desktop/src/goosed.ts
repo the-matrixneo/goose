@@ -81,13 +81,18 @@ export const startGoosed = async (
 
   // Validate that the directory actually exists and is a directory
   try {
-    const stats = fs.statSync(dir);
-    if (!stats.isDirectory()) {
-      log.warn(`Provided path is not a directory: ${dir}, falling back to home directory`);
+    const stats = fs.lstatSync(dir);
+
+    // Reject symlinks for security - they could point outside intended directories
+    if (stats.isSymbolicLink()) {
+      log.warn(`Provided path is a symlink, falling back to home directory for security`);
+      dir = homeDir;
+    } else if (!stats.isDirectory()) {
+      log.warn(`Provided path is not a directory, falling back to home directory`);
       dir = homeDir;
     }
   } catch (error) {
-    log.warn(`Directory does not exist: ${dir}, falling back to home directory`);
+    log.warn(`Directory does not exist, falling back to home directory`);
     dir = homeDir;
   }
 
