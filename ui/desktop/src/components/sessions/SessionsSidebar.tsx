@@ -193,7 +193,7 @@ const SessionsSidebar: React.FC<SessionsSidebarProps> = ({ onSelectSession }) =>
       )}
     >
       <SidebarHeader>
-        <div className="p-1 pt-14 opacity-100 transition-all duration-200">
+        <div className="p-1 pt-16 opacity-100 transition-all duration-200">
           {/* <div className="flex justify-end mb-4">
             <SidebarTrigger />
           </div> */}

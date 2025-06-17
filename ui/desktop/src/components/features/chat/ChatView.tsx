@@ -535,122 +535,125 @@ function ChatContent({
         <SidebarProvider>
           <SessionsSidebar onSelectSession={handleSelectSession} />
           <SidebarInset>
-            <div className="fixed w-full left-0 top-0 z-10 p-4 flex justify-between animate-[appear_300ms_ease-in_forwards]">
-              <div className={`${safeIsMacOS ? 'pl-[72px]' : 'pl-[8px]'}`}>
-                <SidebarTrigger />
+            <div className="flex flex-col min-w-0 h-dvh">
+              <div className="fixed w-full left-0 top-0 z-10 p-4 flex animate-[appear_300ms_ease-in_forwards]">
+                <div className={`${safeIsMacOS ? 'pl-[72px]' : 'pl-[8px]'} flex gap-2`}>
+                  <SidebarTrigger />
+                  <MoreMenu
+                    setView={setView || (() => {})}
+                    setIsGoosehintsModalOpen={setIsGoosehintsModalOpen || (() => {})}
+                  />
+                </div>
               </div>
 
-              <MoreMenu
-                setView={setView || (() => {})}
-                setIsGoosehintsModalOpen={setIsGoosehintsModalOpen || (() => {})}
-              />
-            </div>
-            <div
-              className="flex flex-col flex-1 rounded-none w-full bg-bgApp mt-0 border-none relative"
-              onDrop={handleDrop}
-              onDragOver={handleDragOver}
-            >
-              {recipeConfig?.title && messages.length > 0 && (
-                <AgentHeader
-                  title={recipeConfig.title}
-                  profileInfo={
-                    recipeConfig.profile
-                      ? `${recipeConfig.profile} - ${recipeConfig.mcps || 12} MCPs`
-                      : undefined
-                  }
-                  onChangeProfile={() => {
-                    // Handle profile change
-                    console.log('Change profile clicked');
-                  }}
-                />
-              )}
-              {messages.length === 0 ? (
-                <Splash
-                  append={append}
-                  activities={
-                    Array.isArray(recipeConfig?.activities) ? recipeConfig!.activities : null
-                  }
-                  title={recipeConfig?.title}
-                />
-              ) : (
-                <ScrollArea ref={scrollRef} className="flex-1 h-[calc(100vh-95px)]" autoScroll>
-                  <SearchView>
-                    {filteredMessages.map((message, index) => (
-                      <div
-                        key={message.id || index}
-                        className={`mt-4 px-6 ${isUserMessage(message) ? 'user' : 'assistant'}`}
-                        data-testid="message-container"
-                      >
-                        {isUserMessage(message) ? (
-                          <>
-                            {hasContextHandlerContent(message) ? (
-                              <ContextHandler
-                                messages={messages}
-                                messageId={message.id ?? message.created.toString()}
-                                chatId={chat.id}
-                                workingDir={window.appConfig.get('GOOSE_WORKING_DIR') as string}
-                                contextType={getContextHandlerType(message)}
-                              />
-                            ) : (
-                              <UserMessage message={message} />
-                            )}
-                          </>
-                        ) : (
-                          <>
-                            {/* Only render GooseMessage if it's not a message invoking some context management */}
-                            {hasContextHandlerContent(message) ? (
-                              <ContextHandler
-                                messages={messages}
-                                messageId={message.id ?? message.created.toString()}
-                                chatId={chat.id}
-                                workingDir={window.appConfig.get('GOOSE_WORKING_DIR') as string}
-                                contextType={getContextHandlerType(message)}
-                              />
-                            ) : (
-                              <GooseMessage
-                                messageHistoryIndex={chat?.messageHistoryIndex}
-                                message={message}
-                                messages={messages}
-                                append={append}
-                                appendMessage={(newMessage) => {
-                                  const updatedMessages = [...messages, newMessage];
-                                  setMessages(updatedMessages);
-                                }}
-                                toolCallNotifications={toolCallNotifications}
-                              />
-                            )}
-                          </>
-                        )}
-                      </div>
-                    ))}
-                  </SearchView>
+              <div
+                className="flex flex-col min-w-0 flex-1 overflow-y-scroll bg-background-default relative"
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+              >
+                {recipeConfig?.title && messages.length > 0 && (
+                  <AgentHeader
+                    title={recipeConfig.title}
+                    profileInfo={
+                      recipeConfig.profile
+                        ? `${recipeConfig.profile} - ${recipeConfig.mcps || 12} MCPs`
+                        : undefined
+                    }
+                    onChangeProfile={() => {
+                      // Handle profile change
+                      console.log('Change profile clicked');
+                    }}
+                  />
+                )}
+                {messages.length === 0 ? (
+                  <Splash
+                    append={append}
+                    activities={
+                      Array.isArray(recipeConfig?.activities) ? recipeConfig!.activities : null
+                    }
+                    title={recipeConfig?.title}
+                  />
+                ) : (
+                  // <ScrollArea ref={scrollRef} className="flex-1 h-[calc(100vh-95px)]" autoScroll>
+                  <>
+                    <SearchView>
+                      {filteredMessages.map((message, index) => (
+                        <div
+                          key={message.id || index}
+                          className={`mt-4 px-6 ${isUserMessage(message) ? 'user' : 'assistant'}`}
+                          data-testid="message-container"
+                        >
+                          {isUserMessage(message) ? (
+                            <>
+                              {hasContextHandlerContent(message) ? (
+                                <ContextHandler
+                                  messages={messages}
+                                  messageId={message.id ?? message.created.toString()}
+                                  chatId={chat.id}
+                                  workingDir={window.appConfig.get('GOOSE_WORKING_DIR') as string}
+                                  contextType={getContextHandlerType(message)}
+                                />
+                              ) : (
+                                <UserMessage message={message} />
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              {/* Only render GooseMessage if it's not a message invoking some context management */}
+                              {hasContextHandlerContent(message) ? (
+                                <ContextHandler
+                                  messages={messages}
+                                  messageId={message.id ?? message.created.toString()}
+                                  chatId={chat.id}
+                                  workingDir={window.appConfig.get('GOOSE_WORKING_DIR') as string}
+                                  contextType={getContextHandlerType(message)}
+                                />
+                              ) : (
+                                <GooseMessage
+                                  messageHistoryIndex={chat?.messageHistoryIndex}
+                                  message={message}
+                                  messages={messages}
+                                  append={append}
+                                  appendMessage={(newMessage) => {
+                                    const updatedMessages = [...messages, newMessage];
+                                    setMessages(updatedMessages);
+                                  }}
+                                  toolCallNotifications={toolCallNotifications}
+                                />
+                              )}
+                            </>
+                          )}
+                        </div>
+                      ))}
+                    </SearchView>
 
-                  {error && (
-                    <div className="flex flex-col items-center justify-center p-4">
-                      <div className="text-red-700 dark:text-red-300 bg-red-400/50 p-3 rounded-lg mb-2">
-                        {error.message || 'Honk! Goose experienced an error while responding'}
+                    {error && (
+                      <div className="flex flex-col items-center justify-center p-4">
+                        <div className="text-red-700 dark:text-red-300 bg-red-400/50 p-3 rounded-lg mb-2">
+                          {error.message || 'Honk! Goose experienced an error while responding'}
+                        </div>
+                        <div
+                          className="px-3 py-2 mt-2 text-center whitespace-nowrap cursor-pointer text-textStandard border border-borderSubtle hover:bg-bgSubtle rounded-full inline-block transition-all duration-150"
+                          onClick={async () => {
+                            // Find the last user message
+                            const lastUserMessage = messages.reduceRight(
+                              (found, m) => found || (m.role === 'user' ? m : null),
+                              null as Message | null
+                            );
+                            if (lastUserMessage) {
+                              append(lastUserMessage);
+                            }
+                          }}
+                        >
+                          Retry Last Message
+                        </div>
                       </div>
-                      <div
-                        className="px-3 py-2 mt-2 text-center whitespace-nowrap cursor-pointer text-textStandard border border-borderSubtle hover:bg-bgSubtle rounded-full inline-block transition-all duration-150"
-                        onClick={async () => {
-                          // Find the last user message
-                          const lastUserMessage = messages.reduceRight(
-                            (found, m) => found || (m.role === 'user' ? m : null),
-                            null as Message | null
-                          );
-                          if (lastUserMessage) {
-                            append(lastUserMessage);
-                          }
-                        }}
-                      >
-                        Retry Last Message
-                      </div>
-                    </div>
-                  )}
-                  <div className="block h-8" />
-                </ScrollArea>
-              )}
-
+                    )}
+                    <div className="block h-8" />
+                  </>
+                  // </ScrollArea>
+                )}
+              </div>
               <div className="relative py-4 px-8 pt-0 z-10 animate-[fadein_400ms_ease-in_forwards]">
                 {isLoading && <LoadingGoose />}
                 <ChatInput

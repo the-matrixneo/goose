@@ -98,7 +98,7 @@ export default function Splash({ append, activities, title }: SplashProps) {
               </div>
             </div> */}
 
-            <div className="flex flex-col mt-6 mb-4 animate-in fade-in slide-in-from-bottom-8 duration-500">
+            <div className="flex flex-col mt-10 mb-4 animate-in fade-in slide-in-from-bottom-8 duration-500">
               <h1 className="text-text-prominent text-4xl font-light min-h-[4rem]">
                 <span>{greeting.prefix}</span>
                 <div className="text-text-muted inline">{greeting.message}</div>
