@@ -1220,11 +1220,8 @@ const registerGlobalHotkey = (accelerator: string) => {
 };
 
 app.whenReady().then(async () => {
-  // Register update IPC handlers once
+  // Register update IPC handlers once (but don't setup auto-updater yet)
   registerUpdateIpcHandlers();
-
-  // Setup auto-updater if enabled
-  shouldSetupUpdater() && setupAutoUpdater();
 
   // Add CSP headers to all sessions
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
@@ -1295,6 +1292,18 @@ app.whenReady().then(async () => {
   const { dirPath } = parseArgs();
 
   await createNewWindow(app, dirPath);
+
+  // Setup auto-updater AFTER window is created and displayed (with delay to avoid blocking)
+  setTimeout(() => {
+    if (shouldSetupUpdater()) {
+      log.info('Setting up auto-updater after window creation...');
+      try {
+        setupAutoUpdater();
+      } catch (error) {
+        log.error('Error setting up auto-updater:', error);
+      }
+    }
+  }, 2000); // 2 second delay after window is shown
 
   // Get the existing menu
   const menu = Menu.getApplicationMenu();
