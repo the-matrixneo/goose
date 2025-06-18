@@ -34,8 +34,6 @@ impl Default for LeadWorkerConfig {
     }
 }
 
-
-
 /// Failure detector for identifying task-level failures
 #[derive(Default)]
 pub struct FailureDetector;
@@ -213,12 +211,13 @@ impl LeadWorkerProvider {
                     // Handle task failure
                     let mut failures = self.consecutive_failures.lock().await;
                     let mut lead_turns = self.lead_turns_remaining.lock().await;
-                    
+
                     let new_failures = *failures + 1;
-                    
+
                     // If we're in worker mode and hit failure threshold, add fallback turns
-                    let should_add_fallback = *lead_turns == 0 && new_failures >= self.config.failure_threshold;
-                    
+                    let should_add_fallback =
+                        *lead_turns == 0 && new_failures >= self.config.failure_threshold;
+
                     if should_add_fallback {
                         *lead_turns = self.config.fallback_turns; // Add fallback turns to get back to lead
                         *failures = 0; // Reset when entering fallback
@@ -230,7 +229,7 @@ impl LeadWorkerProvider {
                     // Handle success
                     let mut failures = self.consecutive_failures.lock().await;
                     let mut lead_turns = self.lead_turns_remaining.lock().await;
-                    
+
                     // Only decrement lead turns on SUCCESS (move toward worker when things are going well)
                     *lead_turns = lead_turns.saturating_sub(1);
                     // Reset failure count on success
