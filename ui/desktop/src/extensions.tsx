@@ -260,8 +260,11 @@ export async function replaceWithShims(cmd: string) {
   const binaryPathMap: Record<string, string> = {
     goosed: await window.electron.getBinaryPath('goosed'),
     jbang: await window.electron.getBinaryPath('jbang'),
-    npx: await window.electron.getBinaryPath('npx'),
-    uvx: await window.electron.getBinaryPath('uvx'),
+    // On Windows, don't replace npx/uvx paths to avoid version-specific binding
+    ...(process.platform !== 'win32' && {
+      npx: await window.electron.getBinaryPath('npx'),
+      uvx: await window.electron.getBinaryPath('uvx'),
+    }),
   };
 
   if (binaryPathMap[cmd]) {
