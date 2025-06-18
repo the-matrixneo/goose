@@ -84,7 +84,7 @@
         <link href="https://block.github.io/goose/pr-preview/pr-2962/blog/2025/06/17/isolated-development-environments"/>
         <updated>2025-06-17T00:00:00.000Z</updated>
         <summary type="html"><![CDATA[Never worry about breaking your development setup again with containerized, git-branch-isolated development environments powered by container-use]]></summary>
-        <content type="html"><![CDATA[<p><img decoding="async" loading="lazy" src="https://avatars.githubusercontent.com/u/78824383?v=4&amp;s=100" alt="Dagger Logo" class="img_ev3q"></p>
+        <content type="html"><![CDATA[<p><img decoding="async" loading="lazy" src="https://avatars.githubusercontent.com/u/78824383?v=4" alt="Dagger Logo" class="img_ev3q"></p>
 <p>Over 10 years ago Docker came on the scene and introduced masses of developers to the concept and practice of containers.
 These containers were useful to solve deployment and buildtime problems (and in some cases development environments) and rapidly became mainstream.
 Underlying these containers was interesting tech around "copy on write" filesystems and isolated "not quite" virtual machine like environments (certainly helped to contain processes and clean up after).</p>
