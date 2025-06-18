@@ -20,6 +20,7 @@ use crate::config::{Config, ConfigError};
 use crate::providers::base::ConfigKey;
 use crate::message::Message;
 use crate::model::ModelConfig;
+use crate::providers::base::ConfigKey;
 use mcp_core::tool::Tool;
 
 pub const GITHUB_COPILOT_DEFAULT_MODEL: &str = "gpt-4o";
@@ -390,14 +391,7 @@ impl Provider for GithubCopilotProvider {
             GITHUB_COPILOT_DEFAULT_MODEL,
             GITHUB_COPILOT_KNOWN_MODELS.to_vec(),
             GITHUB_COPILOT_DOC_URL,
-            vec![
-                ConfigKey::new(
-                    "GITHUB_COPILOT_TOKEN",
-                    true,  // required
-                    true,  // secret
-                    None,  // no default value
-                ),
-            ],
+            vec![ConfigKey::new("GITHUB_COPILOT_TOKEN", true, true, None)],
         )
     }
 
