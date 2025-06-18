@@ -38,6 +38,7 @@ where
     F: Fn(ExtensionRequirements, String, bool, Option<HashMap<String, Vec<Tool>>>) -> Fut,
     Fut: Future<Output = BenchAgent> + Send,
 {
+    let start_time = std::time::Instant::now();
     let (result, timed_out) = async {
         let now_stamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -101,7 +102,8 @@ where
         (Err(e), false)
     });
 
-    create_dataset_result_row_stateless(row, result, idx, timed_out)
+    let duration_ms = start_time.elapsed().as_millis() as u64;
+    create_dataset_result_row_stateless(row, result, idx, timed_out, duration_ms)
 }
 
 fn parse_extensions_stateless(
@@ -133,6 +135,7 @@ fn create_dataset_result_row_stateless(
     result: Result<Vec<goose::message::Message>>,
     idx: usize,
     timed_out: bool,
+    duration_ms: u64,
 ) -> serde_json::Value {
     let obj = row.as_object_mut().unwrap();
 
@@ -161,6 +164,10 @@ fn create_dataset_result_row_stateless(
         serde_json::Value::Number(serde_json::Number::from(idx)),
     );
     obj.insert("timed_out".to_string(), serde_json::Value::Bool(timed_out));
+    obj.insert(
+        "duration_ms".to_string(),
+        serde_json::Value::Number(serde_json::Number::from(duration_ms)),
+    );
 
     if timed_out {
         obj.insert(
