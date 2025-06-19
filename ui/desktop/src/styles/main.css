@@ -30,7 +30,7 @@
   --color-yellow-100: #ffd966;
   --color-yellow-200: #fbcd44;
 
-  --color-accent: var(--color-neutral-600);
+  --color-accent: var(--color-neutral-500);
 }
 
 :root {

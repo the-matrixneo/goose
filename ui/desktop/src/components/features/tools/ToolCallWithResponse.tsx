@@ -29,9 +29,9 @@ export default function ToolCallWithResponse({
 
   return (
     <div className={'w-full text-textSubtle text-sm'}>
-      <Card className="">
-        <ToolCallView {...{ isCancelledMessage, toolCall, toolResponse, notifications }} />
-      </Card>
+      <ToolCallView {...{ isCancelledMessage, toolCall, toolResponse, notifications }} />
+      {/* <Card className="">
+      </Card> */}
     </div>
   );
 }
@@ -216,7 +216,7 @@ function ToolCallView({
     >
       {/* Tool Details */}
       {isToolDetails && (
-        <div className="bg-bgStandard rounded-t mt-1">
+        <div className="bg-background-default rounded-t mt-1">
           <ToolDetailsView toolCall={toolCall} isStartExpanded={isExpandToolDetails} />
         </div>
       )}

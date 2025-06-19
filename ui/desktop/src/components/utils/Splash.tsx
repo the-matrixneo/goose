@@ -91,14 +91,14 @@ export default function Splash({ append, activities, title }: SplashProps) {
       )}
       <div className="flex flex-col flex-1">
         <div className="h-full flex flex-col pb-12">
-          <div className="p-8">
+          <div className="px-2">
             {/* <div className="relative text-textStandard mb-12">
               <div className="w-min animate-[flyin_2s_var(--spring-easing)_forwards]">
                 <GooseLogo />
               </div>
             </div> */}
 
-            <div className="flex flex-col mt-10 mb-4 animate-in fade-in slide-in-from-bottom-8 duration-500">
+            <div className="flex flex-col mt-2 mb-4 animate-in fade-in slide-in-from-bottom-8 duration-500">
               <h1 className="text-text-prominent text-4xl font-light min-h-[4rem]">
                 <span>{greeting.prefix}</span>
                 <div className="text-text-muted inline">{greeting.message}</div>
