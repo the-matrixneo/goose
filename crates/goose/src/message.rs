@@ -8,6 +8,7 @@ use std::collections::HashSet;
 /// The content of the messages uses MCP types to avoid additional conversions
 /// when interacting with MCP servers.
 use chrono::Utc;
+use mcp_core::content::{Content, EmbeddedResource, ImageContent, TextContent};
 use mcp_core::handler::ToolResult;
 use mcp_core::tool::ToolCall;
 use rmcp::model::ResourceContents;
@@ -104,6 +105,7 @@ pub struct SummarizationRequested {
 pub enum MessageContent {
     Text(TextContent),
     Image(ImageContent),
+    EmbeddedResource(EmbeddedResource),
     ToolRequest(ToolRequest),
     ToolResponse(ToolResponse),
     ToolConfirmationRequest(ToolConfirmationRequest),
@@ -239,6 +241,14 @@ impl MessageContent {
         }
     }
 
+    /// Get the embedded resource if this is an EmbeddedResource variant
+    pub fn as_embedded_resource(&self) -> Option<&EmbeddedResource> {
+        match self {
+            MessageContent::EmbeddedResource(resource) => Some(resource),
+            _ => None,
+        }
+    }
+
     /// Get the thinking content if this is a ThinkingContent variant
     pub fn as_thinking(&self) -> Option<&ThinkingContent> {
         match self {
@@ -267,7 +277,15 @@ impl From<Content> for MessageContent {
             }
             RawContent::Resource(resource) => {
                 let text = match &resource.resource {
-                    ResourceContents::TextResourceContents { text, .. } => text.clone(),
+                    ResourceContents::TextResourceContents { uri, text, .. } => {
+                        // For special URIs like goose://checkpoint, preserve as resource
+                        if uri.starts_with("goose://") {
+                            MessageContent::EmbeddedResource(resource);
+                        } else
+                        {
+                            text.clone();
+                        }
+                    },
                     ResourceContents::BlobResourceContents { blob, .. } => {
                         format!("[Binary content: {}]", blob.clone())
                     }
