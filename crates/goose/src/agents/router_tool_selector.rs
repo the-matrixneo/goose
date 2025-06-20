@@ -181,8 +181,14 @@ impl RouterToolSelector for VectorToolSelector {
                 .unwrap_or("")
                 .to_string();
             
-            // Combine user_query and additional_context into the query for search
-            let combined_query = format!("{} {}", user_query, additional_context).trim().to_string();
+            // Combine user_query and additional_context, prioritizing the user's actual message
+            let combined_query = if user_message.is_some() {
+                // When we have the actual user message, weight it more heavily
+                format!("{} {} {}", user_query, user_query, additional_context).trim().to_string()
+            } else {
+                // Fallback for when we only have tool parameters
+                format!("{} {}", user_query, additional_context).trim().to_string()
+            };
             
             // Update the params with the combined query for the underlying search
             if let Some(obj) = params.as_object_mut() {
@@ -415,8 +421,14 @@ impl RouterToolSelector for LLMToolSelector {
             .unwrap_or("")
             .to_string();
         
-        // Combine user_query and additional_context into the query for search
-        let combined_query = format!("{} {}", user_query, additional_context).trim().to_string();
+        // Combine user_query and additional_context, prioritizing the user's actual message
+        let combined_query = if user_message.is_some() {
+            // When we have the actual user message, weight it more heavily
+            format!("{} {} {}", user_query, user_query, additional_context).trim().to_string()
+        } else {
+            // Fallback for when we only have tool parameters
+            format!("{} {}", user_query, additional_context).trim().to_string()
+        };
         
         // Update the params with the combined query for the underlying search
         if let Some(obj) = params.as_object_mut() {
