@@ -22,9 +22,9 @@ pub struct BenchModel {
 pub struct BenchDatasetConfig {
     pub max_concurrent: usize,
     pub debug_size: Option<isize>,
-    pub requests_per_second: Option<f64>, // Rate limiting: e.g., 0.5 = one request every 2 seconds
-    pub chunk_delay_ms: Option<u64>,      // Delay between chunks in milliseconds
-    pub agent_timeout_seconds: Option<u64>, // Timeout for agent responses to prevent hanging
+    pub requests_per_second: Option<f64>,
+    pub chunk_delay_ms: Option<u64>,
+    pub max_interactions: Option<usize>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -84,7 +84,7 @@ impl Default for BenchRunConfig {
                 dataset: None,
                 selector: "core".into(),
                 post_process_cmd: None,
-                parallel_safe: true, // Default to true
+                parallel_safe: true,
             }],
             include_dirs: vec![],
             repeat: Some(2),
@@ -100,14 +100,12 @@ impl Default for BenchRunConfig {
 impl BenchRunConfig {
     pub fn from_string(cfg: String) -> anyhow::Result<Self> {
         let mut config: Self = serde_json::from_str(cfg.as_str())?;
-        // update include_dirs to contain full-paths only
         config.include_dirs = BenchmarkWorkDir::canonical_dirs(config.include_dirs);
         Self::canonicalize_eval_post_proc_cmd(&mut config);
         Ok(config)
     }
 
     fn canonicalize_eval_post_proc_cmd(config: &mut BenchRunConfig) {
-        // update eval post-process script paths to all be full-paths
         config.evals.iter_mut().for_each(|eval| {
             if let Some(post_process_cmd) = &eval.post_process_cmd {
                 let canon = BenchmarkWorkDir::canonical_dirs(vec![post_process_cmd.clone()]);

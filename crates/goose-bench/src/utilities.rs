@@ -16,7 +16,6 @@ pub fn await_process_exits(child_processes: &mut [Child], handles: Vec<JoinHandl
         match handle.join() {
             Ok(_res) => (),
             Err(e) => {
-                // Handle thread panic
                 tracing::error!("Thread panicked: {:?}", e);
             }
         }

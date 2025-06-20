@@ -3831,6 +3831,7 @@ dependencies = [
  "futures",
  "goose",
  "include_dir",
+ "indicatif",
  "mcp-core",
  "once_cell",
  "paste",

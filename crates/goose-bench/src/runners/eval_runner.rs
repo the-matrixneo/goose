@@ -5,6 +5,7 @@ use crate::eval_suites::{EvaluationSuite, ExtensionRequirements};
 use crate::reporting::EvaluationResult;
 use crate::utilities::await_process_exits;
 use anyhow::{bail, Context, Result};
+use indicatif::{ProgressBar, ProgressStyle};
 use mcp_core::Tool;
 use std::collections::HashMap;
 use std::env;
@@ -21,10 +22,10 @@ use tracing;
 #[derive(Clone)]
 struct RowProcessingConfig<'a> {
     dataset_config: &'a crate::bench_config::BenchDataset,
+    dataset_rate_config: &'a Option<crate::bench_config::BenchDatasetConfig>,
     selector: String,
     request_delay_ms: Option<u64>,
     agent_creation_mutex: Arc<Mutex<()>>,
-    agent_timeout_seconds: Option<u64>,
 }
 
 // Stateless functions for parallel processing
@@ -45,7 +46,6 @@ where
             .context("Failed to get current timestamp")?
             .as_nanos();
 
-        // Use high precision timestamp + index to ensure uniqueness across parallel executions
         let session_id = format!("{}-{}-row{}", config.selector, now_stamp, idx);
 
         let extensions = parse_extensions_stateless(&row, &config.dataset_config.tools_column)?;
@@ -62,43 +62,89 @@ where
             .await
         };
 
-        if let Some(system_prompt) =
-            get_dataset_system_prompt_stateless(&row, &config.dataset_config.system_prompt_column)
-        {
+        if let Some(system_prompt) = get_dataset_system_prompt_stateless(&row, &config.dataset_config.system_prompt_column) {
             agent.session.override_system_prompt(system_prompt).await;
         }
-
+        
         let prompt = row
             .get(&config.dataset_config.prompt_column)
             .and_then(|v| v.as_str())
             .context("Missing prompt field")?;
 
-        // Add delay before LLM call to respect rate limits
+        // Log the prompt being processed
+        let verbose_conversations = std::env::var("GOOSE_BENCH_VERBOSE_CONVERSATIONS")
+            .map(|v| v == "1" || v.to_lowercase() == "true")
+            .unwrap_or(false);
+            
+        if verbose_conversations {
+            tracing::info!("Processing row {} with prompt: {}", idx, prompt);
+        } else {
+            tracing::info!("Processing row {}", idx);
+        }
+
         if let Some(delay) = config.request_delay_ms {
             tokio::time::sleep(Duration::from_millis(delay)).await;
         }
 
-        // Use timeout to prevent hanging on user input requests
-        let timeout_duration = Duration::from_secs(config.agent_timeout_seconds.unwrap_or(30));
-        let (result, timed_out) =
-            match tokio::time::timeout(timeout_duration, agent.prompt(prompt.to_string())).await {
-                Ok(result) => (result, false),
-                Err(_) => {
-                    tracing::warn!(
-                        "Agent prompt timed out after {}s for row {}, collecting partial results",
-                        timeout_duration.as_secs(),
-                        idx
-                    );
-                    // Instead of failing, collect the agent's message history up to the timeout
-                    (Ok(agent.session.message_history()), true)
+        // Add timeout to prevent hanging on LLM clarifying questions
+        let prompt_timeout = tokio::time::Duration::from_secs(300);
+        let result = match tokio::time::timeout(prompt_timeout, async {
+            // Use interaction limit if specified, otherwise use unlimited interactions
+            match config.dataset_rate_config.as_ref().and_then(|dc| dc.max_interactions) {
+                Some(max_interactions) => agent.prompt_with_limit(prompt.to_string(), max_interactions).await,
+                None => agent.prompt(prompt.to_string()).await,
+            }
+        }).await {
+            Ok(result) => {
+                // Log conversation results
+                match &result {
+                    Ok(messages) => {
+                        tracing::info!("Row {} completed successfully with {} messages", idx, messages.len());
+                        if verbose_conversations {
+                            for (i, msg) in messages.iter().enumerate() {
+                                let role = match msg.role {
+                                    mcp_core::role::Role::User => "User",
+                                    mcp_core::role::Role::Assistant => "Assistant",
+                                };
+                                let content = msg.content.iter()
+                                    .map(|c| match c {
+                                        goose::message::MessageContent::Text(text) => text.text.clone(),
+                                        goose::message::MessageContent::ToolRequest(tool_req) => {
+                                            match &tool_req.tool_call {
+                                                Ok(tool_call) => format!("[Tool: {}]", tool_call.name),
+                                                Err(_) => "[Tool: <invalid>]".to_string(),
+                                            }
+                                        },
+                                        goose::message::MessageContent::ToolResponse(_) => "[Tool Response]".to_string(),
+                                        _ => "<other content>".to_string(),
+                                    })
+                                    .collect::<Vec<_>>()
+                                    .join(" ");
+                                tracing::info!("  Message {}: {} - {}", i, role, content);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        tracing::warn!("Row {} failed with error: {}", idx, e);
+                    }
                 }
-            };
+                result
+            }
+            Err(_timeout) => {
+                tracing::warn!("Agent prompt timed out after 300 seconds for row {}", idx);
+                Err(anyhow::anyhow!("Prompt timeout - likely LLM asking for clarification"))
+            }
+        };
 
-        Ok::<(Result<Vec<goose::message::Message>>, bool), anyhow::Error>((result, timed_out))
+        // Ensure extensions are properly shut down to prevent subprocess leaks
+        if let Err(e) = agent.shutdown().await {
+            tracing::warn!("Failed to shutdown agent extensions for row {}: {}", idx, e);
+        }
+
+        Ok::<(Result<Vec<goose::message::Message>>, bool), anyhow::Error>((result, false))
     }
     .await
     .unwrap_or_else(|e: anyhow::Error| {
-        // If there's an error in the async block, treat it as a regular error
         (Err(e), false)
     });
 
@@ -129,6 +175,7 @@ fn get_dataset_system_prompt_stateless(
         .and_then(|v| v.as_str())
         .map(|s| s.to_string())
 }
+
 
 fn create_dataset_result_row_stateless(
     mut row: serde_json::Value,
@@ -335,6 +382,7 @@ impl EvalRunner {
             BenchmarkWorkDir::deep_copy(agent.session_file().as_path(), here.as_path(), false)
                 .context("Failed to copy session file to evaluation directory")?;
 
+
             tracing::info!("Evaluation completed successfully");
         } else {
             tracing::error!("No evaluation found for selector: {}", bench_eval.selector);
@@ -370,7 +418,6 @@ impl EvalRunner {
             .context("Dataset must be an array")?
             .clone();
 
-        // Apply debug_size limit if specified
         if let Some(dataset_cfg) = &self.config.dataset_config {
             if let Some(debug_size) = dataset_cfg.debug_size {
                 if debug_size > 0 {
@@ -395,7 +442,6 @@ impl EvalRunner {
             .unwrap_or_else(|| "run-0".to_string());
         let run_id = format!("run-{}", run_id.clone());
 
-        // create entire dir subtree for eval and cd into dir for running eval
         work_dir.set_eval(&bench_eval.selector, run_id);
         tracing::info!("Set evaluation directory for {}", bench_eval.selector);
 
@@ -421,7 +467,6 @@ impl EvalRunner {
             .context("No evaluations specified")?;
         let selector = bench_eval.selector.clone();
 
-        // Calculate delay between requests based on requests_per_second
         let request_delay_ms = self
             .config
             .dataset_config
@@ -429,7 +474,6 @@ impl EvalRunner {
             .and_then(|dc| dc.requests_per_second)
             .map(|rps| (1000.0 / rps) as u64);
 
-        // Get chunk delay (pause between processing chunks)
         let chunk_delay_ms = self
             .config
             .dataset_config
@@ -437,17 +481,8 @@ impl EvalRunner {
             .and_then(|dc| dc.chunk_delay_ms)
             .unwrap_or(0);
 
-        // Get agent timeout
-        let agent_timeout_seconds = self
-            .config
-            .dataset_config
-            .as_ref()
-            .and_then(|dc| dc.agent_timeout_seconds);
-
-        // Create mutex to serialize agent creation and prevent database conflicts
         let agent_creation_mutex = Arc::new(Mutex::new(()));
 
-        // Process in chunks to control overall throughput
         let mut all_results = Vec::new();
         let chunk_size = max_concurrent;
 
@@ -462,6 +497,16 @@ impl EvalRunner {
         if chunk_delay_ms > 0 {
             tracing::info!("Chunk delay: {}ms", chunk_delay_ms);
         }
+
+        // Create progress bar
+        let progress = ProgressBar::new(rows.len() as u64);
+        progress.set_style(
+            ProgressStyle::default_bar()
+                .template("{bar:40.cyan/blue} {pos}/{len} rows ({percent}%) [{elapsed_precise}]")
+                .unwrap()
+                .progress_chars("##-"),
+        );
+        progress.set_message("Processing dataset");
 
         for (chunk_num, chunk) in rows.chunks(chunk_size).enumerate() {
             tracing::debug!("Processing chunk {} with {} rows", chunk_num, chunk.len());
@@ -478,10 +523,10 @@ impl EvalRunner {
                         agent_generator.clone(),
                         RowProcessingConfig {
                             dataset_config,
+                            dataset_rate_config: &self.config.dataset_config,
                             selector: selector.clone(),
                             request_delay_ms,
                             agent_creation_mutex: mutex_clone,
-                            agent_timeout_seconds,
                         },
                     )
                 })
@@ -490,12 +535,17 @@ impl EvalRunner {
             let chunk_results = futures::future::join_all(futures).await;
             all_results.extend(chunk_results);
 
-            // Pause between chunks if configured
+            // Update progress bar by the number of rows completed in this chunk
+            progress.inc(chunk.len() as u64);
+
             if chunk_delay_ms > 0 && chunk_num < rows.len() / chunk_size {
                 tracing::debug!("Waiting {}ms before next chunk", chunk_delay_ms);
                 tokio::time::sleep(Duration::from_millis(chunk_delay_ms)).await;
             }
         }
+
+        // Finish progress bar
+        progress.finish_with_message("Dataset processing complete");
 
         self.write_dataset_results(&bench_eval.selector, vec![all_results])
             .await

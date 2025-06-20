@@ -1,5 +1,6 @@
 use crate::logging;
 use crate::session::{build_session, Session, SessionBuilderConfig};
+use goose_bench::interaction_limited_agent::InteractionLimitedAgent;
 use async_trait::async_trait;
 use base64::Engine;
 use goose::agents::extension::{Envs, ExtensionConfig};
@@ -12,6 +13,68 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex as StdMutex, OnceLock};
 use tokio::sync::Mutex;
+
+// Global mutex to serialize environment variable operations
+static ENV_MUTEX: OnceLock<StdMutex<()>> = OnceLock::new();
+
+// Global state to track cleanup
+static CLEAN_CONFIG_SETUP: OnceLock<PathBuf> = OnceLock::new();
+
+// RAII guard for safely managing environment variable overrides
+struct EnvGuard {
+    key: String,
+    original_value: Option<String>,
+}
+
+impl EnvGuard {
+    fn new(key: &str, new_value: &str) -> Self {
+        let mutex = ENV_MUTEX.get_or_init(|| StdMutex::new(()));
+        let _lock = mutex.lock().unwrap();
+        
+        let original_value = std::env::var(key).ok();
+        // SAFETY: We hold a mutex lock, ensuring no concurrent access to environment variables
+        unsafe {
+            std::env::set_var(key, new_value);
+        }
+        
+        Self {
+            key: key.to_string(),
+            original_value,
+        }
+    }
+}
+
+impl Drop for EnvGuard {
+    fn drop(&mut self) {
+        let mutex = ENV_MUTEX.get_or_init(|| StdMutex::new(()));
+        let _lock = mutex.lock().unwrap();
+        
+        // SAFETY: We hold a mutex lock, ensuring no concurrent access to environment variables
+        unsafe {
+            match &self.original_value {
+                Some(value) => std::env::set_var(&self.key, value),
+                None => std::env::remove_var(&self.key),
+            }
+        }
+    }
+}
+
+// Set up clean config for dataset benchmarking
+fn setup_clean_config_for_datasets() -> Result<EnvGuard, std::io::Error> {
+    let temp_dir = std::env::temp_dir().join(format!("goose_bench_clean_config_{}", std::process::id()));
+    std::fs::create_dir_all(&temp_dir)?;
+    
+    // Create a minimal config.yaml with no extensions
+    let config_file = temp_dir.join("config.yaml");
+    std::fs::write(&config_file, "extensions: {}\n")?;
+    
+    // Store temp directory for cleanup
+    let _ = CLEAN_CONFIG_SETUP.set(temp_dir.clone());
+    
+    // Return guard that manages the environment variable
+    Ok(EnvGuard::new("GOOSE_CONFIG_DIR", &temp_dir.to_string_lossy()))
+}
+
 
 // Cache for mock MCP tools to avoid repeated serialization
 static TOOLS_CACHE: OnceLock<StdMutex<HashMap<String, String>>> = OnceLock::new();
@@ -45,23 +108,108 @@ fn get_cached_binary_path() -> String {
         .clone()
 }
 
+// Wrapper to provide mutable messages for Session
+struct SessionWrapper {
+    session: Session,
+    _dummy_messages: Vec<Message>,
+}
+
+impl SessionWrapper {
+    fn new(session: Session) -> Self {
+        Self {
+            session,
+            _dummy_messages: Vec::new(),
+        }
+    }
+}
+
+// Wrapper for InteractionLimitedAgent to implement BenchBaseSession
+struct InteractionLimitedAgentWrapper {
+    agent: InteractionLimitedAgent,
+    session_file: PathBuf,
+    dummy_messages: Vec<Message>,
+}
+
+impl InteractionLimitedAgentWrapper {
+    fn new(agent: InteractionLimitedAgent, session_file: PathBuf) -> Self {
+        Self { 
+            agent, 
+            session_file,
+            dummy_messages: Vec::new(),
+        }
+    }
+}
+
 // allow session obj to be used in benchmarking
 #[async_trait]
-impl BenchBaseSession for Session {
+impl BenchBaseSession for SessionWrapper {
     async fn headless(&mut self, message: String) -> anyhow::Result<()> {
-        self.headless(message).await
+        self.session.headless(message).await
     }
     fn session_file(&self) -> PathBuf {
-        self.session_file()
+        self.session.session_file()
     }
     fn message_history(&self) -> Vec<Message> {
-        self.message_history()
+        self.session.message_history()
     }
     async fn override_system_prompt(&self, override_prompt: String) {
-        self.override_system_prompt(override_prompt).await
+        self.session.override_system_prompt(override_prompt).await
     }
     fn get_total_token_usage(&self) -> anyhow::Result<Option<i32>> {
-        self.get_total_token_usage()
+        self.session.get_total_token_usage()
+    }
+    async fn cleanup_extensions(&self) -> anyhow::Result<()> {
+        self.session.cleanup_extensions().await
+    }
+    fn get_agent(&self) -> &goose::agents::Agent {
+        self.session.get_agent()
+    }
+    fn get_messages_mut(&mut self) -> &mut Vec<Message> {
+        &mut self._dummy_messages
+    }
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+}
+
+#[async_trait]
+impl BenchBaseSession for InteractionLimitedAgentWrapper {
+    async fn headless(&mut self, message: String) -> anyhow::Result<()> {
+        self.agent.prompt(message).await?;
+        Ok(())
+    }
+    
+    fn session_file(&self) -> PathBuf {
+        self.session_file.clone()
+    }
+    
+    fn message_history(&self) -> Vec<Message> {
+        self.agent.message_history()
+    }
+    
+    async fn override_system_prompt(&self, override_prompt: String) {
+        self.agent.override_system_prompt(override_prompt).await;
+    }
+    
+    fn get_total_token_usage(&self) -> anyhow::Result<Option<i32>> {
+        Ok(None)
+    }
+    
+    async fn cleanup_extensions(&self) -> anyhow::Result<()> {
+        Ok(())
+    }
+    
+    fn get_agent(&self) -> &goose::agents::Agent {
+        self.agent.get_agent()
+    }
+    
+    fn get_messages_mut(&mut self) -> &mut Vec<Message> {
+        // InteractionLimitedAgent manages its own messages
+        &mut self.dummy_messages
+    }
+    
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        &mut self.agent
     }
 }
 pub async fn agent_generator(
@@ -101,7 +249,7 @@ async fn standard_agent(
     .await;
 
     // package session obj into benchmark-compatible struct
-    let bench_agent = BenchAgent::new(Box::new(base_session));
+    let bench_agent = BenchAgent::new(Box::new(SessionWrapper::new(base_session)));
 
     // Initialize logging with error capture
     let errors = Some(Arc::new(Mutex::new(bench_agent.get_errors().await)));
@@ -114,74 +262,106 @@ async fn dataset_agent(
     session_id: String,
     available_extensions: Option<HashMap<String, Vec<Tool>>>,
 ) -> BenchAgent {
-    let identifier = Some(Identifier::Name(session_id));
+    // Set up clean config environment automatically for dataset benchmarking
+    let _config_guard = setup_clean_config_for_datasets()
+        .unwrap_or_else(|e| {
+            eprintln!("Warning: Could not set up clean config for dataset benchmarking: {}", e);
+            eprintln!("Proceeding anyway, but may encounter file descriptor limits.");
+            // Return a dummy guard that doesn't modify environment
+            EnvGuard::new("GOOSE_DATASET_FALLBACK", "1")
+        });
 
-    // Prepare mock extensions as Stdio MCP extensions
-    let mock_extensions: Vec<ExtensionConfig> = if let Some(extensions) = available_extensions {
-        extensions
-            .into_iter()
-            .map(|(ext_name, tools)| {
-                // Use cached serialization and binary path for better performance
-                let tools_base64 = get_cached_tools_base64(&ext_name, &tools);
-                let binary_path = get_cached_binary_path();
+    // Create Agent directly instead of going through session
+    let agent = goose::agents::Agent::new();
+    
+    // Configure provider for the agent
+    use goose::config::Config;
+    use goose::providers::create;
+    use goose::model::ModelConfig;
+    
+    let config = Config::global();
+    let provider_name = config
+        .get_param::<String>("GOOSE_PROVIDER")
+        .unwrap_or_else(|_| "anthropic".to_string());
+    let model_name = config
+        .get_param::<String>("GOOSE_MODEL")
+        .unwrap_or_else(|_| "claude-3-5-sonnet-20241022".to_string());
+    
+    let model_config = ModelConfig::new(model_name);
+    let provider = create(&provider_name, model_config)
+        .unwrap_or_else(|e| {
+            eprintln!("Failed to create provider: {}", e);
+            std::process::exit(1);
+        });
+    
+    agent.update_provider(provider).await
+        .unwrap_or_else(|e| {
+            eprintln!("Failed to update provider: {}", e);
+            std::process::exit(1);
+        });
 
-                // Fallback to cargo run if binary doesn't exist
-                let (cmd, args) = if std::path::Path::new(&binary_path).exists() {
-                    (binary_path, vec![])
-                } else {
-                    (
-                        "cargo".to_string(),
-                        vec![
-                            "run".to_string(),
-                            "-p".to_string(),
-                            "goose-bench".to_string(),
-                            "--bin".to_string(),
-                            "mock_mcp_server".to_string(),
-                        ],
-                    )
-                };
+    // Prepare mock extensions as Stdio MCP extensions and add them to the agent
+    if let Some(extensions) = available_extensions {
+        for (ext_name, tools) in extensions {
+            // Use cached serialization and binary path for better performance
+            let tools_base64 = get_cached_tools_base64(&ext_name, &tools);
+            let binary_path = get_cached_binary_path();
 
-                ExtensionConfig::Stdio {
-                    name: ext_name.clone(),
-                    cmd,
-                    args,
-                    envs: Envs::new(HashMap::from([
-                        ("EXTENSION_NAME".to_string(), ext_name),
-                        ("EXTENSION_TOOLS".to_string(), tools_base64),
-                    ])),
-                    env_keys: vec![],
-                    timeout: None,
-                    bundled: None,
-                    description: None,
-                }
-            })
-            .collect()
-    } else {
-        vec![]
-    };
+            // Fallback to cargo run if binary doesn't exist
+            let (cmd, args) = if std::path::Path::new(&binary_path).exists() {
+                (binary_path, vec![])
+            } else {
+                (
+                    "cargo".to_string(),
+                    vec![
+                        "run".to_string(),
+                        "-p".to_string(),
+                        "goose-bench".to_string(),
+                        "--bin".to_string(),
+                        "mock_mcp_server".to_string(),
+                    ],
+                )
+            };
 
-    let base_session = build_session(SessionBuilderConfig {
-        identifier,
-        resume: false,
-        no_session: true,
-        extensions: vec![], // Not used when extensions_override is set
-        remote_extensions: vec![],
-        builtins: vec![],
-        extensions_override: Some(mock_extensions), // Use mock extensions and prevent loading real ones
-        additional_system_prompt: None,
-        settings: None,
-        debug: false,
-        max_tool_repetitions: None,
-        interactive: false, // Benchmarking is non-interactive
-    })
-    .await;
+            let extension_config = ExtensionConfig::Stdio {
+                name: ext_name.clone(),
+                cmd,
+                args,
+                envs: Envs::new(HashMap::from([
+                    ("EXTENSION_NAME".to_string(), ext_name),
+                    ("EXTENSION_TOOLS".to_string(), tools_base64),
+                ])),
+                env_keys: vec![],
+                timeout: None,
+                bundled: None,
+                description: None,
+            };
 
-    // package session obj into benchmark-compatible struct
-    let bench_agent = BenchAgent::new(Box::new(base_session));
+            // Add extension directly to agent
+            if let Err(e) = agent.add_extension(extension_config).await {
+                tracing::warn!("Failed to add extension: {}", e);
+            }
+        }
+    }
+    
+    // Create an InteractionLimitedAgent with the configured agent
+    let interaction_limited = InteractionLimitedAgent::new(agent, None);
+    
+    // Create a dummy session file path for compatibility
+    let session_file = std::env::temp_dir().join(format!("bench_session_{}.json", session_id));
+    
+    // Wrap in BenchBaseSession trait wrapper
+    let wrapper = InteractionLimitedAgentWrapper::new(interaction_limited, session_file);
+    
+    // Wrap in BenchAgent for compatibility
+    let bench_agent = BenchAgent::new(Box::new(wrapper));
 
+    // Environment variable is automatically restored when _config_guard is dropped
+    
     // Initialize logging with error capture
     let errors = Some(Arc::new(Mutex::new(bench_agent.get_errors().await)));
     logging::setup_logging(Some("bench"), errors).expect("Failed to initialize logging");
 
     bench_agent
 }
+
