@@ -29,7 +29,11 @@ impl Agent {
 
         let tool_selection_strategy = match router_tool_selection_strategy.to_lowercase().as_str() {
             "vector" => Some(RouterToolSelectionStrategy::Vector),
+            "vector_with_extension" => Some(RouterToolSelectionStrategy::VectorWithExtension),
             "llm" => Some(RouterToolSelectionStrategy::Llm),
+            "vector_passthrough" => Some(RouterToolSelectionStrategy::VectorPassthrough),
+            "vector_with_extension_passthrough" => Some(RouterToolSelectionStrategy::VectorWithExtensionPassthrough),
+            "llm_passthrough" => Some(RouterToolSelectionStrategy::LlmPassthrough),
             _ => None,
         };
 
@@ -39,8 +43,24 @@ impl Agent {
                 self.list_tools_for_router(Some(RouterToolSelectionStrategy::Vector))
                     .await
             }
+            Some(RouterToolSelectionStrategy::VectorWithExtension) => {
+                self.list_tools_for_router(Some(RouterToolSelectionStrategy::VectorWithExtension))
+                    .await
+            }
             Some(RouterToolSelectionStrategy::Llm) => {
                 self.list_tools_for_router(Some(RouterToolSelectionStrategy::Llm))
+                    .await
+            }
+            Some(RouterToolSelectionStrategy::VectorPassthrough) => {
+                self.list_tools_for_router(Some(RouterToolSelectionStrategy::VectorPassthrough))
+                    .await
+            }
+            Some(RouterToolSelectionStrategy::VectorWithExtensionPassthrough) => {
+                self.list_tools_for_router(Some(RouterToolSelectionStrategy::VectorWithExtensionPassthrough))
+                    .await
+            }
+            Some(RouterToolSelectionStrategy::LlmPassthrough) => {
+                self.list_tools_for_router(Some(RouterToolSelectionStrategy::LlmPassthrough))
                     .await
             }
             _ => self.list_tools(None).await,
@@ -61,12 +81,17 @@ impl Agent {
         let model_name = &model_config.model_name;
 
         let prompt_manager = self.prompt_manager.lock().await;
+        let vector_search_with_extension_enabled = 
+            matches!(tool_selection_strategy, 
+                Some(RouterToolSelectionStrategy::VectorWithExtension) | 
+                Some(RouterToolSelectionStrategy::VectorWithExtensionPassthrough));
         let mut system_prompt = prompt_manager.build_system_prompt(
             extensions_info,
             self.frontend_instructions.lock().await.clone(),
             extension_manager.suggest_disable_extensions_prompt().await,
             Some(model_name),
             tool_selection_strategy,
+            vector_search_with_extension_enabled,
         );
 
         // Handle toolshim if enabled
