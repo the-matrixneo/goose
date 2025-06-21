@@ -11,6 +11,7 @@ import RecipeActivityEditor from './RecipeActivityEditor';
 import RecipeInfoModal from './RecipeInfoModal';
 import RecipeExpandableInfo from './RecipeExpandableInfo';
 import { ScheduleFromRecipeModal } from './schedule/ScheduleFromRecipeModal';
+import { Button } from './ui/button';
 
 interface RecipeEditorProps {
   config?: Recipe;
@@ -306,8 +307,10 @@ export default function RecipeEditor({ config }: RecipeEditorProps) {
                 <div className="text-sm text-textSubtle text-xs text-textSubtle">
                   Copy this link to share with friends or paste directly in Chrome to open
                 </div>
-                <button
+                <Button
                   onClick={() => validateForm() && handleCopy()}
+                  variant="ghost"
+                  size="sm"
                   className="ml-4 p-2 hover:bg-bgApp rounded-lg transition-colors flex items-center disabled:opacity-50 disabled:hover:bg-transparent"
                 >
                   {copied ? (
@@ -318,7 +321,7 @@ export default function RecipeEditor({ config }: RecipeEditorProps) {
                   <span className="ml-1 text-sm text-textSubtle">
                     {copied ? 'Copied!' : 'Copy'}
                   </span>
-                </button>
+                </Button>
               </div>
             )}
             {requiredFieldsAreFilled() && (
@@ -333,23 +336,26 @@ export default function RecipeEditor({ config }: RecipeEditorProps) {
           {/* Action Buttons */}
           <div className="flex flex-col space-y-2 pt-1">
             {process.env.ALPHA && (
-              <button
+              <Button
                 onClick={() => setIsScheduleModalOpen(true)}
                 disabled={!requiredFieldsAreFilled()}
+                variant="outline"
+                size="lg"
                 className="w-full h-[60px] rounded-none border-t text-gray-900 dark:text-white hover:bg-gray-50 dark:border-gray-600 text-lg font-medium"
               >
                 Create Schedule from Recipe
-              </button>
+              </Button>
             )}
-            <button
+            <Button
               onClick={() => {
                 localStorage.removeItem('recipe_editor_extensions');
                 window.close();
               }}
+              variant="ghost"
               className="w-full p-3 text-textSubtle rounded-lg hover:bg-bgSubtle"
             >
               Close
-            </button>
+            </Button>
           </div>
         </div>
       </div>

@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef, KeyboardEvent } from 'react';
 import { Search as SearchIcon } from 'lucide-react';
 import { ArrowDown, ArrowUp, Close } from '../icons';
 import { debounce } from 'lodash';
+import { Button } from '../ui/button';
 
 /**
  * Props for the SearchBar component
@@ -178,7 +179,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         </div>
 
         <div className="flex items-center justify-center h-auto px-4 gap-2">
-          <button
+          <Button
             onClick={toggleCaseSensitive}
             className={`flex items-center justify-center min-w-[32px] h-[28px] rounded transition-all duration-150 ${
               caseSensitive
@@ -188,10 +189,10 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             title="Case Sensitive"
           >
             <span className="text-md font-normal">Aa</span>
-          </button>
+          </Button>
 
           <div className="flex items-center gap-2">
-            <button onClick={(e) => handleNavigate('prev', e)} className="p-1" title="Previous (↑)">
+            <Button onClick={(e) => handleNavigate('prev', e)} className="p-1" title="Previous (↑)">
               <ArrowUp
                 className={`h-5 w-5 transition-opacity ${
                   !hasResults
@@ -199,8 +200,8 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                     : 'text-textSubtleInverse hover:text-textStandardInverse'
                 }`}
               />
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={(e) => handleNavigate('next', e)}
               className="p-1"
               title="Next (↓ or Enter)"
@@ -212,12 +213,12 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                     : 'text-textSubtleInverse hover:text-textStandardInverse'
                 }`}
               />
-            </button>
+            </Button>
           </div>
 
-          <button onClick={handleClose} className="p-1" title="Close (Esc)">
+          <Button onClick={handleClose} className="p-1" title="Close (Esc)">
             <Close className="h-5 w-5 text-textSubtleInverse hover:text-textStandardInverse" />
-          </button>
+          </Button>
         </div>
       </div>
     </div>

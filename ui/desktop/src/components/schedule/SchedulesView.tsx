@@ -459,7 +459,7 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({ onClose }) => {
                           <PopoverTrigger asChild>
                             <Button
                               variant="ghost"
-                              size="icon"
+                              shape="round"
                               onClick={(e) => {
                                 e.stopPropagation();
                               }}

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Card } from './ui/card';
+import { Button } from './ui/button';
 import { ToolCallArguments, ToolCallArgumentValue } from './ToolCallArguments';
 import MarkdownContent from './MarkdownContent';
 import { Content, ToolRequestMessageContent, ToolResponseMessageContent } from '../types/message';
@@ -28,9 +28,7 @@ export default function ToolCallWithResponse({
 
   return (
     <div className={'w-full text-textSubtle text-sm'}>
-      <Card className="">
-        <ToolCallView {...{ isCancelledMessage, toolCall, toolResponse, notifications }} />
-      </Card>
+      <ToolCallView {...{ isCancelledMessage, toolCall, toolResponse, notifications }} />
     </div>
   );
 }
@@ -59,10 +57,14 @@ function ToolCallExpandable({
 
   return (
     <div className={className}>
-      <button onClick={toggleExpand} className="w-full flex justify-between items-center pr-2">
+      <Button
+        onClick={toggleExpand}
+        className="w-full flex justify-between items-center pr-2"
+        variant="ghost"
+      >
         <span className="flex items-center">{label}</span>
         <Expand size={5} isExpanded={isExpanded} />
-      </button>
+      </Button>
       {isExpanded && <div>{children}</div>}
     </div>
   );

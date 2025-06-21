@@ -6,6 +6,7 @@ import { useConfig } from '../ConfigContext';
 import { ViewOptions, View } from '../../App';
 import { saveRecipe, generateRecipeFilename } from '../../recipe/recipeStorage';
 import { Recipe } from '../../recipe';
+import { Button } from '../ui/button';
 
 // RecipeConfig is used for window creation and should match Recipe interface
 type RecipeConfig = Recipe;
@@ -29,7 +30,7 @@ const MenuButton: React.FC<MenuButtonProps> = ({
   icon,
   testId = '',
 }) => (
-  <button
+  <Button
     onClick={onClick}
     data-testid={testId}
     className={`w-full text-left px-4 py-3 min-h-[64px] text-sm hover:bg-bgSubtle transition-[background] border-b border-borderSubtle ${
@@ -45,7 +46,7 @@ const MenuButton: React.FC<MenuButtonProps> = ({
       </div>
       {icon && <div className="ml-2">{icon}</div>}
     </div>
-  </button>
+  </Button>
 );
 
 interface ThemeSelectProps {
@@ -58,7 +59,7 @@ const ThemeSelect: React.FC<ThemeSelectProps> = ({ themeMode, onThemeChange }) =
     <div className="px-4 py-3 border-b border-borderSubtle">
       <div className="text-sm mb-2">Theme</div>
       <div className="grid grid-cols-3 gap-2">
-        <button
+        <Button
           data-testid="light-mode-button"
           onClick={() => onThemeChange('light')}
           className={`flex items-center justify-center gap-2 p-2 rounded-md border transition-colors ${
@@ -69,9 +70,9 @@ const ThemeSelect: React.FC<ThemeSelectProps> = ({ themeMode, onThemeChange }) =
         >
           <Sun className="h-4 w-4" />
           <span className="text-xs">Light</span>
-        </button>
+        </Button>
 
-        <button
+        <Button
           data-testid="dark-mode-button"
           onClick={() => onThemeChange('dark')}
           className={`flex items-center justify-center gap-2 p-2 rounded-md border transition-colors ${
@@ -82,9 +83,9 @@ const ThemeSelect: React.FC<ThemeSelectProps> = ({ themeMode, onThemeChange }) =
         >
           <Moon className="h-4 w-4" />
           <span className="text-xs">Dark</span>
-        </button>
+        </Button>
 
-        <button
+        <Button
           data-testid="system-mode-button"
           onClick={() => onThemeChange('system')}
           className={`flex items-center justify-center gap-2 p-2 rounded-md border transition-colors ${
@@ -95,7 +96,7 @@ const ThemeSelect: React.FC<ThemeSelectProps> = ({ themeMode, onThemeChange }) =
         >
           <Sliders className="h-4 w-4" />
           <span className="text-xs">System</span>
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -237,13 +238,9 @@ export default function MoreMenu({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button
-          data-testid="more-options-button"
-          className={`z-[100] w-7 h-7 p-1 rounded-full border border-borderSubtle transition-colors cursor-pointer no-drag hover:text-textStandard hover:border-borderStandard ${open ? 'text-textStandard' : 'text-textSubtle'}`}
-          role="button"
-        >
+        <Button data-testid="more-options-button" className="z-[100] no-drag" shape="round">
           <Settings />
-        </button>
+        </Button>
       </PopoverTrigger>
 
       <PopoverPortal>

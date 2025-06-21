@@ -1,13 +1,19 @@
-import React, { useEffect, useRef, useState, useMemo, useCallback, createContext, useContext } from 'react';
+import React, {
+  useEffect,
+  useRef,
+  useState,
+  useMemo,
+  useCallback,
+  useContext,
+  createContext,
+} from 'react';
 import { getApiUrl } from '../config';
 import FlappyGoose from './FlappyGoose';
 import GooseMessage from './GooseMessage';
 import ChatInput from './ChatInput';
 import { type View, ViewOptions } from '../App';
 import LoadingGoose from './LoadingGoose';
-import MoreMenuLayout from './more_menu/MoreMenuLayout';
-import { Card } from './ui/card';
-import { ScrollArea, ScrollAreaHandle } from './ui/scroll-area';
+import { ScrollAreaHandle } from './ui/scroll-area';
 import UserMessage from './UserMessage';
 import Splash from './Splash';
 import { SearchView } from './conversation/SearchView';
@@ -36,6 +42,9 @@ import {
   getTextContent,
   TextContent,
 } from '../types/message';
+import SessionsSidebar from './sessions/SessionsSideView';
+import { SidebarProvider, SidebarInset, SidebarTrigger } from './ui/sidebar';
+import MoreMenu from './more_menu/MoreMenu';
 
 // Context for sharing current model info
 const CurrentModelContext = createContext<{ model: string; mode: string } | null>(null);
@@ -60,11 +69,13 @@ const isUserMessage = (message: Message): boolean => {
 };
 
 export default function ChatView({
+  readyForAutoUserPrompt,
   chat,
   setChat,
   setView,
   setIsGoosehintsModalOpen,
 }: {
+  readyForAutoUserPrompt: boolean;
   chat: ChatType;
   setChat: (chat: ChatType) => void;
   setView: (view: View, viewOptions?: ViewOptions) => void;
@@ -73,6 +84,7 @@ export default function ChatView({
   return (
     <ChatContextManagerProvider>
       <ChatContent
+        readyForAutoUserPrompt={readyForAutoUserPrompt}
         chat={chat}
         setChat={setChat}
         setView={setView}
@@ -88,6 +100,7 @@ function ChatContent({
   setView,
   setIsGoosehintsModalOpen,
 }: {
+  readyForAutoUserPrompt: boolean;
   chat: ChatType;
   setChat: (chat: ChatType) => void;
   setView: (view: View, viewOptions?: ViewOptions) => void;
@@ -148,7 +161,6 @@ function ChatContent({
     handleSubmit: _submitMessage,
     updateMessageStreamBody,
     notifications,
-    currentModelInfo,
   } = useMessageStream({
     api: getApiUrl('/reply'),
     initialMessages: chat.messages,
@@ -247,7 +259,6 @@ function ChatContent({
         console.log('Opening recipe editor with config:', response.recipe);
         const recipeConfig = {
           id: response.recipe.title || 'untitled',
-          name: response.recipe.title || 'Untitled Recipe', // Does not exist on recipe type
           title: response.recipe.title || 'Untitled Recipe',
           description: response.recipe.description || '',
           instructions: response.recipe.instructions || '',
@@ -509,138 +520,170 @@ function ChatContent({
     return map;
   }, new Map());
 
+  const handleSelectSession = async (sessionId: string) => {
+    try {
+      const sessionDetails = await fetchSessionDetails(sessionId);
+      if (sessionDetails && sessionDetails.session_id) {
+        setChat({
+          id: sessionDetails.session_id,
+          title: sessionDetails.metadata?.description || `ID: ${sessionDetails.session_id}`,
+          messages: sessionDetails.messages,
+          messageHistoryIndex: sessionDetails.messages.length,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to load session details:', error);
+    }
+  };
+
+  const safeIsMacOS = (window?.electron?.platform || 'darwin') === 'darwin';
+
   return (
-    <CurrentModelContext.Provider value={currentModelInfo}>
-      <div className="flex flex-col w-full h-screen items-center justify-center">
+    <div className="flex flex-col w-full h-screen items-center justify-center">
       {/* Loader when generating recipe */}
       {isGeneratingRecipe && <LayingEggLoader />}
-      <MoreMenuLayout
-        hasMessages={hasMessages}
-        setView={setView}
-        setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
-      />
 
-      <Card
-        className="flex flex-col flex-1 rounded-none h-[calc(100vh-95px)] w-full bg-bgApp mt-0 border-none relative"
-        onDrop={handleDrop}
-        onDragOver={handleDragOver}
-      >
-        {recipeConfig?.title && messages.length > 0 && (
-          <AgentHeader
-            title={recipeConfig.title}
-            profileInfo={
-              recipeConfig.profile
-                ? `${recipeConfig.profile} - ${recipeConfig.mcps || 12} MCPs`
-                : undefined
-            }
-            onChangeProfile={() => {
-              // Handle profile change
-              console.log('Change profile clicked');
-            }}
-          />
-        )}
-        {messages.length === 0 ? (
-          <Splash
-            append={append}
-            activities={Array.isArray(recipeConfig?.activities) ? recipeConfig!.activities : null}
-            title={recipeConfig?.title}
-          />
-        ) : (
-          <ScrollArea ref={scrollRef} className="flex-1" autoScroll>
-            <SearchView>
-              {filteredMessages.map((message, index) => (
-                <div
-                  key={message.id || index}
-                  className="mt-4 px-4"
-                  data-testid="message-container"
-                >
-                  {isUserMessage(message) ? (
-                    <>
-                      {hasContextHandlerContent(message) ? (
-                        <ContextHandler
-                          messages={messages}
-                          messageId={message.id ?? message.created.toString()}
-                          chatId={chat.id}
-                          workingDir={window.appConfig.get('GOOSE_WORKING_DIR') as string}
-                          contextType={getContextHandlerType(message)}
-                        />
-                      ) : (
-                        <UserMessage message={message} />
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      {/* Only render GooseMessage if it's not a message invoking some context management */}
-                      {hasContextHandlerContent(message) ? (
-                        <ContextHandler
-                          messages={messages}
-                          messageId={message.id ?? message.created.toString()}
-                          chatId={chat.id}
-                          workingDir={window.appConfig.get('GOOSE_WORKING_DIR') as string}
-                          contextType={getContextHandlerType(message)}
-                        />
-                      ) : (
-                        <GooseMessage
-                          messageHistoryIndex={chat?.messageHistoryIndex}
-                          message={message}
-                          messages={messages}
-                          append={append}
-                          appendMessage={(newMessage) => {
-                            const updatedMessages = [...messages, newMessage];
-                            setMessages(updatedMessages);
-                          }}
-                          toolCallNotifications={toolCallNotifications}
-                        />
-                      )}
-                    </>
-                  )}
-                </div>
-              ))}
-            </SearchView>
-
-            {error && (
-              <div className="flex flex-col items-center justify-center p-4">
-                <div className="text-red-700 dark:text-red-300 bg-red-400/50 p-3 rounded-lg mb-2">
-                  {error.message || 'Honk! Goose experienced an error while responding'}
-                </div>
-                <div
-                  className="px-3 py-2 mt-2 text-center whitespace-nowrap cursor-pointer text-textStandard border border-borderSubtle hover:bg-bgSubtle rounded-full inline-block transition-all duration-150"
-                  onClick={async () => {
-                    // Find the last user message
-                    const lastUserMessage = messages.reduceRight(
-                      (found, m) => found || (m.role === 'user' ? m : null),
-                      null as Message | null
-                    );
-                    if (lastUserMessage) {
-                      append(lastUserMessage);
-                    }
-                  }}
-                >
-                  Retry Last Message
+      <div className="flex flex-1 w-full relative animate-fade-in">
+        <SidebarProvider>
+          <SessionsSidebar onSelectSession={handleSelectSession} />
+          <SidebarInset>
+            <div className="flex flex-col min-w-0 h-dvh">
+              <div className="fixed w-full right-0 top-0 z-10 p-4 flex animate-[appear_300ms_ease-in_forwards]">
+                <div className="flex w-full justify-end gap-2">
+                  <SidebarTrigger />
+                  <MoreMenu
+                    setView={setView || (() => {})}
+                    setIsGoosehintsModalOpen={setIsGoosehintsModalOpen || (() => {})}
+                  />
                 </div>
               </div>
-            )}
-            <div className="block h-8" />
-          </ScrollArea>
-        )}
 
-        <div className="relative p-4 pt-0 z-10 animate-[fadein_400ms_ease-in_forwards]">
-          {isLoading && <LoadingGoose />}
-          <ChatInput
-            handleSubmit={handleSubmit}
-            isLoading={isLoading}
-            onStop={onStopGoose}
-            commandHistory={commandHistory}
-            initialValue={_input || (hasMessages ? _input : initialPrompt)}
-            setView={setView}
-            hasMessages={hasMessages}
-            numTokens={sessionTokenCount}
-            droppedFiles={droppedFiles}
-            messages={messages}
-            setMessages={setMessages}
-          />
-        </div>
-      </Card>
+              <div
+                className="flex flex-col min-w-0 flex-1 overflow-y-scroll bg-background-default relative px-6 py-16"
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+              >
+                {recipeConfig?.title && messages.length > 0 && (
+                  <AgentHeader
+                    title={recipeConfig.title}
+                    profileInfo={
+                      recipeConfig.profile
+                        ? `${recipeConfig.profile} - ${recipeConfig.mcps || 12} MCPs`
+                        : undefined
+                    }
+                    onChangeProfile={() => {
+                      // Handle profile change
+                      console.log('Change profile clicked');
+                    }}
+                  />
+                )}
+                {messages.length === 0 ? (
+                  <Splash
+                    append={append}
+                    activities={
+                      Array.isArray(recipeConfig?.activities) ? recipeConfig!.activities : null
+                    }
+                    title={recipeConfig?.title}
+                  />
+                ) : (
+                  <>
+                    <SearchView>
+                      {filteredMessages.map((message, index) => (
+                        <div
+                          key={message.id || index}
+                          className={`mt-4 px-6 ${isUserMessage(message) ? 'user' : 'assistant'}`}
+                          data-testid="message-container"
+                        >
+                          {isUserMessage(message) ? (
+                            <>
+                              {hasContextHandlerContent(message) ? (
+                                <ContextHandler
+                                  messages={messages}
+                                  messageId={message.id ?? message.created.toString()}
+                                  chatId={chat.id}
+                                  workingDir={window.appConfig.get('GOOSE_WORKING_DIR') as string}
+                                  contextType={getContextHandlerType(message)}
+                                />
+                              ) : (
+                                <UserMessage message={message} />
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              {/* Only render GooseMessage if it's not a message invoking some context management */}
+                              {hasContextHandlerContent(message) ? (
+                                <ContextHandler
+                                  messages={messages}
+                                  messageId={message.id ?? message.created.toString()}
+                                  chatId={chat.id}
+                                  workingDir={window.appConfig.get('GOOSE_WORKING_DIR') as string}
+                                  contextType={getContextHandlerType(message)}
+                                />
+                              ) : (
+                                <GooseMessage
+                                  messageHistoryIndex={chat?.messageHistoryIndex}
+                                  message={message}
+                                  messages={messages}
+                                  append={append}
+                                  appendMessage={(newMessage) => {
+                                    const updatedMessages = [...messages, newMessage];
+                                    setMessages(updatedMessages);
+                                  }}
+                                  toolCallNotifications={toolCallNotifications}
+                                />
+                              )}
+                            </>
+                          )}
+                        </div>
+                      ))}
+                    </SearchView>
+
+                    {error && (
+                      <div className="flex flex-col items-center justify-center p-4">
+                        <div className="text-red-700 dark:text-red-300 bg-red-400/50 p-3 rounded-lg mb-2">
+                          {error.message || 'Honk! Goose experienced an error while responding'}
+                        </div>
+                        <div
+                          className="px-3 py-2 mt-2 text-center whitespace-nowrap cursor-pointer text-textStandard border border-borderSubtle hover:bg-bgSubtle rounded-full inline-block transition-all duration-150"
+                          onClick={async () => {
+                            // Find the last user message
+                            const lastUserMessage = messages.reduceRight(
+                              (found, m) => found || (m.role === 'user' ? m : null),
+                              null as Message | null
+                            );
+                            if (lastUserMessage) {
+                              append(lastUserMessage);
+                            }
+                          }}
+                        >
+                          Retry Last Message
+                        </div>
+                      </div>
+                    )}
+                    <div className="block h-8" />
+                  </>
+                )}
+              </div>
+              <div className="relative py-4 px-8 pt-0 z-10 animate-[fadein_400ms_ease-in_forwards]">
+                {isLoading && <LoadingGoose />}
+                <ChatInput
+                  handleSubmit={handleSubmit}
+                  isLoading={isLoading}
+                  onStop={onStopGoose}
+                  commandHistory={commandHistory}
+                  initialValue={_input || initialPrompt}
+                  setView={setView}
+                  hasMessages={hasMessages}
+                  numTokens={sessionTokenCount}
+                  droppedFiles={droppedFiles}
+                  messages={messages}
+                  setMessages={setMessages}
+                />
+              </div>
+            </div>
+          </SidebarInset>
+        </SidebarProvider>
+      </div>
 
       {showGame && <FlappyGoose onClose={() => setShowGame(false)} />}
 
@@ -654,6 +697,5 @@ function ChatContent({
         summaryContent={summaryContent}
       />
     </div>
-    </CurrentModelContext.Provider>
   );
 }
