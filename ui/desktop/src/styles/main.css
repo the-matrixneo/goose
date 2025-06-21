@@ -55,7 +55,7 @@
   --background-info: var(--color-blue-200);
   --background-warning: var(--color-yellow-200);
 
-  --border-default: var(--color-neutral-100);
+  --border-default: var(--color-neutral-200);
   --border-input: var(--color-neutral-200);
   --border-strong: var(--color-neutral-300);
   --border-danger: var(--color-red-200);

@@ -510,30 +510,11 @@ export default function ChatInput({
           </div>
         )}
 
-        <div className="absolute right-1 top-1 flex items-center gap-2">
-          {isLoading ? (
-            <Button type="button" onClick={onStop} shape="round">
-              <Stop />
-            </Button>
-          ) : (
-            <Button
-              type="submit"
-              variant="ghost"
-              shape="round"
-              disabled={!displayValue.trim() && pastedImages.length === 0}
-            >
-              <Send />
-            </Button>
-          )}
-        </div>
+        <div className="absolute right-1 top-1 flex items-center gap-2"></div>
       </form>
 
-      <div className="flex items-center transition-colors text-textSubtle relative text-xs p-2 pr-3 border-t border-borderSubtle gap-2">
+      <div className="flex items-center transition-colors relative text-xs pb-1 px-2 gap-2">
         <div className="gap-1 flex items-center justify-between w-full">
-          <Button type="button" shape="round" variant="ghost" onClick={handleFileSelect}>
-            <Attach />
-          </Button>
-
           <BottomMenu
             setView={setView}
             numTokens={numTokens}
@@ -541,6 +522,27 @@ export default function ChatInput({
             isLoading={isLoading}
             setMessages={setMessages}
           />
+
+          <div className="flex items-center gap-1">
+            <Button type="button" shape="round" variant="secondary" onClick={handleFileSelect}>
+              <Attach />
+            </Button>
+
+            {isLoading ? (
+              <Button type="button" onClick={onStop} shape="round" variant="secondary">
+                <Stop />
+              </Button>
+            ) : (
+              <Button
+                type="submit"
+                variant="secondary"
+                shape="round"
+                disabled={!displayValue.trim() && pastedImages.length === 0}
+              >
+                <Send />
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </div>
