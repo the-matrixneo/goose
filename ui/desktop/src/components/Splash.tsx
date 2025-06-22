@@ -26,47 +26,49 @@ export default function Splash({ append, activities, title }: SplashProps) {
       ? [...pills.slice(0, messagePillIndex), ...pills.slice(messagePillIndex + 1)]
       : pills;
 
-  const [timeOfDay, setTimeOfDay] = useState<'morning' | 'afternoon' | 'night'>('morning');
+  const [selectedGreeting, setSelectedGreeting] = useState<{
+    prefix: string;
+    message: string;
+  } | null>(null);
 
-  // Update time of day, current time, and date based on current time
+  // Select a random greeting on component mount
   useEffect(() => {
-    const updateTime = () => {
-      const now = new Date();
-      const hour = now.getHours();
+    const prefixes = ['Hello.', 'Welcome.', 'Greetings.', 'Welcome back.', 'Hello there.'];
 
-      // Update time of day
-      if (hour >= 5 && hour < 12) {
-        setTimeOfDay('morning');
-      } else if (hour >= 12 && hour < 18) {
-        setTimeOfDay('afternoon');
-      } else {
-        setTimeOfDay('night');
-      }
-    };
+    const messages = [
+      ' Ready to get started?',
+      ' What would you like to work on?',
+      ' Ready to build something amazing?',
+      ' What would you like to explore?',
+      " What's on your mind?",
+      ' What shall we create today?',
+      ' What project needs attention?',
+      ' What would you like to tackle?',
+      ' What would you like to explore?',
+      ' What needs to be done?',
+      " What's the plan for today?",
+      ' Ready to create something great?',
+      ' What can be built today?',
+      " What's the next challenge?",
+      ' What progress can be made?',
+      ' What would you like to accomplish?',
+      ' What task awaits?',
+      " What's the mission today?",
+      ' What can be achieved?',
+      ' What project is ready to begin?',
+    ];
 
-    updateTime();
-    const interval = setInterval(updateTime, 1000);
-    return () => clearInterval(interval);
+    const randomPrefixIndex = Math.floor(Math.random() * prefixes.length);
+    const randomMessageIndex = Math.floor(Math.random() * messages.length);
+
+    setSelectedGreeting({
+      prefix: prefixes[randomPrefixIndex],
+      message: messages[randomMessageIndex],
+    });
   }, []);
 
   const getGreeting = () => {
-    switch (timeOfDay) {
-      case 'morning':
-        return {
-          prefix: 'Morning.',
-          message: " Let's get things done.",
-        };
-      case 'afternoon':
-        return {
-          prefix: 'Afternoon.',
-          message: ' Keep the momentum going.',
-        };
-      case 'night':
-        return {
-          prefix: 'Evening.',
-          message: ' Time to wrap things up.',
-        };
-    }
+    return selectedGreeting || { prefix: 'Hello.', message: ' How can I help you today?' };
   };
 
   const greeting = getGreeting();
@@ -91,43 +93,41 @@ export default function Splash({ append, activities, title }: SplashProps) {
       )}
       <div className="flex flex-col flex-1">
         <div className="h-full flex flex-col pb-12">
-          <div className="px-2">
-            {/* <div className="relative text-textStandard mb-12">
+          {/* <div className="relative text-textStandard mb-12">
               <div className="w-min animate-[flyin_2s_var(--spring-easing)_forwards]">
                 <GooseLogo />
               </div>
             </div> */}
 
-            <div className="flex flex-col mt-2 mb-4 animate-in fade-in slide-in-from-bottom-8 duration-500">
-              <h1 className="text-text-prominent text-4xl font-light min-h-[4rem]">
-                <span>{greeting.prefix}</span>
-                <div className="text-text-muted inline">{greeting.message}</div>
-              </h1>
+          <div className="flex flex-col mb-8">
+            <h1 className="text-text-prominent text-4xl font-light">
+              <span>{greeting.prefix}</span>
+            </h1>
+            <div className="text-text-muted text-4xl font-light inline">{greeting.message}</div>
+          </div>
+
+          <div className="flex flex-col">
+            {messagePill && (
+              <div className="mb-6 p-4 rounded-lg border animate-[fadein_500ms_ease-in_forwards]">
+                {messagePill.replace(/^message:/i, '').trim()}
+              </div>
+            )}
+
+            <div className="flex flex-wrap gap-4 animate-[fadein_500ms_ease-in_forwards]">
+              {remainingPills.map((content, index) => (
+                <Card
+                  key={index}
+                  onClick={() => append(content)}
+                  title={content.length > 100 ? content : undefined}
+                  className="cursor-pointer px-6 w-[256px]"
+                >
+                  {content.length > 100 ? content.slice(0, 100) + '...' : content}
+                </Card>
+              ))}
             </div>
 
-            <div className="flex flex-col">
-              {messagePill && (
-                <div className="mb-6 p-4 bg-bgSubtle rounded-lg border border-borderStandard animate-[fadein_500ms_ease-in_forwards]">
-                  {messagePill.replace(/^message:/i, '').trim()}
-                </div>
-              )}
-
-              <div className="flex flex-wrap gap-4 animate-[fadein_500ms_ease-in_forwards]">
-                {remainingPills.map((content, index) => (
-                  <Card
-                    key={index}
-                    onClick={() => append(content)}
-                    title={content.length > 100 ? content : undefined}
-                    className="cursor-pointer px-6 w-[256px]"
-                  >
-                    {content.length > 100 ? content.slice(0, 100) + '...' : content}
-                  </Card>
-                ))}
-              </div>
-
-              <div className="animate-[fadein_500ms_ease-in_forwards]">
-                <SessionInsights />
-              </div>
+            <div className="animate-[fadein_500ms_ease-in_forwards]">
+              <SessionInsights />
             </div>
           </div>
         </div>

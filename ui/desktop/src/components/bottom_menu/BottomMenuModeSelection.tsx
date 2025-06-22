@@ -3,6 +3,7 @@ import { all_goose_modes, ModeSelectionItem } from '../settings/mode/ModeSelecti
 import { useConfig } from '../ConfigContext';
 import { View, ViewOptions } from '../../App';
 import { Orbit } from 'lucide-react';
+import { Button } from '../ui/button';
 
 interface BottomMenuModeSelectionProps {
   setView: (view: View, viewOptions?: ViewOptions) => void;
@@ -85,13 +86,12 @@ export const BottomMenuModeSelection = ({ setView }: BottomMenuModeSelectionProp
 
   return (
     <div className="relative flex items-center" ref={gooseModeDropdownRef}>
-      <button
-        className="flex items-center justify-center text-textSubtle hover:text-textStandard h-6 [&_svg]:size-4"
+      <span
+        className="flex items-center cursor-pointer [&_svg]:size-4 text-text-default/70 hover:text-text-default hover:scale-100 hover:bg-transparent text-xs"
         onClick={() => setIsGooseModeMenuOpen(!isGooseModeMenuOpen)}
       >
-        <span className="pr-1.5">{getValueByKey(gooseMode).toLowerCase()}</span>
-        <Orbit />
-      </button>
+        {getValueByKey(gooseMode).toLowerCase()}
+      </span>
 
       {/* Dropdown Menu */}
       {isGooseModeMenuOpen && (

@@ -8,6 +8,7 @@ import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '../../
 import Modal from '../../../Modal';
 import { useCurrentModelInfo } from '../../../ChatView';
 import { useConfig } from '../../../ConfigContext';
+import { Button } from '../../../ui/button';
 
 interface ModelsBottomBarProps {
   dropdownRef: React.RefObject<HTMLDivElement>;
@@ -43,7 +44,10 @@ export default function ModelsBottomBar({ dropdownRef, setView }: ModelsBottomBa
   }, [read]);
 
   // Determine which model to display - activeModel takes priority when lead/worker is active
-  const displayModel = (isLeadWorkerActive && currentModelInfo?.model) ? currentModelInfo.model : (currentModel || 'Select Model');
+  const displayModel =
+    isLeadWorkerActive && currentModelInfo?.model
+      ? currentModelInfo.model
+      : currentModel || 'Select Model';
   const modelMode = currentModelInfo?.mode;
 
   // Update display provider when current provider changes
@@ -102,13 +106,11 @@ export default function ModelsBottomBar({ dropdownRef, setView }: ModelsBottomBa
               <TooltipTrigger asChild>
                 <span
                   ref={modelRef}
-                  className="truncate max-w-[130px] md:max-w-[200px] lg:max-w-[360px] min-w-0 block"
+                  className="truncate text-text-default/70 hover:text-text-default hover:scale-100 hover:bg-transparent text-xs max-w-[130px] md:max-w-[200px] lg:max-w-[360px] min-w-0 block"
                 >
                   {displayModel}
                   {isLeadWorkerActive && modelMode && (
-                    <span className="ml-1 text-[10px] opacity-60">
-                      ({modelMode})
-                    </span>
+                    <span className="ml-1 text-[10px] opacity-60">({modelMode})</span>
                   )}
                 </span>
               </TooltipTrigger>
@@ -116,9 +118,7 @@ export default function ModelsBottomBar({ dropdownRef, setView }: ModelsBottomBa
                 <TooltipContent className="max-w-96 overflow-auto scrollbar-thin" side="top">
                   {displayModel}
                   {isLeadWorkerActive && modelMode && (
-                    <span className="ml-1 text-[10px] opacity-60">
-                      ({modelMode})
-                    </span>
+                    <span className="ml-1 text-[10px] opacity-60">({modelMode})</span>
                   )}
                 </TooltipContent>
               )}
@@ -128,7 +128,7 @@ export default function ModelsBottomBar({ dropdownRef, setView }: ModelsBottomBa
 
         {/* Dropdown Menu */}
         {isModelMenuOpen && (
-          <div className="absolute bottom-[24px] right-[-55px] w-[300px] bg-bgApp rounded-lg border border-borderSubtle">
+          <div className="absolute bottom-[24px] right-[-55px] w-[300px] bg-bgApp rounded-lg border">
             <div className="">
               <div className="text-sm text-textProminent mt-2 ml-2">Current:</div>
               <div className="flex items-center justify-between text-sm ml-2">
@@ -164,7 +164,7 @@ export default function ModelsBottomBar({ dropdownRef, setView }: ModelsBottomBa
       {isAddModelModalOpen ? (
         <AddModelModal setView={setView} onClose={() => setIsAddModelModalOpen(false)} />
       ) : null}
-      
+
       {isLeadWorkerModalOpen ? (
         <Modal onClose={() => setIsLeadWorkerModalOpen(false)}>
           <LeadWorkerSettings onClose={() => setIsLeadWorkerModalOpen(false)} />

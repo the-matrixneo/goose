@@ -202,32 +202,30 @@ export default function BottomMenu({
   }, [isModelMenuOpen]);
 
   return (
-    <div className="flex justify-between items-center transition-colors text-textSubtle relative text-xs align-middle">
-      <div className="flex items-center pl-2">
-        {/* Tool and Token count */}
-        {<BottomMenuAlertPopover alerts={alerts} />}
+    <div className="flex w-full justify-end items-center pb-2 pr-3 transition-colors relative text-xs align-middle animate-in fade-in slide-in-from-bottom-8 duration-500">
+      {/* Tool and Token count */}
+      {<BottomMenuAlertPopover alerts={alerts} />}
 
-        {/* Model Selector Dropdown */}
-        <ModelsBottomBar dropdownRef={dropdownRef} setView={setView} />
+      {/* Model Selector Dropdown */}
+      <ModelsBottomBar dropdownRef={dropdownRef} setView={setView} />
 
-        {/* Separator */}
-        <div className="w-[1px] h-4 bg-borderSubtle mx-2" />
+      {/* Separator */}
+      <div className="w-1 h-1 rounded-full bg-background-accent/50 mx-2" />
 
-        {/* Goose Mode Selector Dropdown */}
-        <BottomMenuModeSelection setView={setView} />
+      {/* Goose Mode Selector Dropdown */}
+      <BottomMenuModeSelection setView={setView} />
 
-        {/* Summarize Context Button - ADD THIS */}
-        {messages.length > 0 && (
-          <>
-            <div className="w-[1px] h-4 bg-borderSubtle mx-2" />
-            <ManualSummarizeButton
-              messages={messages}
-              isLoading={isLoading}
-              setMessages={setMessages}
-            />
-          </>
-        )}
-      </div>
+      {/* Summarize Context Button - ADD THIS */}
+      {messages.length > 0 && (
+        <>
+          <div className="w-1 h-1 rounded-full bg-background-accent/50 mx-2" />
+          <ManualSummarizeButton
+            messages={messages}
+            isLoading={isLoading}
+            setMessages={setMessages}
+          />
+        </>
+      )}
     </div>
   );
 }

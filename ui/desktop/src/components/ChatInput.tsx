@@ -40,11 +40,7 @@ export default function ChatInput({
   onStop,
   commandHistory = [],
   initialValue = '',
-  setView,
-  numTokens,
   droppedFiles = [],
-  messages = [],
-  setMessages,
 }: ChatInputProps) {
   const [_value, setValue] = useState(initialValue);
   const [displayValue, setDisplayValue] = useState(initialValue); // For immediate visual feedback
@@ -432,11 +428,11 @@ export default function ChatInput({
 
   return (
     <div
-      className={`flex flex-col relative h-auto border rounded-2xl transition-colors animate-in fade-in slide-in-from-bottom-8 duration-500 ${
+      className={`flex flex-col relative h-auto rounded-xl border mx-4 mb-4 transition-colors ${
         isFocused
           ? 'border-borderProminent hover:border-borderProminent'
           : 'border-borderSubtle hover:border-borderStandard'
-      } bg-bgApp z-10`}
+      } z-10`}
     >
       <form onSubmit={onFormSubmit}>
         <textarea
@@ -461,6 +457,27 @@ export default function ChatInput({
           }}
           className="w-full pl-4 pr-[68px] outline-none border-none focus:ring-0 bg-transparent pt-3 pb-1.5 text-sm resize-none text-textStandard placeholder:text-textPlaceholder"
         />
+
+        <div className="flex items-center gap-1 absolute right-2 top-1/2 -translate-y-1/2">
+          <Button type="button" shape="round" variant="ghost" onClick={handleFileSelect}>
+            <Attach />
+          </Button>
+
+          {isLoading ? (
+            <Button type="button" onClick={onStop} shape="round" variant="secondary">
+              <Stop />
+            </Button>
+          ) : (
+            <Button
+              type="submit"
+              variant="secondary"
+              shape="round"
+              disabled={!displayValue.trim() && pastedImages.length === 0}
+            >
+              <Send />
+            </Button>
+          )}
+        </div>
 
         {pastedImages.length > 0 && (
           <div className="flex flex-wrap gap-2 p-2 border-t border-borderSubtle">
@@ -509,42 +526,7 @@ export default function ChatInput({
             ))}
           </div>
         )}
-
-        <div className="absolute right-1 top-1 flex items-center gap-2"></div>
       </form>
-
-      <div className="flex items-center transition-colors relative text-xs pb-1 px-2 gap-2">
-        <div className="gap-1 flex items-center justify-between w-full">
-          <BottomMenu
-            setView={setView}
-            numTokens={numTokens}
-            messages={messages}
-            isLoading={isLoading}
-            setMessages={setMessages}
-          />
-
-          <div className="flex items-center gap-1">
-            <Button type="button" shape="round" variant="secondary" onClick={handleFileSelect}>
-              <Attach />
-            </Button>
-
-            {isLoading ? (
-              <Button type="button" onClick={onStop} shape="round" variant="secondary">
-                <Stop />
-              </Button>
-            ) : (
-              <Button
-                type="submit"
-                variant="secondary"
-                shape="round"
-                disabled={!displayValue.trim() && pastedImages.length === 0}
-              >
-                <Send />
-              </Button>
-            )}
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

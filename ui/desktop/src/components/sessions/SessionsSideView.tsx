@@ -19,6 +19,12 @@ import { cn } from '../../utils';
 
 interface SessionsSidebarProps {
   onSelectSession: (sessionId: string) => void;
+  currentSession?: {
+    id: string;
+    title: string;
+    messageHistoryIndex: number;
+    messages: any[];
+  };
 }
 
 interface GroupedSessions {
@@ -27,7 +33,7 @@ interface GroupedSessions {
   older: { [key: string]: Session[] };
 }
 
-const SessionsSidebar: React.FC<SessionsSidebarProps> = ({ onSelectSession }) => {
+const SessionsSidebar: React.FC<SessionsSidebarProps> = ({ onSelectSession, currentSession }) => {
   const [sessions, setSessions] = useState<Session[]>([]);
   // @ts-expect-error
   const [isLoading, setIsLoading] = useState(true);
@@ -143,11 +149,9 @@ const SessionsSidebar: React.FC<SessionsSidebarProps> = ({ onSelectSession }) =>
       <Collapsible defaultOpen={isFirstTwoGroups} className="group/collapsible">
         <SidebarGroup>
           <CollapsibleTrigger className="w-full">
-            <SidebarGroupLabel className="flex cursor-pointer items-center justify-between h-12">
+            <SidebarGroupLabel className="flex cursor-pointer items-center justify-between text-text-muted hover:text-text-default h-12">
               <div className="flex min-w-0 items-center">
-                <span className="opacity-100 transition-all duration-200 text-xs text-text-muted">
-                  {title}
-                </span>
+                <span className="opacity-100 transition-all duration-200 text-xs">{title}</span>
               </div>
               <ChevronDown className="size-4 text-text-muted flex-shrink-0 opacity-100 transition-all duration-200 group-data-[state=open]/collapsible:rotate-180" />
             </SidebarGroupLabel>
@@ -182,18 +186,52 @@ const SessionsSidebar: React.FC<SessionsSidebarProps> = ({ onSelectSession }) =>
     );
   };
 
+  const renderCurrentSession = () => {
+    if (!currentSession || currentSession.messages.length === 0) return null;
+
+    return (
+      <SidebarGroup>
+        <SidebarGroupLabel className="flex items-center h-12">
+          <span className="opacity-100 transition-all duration-200 text-xs text-text-muted">
+            Current Session
+          </span>
+        </SidebarGroupLabel>
+        <SidebarGroupContent>
+          <SidebarMenu className="mb-2 ml-2 pl-2 border-l border-border-default">
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                asChild
+                className="cursor-pointer w-52 transition-all duration-150 bg-background-muted rounded-2xl text-text-default h-fit flex items-start"
+              >
+                <div className="flex flex-col">
+                  <div className="text-sm w-48 px-2 truncate -mb-1 text-ellipsis">
+                    {currentSession.title || currentSession.id}
+                  </div>
+                  <div className="text-xs w-48 px-2 truncate flex items-center gap-2 text-ellipsis">
+                    <Folder className="size-4" />
+                    {window.appConfig.get('GOOSE_WORKING_DIR') as string}
+                  </div>
+                </div>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroupContent>
+      </SidebarGroup>
+    );
+  };
+
   return (
     <Sidebar
       collapsible="offcanvas"
       variant="inset"
       side="left"
       className={cn(
-        'border-r transition-all duration-500 ease-out',
+        'transition-all duration-500 ease-out',
         isVisible ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0'
       )}
     >
       <SidebarHeader>
-        <div className="p-1 pt-16 opacity-100 transition-all duration-200">
+        <div className="p-1 pt-12 opacity-100 transition-all duration-200">
           <div className="relative flex flex-row items-center gap-2">
             <Search className="absolute top-2.5 left-2.5 size-4 text-muted-foreground" />
             <Input
@@ -234,6 +272,7 @@ const SessionsSidebar: React.FC<SessionsSidebarProps> = ({ onSelectSession }) =>
       </SidebarHeader>
       <SidebarContent>
         <ScrollArea className="h-full">
+          {renderCurrentSession()}
           {(() => {
             let groupIndex = 0;
             const groups = [

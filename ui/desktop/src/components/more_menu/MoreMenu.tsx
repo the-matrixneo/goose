@@ -238,7 +238,13 @@ export default function MoreMenu({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button data-testid="more-options-button" className="z-[100] no-drag" shape="round">
+        <Button
+          data-testid="more-options-button"
+          size="sm"
+          variant="ghost"
+          className="z-[100] no-drag"
+          shape="round"
+        >
           <Settings />
         </Button>
       </PopoverTrigger>

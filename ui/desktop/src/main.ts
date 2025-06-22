@@ -437,7 +437,7 @@ const createChat = async (
 
   const mainWindow = new BrowserWindow({
     titleBarStyle: process.platform === 'darwin' ? 'hidden' : 'default',
-    trafficLightPosition: process.platform === 'darwin' ? { x: 20, y: 26 } : undefined,
+    trafficLightPosition: process.platform === 'darwin' ? { x: 20, y: 21 } : undefined,
     vibrancy: process.platform === 'darwin' ? 'window' : undefined,
     frame: process.platform === 'darwin' ? false : true,
     x: mainWindowState.x,
@@ -446,7 +446,6 @@ const createChat = async (
     height: mainWindowState.height,
     minWidth: 650,
     resizable: true,
-    transparent: false,
     useContentSize: true,
     icon: path.join(__dirname, '../images/icon'),
     webPreferences: {
