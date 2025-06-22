@@ -81,7 +81,7 @@ export default function RecipeExpandableInfo({
               onClick={() => setValueExpanded(!isValueExpanded)}
               aria-label={isValueExpanded ? 'Collapse content' : 'Expand content'}
               title={isValueExpanded ? 'Collapse' : 'Expand'}
-              className="bg-bgSubtle hover:bg-bgStandard text-textStandard hover:text-textProminent transition-colors"
+              className="bg-background-muted hover:bg-background-default text-text-muted hover:text-text-default transition-colors"
             >
               <ChevronDown
                 className={`w-6 h-6 transition-transform duration-300 ${

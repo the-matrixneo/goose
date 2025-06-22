@@ -213,13 +213,13 @@ function ToolCallView({
     >
       {/* Tool Details */}
       {isToolDetails && (
-        <div className="bg-bgStandard rounded-t mt-1">
+        <div className="bg-background-default rounded-t mt-1">
           <ToolDetailsView toolCall={toolCall} isStartExpanded={isExpandToolDetails} />
         </div>
       )}
 
       {logs && logs.length > 0 && (
-        <div className="bg-bgStandard mt-1">
+        <div className="bg-background-default mt-1">
           <ToolLogsView
             logs={logs}
             working={toolResults.length === 0}
@@ -244,7 +244,7 @@ function ToolCallView({
             return (
               <div
                 key={index}
-                className={`bg-bgStandard mt-1 
+                className={`bg-background-default mt-1 
                   ${isToolDetails || index > 0 ? '' : 'rounded-t'} 
                   ${isLast ? 'rounded-b' : ''}
                 `}

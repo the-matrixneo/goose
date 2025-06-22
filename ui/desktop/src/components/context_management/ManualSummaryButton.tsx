@@ -57,14 +57,15 @@ export const ManualSummarizeButton: React.FC<ManualSummarizeButtonProps> = ({
     <>
       <div className="relative flex items-center">
         <button
-          className={`flex items-center justify-center text-textSubtle hover:text-textStandard h-6 [&_svg]:size-4 ${
+          className={`flex items-center justify-center text-text-default/70 hover:text-text-default ${
             isLoadingSummary || isLoading ? 'opacity-50 cursor-not-allowed' : ''
           }`}
           onClick={handleClick}
           disabled={isLoadingSummary || isLoading}
           title="Summarize conversation context"
         >
-          <ScrollText size={16} />
+          {/* <ScrollText size={16} /> */}
+          summarize
         </button>
       </div>
 

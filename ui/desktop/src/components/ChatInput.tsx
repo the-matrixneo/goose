@@ -428,7 +428,7 @@ export default function ChatInput({
 
   return (
     <div
-      className={`flex flex-col relative h-auto rounded-xl border mx-4 mb-4 transition-colors ${
+      className={`flex flex-col relative h-auto rounded-xl border mx-6 mb-4 transition-colors ${
         isFocused
           ? 'border-borderProminent hover:border-borderProminent'
           : 'border-borderSubtle hover:border-borderStandard'
@@ -459,20 +459,21 @@ export default function ChatInput({
         />
 
         <div className="flex items-center gap-1 absolute right-2 top-1/2 -translate-y-1/2">
-          <Button type="button" shape="round" variant="ghost" onClick={handleFileSelect}>
+          <Button type="button" shape="round" size="sm" variant="ghost" onClick={handleFileSelect}>
             <Attach />
           </Button>
 
           {isLoading ? (
-            <Button type="button" onClick={onStop} shape="round" variant="secondary">
+            <Button type="button" onClick={onStop} shape="round" size="sm" variant="secondary">
               <Stop />
             </Button>
           ) : (
             <Button
               type="submit"
-              variant="secondary"
+              size="sm"
+              variant="default"
               shape="round"
-              disabled={!displayValue.trim() && pastedImages.length === 0}
+              // disabled={!displayValue.trim() && pastedImages.length === 0}
             >
               <Send />
             </Button>

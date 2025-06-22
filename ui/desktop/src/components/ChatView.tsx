@@ -42,7 +42,7 @@ import {
   getTextContent,
   TextContent,
 } from '../types/message';
-import SessionsSidebar from './sessions/SessionsSideView';
+import SessionsSidebar from './AppSidebar';
 import { SidebarProvider, SidebarInset, SidebarTrigger, useSidebar } from './ui/sidebar';
 import MoreMenu from './more_menu/MoreMenu';
 import BottomMenu from './bottom_menu/BottomMenu';
@@ -133,7 +133,7 @@ function ChatContentWithSidebar({
   const safeIsMacOS = (window?.electron?.platform || 'darwin') === 'darwin';
 
   // Calculate padding based on sidebar state and macOS
-  const headerPadding = safeIsMacOS ? 'pl-22' : 'pl-8';
+  const headerPadding = safeIsMacOS ? 'pl-20' : 'pl-8';
 
   const [hasMessages, setHasMessages] = useState(false);
   const [lastInteractionTime, setLastInteractionTime] = useState<number>(Date.now());
@@ -142,6 +142,7 @@ function ChatContentWithSidebar({
   const [sessionTokenCount, setSessionTokenCount] = useState<number>(0);
   const [ancestorMessages, setAncestorMessages] = useState<Message[]>([]);
   const [droppedFiles, setDroppedFiles] = useState<string[]>([]);
+  const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
 
   const scrollRef = useRef<ScrollAreaHandle>(null);
 
@@ -212,6 +213,17 @@ function ChatContentWithSidebar({
           body: 'Click here to expand.',
         });
       }
+
+      // Always emit refresh event when message stream finishes for new sessions
+      // Check if this is a new session by looking at the current session ID format
+      const isNewSession = chat.id && chat.id.match(/^\d{8}_\d{6}$/);
+      if (isNewSession) {
+        console.log(
+          'ChatView: Message stream finished for new session, emitting message-stream-finished event'
+        );
+        // Emit event to trigger session refresh
+        window.dispatchEvent(new CustomEvent('message-stream-finished'));
+      }
     },
   });
 
@@ -221,9 +233,20 @@ function ChatContentWithSidebar({
       const message =
         typeof messageOrString === 'string' ? createUserMessage(messageOrString) : messageOrString;
       storeMessageInHistory(message);
+
+      // If this is the first message in a new session, trigger a refresh immediately
+      // Only trigger if we're starting a completely new session (no existing messages)
+      if (messages.length === 0 && chat.messages.length === 0) {
+        console.log('ChatView: New session detected, emitting session-created event');
+        // Emit event to indicate a new session is being created
+        window.dispatchEvent(new CustomEvent('session-created'));
+        // Also update the refresh trigger
+        setRefreshTrigger((prev) => prev + 1);
+      }
+
       return originalAppend(message);
     },
-    [originalAppend, storeMessageInHistory]
+    [originalAppend, storeMessageInHistory, messages.length, chat.messages.length]
   );
 
   // for CLE events -- create a new session id for the next set of messages
@@ -571,7 +594,7 @@ function ChatContentWithSidebar({
       {isGeneratingRecipe && <LayingEggLoader />}
 
       <div className="flex flex-1 w-full relative animate-fade-in">
-        <SessionsSidebar onSelectSession={handleSelectSession} currentSession={chat} />
+        <SessionsSidebar onSelectSession={handleSelectSession} refreshTrigger={refreshTrigger} />
         <SidebarInset>
           <div className="flex flex-col min-w-0 h-[calc(100dvh-40px)] shadow-default bg-background-default mt-2 mr-2 mb-2 rounded-2xl animate-in fade-in slide-in-from-bottom-8 duration-500">
             <div className="fixed w-[16rem] left-0 top-0 z-10">
@@ -587,7 +610,7 @@ function ChatContentWithSidebar({
             </div>
 
             <div
-              className="flex flex-col min-w-0 flex-1 overflow-y-scroll relative pl-6 pr-4 pb-16 pt-12"
+              className="flex flex-col min-w-0 flex-1 overflow-y-scroll relative pl-6 pr-4 pb-16 pt-10"
               onDrop={handleDrop}
               onDragOver={handleDragOver}
             >
@@ -616,54 +639,63 @@ function ChatContentWithSidebar({
               ) : (
                 <>
                   <SearchView>
-                    {filteredMessages.map((message, index) => (
-                      <div
-                        key={message.id || index}
-                        className={`mt-4 px-6 ${isUserMessage(message) ? 'user' : 'assistant'}`}
-                        data-testid="message-container"
-                      >
-                        {isUserMessage(message) ? (
-                          <>
-                            {hasContextHandlerContent(message) ? (
-                              <ContextHandler
-                                messages={messages}
-                                messageId={message.id ?? message.created.toString()}
-                                chatId={chat.id}
-                                workingDir={window.appConfig.get('GOOSE_WORKING_DIR') as string}
-                                contextType={getContextHandlerType(message)}
-                              />
-                            ) : (
-                              <UserMessage message={message} />
-                            )}
-                          </>
-                        ) : (
-                          <>
-                            {/* Only render GooseMessage if it's not a message invoking some context management */}
-                            {hasContextHandlerContent(message) ? (
-                              <ContextHandler
-                                messages={messages}
-                                messageId={message.id ?? message.created.toString()}
-                                chatId={chat.id}
-                                workingDir={window.appConfig.get('GOOSE_WORKING_DIR') as string}
-                                contextType={getContextHandlerType(message)}
-                              />
-                            ) : (
-                              <GooseMessage
-                                messageHistoryIndex={chat?.messageHistoryIndex}
-                                message={message}
-                                messages={messages}
-                                append={append}
-                                appendMessage={(newMessage) => {
-                                  const updatedMessages = [...messages, newMessage];
-                                  setMessages(updatedMessages);
-                                }}
-                                toolCallNotifications={toolCallNotifications}
-                              />
-                            )}
-                          </>
-                        )}
-                      </div>
-                    ))}
+                    {filteredMessages.map((message, index) => {
+                      const isUser = isUserMessage(message);
+                      const nextMessage = filteredMessages[index + 1];
+                      const nextIsUser = nextMessage ? isUserMessage(nextMessage) : null;
+
+                      // Add has-connector class if next message is of the same type
+                      const hasConnector = nextMessage && isUser === nextIsUser;
+
+                      return (
+                        <div
+                          key={message.id || index}
+                          className={`px-4 relative ${index === 0 ? 'mt-0' : 'mt-4'} ${isUser ? 'user' : 'assistant'} ${hasConnector ? 'has-connector' : ''}`}
+                          data-testid="message-container"
+                        >
+                          {isUser ? (
+                            <>
+                              {hasContextHandlerContent(message) ? (
+                                <ContextHandler
+                                  messages={messages}
+                                  messageId={message.id ?? message.created.toString()}
+                                  chatId={chat.id}
+                                  workingDir={window.appConfig.get('GOOSE_WORKING_DIR') as string}
+                                  contextType={getContextHandlerType(message)}
+                                />
+                              ) : (
+                                <UserMessage message={message} />
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              {/* Only render GooseMessage if it's not a message invoking some context management */}
+                              {hasContextHandlerContent(message) ? (
+                                <ContextHandler
+                                  messages={messages}
+                                  messageId={message.id ?? message.created.toString()}
+                                  chatId={chat.id}
+                                  workingDir={window.appConfig.get('GOOSE_WORKING_DIR') as string}
+                                  contextType={getContextHandlerType(message)}
+                                />
+                              ) : (
+                                <GooseMessage
+                                  messageHistoryIndex={chat?.messageHistoryIndex}
+                                  message={message}
+                                  messages={messages}
+                                  append={append}
+                                  appendMessage={(newMessage) => {
+                                    const updatedMessages = [...messages, newMessage];
+                                    setMessages(updatedMessages);
+                                  }}
+                                  toolCallNotifications={toolCallNotifications}
+                                />
+                              )}
+                            </>
+                          )}
+                        </div>
+                      );
+                    })}
                   </SearchView>
 
                   {error && (

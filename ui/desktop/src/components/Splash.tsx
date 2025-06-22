@@ -86,8 +86,8 @@ export default function Splash({ append, activities, title }: SplashProps) {
         <div className="flex items-center px-4 py-2">
           <span className="w-2 h-2 rounded-full bg-blockTeal mr-2" />
           <span className="text-sm">
-            <span className="text-textSubtle">Agent</span>{' '}
-            <span className="text-textStandard">{title}</span>
+            <span className="text-text-muted">Agent</span>{' '}
+            <span className="text-text-default">{title}</span>
           </span>
         </div>
       )}
@@ -99,7 +99,7 @@ export default function Splash({ append, activities, title }: SplashProps) {
               </div>
             </div> */}
 
-          <div className="flex flex-col mb-8">
+          <div className="flex flex-col mb-10 mt-3">
             <h1 className="text-text-prominent text-4xl font-light">
               <span>{greeting.prefix}</span>
             </h1>

@@ -567,30 +567,71 @@ p > code.bg-inline-code {
 
 /* chat connectors */
 
-.user:has(+ .assistant) > .message:after {
+.user:has(+ .assistant) {
+  position: relative;
+}
+
+.user:has(+ .assistant)::before {
   content: '';
   position: absolute;
-  top: 10px;
-  left: 10.5px;
+  top: 20px;
+  left: 0px;
   width: 1px;
   height: 0;
-  background-color: var(--border-prominent);
+  background-color: var(--border-default);
   animation: grow-height 0.3s forwards;
 }
 
-.assistant:has(+ .assistant) > .message:after {
+.user:has(+ .assistant)::after {
   content: '';
   position: absolute;
-  top: 10px;
-  left: 10.5px;
+  top: 18px;
+  left: -2px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--background-medium);
+}
+
+.assistant:has(+ .assistant) {
+  position: relative;
+}
+
+.assistant:has(+ .assistant)::before {
+  content: '';
+  position: absolute;
+  top: 20px;
+  left: 0px;
   width: 1px;
   height: 0;
-  background-color: #f97316;
+  background-color: var(--border-default);
   animation: grow-height 0.3s forwards;
 }
+
+.assistant::after {
+  content: '';
+  position: absolute;
+  top: 18px;
+  left: -2px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--background-medium);
+}
+
+/* .assistant:has(+ .assistant)::after {
+  content: '';
+  position: absolute;
+  top: 18px;
+  left: -2px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--background-medium);
+} */
 
 .assistant:has(+ .user) .goose-message-content {
-  border-bottom: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-muted);
   padding-bottom: 16px;
 }
 
