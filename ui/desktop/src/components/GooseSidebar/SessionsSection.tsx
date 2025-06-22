@@ -1,30 +1,21 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Search, ChevronDown, Folder, Loader2 } from 'lucide-react';
-import { fetchSessions, type Session } from '../sessions';
-import { ScrollArea } from './ui/scroll-area';
-import { Input } from './ui/input';
+import { fetchSessions, type Session } from '../../sessions';
+import { Input } from '../ui/input';
 import {
-  Sidebar,
-  SidebarContent,
-  SidebarHeader,
   SidebarMenu,
   SidebarMenuItem,
+  SidebarMenuButton,
   SidebarGroup,
   SidebarGroupLabel,
   SidebarGroupContent,
-  SidebarMenuButton,
-} from './ui/sidebar';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
-import { cn } from '../utils';
-import { useTextAnimator } from '../hooks/use-text-animator';
-import { Button } from './ui/button';
-import { ChatSmart } from './icons';
-import { Separator } from './ui/separator';
+} from '../ui/sidebar';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible';
+import { useTextAnimator } from '../../hooks/use-text-animator';
 
-interface SidebarProps {
+interface SessionsSectionProps {
   onSelectSession: (sessionId: string) => void;
   refreshTrigger?: number;
-  children?: React.ReactNode;
 }
 
 interface GroupedSessions {
@@ -33,11 +24,10 @@ interface GroupedSessions {
   older: { [key: string]: Session[] };
 }
 
-// Sessions Section Component
-const SessionsSection: React.FC<{
-  onSelectSession: (sessionId: string) => void;
-  refreshTrigger?: number;
-}> = ({ onSelectSession, refreshTrigger }) => {
+export const SessionsSection: React.FC<SessionsSectionProps> = ({
+  onSelectSession,
+  refreshTrigger,
+}) => {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [groupedSessions, setGroupedSessions] = useState<GroupedSessions>({
@@ -224,27 +214,27 @@ const SessionsSection: React.FC<{
       <SidebarMenuItem key={session.id}>
         <SidebarMenuButton
           onClick={handleClick}
-          className="cursor-pointer w-56 transition-all duration-150 hover:bg-background-medium rounded-xl text-text-muted hover:text-text-default h-fit flex items-start"
+          className="cursor-pointer w-56 transition-all duration-300 ease-in-out hover:bg-background-medium hover:shadow-sm rounded-xl text-text-muted hover:text-text-default h-fit flex items-start transform hover:scale-[1.02] active:scale-[0.98]"
         >
-          <div className="flex flex-col">
+          <div className="flex flex-col w-full">
             <div className="text-sm w-48 truncate mb-1 px-1 text-ellipsis text-text-default flex items-center gap-2">
               {shouldShowLoading ? (
-                <div className="flex items-center gap-2 animate-in fade-in duration-200">
+                <div className="flex items-center gap-2 animate-in fade-in duration-300">
                   <Loader2 className="size-3 animate-spin text-text-default" />
                   <span className="text-text-default animate-pulse">Generating description...</span>
                 </div>
               ) : (
                 <span
                   ref={isAnimating ? descriptionRef : undefined}
-                  className={isAnimating ? 'animate-in fade-in duration-300' : ''}
+                  className={`transition-all duration-300 ${isAnimating ? 'animate-in fade-in duration-300' : ''}`}
                 >
                   {hasDescription ? session.metadata.description : `Session ${session.id}`}
                 </span>
               )}
             </div>
-            <div className="text-xs w-48 truncate px-1 flex items-center gap-2 text-ellipsis">
-              <Folder className="size-4" />
-              {session.metadata.working_dir}
+            <div className="text-xs w-48 truncate px-1 flex items-center gap-2 text-ellipsis transition-colors duration-300">
+              <Folder className="size-4 transition-transform duration-300 group-hover:scale-110" />
+              <span className="transition-all duration-300">{session.metadata.working_dir}</span>
             </div>
           </div>
         </SidebarMenuButton>
@@ -261,18 +251,29 @@ const SessionsSection: React.FC<{
       <Collapsible defaultOpen={isFirstTwoGroups} className="group/collapsible">
         <SidebarGroup>
           <CollapsibleTrigger className="w-full">
-            <SidebarGroupLabel className="flex cursor-pointer items-center justify-between text-text-default hover:text-text-default h-12 pl-3">
+            <SidebarGroupLabel className="flex cursor-pointer items-center justify-between text-text-default hover:text-text-default h-12 pl-3 transition-all duration-200 rounded-lg">
               <div className="flex min-w-0 items-center">
-                <span className="opacity-100 transition-all duration-200 text-xs">{title}</span>
+                <span className="opacity-100 transition-all duration-300 text-xs font-medium">
+                  {title}
+                </span>
               </div>
-              <ChevronDown className="size-4 text-text-muted flex-shrink-0 opacity-100 transition-all duration-200 group-data-[state=open]/collapsible:rotate-180" />
+              <ChevronDown className="size-4 text-text-muted flex-shrink-0 opacity-100 transition-all duration-300 ease-in-out group-data-[state=open]/collapsible:rotate-180" />
             </SidebarGroupLabel>
           </CollapsibleTrigger>
-          <CollapsibleContent className="data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up overflow-hidden transition-all duration-200">
+          <CollapsibleContent className="data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up overflow-hidden transition-all duration-300 ease-in-out">
             <SidebarGroupContent>
-              <SidebarMenu className="mb-2">
-                {sessions.map((session) => (
-                  <SessionItem key={session.id} session={session} />
+              <SidebarMenu className="mb-2 space-y-1">
+                {sessions.map((session, sessionIndex) => (
+                  <div
+                    key={session.id}
+                    className="animate-in slide-in-from-left-2 fade-in duration-300"
+                    style={{
+                      animationDelay: `${sessionIndex * 50}ms`,
+                      animationFillMode: 'both',
+                    }}
+                  >
+                    <SessionItem session={session} />
+                  </div>
                 ))}
               </SidebarMenu>
             </SidebarGroupContent>
@@ -286,23 +287,23 @@ const SessionsSection: React.FC<{
     <Collapsible defaultOpen={false} className="group/collapsible rounded-xl">
       <SidebarGroup className="px-1">
         <CollapsibleTrigger className="w-full">
-          <SidebarGroupLabel className="flex cursor-pointer items-center justify-between text-text-default px-4">
+          <SidebarGroupLabel className="flex cursor-pointer items-center py-6 justify-between text-text-default px-4 transition-all duration-200 hover:bg-background-default rounded-lg">
             <div className="flex min-w-0 items-center">
-              <span className="opacity-100 transition-all duration-200 text-sm">Past sessions</span>
+              <span className="text-sm">Sessions</span>
             </div>
-            <ChevronDown className="size-4 text-text-muted flex-shrink-0 opacity-100 transition-all duration-200 group-data-[state=open]/collapsible:rotate-180" />
+            <ChevronDown className="size-4 text-text-muted flex-shrink-0 opacity-100 transition-all duration-300 ease-in-out group-data-[state=open]/collapsible:rotate-180" />
           </SidebarGroupLabel>
         </CollapsibleTrigger>
-        <CollapsibleContent className="data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up overflow-hidden transition-all duration-200">
+        <CollapsibleContent className="data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up overflow-hidden transition-all duration-300 ease-in-out">
           <SidebarGroupContent>
             {/* Search Input */}
-            <div className="p-1 pb-2">
+            <div className="p-1 pb-2 animate-in slide-in-from-top-2 fade-in duration-300">
               <div className="relative flex flex-row items-center gap-2">
                 <Search className="absolute top-2.5 left-2.5 size-4 text-muted-foreground" />
                 <Input
                   type="search"
                   placeholder="Search sessions..."
-                  className="pl-8"
+                  className="pl-8 transition-all duration-200 focus:ring-2 focus:ring-borderProminent"
                   value={searchTerm}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                     setSearchTerm(e.target.value)
@@ -312,118 +313,44 @@ const SessionsSection: React.FC<{
             </div>
 
             {/* Sessions Groups */}
-            {(() => {
-              let groupIndex = 0;
-              const groups = [
-                { sessions: groupedSessions.today, title: 'Today' },
-                { sessions: groupedSessions.yesterday, title: 'Yesterday' },
-                ...Object.entries(groupedSessions.older).map(([date, sessions]) => ({
-                  sessions,
-                  title: new Date(date).toLocaleDateString('en-US', {
-                    weekday: 'long',
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                  }),
-                })),
-              ];
+            <div className="space-y-2">
+              {(() => {
+                let groupIndex = 0;
+                const groups = [
+                  { sessions: groupedSessions.today, title: 'Today' },
+                  { sessions: groupedSessions.yesterday, title: 'Yesterday' },
+                  ...Object.entries(groupedSessions.older).map(([date, sessions]) => ({
+                    sessions,
+                    title: new Date(date).toLocaleDateString('en-US', {
+                      weekday: 'long',
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                    }),
+                  })),
+                ];
 
-              return groups.map(({ sessions, title }) => {
-                if (sessions.length === 0) return null;
-                const currentIndex = groupIndex++;
-                return renderSessionGroup(sessions, title, currentIndex);
-              });
-            })()}
+                return groups.map(({ sessions, title }) => {
+                  if (sessions.length === 0) return null;
+                  const currentIndex = groupIndex++;
+                  return (
+                    <div
+                      key={title}
+                      className="animate-in slide-in-from-left-2 fade-in duration-300"
+                      style={{
+                        animationDelay: `${currentIndex * 100}ms`,
+                        animationFillMode: 'both',
+                      }}
+                    >
+                      {renderSessionGroup(sessions, title, currentIndex)}
+                    </div>
+                  );
+                });
+              })()}
+            </div>
           </SidebarGroupContent>
         </CollapsibleContent>
       </SidebarGroup>
     </Collapsible>
   );
 };
-
-// Main Sidebar Component
-const AppSidebar: React.FC<SidebarProps> = ({ onSelectSession, refreshTrigger, children }) => {
-  const [isVisible, setIsVisible] = useState(false);
-
-  useEffect(() => {
-    // Trigger animation after a small delay
-    const timer = setTimeout(() => {
-      setIsVisible(true);
-    }, 100);
-    return () => clearTimeout(timer);
-  }, []);
-
-  return (
-    <Sidebar
-      collapsible="offcanvas"
-      variant="inset"
-      side="left"
-      className={cn(
-        'transition-all duration-500 ease-out',
-        isVisible ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0'
-      )}
-    >
-      <SidebarHeader>
-        <div className="p-1 pt-12 opacity-100 transition-all duration-200">
-          {/* Header content can be customized here */}
-        </div>
-      </SidebarHeader>
-      <SidebarContent>
-        <ScrollArea className="h-full">
-          {/* Action Buttons */}
-          <div className="px-1 py-0">
-            <Button
-              onClick={() => {
-                window.electron.createChatWindow(
-                  undefined,
-                  window.appConfig.get('GOOSE_WORKING_DIR') as string | undefined
-                );
-              }}
-              className="w-full justify-start rounded-lg h-fit hover:shadow-default hover:bg-background-default transition-all duration-200"
-              variant="ghost"
-            >
-              <div className="flex flex-col gap-1 items-start">
-                <div className="flex gap-2 items-center text-text-default">
-                  <ChatSmart className="w-4 h-4" />
-                  New session
-                </div>
-                <span className="text-xs font-regular text-text-muted">
-                  In the current directory
-                </span>
-              </div>
-            </Button>
-
-            <Button
-              onClick={() => {
-                window.electron.directoryChooser();
-              }}
-              className="w-full justify-start rounded-lg h-fit hover:shadow-default hover:bg-background-default transition-all duration-200"
-              variant="ghost"
-            >
-              <div className="flex flex-col gap-1 items-start">
-                <div className="flex gap-2 items-center text-text-default">
-                  <Folder className="w-4 h-4" />
-                  Open directory
-                </div>
-                <span className="text-xs font-regular text-text-muted">Select a directory</span>
-              </div>
-            </Button>
-          </div>
-
-          <div className="px-4 my-4">
-            <Separator />
-          </div>
-
-          {/* Sessions Section */}
-          <SessionsSection onSelectSession={onSelectSession} refreshTrigger={refreshTrigger} />
-
-          {/* Additional sidebar items can be added here */}
-          {children}
-        </ScrollArea>
-      </SidebarContent>
-    </Sidebar>
-  );
-};
-
-// Export the main component and the sessions section for flexibility
-export { AppSidebar as default, SessionsSection };

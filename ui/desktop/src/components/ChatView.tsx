@@ -42,8 +42,14 @@ import {
   getTextContent,
   TextContent,
 } from '../types/message';
-import SessionsSidebar from './AppSidebar';
-import { SidebarProvider, SidebarInset, SidebarTrigger, useSidebar } from './ui/sidebar';
+import SessionsSidebar from './GooseSidebar/AppSidebar';
+import {
+  SidebarProvider,
+  SidebarInset,
+  SidebarTrigger,
+  Sidebar,
+  SidebarContent,
+} from './ui/sidebar';
 import MoreMenu from './more_menu/MoreMenu';
 import BottomMenu from './bottom_menu/BottomMenu';
 
@@ -133,7 +139,7 @@ function ChatContentWithSidebar({
   const safeIsMacOS = (window?.electron?.platform || 'darwin') === 'darwin';
 
   // Calculate padding based on sidebar state and macOS
-  const headerPadding = safeIsMacOS ? 'pl-20' : 'pl-8';
+  const headerPadding = safeIsMacOS ? 'pl-24' : 'pl-12';
 
   const [hasMessages, setHasMessages] = useState(false);
   const [lastInteractionTime, setLastInteractionTime] = useState<number>(Date.now());
@@ -594,18 +600,27 @@ function ChatContentWithSidebar({
       {isGeneratingRecipe && <LayingEggLoader />}
 
       <div className="flex flex-1 w-full relative animate-fade-in">
-        <SessionsSidebar onSelectSession={handleSelectSession} refreshTrigger={refreshTrigger} />
+        <Sidebar variant="inset" collapsible="offcanvas">
+          <SidebarContent>
+            <SessionsSidebar
+              onSelectSession={handleSelectSession}
+              refreshTrigger={refreshTrigger}
+              setView={setView}
+              setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
+            />
+          </SidebarContent>
+        </Sidebar>
         <SidebarInset>
           <div className="flex flex-col min-w-0 h-[calc(100dvh-40px)] shadow-default bg-background-default mt-2 mr-2 mb-2 rounded-2xl animate-in fade-in slide-in-from-bottom-8 duration-500">
             <div className="fixed w-[16rem] left-0 top-0 z-10">
               <div
-                className={`flex w-full py-3 ${headerPadding} pr-5 z-50 transition-[padding] duration-200 ease-in-out`}
+                className={`flex w-full py-4 ${headerPadding} pr-5 z-50 transition-[padding] duration-200 ease-in-out`}
               >
                 <SidebarTrigger />
-                <MoreMenu
+                {/* <MoreMenu
                   setView={setView || (() => {})}
                   setIsGoosehintsModalOpen={setIsGoosehintsModalOpen || (() => {})}
-                />
+                /> */}
               </div>
             </div>
 

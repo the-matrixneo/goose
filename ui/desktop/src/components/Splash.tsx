@@ -99,7 +99,7 @@ export default function Splash({ append, activities, title }: SplashProps) {
               </div>
             </div> */}
 
-          <div className="flex flex-col mb-10 mt-3">
+          <div className="flex flex-col mb-10 mt-5">
             <h1 className="text-text-prominent text-4xl font-light">
               <span>{greeting.prefix}</span>
             </h1>
