@@ -2,7 +2,6 @@ import { useTextAnimator } from '../hooks/use-text-animator';
 import { Card } from './ui/card';
 import { useState, useEffect } from 'react';
 import { gsap } from 'gsap';
-import { SessionInsights } from './sessions/SessionsInsights';
 
 // Register GSAP plugins
 gsap.registerPlugin();
@@ -81,9 +80,9 @@ export default function Splash({ append, activities, title }: SplashProps) {
   }, []);
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col">
       {title && (
-        <div className="flex items-center px-4 py-2">
+        <div className="flex items-center px-4 py-2 mb-4">
           <span className="w-2 h-2 rounded-full bg-blockTeal mr-2" />
           <span className="text-sm">
             <span className="text-text-muted">Agent</span>{' '}
@@ -91,45 +90,33 @@ export default function Splash({ append, activities, title }: SplashProps) {
           </span>
         </div>
       )}
-      <div className="flex flex-col flex-1">
-        <div className="h-full flex flex-col pb-12">
-          {/* <div className="relative text-textStandard mb-12">
-              <div className="w-min animate-[flyin_2s_var(--spring-easing)_forwards]">
-                <GooseLogo />
-              </div>
-            </div> */}
 
-          <div className="flex flex-col mb-10 mt-5">
-            <h1 className="text-text-prominent text-4xl font-light">
-              <span>{greeting.prefix}</span>
-            </h1>
-            <div className="text-text-muted text-4xl font-light inline">{greeting.message}</div>
+      {/* Compact greeting section */}
+      <div className="flex flex-col px-6 mb-0">
+        <h1 className="text-text-prominent text-4xl font-light mb-2">
+          <span>{greeting.prefix}</span>
+          {/* <span className="text-text-muted">{greeting.message}</span> */}
+        </h1>
+      </div>
+
+      <div className="flex flex-col">
+        {messagePill && (
+          <div className="mb-4 p-3 rounded-lg border animate-[fadein_500ms_ease-in_forwards]">
+            {messagePill.replace(/^message:/i, '').trim()}
           </div>
+        )}
 
-          <div className="flex flex-col">
-            {messagePill && (
-              <div className="mb-6 p-4 rounded-lg border animate-[fadein_500ms_ease-in_forwards]">
-                {messagePill.replace(/^message:/i, '').trim()}
-              </div>
-            )}
-
-            <div className="flex flex-wrap gap-4 animate-[fadein_500ms_ease-in_forwards]">
-              {remainingPills.map((content, index) => (
-                <Card
-                  key={index}
-                  onClick={() => append(content)}
-                  title={content.length > 100 ? content : undefined}
-                  className="cursor-pointer px-6 w-[256px]"
-                >
-                  {content.length > 100 ? content.slice(0, 100) + '...' : content}
-                </Card>
-              ))}
-            </div>
-
-            <div className="animate-[fadein_500ms_ease-in_forwards]">
-              <SessionInsights />
-            </div>
-          </div>
+        <div className="flex flex-wrap gap-3 animate-[fadein_500ms_ease-in_forwards]">
+          {remainingPills.map((content, index) => (
+            <Card
+              key={index}
+              onClick={() => append(content)}
+              title={content.length > 100 ? content : undefined}
+              className="cursor-pointer px-4 py-2 w-[200px]"
+            >
+              {content.length > 100 ? content.slice(0, 100) + '...' : content}
+            </Card>
+          ))}
         </div>
       </div>
     </div>

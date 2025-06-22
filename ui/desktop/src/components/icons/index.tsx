@@ -9,9 +9,11 @@ import ChevronUp from './ChevronUp';
 import { ChevronRight } from './ChevronRight';
 import Close from './Close';
 import Copy from './Copy';
+import Discord from './Discord';
 import Document from './Document';
 import Edit from './Edit';
 import Idea from './Idea';
+import LinkedIn from './LinkedIn';
 import More from './More';
 import Refresh from './Refresh';
 import SensitiveHidden from './SensitiveHidden';
@@ -20,6 +22,7 @@ import Send from './Send';
 import Settings from './Settings';
 import Time from './Time';
 import { Gear } from './Gear';
+import Youtube from './Youtube';
 
 export {
   ArrowDown,
@@ -33,10 +36,12 @@ export {
   ChevronUp,
   Close,
   Copy,
+  Discord,
   Document,
   Edit,
   Idea,
   Gear,
+  LinkedIn,
   More,
   Refresh,
   SensitiveHidden,
@@ -44,4 +49,5 @@ export {
   Send,
   Settings,
   Time,
+  Youtube,
 };

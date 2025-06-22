@@ -11,6 +11,36 @@ interface SessionInsights {
   totalTokens: number;
 }
 
+// Greeting component
+function GreetingCard() {
+  const [selectedGreeting, setSelectedGreeting] = useState<{
+    prefix: string;
+  } | null>(null);
+
+  // Select a random greeting on component mount
+  useEffect(() => {
+    const prefixes = ['Hello.', 'Welcome.', 'Greetings.', 'Welcome back.', 'Hello there.'];
+    const randomPrefixIndex = Math.floor(Math.random() * prefixes.length);
+
+    setSelectedGreeting({
+      prefix: prefixes[randomPrefixIndex],
+    });
+  }, []);
+
+  const greeting = selectedGreeting || { prefix: 'Hello.', message: ' How can I help you today?' };
+
+  return (
+    <Card className="col-span-2 border-none animate-in fade-in slide-in-from-bottom-8 duration-500 bg-background-accent">
+      <CardContent className="flex flex-col justify-end h-full py-4">
+        <h1 className="text-text-on-accent text-4xl font-light">
+          <span>{greeting.prefix}</span>
+        </h1>
+        {/* <p className="text-text-on-accent font-light text-lg">{greeting.message}</p> */}
+      </CardContent>
+    </Card>
+  );
+}
+
 export function SessionInsights() {
   const [insights, setInsights] = useState<SessionInsights | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -55,45 +85,49 @@ export function SessionInsights() {
   }
 
   return (
-    <div className="grid grid-cols-4 gap-4">
-      {/* Total Sessions Card */}
-      <Card className="w-full animate-in fade-in slide-in-from-bottom-8 duration-500">
-        <CardContent className="flex flex-col justify-end h-full">
-          <div className="flex flex-col justify-end">
-            <p className="text-4xl font-mono font-light flex items-end" ref={totalSessionsRef}>
-              {insights?.totalSessions}
-            </p>
-            <CardDescription>Total sessions</CardDescription>
-          </div>
-        </CardContent>
-      </Card>
+    <>
+      <div className="grid grid-cols-4 gap-4 mb-4 mt-2">
+        <GreetingCard />
+      </div>
+      <div className="grid grid-cols-4 gap-4">
+        {/* Total Sessions Card */}
+        <Card className="w-full animate-in fade-in slide-in-from-bottom-8 duration-500">
+          <CardContent className="flex flex-col justify-end h-full">
+            <div className="flex flex-col justify-end">
+              <p className="text-4xl font-mono font-light flex items-end" ref={totalSessionsRef}>
+                {insights?.totalSessions}
+              </p>
+              <CardDescription>Total sessions</CardDescription>
+            </div>
+          </CardContent>
+        </Card>
 
-      {/* Average Duration Card */}
-      <Card className="w-full animate-in fade-in slide-in-from-bottom-8 duration-500">
-        <CardContent className="flex flex-col justify-end h-full">
-          <div className="flex flex-col justify-end">
-            <p className="text-4xl font-mono font-light flex items-end">
-              <span ref={avgDurationRef}>{insights?.avgSessionDuration?.toFixed(1)}m</span>
-            </p>
-            <CardDescription>Avg. duration</CardDescription>
-          </div>
-        </CardContent>
-      </Card>
+        {/* Average Duration Card */}
+        <Card className="w-full animate-in fade-in slide-in-from-bottom-8 duration-500">
+          <CardContent className="flex flex-col justify-end h-full">
+            <div className="flex flex-col justify-end">
+              <p className="text-4xl font-mono font-light flex items-end">
+                <span ref={avgDurationRef}>{insights?.avgSessionDuration?.toFixed(1)}m</span>
+              </p>
+              <CardDescription>Avg. duration</CardDescription>
+            </div>
+          </CardContent>
+        </Card>
 
-      {/* Total Tokens Card */}
-      <Card className="w-full col-span-2 animate-in fade-in slide-in-from-bottom-8 duration-500">
-        <CardContent className="flex flex-col justify-end h-full">
-          <div className="flex flex-col justify-end">
-            <p className="text-4xl font-mono font-light flex items-end" ref={totalTokensRef}>
-              {insights?.totalTokens ? `${(insights.totalTokens / 1000000).toFixed(2)}M` : ''}
-            </p>
-            <CardDescription>Total tokens (millions)</CardDescription>
-          </div>
-        </CardContent>
-      </Card>
+        {/* Total Tokens Card */}
+        <Card className="w-full col-span-2 animate-in fade-in slide-in-from-bottom-8 duration-500">
+          <CardContent className="flex flex-col justify-end h-full">
+            <div className="flex flex-col justify-end">
+              <p className="text-4xl font-mono font-light flex items-end" ref={totalTokensRef}>
+                {insights?.totalTokens ? `${(insights.totalTokens / 1000000).toFixed(2)}M` : ''}
+              </p>
+              <CardDescription>Total tokens (millions)</CardDescription>
+            </div>
+          </CardContent>
+        </Card>
 
-      {/* Activity Heatmap Card */}
-      {/* <Card className="w-full col-span-4">
+        {/* Activity Heatmap Card */}
+        {/* <Card className="w-full col-span-4">
         <CardContent>
           <CardDescription className="mb-4">
             <span className="text-lg text-text-default">Activity Heatmap</span>
@@ -102,25 +136,26 @@ export function SessionInsights() {
         </CardContent>
       </Card> */}
 
-      {/* Most Active Directories Card */}
-      <Card className="w-full col-span-4 animate-in fade-in slide-in-from-bottom-8 duration-500">
-        <CardContent>
-          <CardDescription className="mb-4">
-            <span className="text-lg text-text-default">Active directories</span>
-          </CardDescription>
-          <div className="space-y-2 ">
-            {insights.mostActiveDirs.map(([dir, count], index) => (
-              <div key={index} className="flex items-center justify-between text-sm">
-                <div className="flex items-center space-x-2">
-                  <FolderOpen className="h-4 w-4 text-text-muted" />
-                  <span className="truncate max-w-[200px]">{dir}</span>
+        {/* Most Active Directories Card */}
+        <Card className="w-full col-span-4 animate-in fade-in slide-in-from-bottom-8 duration-500">
+          <CardContent>
+            <CardDescription className="mb-4">
+              <span className="text-lg text-text-default">Active directories</span>
+            </CardDescription>
+            <div className="space-y-2 ">
+              {insights.mostActiveDirs.map(([dir, count], index) => (
+                <div key={index} className="flex items-center justify-between text-sm">
+                  <div className="flex items-center space-x-2">
+                    <FolderOpen className="h-4 w-4 text-text-muted" />
+                    <span className="truncate max-w-[400px] rtl">{dir}</span>
+                  </div>
+                  <span className="text-text-default font-mono font-light">{count} sessions</span>
                 </div>
-                <span className="text-text-default font-mono font-light">{count} sessions</span>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </>
   );
 }

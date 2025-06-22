@@ -428,7 +428,7 @@ export default function ChatInput({
 
   return (
     <div
-      className={`flex flex-col relative h-auto rounded-xl border mx-6 mb-4 transition-colors ${
+      className={`flex flex-col relative h-auto rounded-xl border mx-6 mb-6 transition-colors ${
         isFocused
           ? 'border-borderProminent hover:border-borderProminent'
           : 'border-borderSubtle hover:border-borderStandard'
@@ -464,14 +464,14 @@ export default function ChatInput({
           </Button>
 
           {isLoading ? (
-            <Button type="button" onClick={onStop} shape="round" size="sm" variant="secondary">
+            <Button type="button" onClick={onStop} shape="round" size="sm" variant="ghost">
               <Stop />
             </Button>
           ) : (
             <Button
               type="submit"
               size="sm"
-              variant="default"
+              variant="ghost"
               shape="round"
               // disabled={!displayValue.trim() && pastedImages.length === 0}
             >

@@ -11,6 +11,7 @@ import {
   Tray,
   App,
   globalShortcut,
+  shell,
 } from 'electron';
 import type { OpenDialogReturnValue } from 'electron';
 import { Buffer } from 'node:buffer';
@@ -528,10 +529,16 @@ const createChat = async (
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     // Open all links in external browser
     if (url.startsWith('http:') || url.startsWith('https:')) {
-      electron.shell.openExternal(url);
+      shell.openExternal(url);
       return { action: 'deny' };
     }
     return { action: 'allow' };
+  });
+
+  // Handle new-window events (alternative approach for external links)
+  mainWindow.webContents.on('new-window', (event, url) => {
+    event.preventDefault();
+    shell.openExternal(url);
   });
 
   // Load the index.html of the app.
@@ -1756,18 +1763,10 @@ app.whenReady().then(async () => {
         return;
       }
 
-      // On macOS, use the 'open' command with Chrome
-      if (process.platform === 'darwin') {
-        spawn('open', ['-a', 'Google Chrome', url]);
-      } else if (process.platform === 'win32') {
-        // On Windows, start is built-in command of cmd.exe
-        spawn('cmd.exe', ['/c', 'start', '', 'chrome', url]);
-      } else {
-        // On Linux, use xdg-open with chrome
-        spawn('xdg-open', [url]);
-      }
+      // Use shell.openExternal to open URL in user's default browser
+      shell.openExternal(url);
     } catch (error) {
-      console.error('Error opening URL in Chrome:', error);
+      console.error('Error opening URL in browser:', error);
     }
   });
 

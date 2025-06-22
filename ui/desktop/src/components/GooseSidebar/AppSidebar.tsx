@@ -1,15 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { Folder, FileText, Clock, Save } from 'lucide-react';
+import { Folder, FileText, Clock, MessageCircle } from 'lucide-react';
 import { SidebarContent, SidebarFooter } from '../ui/sidebar';
 import { Button } from '../ui/button';
-import { ChatSmart, Idea, Time, Send, Refresh, Gear } from '../icons';
-import { Separator } from '../ui/separator';
+import { ChatSmart, Time, Gear, LinkedIn, Youtube, Discord } from '../icons';
 import { ViewOptions, View } from '../../App';
 import { useConfig } from '../ConfigContext';
 import { Recipe } from '../../recipe';
 import { saveRecipe, generateRecipeFilename } from '../../recipe/recipeStorage';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/Tooltip';
 import ThemeSelector from './ThemeSelector';
+import GooseLogo from '../GooseLogo';
 
 interface SidebarProps {
   onSelectSession: (sessionId: string) => void;
@@ -96,14 +96,64 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView 
   return (
     <>
       <SidebarContent>
-        {/* Action Buttons */}
-        <div className="px-1 pt-14 py-0 space-y-2 relative">
+        {/* <SidebarHeader>
+          <div className="flex items-center gap-2 pt-12 pb-4">
+            <GooseLogo size="small" />
+            <span className="text-base">codename goose</span>
+          </div>
+        </SidebarHeader> */}
+
+        {/* Menu */}
+        <div className="px-1 py-0 pt-14 space-y-2 relative">
+          <Tooltip delayDuration={500}>
+            <TooltipTrigger className="w-full">
+              <Button
+                onClick={() => {
+                  window.electron.createChatWindow(
+                    undefined,
+                    window.appConfig.get('GOOSE_WORKING_DIR') as string | undefined
+                  );
+                }}
+                className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200"
+                variant="ghost"
+              >
+                <div className="flex gap-2 items-center text-text-default">
+                  <ChatSmart className="w-4 h-4" />
+                  <span className="text-sm">New session</span>
+                </div>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              <p>Start a new session in the current directory</p>
+            </TooltipContent>
+          </Tooltip>
+
+          <Tooltip delayDuration={500}>
+            <TooltipTrigger className="w-full">
+              <Button
+                onClick={() => {
+                  window.electron.directoryChooser();
+                }}
+                className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200"
+                variant="ghost"
+              >
+                <div className="flex gap-2 items-center text-text-default">
+                  <Folder className="w-4 h-4" />
+                  <span className="text-sm">Open directory</span>
+                </div>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              <p>Start a new session in a different directory</p>
+            </TooltipContent>
+          </Tooltip>
+
           {setView && (
             <Tooltip delayDuration={500}>
               <TooltipTrigger className="w-full">
                 <Button
                   onClick={() => setView('sessions')}
-                  className="w-full justify-start px-3 rounded-lg h-fit hover:shadow-default hover:bg-background-default transition-all duration-200"
+                  className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200"
                   variant="ghost"
                 >
                   <div className="flex gap-2 items-center text-text-default">
@@ -123,7 +173,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView 
               <TooltipTrigger className="w-full">
                 <Button
                   onClick={() => setView('schedules')}
-                  className="w-full justify-start px-3 rounded-lg h-fit hover:shadow-default hover:bg-background-default transition-all duration-200"
+                  className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200"
                   variant="ghost"
                 >
                   <div className="flex gap-2 items-center text-text-default">
@@ -138,106 +188,17 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView 
             </Tooltip>
           )}
 
-          {setIsGoosehintsModalOpen && (
-            <Tooltip delayDuration={500}>
-              <TooltipTrigger className="w-full">
-                <Button
-                  onClick={() => setIsGoosehintsModalOpen(true)}
-                  className="w-full justify-start px-3 rounded-lg h-fit hover:shadow-default hover:bg-background-default transition-all duration-200"
-                  variant="ghost"
-                >
-                  <div className="flex gap-2 items-center text-text-default">
-                    <Idea className="w-4 h-4" />
-                    Configure .goosehints
-                  </div>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                <p>Customize instructions</p>
-              </TooltipContent>
-            </Tooltip>
-          )}
-
-          {recipeConfig ? (
-            <>
-              <Tooltip delayDuration={500}>
-                <TooltipTrigger className="w-full">
-                  <Button
-                    onClick={() => {
-                      window.electron.createChatWindow(
-                        undefined,
-                        undefined,
-                        undefined,
-                        undefined,
-                        recipeConfig as Recipe,
-                        'recipeEditor'
-                      );
-                    }}
-                    className="w-full justify-start px-3 rounded-lg h-fit hover:shadow-default hover:bg-background-default transition-all duration-200"
-                    variant="ghost"
-                  >
-                    <div className="flex gap-2 items-center text-text-default">
-                      <Send className="w-4 h-4" />
-                      View recipe
-                    </div>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="right">
-                  <p>View the recipe you're using</p>
-                </TooltipContent>
-              </Tooltip>
-
-              <Tooltip delayDuration={500}>
-                <TooltipTrigger className="w-full">
-                  <Button
-                    onClick={handleSaveRecipeClick}
-                    className="w-full justify-start px-3 rounded-lg h-fit hover:shadow-default hover:bg-background-default transition-all duration-200"
-                    variant="ghost"
-                  >
-                    <div className="flex gap-2 items-center text-text-default">
-                      <Save className="w-4 h-4" />
-                      Save recipe
-                    </div>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="right">
-                  <p>Save this recipe for reuse</p>
-                </TooltipContent>
-              </Tooltip>
-            </>
-          ) : (
-            <Tooltip delayDuration={500}>
-              <TooltipTrigger className="w-full">
-                <Button
-                  onClick={() => {
-                    window.electron.logInfo('Make Agent button clicked');
-                    window.dispatchEvent(new CustomEvent('make-agent-from-chat'));
-                  }}
-                  className="w-full justify-start px-3 rounded-lg h-fit hover:shadow-default hover:bg-background-default transition-all duration-200"
-                  variant="ghost"
-                >
-                  <div className="flex gap-2 items-center text-text-default">
-                    <Send className="w-4 h-4" />
-                    Make Agent from this session
-                  </div>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                <p>Make a custom agent you can share or reuse</p>
-              </TooltipContent>
-            </Tooltip>
-          )}
           {setView && (
             <Tooltip delayDuration={500}>
               <TooltipTrigger className="w-full">
                 <Button
                   onClick={() => setView('recipes')}
-                  className="w-full justify-start px-3 rounded-lg h-fit hover:shadow-default hover:bg-background-default transition-all duration-200"
+                  className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200"
                   variant="ghost"
                 >
                   <div className="flex gap-2 items-center text-text-default">
                     <FileText className="w-4 h-4" />
-                    Recipe Library
+                    Recipe library
                   </div>
                 </Button>
               </TooltipTrigger>
@@ -247,12 +208,12 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView 
             </Tooltip>
           )}
 
-          {/* {setView && (
+          {setView && (
             <Tooltip delayDuration={500}>
               <TooltipTrigger className="w-full">
                 <Button
                   onClick={() => setView('settings')}
-                  className="w-full justify-start px-3 rounded-lg h-fit hover:shadow-default hover:bg-background-default transition-all duration-200"
+                  className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200"
                   variant="ghost"
                 >
                   <div className="flex gap-2 items-center text-text-default">
@@ -265,77 +226,69 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView 
                 <p>View all settings and options</p>
               </TooltipContent>
             </Tooltip>
-          )} */}
+          )}
         </div>
 
         {/* Theme Selector */}
-        <div className="mt-4">
-          <ThemeSelector />
-        </div>
+        <div className="mt-4">{/* <ThemeSelector /> */}</div>
       </SidebarContent>
 
       <SidebarFooter>
-        <div className="flex justify-between items-center w-full">
-          <Tooltip delayDuration={500}>
-            <TooltipTrigger>
-              <Button
-                onClick={() => {
-                  window.electron.createChatWindow(
-                    undefined,
-                    window.appConfig.get('GOOSE_WORKING_DIR') as string | undefined
-                  );
-                }}
-                className="px-3 hover:shadow-default hover:bg-background-default transition-all duration-200"
-                variant="ghost"
-                shape="round"
-              >
-                <ChatSmart className="w-4 h-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="right">
-              <p>Start a new session in the current directory</p>
-            </TooltipContent>
-          </Tooltip>
+        <div className="flex items-center gap-2">
+          <GooseLogo size="small" />
+          <span className="text-base">codename goose</span>
+        </div>
 
-          <Tooltip delayDuration={500}>
-            <TooltipTrigger>
-              <Button
-                onClick={() => {
-                  window.electron.directoryChooser();
-                }}
-                className="px-3 hover:shadow-default hover:bg-background-default transition-all duration-200"
-                variant="ghost"
-                shape="round"
-              >
-                <Folder className="w-4 h-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="right">
-              <p>Start a new session in a different directory</p>
-            </TooltipContent>
-          </Tooltip>
+        <div className="pb-4">
+          <div className="flex gap-2">
+            <Tooltip delayDuration={500}>
+              <TooltipTrigger asChild>
+                <a
+                  href="https://discord.gg/pvQ8S2e5"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center h-8 w-8 p-0 rounded-full hover:bg-neutral-200 transition-all duration-200"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                </a>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                <p>Join our Discord</p>
+              </TooltipContent>
+            </Tooltip>
 
-          {/* <Button
-            onClick={async () => {
-              await remove('GOOSE_PROVIDER', false);
-              await remove('GOOSE_MODEL', false);
-              setView?.('welcome');
-            }}
-            className="px-3 hover:shadow-default hover:bg-background-default transition-all duration-200 text-red-400 hover:text-red-300"
-            variant="ghost"
-            shape="round"
-          >
-            <Refresh />
-          </Button> */}
+            <Tooltip delayDuration={500}>
+              <TooltipTrigger asChild>
+                <a
+                  href="https://www.linkedin.com/company/block-opensource"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center h-8 w-8 p-0 rounded-full hover:bg-neutral-200 transition-all duration-200"
+                >
+                  <LinkedIn className="w-4 h-4" />
+                </a>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                <p>Follow us on LinkedIn</p>
+              </TooltipContent>
+            </Tooltip>
 
-          <Button
-            onClick={() => setView?.('settings')}
-            className="px-3 hover:shadow-default hover:bg-background-default transition-all duration-200"
-            variant="ghost"
-            shape="round"
-          >
-            <Gear />
-          </Button>
+            <Tooltip delayDuration={500}>
+              <TooltipTrigger asChild>
+                <a
+                  href="https://www.youtube.com/@blockopensource"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center h-8 w-8 p-0 rounded-full hover:bg-neutral-200 transition-all duration-200"
+                >
+                  <Youtube className="w-4 h-4" />
+                </a>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                <p>Watch on YouTube</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
         </div>
       </SidebarFooter>
 

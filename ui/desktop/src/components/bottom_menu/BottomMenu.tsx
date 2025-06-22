@@ -9,6 +9,7 @@ import { useConfig } from '../ConfigContext';
 import { useModelAndProvider } from '../ModelAndProviderContext';
 import { Message } from '../../types/message';
 import { ManualSummarizeButton } from '../context_management/ManualSummaryButton';
+import { DirSwitcher } from './DirSwitcher';
 
 const TOKEN_LIMIT_DEFAULT = 128000; // fallback for custom models that the backend doesn't know about
 const TOKEN_WARNING_THRESHOLD = 0.8; // warning shows at 80% of the token limit
@@ -202,30 +203,36 @@ export default function BottomMenu({
   }, [isModelMenuOpen]);
 
   return (
-    <div className="flex w-full justify-end items-center pb-2 pr-3 transition-colors relative text-xs align-middle animate-in fade-in slide-in-from-bottom-8 duration-500">
-      {/* Tool and Token count */}
-      {<BottomMenuAlertPopover alerts={alerts} />}
+    <div className="flex w-full justify-between items-center pb-2 pr-3 transition-colors relative text-xs align-middle animate-in fade-in slide-in-from-bottom-8 duration-500">
+      <div>
+        <DirSwitcher hasMessages={messages.length > 0} />
+      </div>
 
-      {/* Model Selector Dropdown */}
-      <ModelsBottomBar dropdownRef={dropdownRef} setView={setView} />
+      <div className="flex items-center">
+        {/* Tool and Token count */}
+        {<BottomMenuAlertPopover alerts={alerts} />}
 
-      {/* Separator */}
-      <div className="w-1 h-1 rounded-full bg-background-accent/50 mx-2" />
+        {/* Model Selector Dropdown */}
+        <ModelsBottomBar dropdownRef={dropdownRef} setView={setView} />
 
-      {/* Goose Mode Selector Dropdown */}
-      <BottomMenuModeSelection setView={setView} />
+        {/* Separator */}
+        <div className="w-1 h-1 rounded-full bg-background-accent/50 mx-2" />
 
-      {/* Summarize Context Button - ADD THIS */}
-      {messages.length > 0 && (
-        <>
-          <div className="w-1 h-1 rounded-full bg-background-accent/50 mx-2" />
-          <ManualSummarizeButton
-            messages={messages}
-            isLoading={isLoading}
-            setMessages={setMessages}
-          />
-        </>
-      )}
+        {/* Goose Mode Selector Dropdown */}
+        <BottomMenuModeSelection setView={setView} />
+
+        {/* Summarize Context Button - ADD THIS */}
+        {messages.length > 0 && (
+          <>
+            <div className="w-1 h-1 rounded-full bg-background-accent/50 mx-2" />
+            <ManualSummarizeButton
+              messages={messages}
+              isLoading={isLoading}
+              setMessages={setMessages}
+            />
+          </>
+        )}
+      </div>
     </div>
   );
 }
