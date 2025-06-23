@@ -30,7 +30,7 @@ function GreetingCard() {
   const greeting = selectedGreeting || { prefix: 'Hello.', message: ' How can I help you today?' };
 
   return (
-    <Card className="col-span-2 border-none animate-in fade-in slide-in-from-bottom-8 duration-500 bg-background-accent">
+    <Card className="col-span-2 border-none animate-in fade-in slide-in-from-right-8 duration-300 bg-background-accent">
       <CardContent className="flex flex-col justify-end h-full py-4">
         <h1 className="text-text-on-accent text-4xl font-light">
           <span>{greeting.prefix}</span>
@@ -86,12 +86,13 @@ export function SessionInsights() {
 
   return (
     <>
-      <div className="grid grid-cols-4 gap-4 mb-4 mt-2">
+      <div className="grid grid-cols-4 gap-4 mb-4">
         <GreetingCard />
       </div>
+
       <div className="grid grid-cols-4 gap-4">
         {/* Total Sessions Card */}
-        <Card className="w-full animate-in fade-in slide-in-from-bottom-8 duration-500">
+        <Card className="w-full animate-in fade-in slide-in-from-right-8 duration-500">
           <CardContent className="flex flex-col justify-end h-full">
             <div className="flex flex-col justify-end">
               <p className="text-4xl font-mono font-light flex items-end" ref={totalSessionsRef}>
@@ -103,7 +104,7 @@ export function SessionInsights() {
         </Card>
 
         {/* Average Duration Card */}
-        <Card className="w-full animate-in fade-in slide-in-from-bottom-8 duration-500">
+        <Card className="w-full animate-in fade-in slide-in-from-right-8 duration-500">
           <CardContent className="flex flex-col justify-end h-full">
             <div className="flex flex-col justify-end">
               <p className="text-4xl font-mono font-light flex items-end">
@@ -115,7 +116,7 @@ export function SessionInsights() {
         </Card>
 
         {/* Total Tokens Card */}
-        <Card className="w-full col-span-2 animate-in fade-in slide-in-from-bottom-8 duration-500">
+        <Card className="w-full col-span-2 animate-in fade-in slide-in-from-right-8 duration-500">
           <CardContent className="flex flex-col justify-end h-full">
             <div className="flex flex-col justify-end">
               <p className="text-4xl font-mono font-light flex items-end" ref={totalTokensRef}>
@@ -137,7 +138,7 @@ export function SessionInsights() {
       </Card> */}
 
         {/* Most Active Directories Card */}
-        <Card className="w-full col-span-4 animate-in fade-in slide-in-from-bottom-8 duration-500">
+        <Card className="w-full col-span-4 animate-in fade-in slide-in-from-right-8 duration-500">
           <CardContent>
             <CardDescription className="mb-4">
               <span className="text-lg text-text-default">Active directories</span>

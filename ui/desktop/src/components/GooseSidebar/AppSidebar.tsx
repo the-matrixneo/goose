@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Folder, FileText, Clock, MessageCircle } from 'lucide-react';
+import { Folder, FileText, Clock, MessageCircle, Home } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { SidebarContent, SidebarFooter } from '../ui/sidebar';
 import { Button } from '../ui/button';
 import { ChatSmart, Time, Gear, LinkedIn, Youtube, Discord } from '../icons';
@@ -17,10 +18,12 @@ interface SidebarProps {
   children?: React.ReactNode;
   setIsGoosehintsModalOpen?: (isOpen: boolean) => void;
   setView?: (view: View, viewOptions?: ViewOptions) => void;
+  currentPath?: string;
 }
 
 // Main Sidebar Component
-const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView }) => {
+const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView, currentPath }) => {
+  const navigate = useNavigate();
   const [isVisible, setIsVisible] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [saveRecipeName, setSaveRecipeName] = useState('');
@@ -93,6 +96,11 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView 
 
   const recipeConfig = window.appConfig.get('recipeConfig');
 
+  // Helper function to check if a path is active
+  const isActivePath = (path: string) => {
+    return currentPath === path;
+  };
+
   return (
     <>
       <SidebarContent>
@@ -105,6 +113,24 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView 
 
         {/* Menu */}
         <div className="px-1 py-0 pt-14 space-y-2 relative">
+          <Tooltip delayDuration={500}>
+            <TooltipTrigger className="w-full">
+              <Button
+                onClick={() => navigate('/')}
+                className={`w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200`}
+                variant="ghost"
+              >
+                <div className="flex gap-2 items-center text-text-default">
+                  <Home className="w-4 h-4" />
+                  <span className="text-sm">Home</span>
+                </div>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              <p>Go back to the main chat screen</p>
+            </TooltipContent>
+          </Tooltip>
+
           <Tooltip delayDuration={500}>
             <TooltipTrigger className="w-full">
               <Button
@@ -148,32 +174,34 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView 
             </TooltipContent>
           </Tooltip>
 
-          {setView && (
-            <Tooltip delayDuration={500}>
-              <TooltipTrigger className="w-full">
-                <Button
-                  onClick={() => setView('sessions')}
-                  className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200"
-                  variant="ghost"
-                >
-                  <div className="flex gap-2 items-center text-text-default">
-                    <Time className="w-4 h-4" />
-                    Past sessions
-                  </div>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                <p>View and share previous sessions</p>
-              </TooltipContent>
-            </Tooltip>
-          )}
+          <Tooltip delayDuration={500}>
+            <TooltipTrigger className="w-full">
+              <Button
+                onClick={() => navigate('/sessions')}
+                className={`w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200 ${
+                  isActivePath('/sessions') ? 'bg-neutral-200' : ''
+                }`}
+                variant="ghost"
+              >
+                <div className="flex gap-2 items-center text-text-default">
+                  <Time className="w-4 h-4" />
+                  Past sessions
+                </div>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              <p>View and share previous sessions</p>
+            </TooltipContent>
+          </Tooltip>
 
-          {process.env.ALPHA && setView && (
+          {process.env.ALPHA && (
             <Tooltip delayDuration={500}>
               <TooltipTrigger className="w-full">
                 <Button
-                  onClick={() => setView('schedules')}
-                  className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200"
+                  onClick={() => navigate('/schedules')}
+                  className={`w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200 ${
+                    isActivePath('/schedules') ? 'bg-neutral-200' : ''
+                  }`}
                   variant="ghost"
                 >
                   <div className="flex gap-2 items-center text-text-default">
@@ -188,45 +216,45 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView 
             </Tooltip>
           )}
 
-          {setView && (
-            <Tooltip delayDuration={500}>
-              <TooltipTrigger className="w-full">
-                <Button
-                  onClick={() => setView('recipes')}
-                  className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200"
-                  variant="ghost"
-                >
-                  <div className="flex gap-2 items-center text-text-default">
-                    <FileText className="w-4 h-4" />
-                    Recipe library
-                  </div>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                <p>Browse your saved recipes</p>
-              </TooltipContent>
-            </Tooltip>
-          )}
+          <Tooltip delayDuration={500}>
+            <TooltipTrigger className="w-full">
+              <Button
+                onClick={() => navigate('/recipes')}
+                className={`w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200 ${
+                  isActivePath('/recipes') ? 'bg-neutral-200' : ''
+                }`}
+                variant="ghost"
+              >
+                <div className="flex gap-2 items-center text-text-default">
+                  <FileText className="w-4 h-4" />
+                  Recipe library
+                </div>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              <p>Browse your saved recipes</p>
+            </TooltipContent>
+          </Tooltip>
 
-          {setView && (
-            <Tooltip delayDuration={500}>
-              <TooltipTrigger className="w-full">
-                <Button
-                  onClick={() => setView('settings')}
-                  className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200"
-                  variant="ghost"
-                >
-                  <div className="flex gap-2 items-center text-text-default">
-                    <Gear className="w-4 h-4" />
-                    Settings
-                  </div>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                <p>View all settings and options</p>
-              </TooltipContent>
-            </Tooltip>
-          )}
+          <Tooltip delayDuration={500}>
+            <TooltipTrigger className="w-full">
+              <Button
+                onClick={() => navigate('/settings')}
+                className={`w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200 ${
+                  isActivePath('/settings') ? 'bg-neutral-200' : ''
+                }`}
+                variant="ghost"
+              >
+                <div className="flex gap-2 items-center text-text-default">
+                  <Gear className="w-4 h-4" />
+                  Settings
+                </div>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              <p>View all settings and options</p>
+            </TooltipContent>
+          </Tooltip>
         </div>
 
         {/* Theme Selector */}

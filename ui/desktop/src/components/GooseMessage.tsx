@@ -147,7 +147,7 @@ export default function GooseMessage({
         {/* Visible assistant response */}
         {displayText && (
           <div className="flex flex-col group">
-            <div className={`goose-message-content pt-2 pb-4`}>
+            <div className={`goose-message-content py-2`}>
               <div ref={contentRef}>{<MarkdownContent content={displayText} />}</div>
             </div>
 
@@ -179,7 +179,7 @@ export default function GooseMessage({
         {toolRequests.length > 0 && (
           <div className="relative flex flex-col w-full">
             {toolRequests.map((toolRequest) => (
-              <div className={`goose-message-tool px-2 py-2 mb-2`} key={toolRequest.id}>
+              <div className={`goose-message-tool px-2 py-2`} key={toolRequest.id}>
                 <ToolCallWithResponse
                   // If the message is resumed and not matched tool response, it means the tool is broken or cancelled.
                   isCancelledMessage={

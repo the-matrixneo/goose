@@ -18,6 +18,7 @@ import { Modal, ModalContent } from '../ui/modal';
 import { Button } from '../ui/button';
 import { toast } from 'react-toastify';
 import MoreMenuLayout from '../more_menu/MoreMenuLayout';
+import { MainPanelLayout } from '../Layout/MainPanelLayout';
 
 interface SessionHistoryViewProps {
   session: SessionDetails;
@@ -107,79 +108,81 @@ const SessionHistoryView: React.FC<SessionHistoryViewProps> = ({
   };
 
   return (
-    <div className="h-screen w-full flex flex-col">
-      <MoreMenuLayout showMenu={false} />
+    <>
+      <MainPanelLayout>
+        <div className="flex flex-col h-full">
+          <SessionHeaderCard onBack={onBack}>
+            <div className="ml-8">
+              <h1 className="text-lg text-textStandardInverse">
+                {session.metadata.description || session.session_id}
+              </h1>
+              <div className="flex items-center text-sm text-textSubtle mt-1 space-x-5">
+                <span className="flex items-center">
+                  <Calendar className="w-4 h-4 mr-1" />
+                  {formatMessageTimestamp(session.messages[0]?.created)}
+                </span>
+                <span className="flex items-center">
+                  <MessageSquareText className="w-4 h-4 mr-1" />
+                  {session.metadata.message_count}
+                </span>
+                {session.metadata.total_tokens !== null && (
+                  <span className="flex items-center">
+                    <Target className="w-4 h-4 mr-1" />
+                    {session.metadata.total_tokens.toLocaleString()}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center text-sm text-textSubtle space-x-5">
+                <span className="flex items-center">
+                  <Folder className="w-4 h-4 mr-1" />
+                  {session.metadata.working_dir}
+                </span>
+              </div>
+            </div>
 
-      <SessionHeaderCard onBack={onBack}>
-        <div className="ml-8">
-          <h1 className="text-lg text-textStandardInverse">
-            {session.metadata.description || session.session_id}
-          </h1>
-          <div className="flex items-center text-sm text-textSubtle mt-1 space-x-5">
-            <span className="flex items-center">
-              <Calendar className="w-4 h-4 mr-1" />
-              {formatMessageTimestamp(session.messages[0]?.created)}
-            </span>
-            <span className="flex items-center">
-              <MessageSquareText className="w-4 h-4 mr-1" />
-              {session.metadata.message_count}
-            </span>
-            {session.metadata.total_tokens !== null && (
-              <span className="flex items-center">
-                <Target className="w-4 h-4 mr-1" />
-                {session.metadata.total_tokens.toLocaleString()}
-              </span>
+            {showActionButtons && (
+              <div className="ml-auto flex items-center space-x-4">
+                <button
+                  onClick={handleShare}
+                  title="Share Session"
+                  disabled={!canShare || isSharing}
+                  className={`flex items-center text-textStandardInverse px-2 py-1 ${
+                    canShare
+                      ? 'hover:font-bold hover:scale-110 transition-all duration-150'
+                      : 'cursor-not-allowed opacity-50'
+                  }`}
+                >
+                  {isSharing ? (
+                    <>
+                      <LoaderCircle className="w-7 h-7 animate-spin mr-2" />
+                      <span>Sharing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Share2 className="w-7 h-7" />
+                    </>
+                  )}
+                </button>
+
+                <button
+                  onClick={onResume}
+                  title="Resume Session"
+                  className="flex items-center text-textStandardInverse px-2 py-1 hover:font-bold hover:scale-110 transition-all duration-150"
+                >
+                  <Sparkles className="w-7 h-7" />
+                </button>
+              </div>
             )}
-          </div>
-          <div className="flex items-center text-sm text-textSubtle space-x-5">
-            <span className="flex items-center">
-              <Folder className="w-4 h-4 mr-1" />
-              {session.metadata.working_dir}
-            </span>
-          </div>
+          </SessionHeaderCard>
+
+          <SessionMessages
+            messages={session.messages}
+            isLoading={isLoading}
+            error={error}
+            onRetry={onRetry}
+          />
         </div>
-
-        {showActionButtons && (
-          <div className="ml-auto flex items-center space-x-4">
-            <button
-              onClick={handleShare}
-              title="Share Session"
-              disabled={!canShare || isSharing}
-              className={`flex items-center text-textStandardInverse px-2 py-1 ${
-                canShare
-                  ? 'hover:font-bold hover:scale-110 transition-all duration-150'
-                  : 'cursor-not-allowed opacity-50'
-              }`}
-            >
-              {isSharing ? (
-                <>
-                  <LoaderCircle className="w-7 h-7 animate-spin mr-2" />
-                  <span>Sharing...</span>
-                </>
-              ) : (
-                <>
-                  <Share2 className="w-7 h-7" />
-                </>
-              )}
-            </button>
-
-            <button
-              onClick={onResume}
-              title="Resume Session"
-              className="flex items-center text-textStandardInverse px-2 py-1 hover:font-bold hover:scale-110 transition-all duration-150"
-            >
-              <Sparkles className="w-7 h-7" />
-            </button>
-          </div>
-        )}
-      </SessionHeaderCard>
-
-      <SessionMessages
-        messages={session.messages}
-        isLoading={isLoading}
-        error={error}
-        onRetry={onRetry}
-      />
+      </MainPanelLayout>
 
       <Modal open={isShareModalOpen} onOpenChange={setIsShareModalOpen}>
         <ModalContent className="sm:max-w-md p-0 bg-bgApp dark:bg-bgApp dark:border-borderSubtle">
@@ -225,7 +228,7 @@ const SessionHistoryView: React.FC<SessionHistoryViewProps> = ({
           </div>
         </ModalContent>
       </Modal>
-    </div>
+    </>
   );
 };
 

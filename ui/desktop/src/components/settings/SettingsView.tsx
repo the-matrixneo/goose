@@ -1,5 +1,5 @@
 import { ScrollArea } from '../ui/scroll-area';
-import BackButton from '../ui/BackButton';
+import { SidebarTrigger, useSidebar } from '../ui/sidebar';
 import type { View, ViewOptions } from '../../App';
 import ExtensionsSection from './extensions/ExtensionsSection';
 import ModelsSection from './models/ModelsSection';
@@ -10,6 +10,7 @@ import { ResponseStylesSection } from './response_styles/ResponseStylesSection';
 import AppSettingsSection from './app/AppSettingsSection';
 import { ExtensionConfig } from '../../api';
 import MoreMenuLayout from '../more_menu/MoreMenuLayout';
+import { MainPanelLayout } from '../Layout/MainPanelLayout';
 
 export type SettingsViewOptions = {
   deepLinkConfig?: ExtensionConfig;
@@ -26,41 +27,58 @@ export default function SettingsView({
   setView: (view: View, viewOptions?: ViewOptions) => void;
   viewOptions: SettingsViewOptions;
 }) {
+  const { open: isSidebarOpen } = useSidebar();
+
+  const safeIsMacOS = (window?.electron?.platform || 'darwin') === 'darwin';
+
+  // Calculate padding based on sidebar state and macOS
+  const headerPadding = !isSidebarOpen ? (safeIsMacOS ? 'pl-20' : 'pl-12') : 'pl-4';
+
   return (
-    <div className="h-screen w-full animate-[fadein_200ms_ease-in_forwards]">
-      <MoreMenuLayout showMenu={false} />
-
-      <ScrollArea className="h-full w-full">
-        <div className="flex flex-col pb-24">
-          <div className="px-8 pt-6 pb-4">
-            <BackButton onClick={() => onClose()} />
-            <h1 className="text-3xl font-medium text-textStandard mt-1">Settings</h1>
-          </div>
-
-          {/* Content Area */}
-          <div className="flex-1 pt-[20px]">
-            <div className="space-y-8">
-              {/* Models Section */}
-              <ModelsSection setView={setView} />
-              {/* Extensions Section */}
-              <ExtensionsSection
-                deepLinkConfig={viewOptions.deepLinkConfig}
-                showEnvVars={viewOptions.showEnvVars}
-              />
-              {/* Goose Modes */}
-              <ModeSection setView={setView} />
-              {/*Session sharing*/}
-              <SessionSharingSection />
-              {/* Response Styles */}
-              <ResponseStylesSection />
-              {/* Tool Selection Strategy */}
-              <ToolSelectionStrategySection setView={setView} />
-              {/* App Settings */}
-              <AppSettingsSection scrollToSection={viewOptions.section} />
-            </div>
+    <>
+      <MainPanelLayout>
+        <div className="h-12 flex items-center justify-between">
+          <div className={`flex items-center ${headerPadding}`}>
+            <SidebarTrigger className="no-drag" />
           </div>
         </div>
-      </ScrollArea>
-    </div>
+
+        <div className="flex-1 flex flex-col min-h-0">
+          {/* Content Area */}
+          <div className="flex flex-col mt-4 mb-6 px-6">
+            <h1 className="text-4xl font-light">Settings</h1>
+            <h3 className="text-sm text-text-muted mt-2">
+              Configure your Goose experience with models, extensions, and preferences.
+            </h3>
+          </div>
+
+          <div className="flex-1 min-h-0 relative px-6">
+            <ScrollArea className="h-full">
+              <div className="h-full relative">
+                <div className="space-y-8 pt-4">
+                  {/* Models Section */}
+                  <ModelsSection setView={setView} />
+                  {/* Extensions Section */}
+                  <ExtensionsSection
+                    deepLinkConfig={viewOptions.deepLinkConfig}
+                    showEnvVars={viewOptions.showEnvVars}
+                  />
+                  {/* Goose Modes */}
+                  <ModeSection setView={setView} />
+                  {/*Session sharing*/}
+                  <SessionSharingSection />
+                  {/* Response Styles */}
+                  <ResponseStylesSection />
+                  {/* Tool Selection Strategy */}
+                  <ToolSelectionStrategySection setView={setView} />
+                  {/* App Settings */}
+                  <AppSettingsSection scrollToSection={viewOptions.section} />
+                </div>
+              </div>
+            </ScrollArea>
+          </div>
+        </div>
+      </MainPanelLayout>
+    </>
   );
 }

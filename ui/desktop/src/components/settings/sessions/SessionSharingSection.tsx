@@ -83,20 +83,20 @@ export default function SessionSharingSection() {
   };
 
   return (
-    <section id="session-sharing" className="px-8">
+    <section id="session-sharing">
       {/*Title*/}
       <div className="flex justify-between items-center mb-2">
-        <h2 className="text-xl font-medium text-textStandard">Session sharing</h2>
+        <h2 className="text-xl text-text-default">Session sharing</h2>
       </div>
 
-      <div className="border-b border-borderSubtle pb-8">
+      <div className="border-b pb-8">
         {envBaseUrlShare ? (
-          <p className="text-sm text-textStandard mb-4">
+          <p className="text-sm text-text-muted mb-4">
             Session sharing is configured but fully opt-in — your sessions are only shared when you
             explicitly click the share button.
           </p>
         ) : (
-          <p className="text-sm text-textStandard mb-4">
+          <p className="text-sm text-text-muted mb-4">
             You can enable session sharing to share your sessions with others. You'll then need to
             enter the base URL for the session sharing API endpoint. Anyone with access to the same
             API and sharing session enabled will be able to see your sessions.
@@ -106,13 +106,13 @@ export default function SessionSharingSection() {
         <div className="space-y-4">
           {/* Toggle for enabling session sharing */}
           <div className="flex items-center justify-between">
-            <label className="text-textStandard cursor-pointer">
+            <label className="text-text-default cursor-pointer">
               {envBaseUrlShare
                 ? 'Session sharing has already been configured'
                 : 'Enable session sharing'}
             </label>
             {envBaseUrlShare ? (
-              <Lock className="w-5 h-5 text-gray-600" />
+              <Lock className="w-5 h-5 text-text-muted" />
             ) : (
               <Switch
                 checked={sessionSharingConfig.enabled}
@@ -127,10 +127,7 @@ export default function SessionSharingSection() {
           {sessionSharingConfig.enabled && (
             <div className="space-y-2 relative">
               <div className="flex items-center space-x-2">
-                <label
-                  htmlFor="session-sharing-url"
-                  className="text-sm font-medium text-textStandard"
-                >
+                <label htmlFor="session-sharing-url" className="text-sm text-text-default">
                   Base URL
                 </label>
                 {isUrlConfigured && <Check className="w-5 h-5 text-green-500" />}

@@ -183,18 +183,18 @@ export default function ExtensionsSection({
   };
 
   return (
-    <section id="extensions" className="px-8">
+    <section id="extensions">
       <div className="flex justify-between items-center mb-2">
-        <h2 className="text-xl font-medium text-textStandard">Extensions</h2>
+        <h2 className="text-xl text-text-default">Extensions</h2>
       </div>
       <div>
-        <p className="text-sm text-textStandard mb-6">
+        <p className="text-sm text-text-muted mb-6">
           These extensions use the Model Context Protocol (MCP). They can expand Goose's
           capabilities using three main components: Prompts, Resources, and Tools.
         </p>
       </div>
 
-      <div className="border-b border-borderSubtle pb-8">
+      <div className="border-b pb-8">
         <ExtensionList
           extensions={extensions}
           onToggle={handleExtensionToggle}
@@ -205,14 +205,16 @@ export default function ExtensionsSection({
         {!hideButtons && (
           <div className="flex gap-4 pt-4 w-full">
             <Button
-              className="flex items-center gap-2 justify-center text-white dark:text-black bg-bgAppInverse hover:bg-bgStandardInverse [&>svg]:!size-4"
+              className="flex items-center gap-2 justify-center"
+              variant="default"
               onClick={() => setIsAddModalOpen(true)}
             >
               <Plus className="h-4 w-4" />
               Add custom extension
             </Button>
             <Button
-              className="flex items-center gap-2 justify-center text-textStandard bg-bgApp border border-borderSubtle hover:border-borderProminent hover:bg-bgApp [&>svg]:!size-4"
+              className="flex items-center gap-2 justify-center"
+              variant="secondary"
               onClick={() => window.open('https://block.github.io/goose/v1/extensions/', '_blank')}
             >
               <GPSIcon size={12} />

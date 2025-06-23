@@ -61,14 +61,14 @@ export function ModeSelectionItem({
   return (
     <div className="group hover:cursor-pointer">
       <div
-        className="flex items-center justify-between text-textStandard py-2 px-4 hover:bg-bgSubtle"
+        className="flex items-center justify-between text-textStandard py-2 hover:bg-bgSubtle"
         onClick={() => handleModeChange(mode.key)}
       >
         <div className="flex">
           <div>
-            <h3 className="text-textStandard">{mode.label}</h3>
+            <h3 className="text-text-default">{mode.label}</h3>
             {showDescription && (
-              <p className="text-xs text-textSubtle mt-[2px]">{mode.description}</p>
+              <p className="text-xs text-text-muted mt-[2px]">{mode.description}</p>
             )}
           </div>
         </div>
@@ -82,7 +82,7 @@ export function ModeSelectionItem({
                 });
               }}
             >
-              <Gear className="w-4 h-4 text-textSubtle hover:text-textStandard" />
+              <Gear className="w-4 h-4 text-text-muted hover:text-text-default" />
             </button>
           )}
           <input
@@ -94,10 +94,10 @@ export function ModeSelectionItem({
             className="peer sr-only"
           />
           <div
-            className="h-4 w-4 rounded-full border border-borderStandard 
+            className="h-4 w-4 rounded-full border border-border-default 
                   peer-checked:border-[6px] peer-checked:border-black dark:peer-checked:border-white
                   peer-checked:bg-white dark:peer-checked:bg-black
-                  transition-all duration-200 ease-in-out group-hover:border-borderProminent"
+                  transition-all duration-200 ease-in-out group-hover:border-border-default"
           ></div>
         </div>
       </div>

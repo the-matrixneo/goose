@@ -1,5 +1,6 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
+@plugin '@tailwindcss/typography';
 
 /* Cash Sans */
 
@@ -571,6 +572,17 @@ p > code.bg-inline-code {
   position: relative;
 }
 
+.user::before {
+  content: '';
+  position: absolute;
+  top: 18px;
+  left: -2px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--background-medium);
+}
+
 .user:has(+ .assistant)::before {
   content: '';
   position: absolute;
@@ -630,10 +642,19 @@ p > code.bg-inline-code {
   background-color: var(--background-medium);
 } */
 
-.assistant:has(+ .user) .goose-message-content {
-  border-bottom: 1px solid var(--border-muted);
-  padding-bottom: 16px;
+.assistant:has(+ .user) .goose-message {
+  padding-bottom: 24px;
 }
+
+/* .assistant:has(+ .user) .goose-message::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 50%;
+  height: 1px;
+  background-color: var(--border-default);
+} */
 
 @keyframes grow-height {
   from {
@@ -642,4 +663,45 @@ p > code.bg-inline-code {
   to {
     height: calc(100% + 16px);
   }
+}
+
+/* Virtualized list styles */
+.virtualized-list {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-neutral-300) transparent;
+}
+
+.virtualized-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.virtualized-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.virtualized-list::-webkit-scrollbar-thumb {
+  background-color: var(--color-neutral-300);
+  border-radius: 4px;
+}
+
+.dark .virtualized-list::-webkit-scrollbar-thumb {
+  background-color: var(--color-neutral-400);
+}
+
+.virtualized-list::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-neutral-400);
+}
+
+.dark .virtualized-list::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-neutral-300);
+}
+
+/* Ensure virtualized items don't have margin/padding that could break layout */
+.virtualized-list > div {
+  outline: none;
+}
+
+/* Optimize performance for virtualized rendering */
+.virtualized-list * {
+  contain: layout style paint;
 }

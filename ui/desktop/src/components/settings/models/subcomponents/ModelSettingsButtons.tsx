@@ -9,10 +9,11 @@ interface ConfigureModelButtonsProps {
 
 export default function ModelSettingsButtons({ setView }: ConfigureModelButtonsProps) {
   return (
-    <div className="flex gap-4 pt-4 ">
+    <div className="flex gap-2 pt-4">
       <AddModelButton setView={setView} />
       <Button
-        className="flex items-center gap-2 justify-center text-textStandard bg-bgApp border border-borderSubtle hover:border-borderProminent hover:bg-bgApp [&>svg]:!size-4"
+        className="flex items-center gap-2 justify-center"
+        variant="secondary"
         onClick={() => {
           setView('ConfigureProviders');
         }}

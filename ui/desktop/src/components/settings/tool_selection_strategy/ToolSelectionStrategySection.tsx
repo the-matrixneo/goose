@@ -57,12 +57,12 @@ export const ToolSelectionStrategySection = ({
   }, [fetchCurrentStrategy]);
 
   return (
-    <section id="tool-selection-strategy" className="px-8">
+    <section id="tool-selection-strategy">
       <div className="flex justify-between items-center mb-2">
-        <h2 className="text-xl font-medium text-textStandard">Tool Selection Strategy (preview)</h2>
+        <h2 className="text-xl text-text-default">Tool Selection Strategy (preview)</h2>
       </div>
-      <div className="border-b border-borderSubtle pb-8">
-        <p className="text-sm text-textStandard mb-6">
+      <div className="border-b pb-8">
+        <p className="text-sm text-text-muted mb-6">
           Configure how Goose selects tools for your requests. Recommended when many extensions are
           enabled. Available only with Claude models served on Databricks for now.
         </p>
@@ -70,13 +70,13 @@ export const ToolSelectionStrategySection = ({
           {all_tool_selection_strategies.map((strategy) => (
             <div className="group hover:cursor-pointer" key={strategy.key}>
               <div
-                className="flex items-center justify-between text-textStandard py-2 px-4 hover:bg-bgSubtle"
+                className="flex items-center justify-between text-text-default rounded-xl py-2 px-3 hover:bg-background-muted"
                 onClick={() => handleStrategyChange(strategy.key)}
               >
                 <div className="flex">
                   <div>
-                    <h3 className="text-textStandard">{strategy.label}</h3>
-                    <p className="text-xs text-textSubtle mt-[2px]">{strategy.description}</p>
+                    <h3 className="text-text-default">{strategy.label}</h3>
+                    <p className="text-xs text-text-muted mt-[2px]">{strategy.description}</p>
                   </div>
                 </div>
 
@@ -90,10 +90,10 @@ export const ToolSelectionStrategySection = ({
                     className="peer sr-only"
                   />
                   <div
-                    className="h-4 w-4 rounded-full border border-borderStandard 
+                    className="h-4 w-4 rounded-full border border-border-default 
                           peer-checked:border-[6px] peer-checked:border-black dark:peer-checked:border-white
                           peer-checked:bg-white dark:peer-checked:bg-black
-                          transition-all duration-200 ease-in-out group-hover:border-borderProminent"
+                          transition-all duration-200 ease-in-out group-hover:border-border-default"
                   ></div>
                 </div>
               </div>

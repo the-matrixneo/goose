@@ -191,10 +191,10 @@ export default function UpdateSection() {
   return (
     <div>
       <div className="flex justify-between items-center mb-2">
-        <h2 className="text-xl font-medium text-textStandard">Updates</h2>
+        <h2 className="text-xl text-text-default">Updates</h2>
       </div>
       <div className="pb-8">
-        <p className="text-sm text-textStandard mb-6">
+        <p className="text-sm text-text-muted mb-6">
           Current version: {updateInfo.currentVersion || 'Loading...'}
           {updateInfo.latestVersion && updateInfo.isUpdateAvailable && (
             <span className="text-textSubtle"> → {updateInfo.latestVersion} available</span>
@@ -207,34 +207,28 @@ export default function UpdateSection() {
             <Button
               onClick={checkForUpdates}
               disabled={updateStatus !== 'idle' && updateStatus !== 'error'}
-              variant="outline"
+              variant="secondary"
               size="sm"
-              className="text-xs"
             >
               Check for Updates
             </Button>
 
             {updateInfo.isUpdateAvailable && updateStatus === 'idle' && (
-              <Button
-                onClick={downloadAndInstallUpdate}
-                variant="default"
-                size="sm"
-                className="text-xs"
-              >
+              <Button onClick={downloadAndInstallUpdate} variant="secondary" size="sm">
                 <Download className="w-3 h-3 mr-1" />
                 Download Update
               </Button>
             )}
 
             {updateStatus === 'ready' && (
-              <Button onClick={installUpdate} variant="default" size="sm" className="text-xs">
+              <Button onClick={installUpdate} variant="default" size="sm">
                 Install & Restart
               </Button>
             )}
           </div>
 
           {getStatusMessage() && (
-            <div className="flex items-center gap-2 text-xs text-textSubtle">
+            <div className="flex items-center gap-2 text-xs text-text-muted">
               {getStatusIcon()}
               <span>{getStatusMessage()}</span>
             </div>
@@ -251,7 +245,7 @@ export default function UpdateSection() {
 
           {/* Update information */}
           {updateInfo.isUpdateAvailable && (
-            <div className="text-xs text-textSubtle mt-4 space-y-1">
+            <div className="text-xs text-text-muted mt-4 space-y-1">
               <p>Update will be downloaded to your Downloads folder.</p>
               <p className="text-xs text-amber-600">
                 After download, extract Goose-{updateInfo.latestVersion}.zip and move the Goose app

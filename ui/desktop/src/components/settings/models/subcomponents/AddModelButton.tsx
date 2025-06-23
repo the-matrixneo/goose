@@ -14,7 +14,8 @@ export const AddModelButton = ({ setView }: AddModelButtonProps) => {
   return (
     <>
       <Button
-        className="flex items-center gap-2 justify-center text-white dark:text-black bg-bgAppInverse hover:bg-bgStandardInverse [&>svg]:!size-4"
+        className="flex items-center gap-2 justify-center"
+        variant="default"
         onClick={() => setIsAddModelModalOpen(true)}
       >
         <ArrowLeftRight />

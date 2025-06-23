@@ -41,14 +41,14 @@ export function ResponseStyleSelectionItem({
   return (
     <div className="group hover:cursor-pointer">
       <div
-        className="flex items-center justify-between text-textStandard py-2 px-4 hover:bg-bgSubtle"
+        className="flex items-center justify-between text-text-default rounded-xl py-2 px-3 hover:bg-background-muted"
         onClick={() => handleStyleChange(style.key)}
       >
         <div className="flex">
           <div>
             <h3 className="text-textStandard">{style.label}</h3>
             {showDescription && (
-              <p className="text-xs text-textSubtle max-w-md mt-[2px]">{style.description}</p>
+              <p className="text-xs text-text-muted max-w-md mt-[2px]">{style.description}</p>
             )}
           </div>
         </div>

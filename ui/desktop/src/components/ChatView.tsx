@@ -43,13 +43,7 @@ import {
   TextContent,
 } from '../types/message';
 import SessionsSidebar from './GooseSidebar/AppSidebar';
-import {
-  SidebarProvider,
-  SidebarInset,
-  SidebarTrigger,
-  Sidebar,
-  SidebarContent,
-} from './ui/sidebar';
+import { SidebarTrigger } from './ui/sidebar';
 import BottomMenu from './bottom_menu/BottomMenu';
 import { SessionInsights } from './sessions/SessionsInsights';
 import { useSidebar } from './ui/sidebar';
@@ -58,6 +52,7 @@ import { Gear, Idea } from './icons';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/Tooltip';
 import { Bot, Folder, Save, Send } from 'lucide-react';
 import { ChatSmart } from './icons';
+import { MainPanelLayout } from './Layout/MainPanelLayout';
 
 // Context for sharing current model info
 const CurrentModelContext = createContext<{ model: string; mode: string } | null>(null);
@@ -120,14 +115,12 @@ function ChatContent({
   setIsGoosehintsModalOpen: (isOpen: boolean) => void;
 }) {
   return (
-    <SidebarProvider>
-      <ChatContentWithSidebar
-        chat={chat}
-        setChat={setChat}
-        setView={setView}
-        setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
-      />
-    </SidebarProvider>
+    <ChatContentWithSidebar
+      chat={chat}
+      setChat={setChat}
+      setView={setView}
+      setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
+    />
   );
 }
 
@@ -585,144 +578,115 @@ function ChatContentWithSidebar({
     return map;
   }, new Map());
 
-  const handleSelectSession = async (sessionId: string) => {
-    try {
-      const sessionDetails = await fetchSessionDetails(sessionId);
-      if (sessionDetails && sessionDetails.session_id) {
-        setChat({
-          id: sessionDetails.session_id,
-          title: sessionDetails.metadata?.description || `ID: ${sessionDetails.session_id}`,
-          messages: sessionDetails.messages,
-          messageHistoryIndex: sessionDetails.messages.length,
-        });
-      }
-    } catch (error) {
-      console.error('Failed to load session details:', error);
-    }
-  };
-
   return (
-    <div className="flex flex-col w-full h-screen items-center justify-center bg-background-muted">
-      {/* Loader when generating recipe */}
-      {isGeneratingRecipe && <LayingEggLoader />}
+    <div>
+      <MainPanelLayout>
+        {/* Loader when generating recipe */}
 
-      <div className="flex flex-1 w-full relative animate-fade-in">
-        <Sidebar variant="inset" collapsible="offcanvas">
-          <SidebarContent>
-            <SessionsSidebar
-              onSelectSession={handleSelectSession}
-              refreshTrigger={refreshTrigger}
-              setView={setView}
-              setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
-            />
-          </SidebarContent>
-        </Sidebar>
-        <SidebarInset>
-          <div className="flex flex-col min-w-0 h-[calc(100dvh-40px)] shadow-default bg-background-default mt-2 mr-2 mb-2 rounded-2xl animate-in fade-in slide-in-from-bottom-8 duration-500">
-            <div
-              className={`h-12 flex items-center justify-between fade-in duration-300 transition-all border-b ${!isSidebarOpen ? 'border-border-default' : 'border-transparent'}`}
-            >
-              <div className={`flex items-center ${headerPadding}`}>
-                <SidebarTrigger className="no-drag" />
-              </div>
-              <div className="flex items-center pr-4">
-                {setIsGoosehintsModalOpen && (
-                  <Tooltip delayDuration={500}>
-                    <TooltipTrigger className="w-full">
-                      <Button
-                        onClick={() => setIsGoosehintsModalOpen(true)}
-                        className="px-3"
-                        variant="ghost"
-                        size="sm"
-                        shape="round"
-                      >
-                        <div className="flex gap-2 items-center text-text-default">
-                          <Idea className="w-4 h-4" />
-                          {/* Configure .goosehints */}
-                        </div>
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="right">
-                      <p>Customize instructions</p>
-                    </TooltipContent>
-                  </Tooltip>
-                )}
+        {isGeneratingRecipe && <LayingEggLoader />}
 
-                {recipeConfig ? (
-                  <>
-                    <Tooltip delayDuration={500}>
-                      <TooltipTrigger className="w-full">
-                        <Button
-                          onClick={() => {
-                            window.electron.createChatWindow(
-                              undefined,
-                              undefined,
-                              undefined,
-                              undefined,
-                              recipeConfig as Recipe,
-                              'recipeEditor'
-                            );
-                          }}
-                          className="px-3"
-                          variant="ghost"
-                        >
-                          <div className="flex gap-2 items-center text-text-default">
-                            <Send className="w-4 h-4" />
-                            View recipe
-                          </div>
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="right">
-                        <p>View the recipe you're using</p>
-                      </TooltipContent>
-                    </Tooltip>
+        <div className="h-12 flex items-center justify-between">
+          <div className={`flex items-center ${headerPadding}`}>
+            <SidebarTrigger className="no-drag" />
+          </div>
+          <div className="flex items-center pr-4">
+            {setIsGoosehintsModalOpen && (
+              <Tooltip delayDuration={500}>
+                <TooltipTrigger className="w-full">
+                  <Button
+                    onClick={() => setIsGoosehintsModalOpen(true)}
+                    className="px-3"
+                    variant="ghost"
+                    size="sm"
+                    shape="round"
+                  >
+                    <div className="flex gap-2 items-center text-text-default">
+                      <Idea className="w-4 h-4" />
+                      {/* Configure .goosehints */}
+                    </div>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  <p>Customize instructions</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
 
-                    <Tooltip delayDuration={500}>
-                      <TooltipTrigger className="w-full">
-                        <Button
-                          // onClick={handleSaveRecipeClick}
-                          className="px-3"
-                          variant="ghost"
-                          size="sm"
-                          shape="round"
-                        >
-                          <div className="flex gap-2 items-center text-text-default">
-                            <Save className="w-4 h-4" />
-                            Save recipe
-                          </div>
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="right">
-                        <p>Save this recipe for reuse</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </>
-                ) : (
-                  <Tooltip delayDuration={500}>
-                    <TooltipTrigger className="w-full">
-                      <Button
-                        onClick={() => {
-                          window.electron.logInfo('Make Agent button clicked');
-                          window.dispatchEvent(new CustomEvent('make-agent-from-chat'));
-                        }}
-                        className="px-3"
-                        variant="ghost"
-                        size="sm"
-                        shape="round"
-                      >
-                        <div className="flex gap-2 items-center text-text-default">
-                          <Bot className="w-4 h-4" />
-                          {/* Make Agent from this session */}
-                        </div>
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="right">
-                      <p>Make a custom agent you can share or reuse</p>
-                    </TooltipContent>
-                  </Tooltip>
-                )}
+            {recipeConfig ? (
+              <>
+                <Tooltip delayDuration={500}>
+                  <TooltipTrigger className="w-full">
+                    <Button
+                      onClick={() => {
+                        window.electron.createChatWindow(
+                          undefined,
+                          undefined,
+                          undefined,
+                          undefined,
+                          recipeConfig as Recipe,
+                          'recipeEditor'
+                        );
+                      }}
+                      className="px-3"
+                      variant="ghost"
+                    >
+                      <div className="flex gap-2 items-center text-text-default">
+                        <Send className="w-4 h-4" />
+                        View recipe
+                      </div>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    <p>View the recipe you're using</p>
+                  </TooltipContent>
+                </Tooltip>
 
-                {/* <Button
+                <Tooltip delayDuration={500}>
+                  <TooltipTrigger className="w-full">
+                    <Button
+                      // onClick={handleSaveRecipeClick}
+                      className="px-3"
+                      variant="ghost"
+                      size="sm"
+                      shape="round"
+                    >
+                      <div className="flex gap-2 items-center text-text-default">
+                        <Save className="w-4 h-4" />
+                        Save recipe
+                      </div>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    <p>Save this recipe for reuse</p>
+                  </TooltipContent>
+                </Tooltip>
+              </>
+            ) : (
+              <Tooltip delayDuration={500}>
+                <TooltipTrigger className="w-full">
+                  <Button
+                    onClick={() => {
+                      window.electron.logInfo('Make Agent button clicked');
+                      window.dispatchEvent(new CustomEvent('make-agent-from-chat'));
+                    }}
+                    className="px-3"
+                    variant="ghost"
+                    size="sm"
+                    shape="round"
+                  >
+                    <div className="flex gap-2 items-center text-text-default">
+                      <Bot className="w-4 h-4" />
+                      {/* Make Agent from this session */}
+                    </div>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  <p>Make a custom agent you can share or reuse</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+
+            {/* <Button
             onClick={async () => {
               await remove('GOOSE_PROVIDER', false);
               await remove('GOOSE_MODEL', false);
@@ -734,168 +698,158 @@ function ChatContentWithSidebar({
           >
             <Refresh />
           </Button> */}
-              </div>
-            </div>
+          </div>
+        </div>
 
-            <div
-              className="flex flex-col min-w-0 flex-1 overflow-y-scroll relative pl-6 pr-4 pb-16 pt-6"
-              onDrop={handleDrop}
-              onDragOver={handleDragOver}
-            >
-              {/* Session Insights at the top */}
-              {messages.length === 0 && (
-                <div className="mb-8 animate-[fadein_500ms_ease-in_forwards]">
-                  <SessionInsights />
-                </div>
-              )}
+        <div
+          className="flex flex-col min-w-0 flex-1 overflow-y-scroll relative pl-6 pr-4 pb-16 pt-6"
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+        >
+          {/* Session Insights at the top */}
+          {messages.length === 0 && <SessionInsights />}
 
-              {recipeConfig?.title && messages.length > 0 && (
-                <AgentHeader
-                  title={recipeConfig.title}
-                  profileInfo={
-                    recipeConfig.profile
-                      ? `${recipeConfig.profile} - ${recipeConfig.mcps || 12} MCPs`
-                      : undefined
-                  }
-                  onChangeProfile={() => {
-                    // Handle profile change
-                    console.log('Change profile clicked');
-                  }}
-                />
-              )}
-              {messages.length === 0 ? (
-                <>
-                  <SearchView>{/* Empty search view when no messages */}</SearchView>
-                </>
-              ) : (
-                <>
-                  <SearchView>
-                    {filteredMessages.map((message, index) => {
-                      const isUser = isUserMessage(message);
-                      const nextMessage = filteredMessages[index + 1];
-                      const nextIsUser = nextMessage ? isUserMessage(nextMessage) : null;
+          {recipeConfig?.title && messages.length > 0 && (
+            <AgentHeader
+              title={recipeConfig.title}
+              profileInfo={
+                recipeConfig.profile
+                  ? `${recipeConfig.profile} - ${recipeConfig.mcps || 12} MCPs`
+                  : undefined
+              }
+              onChangeProfile={() => {
+                // Handle profile change
+                console.log('Change profile clicked');
+              }}
+            />
+          )}
+          {messages.length === 0 ? (
+            <>
+              <SearchView>{/* Empty search view when no messages */}</SearchView>
+            </>
+          ) : (
+            <>
+              <SearchView>
+                {filteredMessages.map((message, index) => {
+                  const isUser = isUserMessage(message);
+                  const nextMessage = filteredMessages[index + 1];
 
-                      // Add has-connector class if next message is of the same type
-                      const hasConnector = nextMessage && isUser === nextIsUser;
-
-                      return (
-                        <div
-                          key={message.id || index}
-                          className={`px-4 relative ${index === 0 ? 'mt-0' : 'mt-4'} ${isUser ? 'user' : 'assistant'} ${hasConnector ? 'has-connector' : ''}`}
-                          data-testid="message-container"
-                        >
-                          {isUser ? (
-                            <>
-                              {hasContextHandlerContent(message) ? (
-                                <ContextHandler
-                                  messages={messages}
-                                  messageId={message.id ?? message.created.toString()}
-                                  chatId={chat.id}
-                                  workingDir={window.appConfig.get('GOOSE_WORKING_DIR') as string}
-                                  contextType={getContextHandlerType(message)}
-                                />
-                              ) : (
-                                <UserMessage message={message} />
-                              )}
-                            </>
+                  return (
+                    <div
+                      key={message.id || index}
+                      className={`px-4 relative ${index === 0 ? 'mt-0' : 'mt-4'} ${isUser ? 'user' : 'assistant'}`}
+                      data-testid="message-container"
+                    >
+                      {isUser ? (
+                        <>
+                          {hasContextHandlerContent(message) ? (
+                            <ContextHandler
+                              messages={messages}
+                              messageId={message.id ?? message.created.toString()}
+                              chatId={chat.id}
+                              workingDir={window.appConfig.get('GOOSE_WORKING_DIR') as string}
+                              contextType={getContextHandlerType(message)}
+                            />
                           ) : (
-                            <>
-                              {/* Only render GooseMessage if it's not a message invoking some context management */}
-                              {hasContextHandlerContent(message) ? (
-                                <ContextHandler
-                                  messages={messages}
-                                  messageId={message.id ?? message.created.toString()}
-                                  chatId={chat.id}
-                                  workingDir={window.appConfig.get('GOOSE_WORKING_DIR') as string}
-                                  contextType={getContextHandlerType(message)}
-                                />
-                              ) : (
-                                <GooseMessage
-                                  messageHistoryIndex={chat?.messageHistoryIndex}
-                                  message={message}
-                                  messages={messages}
-                                  append={append}
-                                  appendMessage={(newMessage) => {
-                                    const updatedMessages = [...messages, newMessage];
-                                    setMessages(updatedMessages);
-                                  }}
-                                  toolCallNotifications={toolCallNotifications}
-                                />
-                              )}
-                            </>
+                            <UserMessage message={message} />
                           )}
-                        </div>
-                      );
-                    })}
-                  </SearchView>
-
-                  {error && (
-                    <div className="flex flex-col items-center justify-center p-4">
-                      <div className="text-red-700 dark:text-red-300 bg-red-400/50 p-3 rounded-lg mb-2">
-                        {error.message || 'Honk! Goose experienced an error while responding'}
-                      </div>
-                      <div
-                        className="px-3 py-2 mt-2 text-center whitespace-nowrap cursor-pointer text-textStandard border border-borderSubtle hover:bg-bgSubtle rounded-full inline-block transition-all duration-150"
-                        onClick={async () => {
-                          // Find the last user message
-                          const lastUserMessage = messages.reduceRight(
-                            (found, m) => found || (m.role === 'user' ? m : null),
-                            null as Message | null
-                          );
-                          if (lastUserMessage) {
-                            append(lastUserMessage);
-                          }
-                        }}
-                      >
-                        Retry Last Message
-                      </div>
+                        </>
+                      ) : (
+                        <>
+                          {/* Only render GooseMessage if it's not a message invoking some context management */}
+                          {hasContextHandlerContent(message) ? (
+                            <ContextHandler
+                              messages={messages}
+                              messageId={message.id ?? message.created.toString()}
+                              chatId={chat.id}
+                              workingDir={window.appConfig.get('GOOSE_WORKING_DIR') as string}
+                              contextType={getContextHandlerType(message)}
+                            />
+                          ) : (
+                            <GooseMessage
+                              messageHistoryIndex={chat?.messageHistoryIndex}
+                              message={message}
+                              messages={messages}
+                              append={append}
+                              appendMessage={(newMessage) => {
+                                const updatedMessages = [...messages, newMessage];
+                                setMessages(updatedMessages);
+                              }}
+                              toolCallNotifications={toolCallNotifications}
+                            />
+                          )}
+                        </>
+                      )}
                     </div>
-                  )}
-                  <div className="block h-8" />
-                </>
-              )}
-            </div>
-            <div className="relative z-10 animate-[fadein_400ms_ease-in_forwards]">
-              {isLoading && <LoadingGoose />}
+                  );
+                })}
+              </SearchView>
 
-              {/* Splash component at the bottom when no messages
-              {messages.length === 0 && (
-                <div className="mb-4">
-                  <Splash
-                    append={append}
-                    activities={
-                      Array.isArray(recipeConfig?.activities) ? recipeConfig!.activities : null
-                    }
-                    title={recipeConfig?.title}
-                  />
+              {error && (
+                <div className="flex flex-col items-center justify-center p-4">
+                  <div className="text-red-700 dark:text-red-300 bg-red-400/50 p-3 rounded-lg mb-2">
+                    {error.message || 'Honk! Goose experienced an error while responding'}
+                  </div>
+                  <div
+                    className="px-3 py-2 mt-2 text-center whitespace-nowrap cursor-pointer text-textStandard border border-borderSubtle hover:bg-bgSubtle rounded-full inline-block transition-all duration-150"
+                    onClick={async () => {
+                      // Find the last user message
+                      const lastUserMessage = messages.reduceRight(
+                        (found, m) => found || (m.role === 'user' ? m : null),
+                        null as Message | null
+                      );
+                      if (lastUserMessage) {
+                        append(lastUserMessage);
+                      }
+                    }}
+                  >
+                    Retry Last Message
+                  </div>
                 </div>
-              )} */}
+              )}
+              <div className="block h-8" />
+            </>
+          )}
+        </div>
+        <div className="relative z-10 animate-[fadein_400ms_ease-in_forwards]">
+          {isLoading && <LoadingGoose />}
 
-              <ChatInput
-                handleSubmit={handleSubmit}
-                isLoading={isLoading}
-                onStop={onStopGoose}
-                commandHistory={commandHistory}
-                initialValue={_input || initialPrompt}
-                setView={setView}
-                hasMessages={hasMessages}
-                numTokens={sessionTokenCount}
-                droppedFiles={droppedFiles}
-                messages={messages}
-                setMessages={setMessages}
+          {/* Splash component at the bottom when no messages
+          {messages.length === 0 && (
+            <div className="mb-4">
+              <Splash
+                append={append}
+                activities={
+                  Array.isArray(recipeConfig?.activities) ? recipeConfig!.activities : null
+                }
+                title={recipeConfig?.title}
               />
             </div>
-          </div>
+          )} */}
 
-          <BottomMenu
-            setView={setView}
-            numTokens={sessionTokenCount}
-            messages={messages}
+          <ChatInput
+            handleSubmit={handleSubmit}
             isLoading={isLoading}
+            onStop={onStopGoose}
+            commandHistory={commandHistory}
+            initialValue={_input || initialPrompt}
+            setView={setView}
+            hasMessages={hasMessages}
+            numTokens={sessionTokenCount}
+            droppedFiles={droppedFiles}
+            messages={messages}
             setMessages={setMessages}
           />
-        </SidebarInset>
-      </div>
+        </div>
+      </MainPanelLayout>
+
+      <BottomMenu
+        setView={setView}
+        numTokens={sessionTokenCount}
+        messages={messages}
+        isLoading={isLoading}
+        setMessages={setMessages}
+      />
 
       {showGame && <FlappyGoose onClose={() => setShowGame(false)} />}
 

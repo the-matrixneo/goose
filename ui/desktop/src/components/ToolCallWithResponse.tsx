@@ -182,7 +182,7 @@ function ToolCallView({
         stringValue.length > 30 ? stringValue.substring(0, 30) + '...' : stringValue;
 
       return (
-        <span className="ml-2 text-textSubtle truncate text-xs opacity-70">
+        <span className="ml-2 text-text-muted truncate text-xs opacity-70">
           {key}: {truncatedValue}
         </span>
       );
@@ -190,7 +190,7 @@ function ToolCallView({
 
     // For multiple parameters, just show the keys
     return (
-      <span className="ml-2 text-textSubtle truncate text-xs opacity-70">
+      <span className="ml-2 text-text-muted truncate text-xs opacity-70">
         {entries.map(([key]) => key).join(', ')}
       </span>
     );
