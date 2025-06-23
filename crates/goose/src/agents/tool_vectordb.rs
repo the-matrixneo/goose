@@ -57,11 +57,11 @@ impl ToolVectorDB {
 
     pub fn get_db_path() -> Result<PathBuf> {
         let config = Config::global();
-        
+
         // Check for custom database path override
         if let Ok(custom_path) = config.get_param::<String>("GOOSE_VECTOR_DB_PATH") {
             let path = PathBuf::from(custom_path);
-            
+
             // Validate the path is absolute
             if !path.is_absolute() {
                 return Err(anyhow::anyhow!(
@@ -69,10 +69,10 @@ impl ToolVectorDB {
                     path.display()
                 ));
             }
-            
+
             return Ok(path);
         }
-        
+
         // Fall back to default XDG-based path
         let data_dir = Xdg::new()
             .context("Failed to determine base strategy")?
@@ -545,10 +545,17 @@ mod tests {
 
         // Test that relative paths are rejected
         env::set_var("GOOSE_VECTOR_DB_PATH", "relative/path");
-        
+
         let result = ToolVectorDB::get_db_path();
-        assert!(result.is_err(), "Expected error for relative path, got: {:?}", result);
-        assert!(result.unwrap_err().to_string().contains("must be an absolute path"));
+        assert!(
+            result.is_err(),
+            "Expected error for relative path, got: {:?}",
+            result
+        );
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("must be an absolute path"));
 
         // Clean up
         env::remove_var("GOOSE_VECTOR_DB_PATH");
@@ -564,8 +571,16 @@ mod tests {
 
         // Test that it falls back to default XDG path
         let db_path = ToolVectorDB::get_db_path()?;
-        assert!(db_path.to_string_lossy().contains("goose"), "Path should contain 'goose', got: {}", db_path.display());
-        assert!(db_path.to_string_lossy().contains("tool_db"), "Path should contain 'tool_db', got: {}", db_path.display());
+        assert!(
+            db_path.to_string_lossy().contains("goose"),
+            "Path should contain 'goose', got: {}",
+            db_path.display()
+        );
+        assert!(
+            db_path.to_string_lossy().contains("tool_db"),
+            "Path should contain 'tool_db', got: {}",
+            db_path.display()
+        );
 
         Ok(())
     }
