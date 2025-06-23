@@ -1,10 +1,15 @@
+// TEMPORARY DEBUG LOGGING ADDED:
+// This file contains extensive println! debug logging to help track session saving and reading operations.
+// Look for lines with [SESSION DEBUG] prefix in the console output.
+// These should be removed once debugging is complete.
+
 use crate::message::Message;
 use crate::providers::base::Provider;
 use anyhow::Result;
 use chrono::Local;
 use etcetera::{choose_app_strategy, AppStrategy, AppStrategyArgs};
 use serde::{Deserialize, Serialize};
-use std::fs::{self, File};
+use std::fs;
 use std::io::{self, BufRead, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -207,24 +212,49 @@ pub fn generate_session_id() -> String {
     Local::now().format("%Y%m%d_%H%M%S").to_string()
 }
 
-/// Read messages from a session file
+/// Read messages from a session file with corruption recovery
 ///
 /// Creates the file if it doesn't exist, reads and deserializes all messages if it does.
 /// The first line of the file is expected to be metadata, and the rest are messages.
 /// Large messages are automatically truncated to prevent memory issues.
+/// Includes recovery mechanisms for corrupted files.
 pub fn read_messages(session_file: &Path) -> Result<Vec<Message>> {
-    read_messages_with_truncation(session_file, Some(50000)) // 50KB limit per message content
+    println!("🔍 [SESSION DEBUG] Starting to read messages from: {:?}", session_file);
+    let result = read_messages_with_truncation(session_file, Some(50000)); // 50KB limit per message content
+    match &result {
+        Ok(messages) => println!("✅ [SESSION DEBUG] Successfully read {} messages from: {:?}", messages.len(), session_file),
+        Err(e) => println!("❌ [SESSION DEBUG] Failed to read messages from {:?}: {}", session_file, e),
+    }
+    result
 }
 
-/// Read messages from a session file with optional content truncation
+/// Read messages from a session file with optional content truncation and corruption recovery
 ///
 /// Creates the file if it doesn't exist, reads and deserializes all messages if it does.
 /// The first line of the file is expected to be metadata, and the rest are messages.
 /// If max_content_size is Some, large message content will be truncated during loading.
+/// Includes robust error handling and corruption recovery mechanisms.
 pub fn read_messages_with_truncation(
     session_file: &Path,
     max_content_size: Option<usize>,
 ) -> Result<Vec<Message>> {
+    // Check if there's a backup file we should restore from
+    let backup_file = session_file.with_extension("backup");
+    if !session_file.exists() && backup_file.exists() {
+        println!("🔄 [SESSION DEBUG] Session file missing but backup exists, restoring from backup: {:?}", backup_file);
+        tracing::warn!(
+            "Session file missing but backup exists, restoring from backup: {:?}",
+            backup_file
+        );
+        if let Err(e) = fs::copy(&backup_file, session_file) {
+            println!("❌ [SESSION DEBUG] Failed to restore from backup: {}", e);
+            tracing::error!("Failed to restore from backup: {}", e);
+        }
+    }
+
+    println!("📖 [SESSION DEBUG] Reading messages with truncation from: {:?}, max_size: {:?}", session_file, max_content_size);
+
+    // Open the file with appropriate options
     let file = fs::OpenOptions::new()
         .read(true)
         .write(true)
@@ -235,27 +265,104 @@ pub fn read_messages_with_truncation(
     let reader = io::BufReader::new(file);
     let mut lines = reader.lines();
     let mut messages = Vec::new();
+    let mut corrupted_lines = Vec::new();
+    let mut line_number = 1;
+
+    println!("📂 [SESSION DEBUG] File opened successfully, starting to read lines...");
 
     // Read the first line as metadata or create default if empty/missing
-    if let Some(line) = lines.next() {
-        let line = line?;
-        // Try to parse as metadata, but if it fails, treat it as a message
-        if let Ok(_metadata) = serde_json::from_str::<SessionMetadata>(&line) {
-            // Metadata successfully parsed, continue with the rest of the lines as messages
-        } else {
-            // This is not metadata, it's a message
-            let message = parse_message_with_truncation(&line, max_content_size)?;
-            messages.push(message);
+    if let Some(line_result) = lines.next() {
+        println!("📝 [SESSION DEBUG] Reading first line (metadata)...");
+        match line_result {
+            Ok(line) => {
+                // Try to parse as metadata, but if it fails, treat it as a message
+                if let Ok(_metadata) = serde_json::from_str::<SessionMetadata>(&line) {
+                    // Metadata successfully parsed, continue with the rest of the lines as messages
+                    println!("✅ [SESSION DEBUG] Successfully parsed metadata from first line");
+                } else {
+                    // This is not metadata, it's a message
+                    println!("⚠️ [SESSION DEBUG] First line is not metadata, treating as message");
+                    match parse_message_with_truncation(&line, max_content_size) {
+                        Ok(message) => {
+                            println!("✅ [SESSION DEBUG] Successfully parsed first line as message");
+                            messages.push(message);
+                        }
+                        Err(e) => {
+                            println!("❌ [SESSION DEBUG] Failed to parse first line as message: {}", e);
+                            tracing::warn!("Failed to parse first line as message: {}", e);
+                            corrupted_lines.push((line_number, line));
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                println!("❌ [SESSION DEBUG] Failed to read first line: {}", e);
+                tracing::error!("Failed to read first line: {}", e);
+                corrupted_lines.push((line_number, "[Unreadable line]".to_string()));
+            }
         }
+        line_number += 1;
+    } else {
+        println!("📄 [SESSION DEBUG] File is empty, no lines to read");
     }
 
     // Read the rest of the lines as messages
-    for line in lines {
-        let line = line?;
-        let message = parse_message_with_truncation(&line, max_content_size)?;
-        messages.push(message);
+    println!("📋 [SESSION DEBUG] Reading remaining lines as messages...");
+    for line_result in lines {
+        match line_result {
+            Ok(line) => match parse_message_with_truncation(&line, max_content_size) {
+                Ok(message) => {
+                    messages.push(message);
+                    if messages.len() % 10 == 0 {
+                        println!("📊 [SESSION DEBUG] Parsed {} messages so far...", messages.len());
+                    }
+                }
+                Err(e) => {
+                    println!("❌ [SESSION DEBUG] Failed to parse line {}: {}", line_number, e);
+                    tracing::warn!("Failed to parse line {}: {}", line_number, e);
+                    corrupted_lines.push((line_number, line));
+                }
+            },
+            Err(e) => {
+                println!("❌ [SESSION DEBUG] Failed to read line {}: {}", line_number, e);
+                tracing::error!("Failed to read line {}: {}", line_number, e);
+                corrupted_lines.push((line_number, "[Unreadable line]".to_string()));
+            }
+        }
+        line_number += 1;
     }
 
+    // If we found corrupted lines, create a backup and log the issues
+    if !corrupted_lines.is_empty() {
+        println!("⚠️ [SESSION DEBUG] Found {} corrupted lines, creating backup", corrupted_lines.len());
+        tracing::warn!(
+            "Found {} corrupted lines in session file, creating backup",
+            corrupted_lines.len()
+        );
+
+        // Create a backup of the original file
+        if !backup_file.exists() {
+            if let Err(e) = fs::copy(session_file, &backup_file) {
+                println!("❌ [SESSION DEBUG] Failed to create backup file: {}", e);
+                tracing::error!("Failed to create backup file: {}", e);
+            } else {
+                println!("💾 [SESSION DEBUG] Created backup file: {:?}", backup_file);
+                tracing::info!("Created backup file: {:?}", backup_file);
+            }
+        }
+
+        // Log details about corrupted lines
+        for (num, line) in &corrupted_lines {
+            let preview = if line.len() > 50 {
+                format!("{}... (truncated)", &line[..50])
+            } else {
+                line.clone()
+            };
+            tracing::debug!("Corrupted line {}: {}", num, preview);
+        }
+    }
+
+    println!("🎯 [SESSION DEBUG] Finished reading session file. Total messages: {}, corrupted lines: {}", messages.len(), corrupted_lines.len());
     Ok(messages)
 }
 
@@ -405,7 +512,10 @@ fn truncate_json_string(json_str: &str, max_content_size: usize) -> String {
 ///
 /// Returns default empty metadata if the file doesn't exist or has no metadata.
 pub fn read_metadata(session_file: &Path) -> Result<SessionMetadata> {
+    println!("📋 [SESSION DEBUG] Reading metadata from: {:?}", session_file);
+    
     if !session_file.exists() {
+        println!("⚠️ [SESSION DEBUG] Session file doesn't exist, returning default metadata");
         return Ok(SessionMetadata::default());
     }
 
@@ -415,16 +525,22 @@ pub fn read_metadata(session_file: &Path) -> Result<SessionMetadata> {
 
     // Read just the first line
     if reader.read_line(&mut first_line)? > 0 {
+        println!("📝 [SESSION DEBUG] Read first line, attempting to parse as metadata...");
         // Try to parse as metadata
         match serde_json::from_str::<SessionMetadata>(&first_line) {
-            Ok(metadata) => Ok(metadata),
-            Err(_) => {
+            Ok(metadata) => {
+                println!("✅ [SESSION DEBUG] Successfully parsed metadata: description='{}'", metadata.description);
+                Ok(metadata)
+            },
+            Err(e) => {
                 // If the first line isn't metadata, return default
+                println!("⚠️ [SESSION DEBUG] First line is not valid metadata ({}), returning default", e);
                 Ok(SessionMetadata::default())
             }
         }
     } else {
         // Empty file, return default
+        println!("📄 [SESSION DEBUG] File is empty, returning default metadata");
         Ok(SessionMetadata::default())
     }
 }
@@ -438,7 +554,13 @@ pub async fn persist_messages(
     messages: &[Message],
     provider: Option<Arc<dyn Provider>>,
 ) -> Result<()> {
-    persist_messages_with_schedule_id(session_file, messages, provider, None).await
+    println!("🔄 [SESSION DEBUG] persist_messages called with {} messages to: {:?}", messages.len(), session_file);
+    let result = persist_messages_with_schedule_id(session_file, messages, provider, None).await;
+    match &result {
+        Ok(_) => println!("✅ [SESSION DEBUG] persist_messages completed successfully"),
+        Err(e) => println!("❌ [SESSION DEBUG] persist_messages failed: {}", e),
+    }
+    result
 }
 
 /// Write messages to a session file with metadata, including an optional scheduled job ID
@@ -477,28 +599,93 @@ pub async fn persist_messages_with_schedule_id(
     }
 }
 
-/// Write messages to a session file with the provided metadata
+/// Write messages to a session file with the provided metadata using atomic operations
 ///
-/// Overwrites the file with metadata as the first line, followed by all messages in JSONL format.
+/// This function uses atomic file operations to prevent corruption:
+/// 1. Writes to a temporary file first
+/// 2. Uses fs2 file locking to prevent concurrent writes
+/// 3. Atomically moves the temp file to the final location
+/// 4. Includes comprehensive error handling and recovery
 pub fn save_messages_with_metadata(
     session_file: &Path,
     metadata: &SessionMetadata,
     messages: &[Message],
 ) -> Result<()> {
-    let file = File::create(session_file).expect("The path specified does not exist");
-    let mut writer = io::BufWriter::new(file);
+    use fs2::FileExt;
 
-    // Write metadata as the first line
-    serde_json::to_writer(&mut writer, &metadata)?;
-    writeln!(writer)?;
+    println!("💾 [SESSION DEBUG] Starting to save {} messages to: {:?}", messages.len(), session_file);
 
-    // Write all messages
-    for message in messages {
-        serde_json::to_writer(&mut writer, &message)?;
-        writeln!(writer)?;
+    // Create a temporary file in the same directory to ensure atomic move
+    let temp_file = session_file.with_extension("tmp");
+    println!("📝 [SESSION DEBUG] Using temporary file: {:?}", temp_file);
+
+    // Ensure the parent directory exists
+    if let Some(parent) = session_file.parent() {
+        println!("📁 [SESSION DEBUG] Ensuring parent directory exists: {:?}", parent);
+        fs::create_dir_all(parent)?;
     }
 
-    writer.flush()?;
+    // Create and lock the temporary file
+    println!("🔒 [SESSION DEBUG] Creating and locking temporary file...");
+    let file = fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(&temp_file)
+        .map_err(|e| anyhow::anyhow!("Failed to create temporary file {:?}: {}", temp_file, e))?;
+
+    // Get an exclusive lock on the file
+    println!("🔐 [SESSION DEBUG] Acquiring exclusive lock...");
+    file.try_lock_exclusive()
+        .map_err(|e| anyhow::anyhow!("Failed to lock file: {}", e))?;
+
+    // Write to temporary file
+    {
+        println!("✍️ [SESSION DEBUG] Writing metadata and {} messages to temporary file...", messages.len());
+        let mut writer = io::BufWriter::new(&file);
+
+        // Write metadata as the first line
+        println!("📊 [SESSION DEBUG] Writing metadata as first line...");
+        serde_json::to_writer(&mut writer, &metadata)
+            .map_err(|e| anyhow::anyhow!("Failed to serialize metadata: {}", e))?;
+        writeln!(writer)?;
+
+        // Write all messages
+        println!("📝 [SESSION DEBUG] Writing {} messages...", messages.len());
+        for (i, message) in messages.iter().enumerate() {
+            serde_json::to_writer(&mut writer, &message)
+                .map_err(|e| anyhow::anyhow!("Failed to serialize message {}: {}", i, e))?;
+            writeln!(writer)?;
+            
+            if (i + 1) % 50 == 0 {
+                println!("📊 [SESSION DEBUG] Written {} messages so far...", i + 1);
+            }
+        }
+
+        // Ensure all data is written to disk
+        println!("💽 [SESSION DEBUG] Flushing writer buffer...");
+        writer.flush()?;
+    }
+
+    // Sync to ensure data is persisted
+    println!("🔄 [SESSION DEBUG] Syncing data to disk...");
+    file.sync_all()?;
+
+    // Release the lock
+    println!("🔓 [SESSION DEBUG] Releasing file lock...");
+    fs2::FileExt::unlock(&file).map_err(|e| anyhow::anyhow!("Failed to unlock file: {}", e))?;
+
+    // Atomically move the temporary file to the final location
+    println!("🚀 [SESSION DEBUG] Atomically moving temp file to final location...");
+    fs::rename(&temp_file, session_file).map_err(|e| {
+        // Clean up temp file on failure
+        println!("❌ [SESSION DEBUG] Failed to move temp file, cleaning up...");
+        let _ = fs::remove_file(&temp_file);
+        anyhow::anyhow!("Failed to move temporary file to final location: {}", e)
+    })?;
+
+    println!("✅ [SESSION DEBUG] Successfully saved session file: {:?}", session_file);
+    tracing::debug!("Successfully saved session file: {:?}", session_file);
     Ok(())
 }
 
