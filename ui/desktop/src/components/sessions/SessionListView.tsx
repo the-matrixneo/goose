@@ -346,7 +346,6 @@ const SessionListView: React.FC<SessionListViewProps> = ({ setView, onSelectSess
                 top: position.top,
                 left: 0,
                 right: 0,
-                // Remove fixed height - let content determine height naturally
               }}
             />
           );
