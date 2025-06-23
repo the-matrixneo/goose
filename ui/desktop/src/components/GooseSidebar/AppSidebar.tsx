@@ -11,6 +11,7 @@ import { saveRecipe, generateRecipeFilename } from '../../recipe/recipeStorage';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/Tooltip';
 import ThemeSelector from './ThemeSelector';
 import GooseLogo from '../GooseLogo';
+import { useChatContext } from '../../contexts/ChatContext';
 
 interface SidebarProps {
   onSelectSession: (sessionId: string) => void;
@@ -30,6 +31,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
   const [saveGlobal, setSaveGlobal] = useState(true);
   const [saving, setSaving] = useState(false);
   const { remove } = useConfig();
+  const { hasActiveSession, resetChat } = useChatContext();
 
   useEffect(() => {
     // Trigger animation after a small delay
@@ -116,7 +118,19 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
           <Tooltip delayDuration={500}>
             <TooltipTrigger className="w-full">
               <Button
-                onClick={() => navigate('/')}
+                onClick={() => {
+                  // If we're not on the chat page and have an active session, just navigate back to chat
+                  if (currentPath !== '/' && hasActiveSession) {
+                    navigate('/');
+                  } else if (hasActiveSession) {
+                    // If we're already on the chat page and have an active session, create a new session
+                    resetChat();
+                    navigate('/');
+                  } else {
+                    // Navigate to home if no active session
+                    navigate('/');
+                  }
+                }}
                 className={`w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200`}
                 variant="ghost"
               >
@@ -127,7 +141,13 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
               </Button>
             </TooltipTrigger>
             <TooltipContent side="right">
-              <p>Go back to the main chat screen</p>
+              <p>
+                {currentPath !== '/' && hasActiveSession
+                  ? 'Return to chat'
+                  : hasActiveSession
+                    ? 'Create a new session'
+                    : 'Go back to the main chat screen'}
+              </p>
             </TooltipContent>
           </Tooltip>
 
@@ -145,16 +165,16 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
               >
                 <div className="flex gap-2 items-center text-text-default">
                   <ChatSmart className="w-4 h-4" />
-                  <span className="text-sm">New session</span>
+                  <span className="text-sm">New window</span>
                 </div>
               </Button>
             </TooltipTrigger>
             <TooltipContent side="right">
-              <p>Start a new session in the current directory</p>
+              <p>Start a new session in a new window</p>
             </TooltipContent>
           </Tooltip>
 
-          <Tooltip delayDuration={500}>
+          {/* <Tooltip delayDuration={500}>
             <TooltipTrigger className="w-full">
               <Button
                 onClick={() => {
@@ -172,7 +192,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
             <TooltipContent side="right">
               <p>Start a new session in a different directory</p>
             </TooltipContent>
-          </Tooltip>
+          </Tooltip> */}
 
           <Tooltip delayDuration={500}>
             <TooltipTrigger className="w-full">
@@ -258,7 +278,9 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
         </div>
 
         {/* Theme Selector */}
-        <div className="mt-4">{/* <ThemeSelector /> */}</div>
+        <div className="mt-4 opacity-0">
+          <ThemeSelector />
+        </div>
       </SidebarContent>
 
       <SidebarFooter>

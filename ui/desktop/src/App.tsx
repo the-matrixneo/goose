@@ -21,6 +21,7 @@ import RecipeEditor from './components/RecipeEditor';
 import RecipesView from './components/RecipesView';
 import { useChat } from './hooks/useChat';
 import { AppLayout } from './components/Layout/AppLayout';
+import { ChatProvider } from './contexts/ChatContext';
 
 import 'react-toastify/dist/ReactToastify.css';
 import { useConfig, MalformedConfigError } from './components/ConfigContext';
@@ -828,7 +829,11 @@ export default function App() {
           <Routes>
             <Route
               path="/"
-              element={<AppLayout setIsGoosehintsModalOpen={setIsGoosehintsModalOpen} />}
+              element={
+                <ChatProvider chat={chat} setChat={setChat}>
+                  <AppLayout setIsGoosehintsModalOpen={setIsGoosehintsModalOpen} />
+                </ChatProvider>
+              }
             >
               <Route
                 index

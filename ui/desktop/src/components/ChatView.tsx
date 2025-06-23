@@ -199,6 +199,7 @@ function ChatContentWithSidebar({
     notifications,
   } = useMessageStream({
     api: getApiUrl('/reply'),
+    id: chat.id,
     initialMessages: chat.messages,
     body: { session_id: chat.id, session_working_dir: window.appConfig.get('GOOSE_WORKING_DIR') },
     onFinish: async (_message, _reason) => {
@@ -590,100 +591,104 @@ function ChatContentWithSidebar({
             <SidebarTrigger className="no-drag" />
           </div>
           <div className="flex items-center pr-4">
-            {setIsGoosehintsModalOpen && (
-              <Tooltip delayDuration={500}>
-                <TooltipTrigger className="w-full">
-                  <Button
-                    onClick={() => setIsGoosehintsModalOpen(true)}
-                    className="px-3"
-                    variant="ghost"
-                    size="sm"
-                    shape="round"
-                  >
-                    <div className="flex gap-2 items-center text-text-default">
-                      <Idea className="w-4 h-4" />
-                      {/* Configure .goosehints */}
-                    </div>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="right">
-                  <p>Customize instructions</p>
-                </TooltipContent>
-              </Tooltip>
-            )}
-
-            {recipeConfig ? (
+            {messages.length > 0 && (
               <>
-                <Tooltip delayDuration={500}>
-                  <TooltipTrigger className="w-full">
-                    <Button
-                      onClick={() => {
-                        window.electron.createChatWindow(
-                          undefined,
-                          undefined,
-                          undefined,
-                          undefined,
-                          recipeConfig as Recipe,
-                          'recipeEditor'
-                        );
-                      }}
-                      className="px-3"
-                      variant="ghost"
-                    >
-                      <div className="flex gap-2 items-center text-text-default">
-                        <Send className="w-4 h-4" />
-                        View recipe
-                      </div>
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">
-                    <p>View the recipe you're using</p>
-                  </TooltipContent>
-                </Tooltip>
+                {setIsGoosehintsModalOpen && (
+                  <Tooltip delayDuration={500}>
+                    <TooltipTrigger className="w-full">
+                      <Button
+                        onClick={() => setIsGoosehintsModalOpen(true)}
+                        className="px-3"
+                        variant="ghost"
+                        size="sm"
+                        shape="round"
+                      >
+                        <div className="flex gap-2 items-center text-text-default">
+                          <Idea className="w-4 h-4" />
+                          {/* Configure .goosehints */}
+                        </div>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">
+                      <p>Customize instructions</p>
+                    </TooltipContent>
+                  </Tooltip>
+                )}
 
-                <Tooltip delayDuration={500}>
-                  <TooltipTrigger className="w-full">
-                    <Button
-                      // onClick={handleSaveRecipeClick}
-                      className="px-3"
-                      variant="ghost"
-                      size="sm"
-                      shape="round"
-                    >
-                      <div className="flex gap-2 items-center text-text-default">
-                        <Save className="w-4 h-4" />
-                        Save recipe
-                      </div>
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">
-                    <p>Save this recipe for reuse</p>
-                  </TooltipContent>
-                </Tooltip>
+                {recipeConfig ? (
+                  <>
+                    <Tooltip delayDuration={500}>
+                      <TooltipTrigger className="w-full">
+                        <Button
+                          onClick={() => {
+                            window.electron.createChatWindow(
+                              undefined,
+                              undefined,
+                              undefined,
+                              undefined,
+                              recipeConfig as Recipe,
+                              'recipeEditor'
+                            );
+                          }}
+                          className="px-3"
+                          variant="ghost"
+                        >
+                          <div className="flex gap-2 items-center text-text-default">
+                            <Send className="w-4 h-4" />
+                            View recipe
+                          </div>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="right">
+                        <p>View the recipe you're using</p>
+                      </TooltipContent>
+                    </Tooltip>
+
+                    <Tooltip delayDuration={500}>
+                      <TooltipTrigger className="w-full">
+                        <Button
+                          // onClick={handleSaveRecipeClick}
+                          className="px-3"
+                          variant="ghost"
+                          size="sm"
+                          shape="round"
+                        >
+                          <div className="flex gap-2 items-center text-text-default">
+                            <Save className="w-4 h-4" />
+                            Save recipe
+                          </div>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="right">
+                        <p>Save this recipe for reuse</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </>
+                ) : (
+                  <Tooltip delayDuration={500}>
+                    <TooltipTrigger className="w-full">
+                      <Button
+                        onClick={() => {
+                          window.electron.logInfo('Make Agent button clicked');
+                          window.dispatchEvent(new CustomEvent('make-agent-from-chat'));
+                        }}
+                        className="px-3"
+                        variant="ghost"
+                        size="sm"
+                        shape="round"
+                      >
+                        <div className="flex gap-2 items-center text-text-default">
+                          <Bot className="w-4 h-4" />
+                          {/* Make Agent from this session */}
+                        </div>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">
+                      <p>Make a custom agent you can share or reuse</p>
+                    </TooltipContent>
+                  </Tooltip>
+                )}
               </>
-            ) : (
-              <Tooltip delayDuration={500}>
-                <TooltipTrigger className="w-full">
-                  <Button
-                    onClick={() => {
-                      window.electron.logInfo('Make Agent button clicked');
-                      window.dispatchEvent(new CustomEvent('make-agent-from-chat'));
-                    }}
-                    className="px-3"
-                    variant="ghost"
-                    size="sm"
-                    shape="round"
-                  >
-                    <div className="flex gap-2 items-center text-text-default">
-                      <Bot className="w-4 h-4" />
-                      {/* Make Agent from this session */}
-                    </div>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="right">
-                  <p>Make a custom agent you can share or reuse</p>
-                </TooltipContent>
-              </Tooltip>
             )}
 
             {/* <Button
