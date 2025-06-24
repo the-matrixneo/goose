@@ -108,15 +108,16 @@ impl BenchRunConfig {
         let mut config: Self = serde_json::from_str(cfg.as_str())?;
         config.include_dirs = BenchmarkWorkDir::canonical_dirs(config.include_dirs);
         Self::canonicalize_eval_post_proc_cmd(&mut config);
-        
+
         // Validate global environment variables
         Self::parse_env_vars(&config.env).context("Invalid global environment variables")?;
-        
+
         // Validate eval-specific environment variables
         for (i, eval) in config.evals.iter().enumerate() {
-            Self::parse_env_vars(&eval.env).context(format!("Invalid environment variables in eval {}", i))?;
+            Self::parse_env_vars(&eval.env)
+                .context(format!("Invalid environment variables in eval {}", i))?;
         }
-        
+
         Ok(config)
     }
 
@@ -125,13 +126,17 @@ impl BenchRunConfig {
         if let Some((key, value)) = env_var.split_once('=') {
             Ok((key.to_string(), value.to_string()))
         } else {
-            anyhow::bail!("Invalid environment variable format: '{}'. Expected format: 'KEY=value'", env_var)
+            anyhow::bail!(
+                "Invalid environment variable format: '{}'. Expected format: 'KEY=value'",
+                env_var
+            )
         }
     }
 
     /// Parse a vector of environment variable strings into (key, value) tuples
     pub fn parse_env_vars(env_vars: &[String]) -> anyhow::Result<Vec<(String, String)>> {
-        env_vars.iter()
+        env_vars
+            .iter()
             .map(|env_var| Self::parse_env_var(env_var))
             .collect()
     }

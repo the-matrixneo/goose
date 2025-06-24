@@ -32,7 +32,6 @@ pub struct BenchAgent {
     errors: Arc<Mutex<Vec<BenchAgentError>>>,
 }
 
-
 impl BenchAgent {
     pub fn new(session: Box<dyn BenchBaseSession>) -> Self {
         let errors = Arc::new(Mutex::new(Vec::new()));
@@ -52,25 +51,42 @@ impl BenchAgent {
         let errors = self.errors.lock().await;
         errors.clone()
     }
-    
+
     pub async fn clear_errors(&self) {
         let mut errors = self.errors.lock().await;
         errors.clear();
     }
-    
-    pub async fn prompt_with_limit(&mut self, prompt: String, max_interactions: usize) -> anyhow::Result<Vec<Message>> {
+
+    pub async fn prompt_with_limit(
+        &mut self,
+        prompt: String,
+        max_interactions: usize,
+    ) -> anyhow::Result<Vec<Message>> {
         // Try to downcast to InteractionLimitedAgent
-        if let Some(interaction_limited) = self.session.as_any_mut().downcast_mut::<crate::interaction_limited_agent::InteractionLimitedAgent>() {
-            interaction_limited.prompt_with_limit(prompt, max_interactions).await
+        if let Some(interaction_limited) =
+            self.session
+                .as_any_mut()
+                .downcast_mut::<crate::interaction_limited_agent::InteractionLimitedAgent>()
+        {
+            interaction_limited
+                .prompt_with_limit(prompt, max_interactions)
+                .await
         } else {
             // Fallback to regular prompt for non-InteractionLimitedAgent sessions
             self.prompt(prompt).await
         }
     }
-    
-    pub async fn prompt_multi_turn(&mut self, prompts: Vec<String>) -> anyhow::Result<Vec<Message>> {
+
+    pub async fn prompt_multi_turn(
+        &mut self,
+        prompts: Vec<String>,
+    ) -> anyhow::Result<Vec<Message>> {
         // Try to downcast to InteractionLimitedAgent
-        if let Some(interaction_limited) = self.session.as_any_mut().downcast_mut::<crate::interaction_limited_agent::InteractionLimitedAgent>() {
+        if let Some(interaction_limited) =
+            self.session
+                .as_any_mut()
+                .downcast_mut::<crate::interaction_limited_agent::InteractionLimitedAgent>()
+        {
             interaction_limited.prompt_multi_turn(prompts).await
         } else {
             // Fallback to single prompt for non-InteractionLimitedAgent sessions
@@ -87,14 +103,12 @@ impl BenchAgent {
     pub(crate) fn session_file(&self) -> PathBuf {
         self.session.session_file()
     }
-    
+
     pub async fn shutdown(&self) -> anyhow::Result<()> {
         let cleanup_timeout = tokio::time::Duration::from_secs(5);
         match tokio::time::timeout(cleanup_timeout, self.session.cleanup_extensions()).await {
             Ok(result) => result,
-            Err(_timeout) => {
-                Ok(())
-            }
+            Err(_timeout) => Ok(()),
         }
     }
 
@@ -102,16 +116,20 @@ impl BenchAgent {
     pub async fn reset_for_reuse(&mut self) -> anyhow::Result<()> {
         // Clear errors
         self.clear_errors().await;
-        
+
         // Clear message history
         let messages = self.session.get_messages_mut();
         messages.clear();
-        
+
         // Try to reset InteractionLimitedAgent if that's what we have
-        if let Some(interaction_limited) = self.session.as_any_mut().downcast_mut::<crate::interaction_limited_agent::InteractionLimitedAgent>() {
+        if let Some(interaction_limited) =
+            self.session
+                .as_any_mut()
+                .downcast_mut::<crate::interaction_limited_agent::InteractionLimitedAgent>()
+        {
             interaction_limited.reset().await?;
         }
-        
+
         Ok(())
     }
 }

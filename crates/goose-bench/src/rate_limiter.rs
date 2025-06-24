@@ -25,13 +25,13 @@ struct RateLimiterInner {
 
 impl TokenBucketRateLimiter {
     /// Create a new token bucket rate limiter
-    /// 
+    ///
     /// # Arguments
     /// * `requests_per_second` - Maximum number of requests allowed per second
     /// * `burst_capacity` - Maximum burst capacity (defaults to requests_per_second if None)
     pub fn new(requests_per_second: f64, burst_capacity: Option<u32>) -> Self {
         let capacity = burst_capacity.unwrap_or(requests_per_second.ceil() as u32);
-        
+
         Self {
             inner: Arc::new(RateLimiterInner {
                 capacity,
@@ -47,7 +47,12 @@ impl TokenBucketRateLimiter {
     /// This method will block until a token is available
     pub async fn acquire(&self) -> RateLimitPermit {
         // First, acquire a semaphore permit to limit concurrent waiters
-        let _permit = self.inner.semaphore.clone().acquire_owned().await
+        let _permit = self
+            .inner
+            .semaphore
+            .clone()
+            .acquire_owned()
+            .await
             .expect("Semaphore should not be closed");
 
         // Wait until we can get a token
@@ -65,7 +70,7 @@ impl TokenBucketRateLimiter {
     /// Try to acquire a token without blocking
     async fn try_acquire_token(&self) -> bool {
         self.refill_tokens().await;
-        
+
         let mut tokens = self.inner.tokens.lock().await;
         if *tokens > 0 {
             *tokens -= 1;
@@ -80,10 +85,10 @@ impl TokenBucketRateLimiter {
         let now = Instant::now();
         let mut last_refill = self.inner.last_refill.lock().await;
         let elapsed = now.duration_since(*last_refill);
-        
+
         if elapsed.as_millis() > 0 {
             let tokens_to_add = (elapsed.as_secs_f64() * self.inner.refill_rate) as u32;
-            
+
             if tokens_to_add > 0 {
                 let mut tokens = self.inner.tokens.lock().await;
                 *tokens = (*tokens + tokens_to_add).min(self.inner.capacity);
@@ -109,7 +114,7 @@ impl TokenBucketRateLimiter {
     pub async fn stats(&self) -> RateLimiterStats {
         let tokens = *self.inner.tokens.lock().await;
         let available_permits = self.inner.semaphore.available_permits();
-        
+
         RateLimiterStats {
             available_tokens: tokens,
             capacity: self.inner.capacity,
@@ -177,16 +182,16 @@ mod tests {
     #[tokio::test]
     async fn test_token_bucket_basic() {
         let limiter = TokenBucketRateLimiter::new(2.0, Some(2));
-        
+
         // Should be able to acquire 2 tokens immediately
         let _permit1 = limiter.acquire().await;
         let _permit2 = limiter.acquire().await;
-        
+
         // Third acquisition should take some time
         let start = Instant::now();
         let _permit3 = limiter.acquire().await;
         let elapsed = start.elapsed();
-        
+
         // Should have waited approximately 0.5 seconds (1/2 tokens per second)
         assert!(elapsed >= Duration::from_millis(400));
         assert!(elapsed <= Duration::from_millis(600));
@@ -195,18 +200,18 @@ mod tests {
     #[tokio::test]
     async fn test_token_bucket_refill() {
         let limiter = TokenBucketRateLimiter::new(10.0, Some(1));
-        
+
         // Acquire the only token
         let _permit1 = limiter.acquire().await;
-        
+
         // Wait for refill
         sleep(Duration::from_millis(200)).await;
-        
+
         // Should be able to acquire another token quickly
         let start = Instant::now();
         let _permit2 = limiter.acquire().await;
         let elapsed = start.elapsed();
-        
+
         // Should be very fast since token was refilled
         assert!(elapsed <= Duration::from_millis(50));
     }
@@ -214,17 +219,17 @@ mod tests {
     #[tokio::test]
     async fn test_stats() {
         let limiter = TokenBucketRateLimiter::new(5.0, Some(10));
-        
+
         let stats = limiter.stats().await;
         assert_eq!(stats.capacity, 10);
         assert_eq!(stats.available_tokens, 10);
         assert_eq!(stats.refill_rate, 5.0);
         assert_eq!(stats.waiting_requests, 0);
-        
+
         // Acquire some tokens
         let _permit1 = limiter.acquire().await;
         let _permit2 = limiter.acquire().await;
-        
+
         let stats = limiter.stats().await;
         assert_eq!(stats.available_tokens, 8);
     }
@@ -233,11 +238,11 @@ mod tests {
     async fn test_global_rate_limiter() {
         // Initialize global rate limiter
         initialize_global_rate_limiter(1.0, Some(1));
-        
+
         // Should be able to acquire a permit
         let permit = acquire_global_permit().await;
         assert!(permit.is_some());
-        
+
         // Stats should be available
         let stats = global_rate_limiter_stats().await;
         assert!(stats.is_some());

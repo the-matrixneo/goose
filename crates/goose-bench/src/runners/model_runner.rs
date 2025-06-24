@@ -46,7 +46,9 @@ impl ModelRunner {
 
         let mut all_runs_results: Vec<BenchmarkResults> = Vec::new();
         for i in 0..self.config.repeat.unwrap_or(1) {
-            if let Ok(run_results) = self.collect_run_results(model.clone(), suites.clone(), i.to_string()) {
+            if let Ok(run_results) =
+                self.collect_run_results(model.clone(), suites.clone(), i.to_string())
+            {
                 all_runs_results.push(run_results);
             }
         }
@@ -71,11 +73,12 @@ impl ModelRunner {
             ))?;
             envs.extend(env_vars);
         }
-        
+
         // Add global environment variables from config
-        let global_env_vars = BenchRunConfig::parse_env_vars(&self.config.env).context("Failed to parse global environment variables")?;
+        let global_env_vars = BenchRunConfig::parse_env_vars(&self.config.env)
+            .context("Failed to parse global environment variables")?;
         envs.extend(global_env_vars);
-        
+
         envs.push(("GOOSE_MODEL".to_string(), model.clone().name));
         envs.push(("GOOSE_PROVIDER".to_string(), model.clone().provider));
 
@@ -108,7 +111,8 @@ impl ModelRunner {
                         .context("Failed to serialize configuration")?;
                     // Merge environment variables: global env, then eval-specific env (which can override global)
                     let mut eval_envs = envs.clone();
-                    let eval_env_vars = BenchRunConfig::parse_env_vars(&eval_selector.env).context("Failed to parse eval-specific environment variables")?;
+                    let eval_env_vars = BenchRunConfig::parse_env_vars(&eval_selector.env)
+                        .context("Failed to parse eval-specific environment variables")?;
                     eval_envs.extend(eval_env_vars);
                     let handle = parallel_bench_cmd("exec-eval".to_string(), cfg, eval_envs);
                     results_handles.get_mut(suite).unwrap().push(handle);
@@ -125,7 +129,8 @@ impl ModelRunner {
                     .context("Failed to serialize configuration")?;
                 // Merge environment variables: global env, then eval-specific env (which can override global)
                 let mut eval_envs = envs.clone();
-                let eval_env_vars = BenchRunConfig::parse_env_vars(&eval_selector.env).context("Failed to parse eval-specific environment variables")?;
+                let eval_env_vars = BenchRunConfig::parse_env_vars(&eval_selector.env)
+                    .context("Failed to parse eval-specific environment variables")?;
                 eval_envs.extend(eval_env_vars);
 
                 let handle = parallel_bench_cmd("exec-eval".to_string(), cfg, eval_envs);

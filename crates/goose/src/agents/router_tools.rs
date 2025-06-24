@@ -7,10 +7,12 @@ use mcp_core::tool::{Tool, ToolAnnotations};
 use serde_json::json;
 
 pub const ROUTER_VECTOR_SEARCH_TOOL_NAME: &str = "router__vector_search";
-pub const ROUTER_VECTOR_SEARCH_WITH_EXTENSION_TOOL_NAME: &str = "router__vector_search_with_extension";
+pub const ROUTER_VECTOR_SEARCH_WITH_EXTENSION_TOOL_NAME: &str =
+    "router__vector_search_with_extension";
 pub const ROUTER_LLM_SEARCH_TOOL_NAME: &str = "router__llm_search";
 pub const ROUTER_VECTOR_SEARCH_PASSTHROUGH_TOOL_NAME: &str = "router__vector_search_passthrough";
-pub const ROUTER_VECTOR_SEARCH_WITH_EXTENSION_PASSTHROUGH_TOOL_NAME: &str = "router__vector_search_with_extension_passthrough";
+pub const ROUTER_VECTOR_SEARCH_WITH_EXTENSION_PASSTHROUGH_TOOL_NAME: &str =
+    "router__vector_search_with_extension_passthrough";
 pub const ROUTER_LLM_SEARCH_PASSTHROUGH_TOOL_NAME: &str = "router__llm_search_passthrough";
 
 pub fn vector_search_tool_with_extension() -> Tool {

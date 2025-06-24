@@ -1,6 +1,5 @@
 use crate::logging;
 use crate::session::{build_session, Session, SessionBuilderConfig};
-use goose_bench::interaction_limited_agent::InteractionLimitedAgent;
 use async_trait::async_trait;
 use base64::Engine;
 use goose::agents::extension::{Envs, ExtensionConfig};
@@ -8,6 +7,7 @@ use goose::message::Message;
 use goose::session::Identifier;
 use goose_bench::bench_session::{BenchAgent, BenchBaseSession};
 use goose_bench::eval_suites::ExtensionRequirements;
+use goose_bench::interaction_limited_agent::InteractionLimitedAgent;
 use mcp_core::Tool;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -30,13 +30,13 @@ impl EnvGuard {
     fn new(key: &str, new_value: &str) -> Self {
         let mutex = ENV_MUTEX.get_or_init(|| StdMutex::new(()));
         let _lock = mutex.lock().unwrap();
-        
+
         let original_value = std::env::var(key).ok();
         // SAFETY: We hold a mutex lock, ensuring no concurrent access to environment variables
         unsafe {
             std::env::set_var(key, new_value);
         }
-        
+
         Self {
             key: key.to_string(),
             original_value,
@@ -48,7 +48,7 @@ impl Drop for EnvGuard {
     fn drop(&mut self) {
         let mutex = ENV_MUTEX.get_or_init(|| StdMutex::new(()));
         let _lock = mutex.lock().unwrap();
-        
+
         // SAFETY: We hold a mutex lock, ensuring no concurrent access to environment variables
         unsafe {
             match &self.original_value {
@@ -61,20 +61,23 @@ impl Drop for EnvGuard {
 
 // Set up clean config for dataset benchmarking
 fn setup_clean_config_for_datasets() -> Result<EnvGuard, std::io::Error> {
-    let temp_dir = std::env::temp_dir().join(format!("goose_bench_clean_config_{}", std::process::id()));
+    let temp_dir =
+        std::env::temp_dir().join(format!("goose_bench_clean_config_{}", std::process::id()));
     std::fs::create_dir_all(&temp_dir)?;
-    
+
     // Create a minimal config.yaml with no extensions
     let config_file = temp_dir.join("config.yaml");
     std::fs::write(&config_file, "extensions: {}\n")?;
-    
+
     // Store temp directory for cleanup
     let _ = CLEAN_CONFIG_SETUP.set(temp_dir.clone());
-    
-    // Return guard that manages the environment variable
-    Ok(EnvGuard::new("GOOSE_CONFIG_DIR", &temp_dir.to_string_lossy()))
-}
 
+    // Return guard that manages the environment variable
+    Ok(EnvGuard::new(
+        "GOOSE_CONFIG_DIR",
+        &temp_dir.to_string_lossy(),
+    ))
+}
 
 // Cache for mock MCP tools to avoid repeated serialization
 static TOOLS_CACHE: OnceLock<StdMutex<HashMap<String, String>>> = OnceLock::new();
@@ -132,8 +135,8 @@ struct InteractionLimitedAgentWrapper {
 
 impl InteractionLimitedAgentWrapper {
     fn new(agent: InteractionLimitedAgent, session_file: PathBuf) -> Self {
-        Self { 
-            agent, 
+        Self {
+            agent,
             session_file,
             dummy_messages: Vec::new(),
         }
@@ -178,36 +181,36 @@ impl BenchBaseSession for InteractionLimitedAgentWrapper {
         self.agent.prompt(message).await?;
         Ok(())
     }
-    
+
     fn session_file(&self) -> PathBuf {
         self.session_file.clone()
     }
-    
+
     fn message_history(&self) -> Vec<Message> {
         self.agent.message_history()
     }
-    
+
     async fn override_system_prompt(&self, override_prompt: String) {
         self.agent.override_system_prompt(override_prompt).await;
     }
-    
+
     fn get_total_token_usage(&self) -> anyhow::Result<Option<i32>> {
         Ok(None)
     }
-    
+
     async fn cleanup_extensions(&self) -> anyhow::Result<()> {
         Ok(())
     }
-    
+
     fn get_agent(&self) -> &goose::agents::Agent {
         self.agent.get_agent()
     }
-    
+
     fn get_messages_mut(&mut self) -> &mut Vec<Message> {
         // InteractionLimitedAgent manages its own messages
         &mut self.dummy_messages
     }
-    
+
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         &mut self.agent
     }
@@ -224,7 +227,6 @@ pub async fn agent_generator(
         standard_agent(requirements, session_id, available_extensions).await
     }
 }
-
 
 async fn standard_agent(
     requirements: ExtensionRequirements,
@@ -274,12 +276,12 @@ async fn dataset_agent(
     // Create Agent directly instead of going through session
     let agent = goose::agents::Agent::new();
     tracing::debug!("Base agent created");
-    
+
     // Configure provider for the agent
     use goose::config::Config;
-    use goose::providers::create;
     use goose::model::ModelConfig;
-    
+    use goose::providers::create;
+
     // For dataset benchmarking, use a fresh config instance that respects GOOSE_CONFIG_DIR
     let config = Config::default();
     let provider_name = config
@@ -288,22 +290,25 @@ async fn dataset_agent(
     let model_name = config
         .get_param::<String>("GOOSE_MODEL")
         .unwrap_or_else(|_| "claude-3-5-sonnet-20241022".to_string());
-    
+
     let model_config = ModelConfig::new(model_name.clone());
-    let provider = create(&provider_name, model_config)
-        .unwrap_or_else(|_| std::process::exit(1));
-    
-    agent.update_provider(provider).await
+    let provider = create(&provider_name, model_config).unwrap_or_else(|_| std::process::exit(1));
+
+    agent
+        .update_provider(provider)
+        .await
         .unwrap_or_else(|_| std::process::exit(1));
     tracing::debug!(provider = %provider_name, model = %model_name, "Provider configured");
 
     // Prepare mock extensions as Stdio MCP extensions and add them to the agent
     if let Some(extensions) = available_extensions {
         let extension_count = extensions.len();
-        tracing::debug!(extension_count = extension_count, "Starting extension setup");
-        
+        tracing::debug!(
+            extension_count = extension_count,
+            "Starting extension setup"
+        );
+
         for (ext_name, tools) in extensions {
-            
             // Use cached serialization and binary path for better performance
             let tools_base64 = get_cached_tools_base64(&ext_name, &tools);
             let binary_path = get_cached_binary_path();
@@ -340,7 +345,7 @@ async fn dataset_agent(
 
             // Add extension directly to agent
             let add_result = agent.add_extension(extension_config).await;
-            
+
             match add_result {
                 Ok(_) => tracing::debug!(
                     extension = %ext_name,
@@ -354,28 +359,28 @@ async fn dataset_agent(
                 ),
             }
         }
-        
+
         tracing::debug!(
             extension_count = extension_count,
             "All extensions setup completed"
         );
     }
-    
+
     // Create an InteractionLimitedAgent with the configured agent
     let interaction_limited = InteractionLimitedAgent::new(agent, None);
-    
+
     // Create a dummy session file path for compatibility
     let session_file = std::env::temp_dir().join(format!("bench_session_{}.json", session_id));
-    
+
     // Wrap in BenchBaseSession trait wrapper
     let wrapper = InteractionLimitedAgentWrapper::new(interaction_limited, session_file);
-    
+
     // Wrap in BenchAgent for compatibility
     let bench_agent = BenchAgent::new(Box::new(wrapper));
     tracing::debug!("Agent wrappers created");
 
     // Environment variable is automatically restored when _config_guard is dropped
-    
+
     // Initialize logging with error capture
     let errors = Some(Arc::new(Mutex::new(bench_agent.get_errors().await)));
     logging::setup_logging(Some("bench"), errors).expect("Failed to initialize logging");
@@ -388,4 +393,3 @@ async fn dataset_agent(
 
     bench_agent
 }
-
