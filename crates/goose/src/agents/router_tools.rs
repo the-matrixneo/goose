@@ -7,10 +7,12 @@ use mcp_core::tool::{Tool, ToolAnnotations};
 use serde_json::json;
 
 pub const ROUTER_VECTOR_SEARCH_TOOL_NAME: &str = "router__vector_search";
-pub const ROUTER_VECTOR_SEARCH_WITH_EXTENSION_TOOL_NAME: &str = "router__vector_search_with_extension";
+pub const ROUTER_VECTOR_SEARCH_WITH_EXTENSION_TOOL_NAME: &str =
+    "router__vector_search_with_extension";
 pub const ROUTER_LLM_SEARCH_TOOL_NAME: &str = "router__llm_search";
 pub const ROUTER_VECTOR_SEARCH_PASSTHROUGH_TOOL_NAME: &str = "router__vector_search_passthrough";
-pub const ROUTER_VECTOR_SEARCH_WITH_EXTENSION_PASSTHROUGH_TOOL_NAME: &str = "router__vector_search_with_extension_passthrough";
+pub const ROUTER_VECTOR_SEARCH_WITH_EXTENSION_PASSTHROUGH_TOOL_NAME: &str =
+    "router__vector_search_with_extension_passthrough";
 pub const ROUTER_LLM_SEARCH_PASSTHROUGH_TOOL_NAME: &str = "router__llm_search_passthrough";
 
 pub fn vector_search_tool_with_extension() -> Tool {
@@ -78,8 +80,7 @@ pub fn vector_search_tool() -> Tool {
 }
 
 pub fn vector_search_tool_prompt() -> String {
-    format!(
-        r#"# Tool Selection Instructions
+    r#"# Tool Selection Instructions
     Important: the user has opted to dynamically enable tools, so although an extension could be enabled, \
     please invoke the vector search tool to actually retrieve the most relevant tools to use according to the user's messages.
     For example, if the user has 3 extensions enabled, but they are asking for a tool to read a pdf file, \
@@ -98,7 +99,8 @@ pub fn vector_search_tool_prompt() -> String {
 }
 
 pub fn vector_search_tool_with_extension_prompt() -> String {
-    r#"# Tool Selection Instructions (Extension-Specific)
+    format!(
+        r#"# Tool Selection Instructions (Extension-Specific)
     Important: the user has opted to dynamically enable tools, so although an extension could be enabled, \
     please invoke the vector search tool with extension to actually retrieve the most relevant tools to use according to the user's messages from a specific extension.
     You have the list of extension names available to you in your system prompt.
