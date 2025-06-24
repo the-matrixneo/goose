@@ -1,0 +1,49 @@
+[package]
+name = "bitmortar"
+version = "0.1.0"
+edition = "2021"
+description = "A unified API server that provides Databricks-compatible endpoints while routing to various LLM providers"
+
+[dependencies]
+# Web framework
+axum = "0.7"
+tokio = { version = "1.0", features = ["full"] }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Configuration
+clap = { version = "4.0", features = ["derive"] }
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Async traits
+async-trait = "0.1"
+
+# URL parsing
+url = "2.0"
+
+# UUID for request IDs
+uuid = { version = "1.0", features = ["v4"] }
+
+# Time handling
+chrono = { version = "0.4", features = ["serde"] }
+
+# Random number generation for load balancing
+rand = "0.8"
+
+# TOML parsing for configuration
+toml = "0.8"
+
+# Use goose providers directly
+goose = { path = "../goose" }
+mcp-core = { path = "../mcp-core" }

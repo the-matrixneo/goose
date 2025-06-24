@@ -1,0 +1,73 @@
+# BitMortar Configuration
+
+[server]
+host = "0.0.0.0"
+port = 8080
+timeout = 600
+
+[routing]
+default_provider = "openai"
+load_balancing = "Priority"
+
+# Model-specific routing rules
+[routing.model_routes.gpt-4o]
+provider = "openai"
+fallbacks = []
+
+[routing.model_routes.gpt-4o-mini]
+provider = "openai"
+fallbacks = []
+
+[routing.model_routes."claude-3-5-sonnet-latest"]
+provider = "anthropic"
+fallbacks = []
+
+[routing.model_routes."databricks-claude-3-7-sonnet"]
+provider = "databricks"
+target_model = "claude-3-7-sonnet"
+fallbacks = ["anthropic"]
+
+# Provider configurations
+[providers.openai]
+provider_type = "openai"
+enabled = true
+priority = 100
+
+[providers.openai.config]
+# These will be set as environment variables for the Goose provider
+OPENAI_API_KEY = "your-openai-api-key-here"
+OPENAI_HOST = "https://api.openai.com"
+
+[providers.anthropic]
+provider_type = "anthropic"
+enabled = true
+priority = 90
+
+[providers.anthropic.config]
+ANTHROPIC_API_KEY = "your-anthropic-api-key-here"
+ANTHROPIC_HOST = "https://api.anthropic.com"
+
+[providers.databricks]
+provider_type = "databricks"
+enabled = false  # Set to true to enable
+priority = 80
+
+[providers.databricks.config]
+DATABRICKS_HOST = "https://your-databricks-workspace.cloud.databricks.com"
+DATABRICKS_TOKEN = "your-databricks-token-here"
+
+[providers.groq]
+provider_type = "groq"
+enabled = false
+priority = 70
+
+[providers.groq.config]
+GROQ_API_KEY = "your-groq-api-key-here"
+
+[providers.xai]
+provider_type = "xai"
+enabled = false
+priority = 60
+
+[providers.xai.config]
+XAI_API_KEY = "your-xai-api-key-here"
