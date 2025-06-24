@@ -1,4 +1,4 @@
-use crate::logging;
+// Logging is handled by CLI entry point
 use crate::session::{build_session, Session, SessionBuilderConfig};
 use async_trait::async_trait;
 use base64::Engine;
@@ -17,10 +17,7 @@ use tokio::sync::Mutex;
 // Global mutex to serialize environment variable operations
 static ENV_MUTEX: OnceLock<StdMutex<()>> = OnceLock::new();
 
-// Global state to track cleanup
-static CLEAN_CONFIG_SETUP: OnceLock<PathBuf> = OnceLock::new();
 
-// RAII guard for safely managing environment variable overrides
 struct EnvGuard {
     key: String,
     original_value: Option<String>,
@@ -30,13 +27,8 @@ impl EnvGuard {
     fn new(key: &str, new_value: &str) -> Self {
         let mutex = ENV_MUTEX.get_or_init(|| StdMutex::new(()));
         let _lock = mutex.lock().unwrap();
-
         let original_value = std::env::var(key).ok();
-        // SAFETY: We hold a mutex lock, ensuring no concurrent access to environment variables
-        unsafe {
-            std::env::set_var(key, new_value);
-        }
-
+        std::env::set_var(key, new_value);
         Self {
             key: key.to_string(),
             original_value,
@@ -48,70 +40,40 @@ impl Drop for EnvGuard {
     fn drop(&mut self) {
         let mutex = ENV_MUTEX.get_or_init(|| StdMutex::new(()));
         let _lock = mutex.lock().unwrap();
-
-        // SAFETY: We hold a mutex lock, ensuring no concurrent access to environment variables
-        unsafe {
-            match &self.original_value {
-                Some(value) => std::env::set_var(&self.key, value),
-                None => std::env::remove_var(&self.key),
-            }
+        match &self.original_value {
+            Some(value) => std::env::set_var(&self.key, value),
+            None => std::env::remove_var(&self.key),
         }
     }
 }
 
-// Set up clean config for dataset benchmarking
 fn setup_clean_config_for_datasets() -> Result<EnvGuard, std::io::Error> {
     let temp_dir =
         std::env::temp_dir().join(format!("goose_bench_clean_config_{}", std::process::id()));
     std::fs::create_dir_all(&temp_dir)?;
-
-    // Create a minimal config.yaml with no extensions
     let config_file = temp_dir.join("config.yaml");
     std::fs::write(&config_file, "extensions: {}\n")?;
-
-    // Store temp directory for cleanup
-    let _ = CLEAN_CONFIG_SETUP.set(temp_dir.clone());
-
-    // Return guard that manages the environment variable
     Ok(EnvGuard::new(
         "GOOSE_CONFIG_DIR",
         &temp_dir.to_string_lossy(),
     ))
 }
 
-// Cache for mock MCP tools to avoid repeated serialization
-static TOOLS_CACHE: OnceLock<StdMutex<HashMap<String, String>>> = OnceLock::new();
-static BINARY_PATH_CACHE: OnceLock<String> = OnceLock::new();
-
-fn get_cached_tools_base64(ext_name: &str, tools: &[Tool]) -> String {
-    let cache = TOOLS_CACHE.get_or_init(|| StdMutex::new(HashMap::new()));
-    let mut cache_lock = cache.lock().unwrap();
-
-    if let Some(cached) = cache_lock.get(ext_name) {
-        return cached.clone();
-    }
-
+fn get_tools_base64(tools: &[Tool]) -> String {
     let tools_json = serde_json::to_string(tools).expect("Failed to serialize tools");
-    let tools_base64 = base64::engine::general_purpose::STANDARD.encode(tools_json);
-    cache_lock.insert(ext_name.to_string(), tools_base64.clone());
-    tools_base64
+    base64::engine::general_purpose::STANDARD.encode(tools_json)
 }
 
-fn get_cached_binary_path() -> String {
-    BINARY_PATH_CACHE
-        .get_or_init(|| {
-            std::env::current_exe()
-                .expect("Failed to get current executable path")
-                .parent()
-                .expect("Failed to get parent directory")
-                .join("mock_mcp_server")
-                .to_string_lossy()
-                .to_string()
-        })
-        .clone()
+fn get_mock_binary_path() -> String {
+    std::env::current_exe()
+        .expect("Failed to get current executable path")
+        .parent()
+        .expect("Failed to get parent directory")
+        .join("mock_mcp_server")
+        .to_string_lossy()
+        .to_string()
 }
 
-// Wrapper to provide mutable messages for Session
 struct SessionWrapper {
     session: Session,
     _dummy_messages: Vec<Message>,
@@ -199,7 +161,8 @@ impl BenchBaseSession for InteractionLimitedAgentWrapper {
     }
 
     async fn cleanup_extensions(&self) -> anyhow::Result<()> {
-        Ok(())
+        // Call cleanup on the underlying agent through the InteractionLimitedAgent
+        self.agent.cleanup_extensions().await
     }
 
     fn get_agent(&self) -> &goose::agents::Agent {
@@ -256,16 +219,16 @@ async fn standard_agent(
     // package session obj into benchmark-compatible struct
     let bench_agent = BenchAgent::new(Box::new(SessionWrapper::new(base_session)));
 
-    // Initialize logging with error capture
-    let errors = Some(Arc::new(Mutex::new(bench_agent.get_errors().await)));
-    logging::setup_logging(Some("bench"), errors).expect("Failed to initialize logging");
+    // Logging is already set up by CLI - just register error capture if needed
+    let errors = Arc::new(Mutex::new(bench_agent.get_errors().await));
+    goose_bench::error_capture::ErrorCaptureLayer::register_error_vector(errors);
 
     bench_agent
 }
 async fn dataset_agent(
     _requirements: ExtensionRequirements,
     session_id: String,
-    available_extensions: Option<HashMap<String, Vec<Tool>>>,
+    _available_extensions: Option<HashMap<String, Vec<Tool>>>,
 ) -> BenchAgent {
     tracing::info!(session_id = %session_id, "Starting dataset agent creation");
 
@@ -301,18 +264,17 @@ async fn dataset_agent(
         .unwrap_or_else(|_| std::process::exit(1));
     tracing::debug!(provider = %provider_name, model = %model_name, "Provider configured");
 
-    // Prepare mock extensions as Stdio MCP extensions and add them to the agent
-    if let Some(extensions) = available_extensions {
+    // Set up extensions for this specific agent if provided
+    if let Some(extensions) = _available_extensions {
         let extension_count = extensions.len();
         tracing::debug!(
             extension_count = extension_count,
-            "Starting extension setup"
+            "Setting up extensions for agent"
         );
 
         for (ext_name, tools) in extensions {
-            // Use cached serialization and binary path for better performance
-            let tools_base64 = get_cached_tools_base64(&ext_name, &tools);
-            let binary_path = get_cached_binary_path();
+            let tools_base64 = get_tools_base64(&tools);
+            let binary_path = get_mock_binary_path();
 
             // Fallback to cargo run if binary doesn't exist
             let (cmd, args) = if std::path::Path::new(&binary_path).exists() {
@@ -382,9 +344,9 @@ async fn dataset_agent(
 
     // Environment variable is automatically restored when _config_guard is dropped
 
-    // Initialize logging with error capture
-    let errors = Some(Arc::new(Mutex::new(bench_agent.get_errors().await)));
-    logging::setup_logging(Some("bench"), errors).expect("Failed to initialize logging");
+    // Logging is already set up by CLI - just register error capture if needed
+    let errors = Arc::new(Mutex::new(bench_agent.get_errors().await));
+    goose_bench::error_capture::ErrorCaptureLayer::register_error_vector(errors);
     tracing::debug!("Logging setup completed");
 
     tracing::info!(

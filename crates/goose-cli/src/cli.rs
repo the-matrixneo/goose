@@ -204,14 +204,14 @@ pub enum BenchCommand {
 
     #[command(name = "eval-model", about = "Run an eval of model")]
     EvalModel {
-        #[arg(short, long, help = "A serialized config file for the model only.")]
-        config: String,
+        #[arg(short, long, help = "Path to a config file for the model only.")]
+        config: PathBuf,
     },
 
     #[command(name = "exec-eval", about = "run a single eval")]
     ExecEval {
-        #[arg(short, long, help = "A serialized config file for the eval only.")]
-        config: String,
+        #[arg(short, long, help = "Path to a config file for the eval only.")]
+        config: PathBuf,
     },
 
     #[command(

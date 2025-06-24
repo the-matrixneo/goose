@@ -6,10 +6,11 @@ use crate::utilities::{await_process_exits, parallel_bench_cmd};
 use anyhow::{Context, Result};
 use dotenvy::from_path_iter;
 use std::collections::HashMap;
-use std::fs::read_to_string;
+use std::fs::{self, read_to_string};
 use std::path::PathBuf;
 use std::process::Child;
 use std::thread;
+use std::env;
 
 #[derive(Clone)]
 pub struct ModelRunner {
@@ -17,7 +18,13 @@ pub struct ModelRunner {
 }
 
 impl ModelRunner {
-    pub fn from(config: String) -> Result<ModelRunner> {
+    pub fn from(config_path: PathBuf) -> Result<ModelRunner> {
+        let config = BenchRunConfig::from(config_path.clone())
+            .context("Failed to parse configuration from file")?;
+        Ok(ModelRunner { config })
+    }
+    
+    pub fn from_string(config: String) -> Result<ModelRunner> {
         let config =
             BenchRunConfig::from_string(config).context("Failed to parse configuration")?;
         Ok(ModelRunner { config })
@@ -102,38 +109,48 @@ impl ModelRunner {
 
             // Run parallel-safe evaluations in parallel
             if !parallel_evals.is_empty() {
-                for eval_selector in &parallel_evals {
+                for (idx, eval_selector) in parallel_evals.iter().enumerate() {
                     let mut config_copy = self.config.clone();
                     config_copy.run_id = Some(run_id.clone());
                     config_copy.evals = vec![(*eval_selector).clone()];
-                    let cfg = config_copy
-                        .to_string()
-                        .context("Failed to serialize configuration")?;
+                    
+                    // Write config to temp file
+                    let config_path = env::current_dir()
+                        .context("Failed to get current directory")?
+                        .join(format!("temp_eval_config_{}_{}_{}.json", suite, run_id, idx));
+                    fs::write(&config_path, config_copy.to_string()?)
+                        .context("Failed to write temporary config file")?;
+                    
                     // Merge environment variables: global env, then eval-specific env (which can override global)
                     let mut eval_envs = envs.clone();
                     let eval_env_vars = BenchRunConfig::parse_env_vars(&eval_selector.env)
                         .context("Failed to parse eval-specific environment variables")?;
                     eval_envs.extend(eval_env_vars);
-                    let handle = parallel_bench_cmd("exec-eval".to_string(), cfg, eval_envs);
+                    let handle = parallel_bench_cmd("exec-eval".to_string(), config_path.to_string_lossy().to_string(), eval_envs);
                     results_handles.get_mut(suite).unwrap().push(handle);
                 }
             }
 
             // Run non-parallel-safe evaluations sequentially
-            for eval_selector in &sequential_evals {
+            for (idx, eval_selector) in sequential_evals.iter().enumerate() {
                 let mut config_copy = self.config.clone();
                 config_copy.run_id = Some(run_id.clone());
                 config_copy.evals = vec![(*eval_selector).clone()];
-                let cfg = config_copy
-                    .to_string()
-                    .context("Failed to serialize configuration")?;
+                
+                // Write config to temp file
+                let config_path = env::current_dir()
+                    .context("Failed to get current directory")?
+                    .join(format!("temp_eval_config_seq_{}_{}_{}.json", suite, run_id, idx));
+                fs::write(&config_path, config_copy.to_string()?)
+                    .context("Failed to write temporary config file")?;
+                
                 // Merge environment variables: global env, then eval-specific env (which can override global)
                 let mut eval_envs = envs.clone();
                 let eval_env_vars = BenchRunConfig::parse_env_vars(&eval_selector.env)
                     .context("Failed to parse eval-specific environment variables")?;
                 eval_envs.extend(eval_env_vars);
 
-                let handle = parallel_bench_cmd("exec-eval".to_string(), cfg, eval_envs);
+                let handle = parallel_bench_cmd("exec-eval".to_string(), config_path.to_string_lossy().to_string(), eval_envs);
 
                 // Wait for this process to complete before starting the next one
                 let mut child_procs = vec![handle];

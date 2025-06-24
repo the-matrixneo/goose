@@ -62,17 +62,11 @@ impl BenchAgent {
         prompt: String,
         max_interactions: usize,
     ) -> anyhow::Result<Vec<Message>> {
-        // Try to downcast to InteractionLimitedAgent
-        if let Some(interaction_limited) =
-            self.session
-                .as_any_mut()
-                .downcast_mut::<crate::interaction_limited_agent::InteractionLimitedAgent>()
-        {
+        if let Some(interaction_limited) = self.try_downcast_interaction_limited() {
             interaction_limited
                 .prompt_with_limit(prompt, max_interactions)
                 .await
         } else {
-            // Fallback to regular prompt for non-InteractionLimitedAgent sessions
             self.prompt(prompt).await
         }
     }
@@ -81,20 +75,22 @@ impl BenchAgent {
         &mut self,
         prompts: Vec<String>,
     ) -> anyhow::Result<Vec<Message>> {
-        // Try to downcast to InteractionLimitedAgent
-        if let Some(interaction_limited) =
-            self.session
-                .as_any_mut()
-                .downcast_mut::<crate::interaction_limited_agent::InteractionLimitedAgent>()
-        {
+        if let Some(interaction_limited) = self.try_downcast_interaction_limited() {
             interaction_limited.prompt_multi_turn(prompts).await
         } else {
-            // Fallback to single prompt for non-InteractionLimitedAgent sessions
             if prompts.is_empty() {
                 return Err(anyhow::anyhow!("At least one prompt is required"));
             }
             self.prompt(prompts.into_iter().next().unwrap()).await
         }
+    }
+
+    fn try_downcast_interaction_limited(
+        &mut self,
+    ) -> Option<&mut crate::interaction_limited_agent::InteractionLimitedAgent> {
+        self.session
+            .as_any_mut()
+            .downcast_mut::<crate::interaction_limited_agent::InteractionLimitedAgent>()
     }
 
     pub(crate) async fn get_token_usage(&self) -> Option<i32> {
@@ -112,24 +108,13 @@ impl BenchAgent {
         }
     }
 
-    /// Reset the agent state for reuse in the agent pool
     pub async fn reset_for_reuse(&mut self) -> anyhow::Result<()> {
-        // Clear errors
         self.clear_errors().await;
-
-        // Clear message history
-        let messages = self.session.get_messages_mut();
-        messages.clear();
-
-        // Try to reset InteractionLimitedAgent if that's what we have
-        if let Some(interaction_limited) =
-            self.session
-                .as_any_mut()
-                .downcast_mut::<crate::interaction_limited_agent::InteractionLimitedAgent>()
-        {
+        self.session.get_messages_mut().clear();
+        
+        if let Some(interaction_limited) = self.try_downcast_interaction_limited() {
             interaction_limited.reset().await?;
         }
-
         Ok(())
     }
 }

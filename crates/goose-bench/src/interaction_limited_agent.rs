@@ -181,4 +181,29 @@ impl InteractionLimitedAgent {
 
         Ok(())
     }
+
+    /// Clean up extension processes
+    pub async fn cleanup_extensions(&self) -> Result<()> {
+        tracing::debug!("Cleaning up InteractionLimitedAgent extensions");
+        
+        // Get list of all extensions and remove them
+        let extensions = self.agent.list_extensions().await;
+        
+        for extension_name in extensions {
+            let remove_timeout = tokio::time::Duration::from_secs(10);
+            match tokio::time::timeout(remove_timeout, self.agent.remove_extension(&extension_name)).await {
+                Ok(Ok(_)) => {
+                    tracing::debug!(extension = %extension_name, "Extension removed successfully");
+                }
+                Ok(Err(e)) => {
+                    tracing::warn!(extension = %extension_name, error = %e, "Failed to remove extension");
+                }
+                Err(_timeout) => {
+                    tracing::warn!(extension = %extension_name, "Timeout removing extension");
+                }
+            }
+        }
+        
+        Ok(())
+    }
 }

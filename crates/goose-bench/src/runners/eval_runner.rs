@@ -8,57 +8,20 @@ use anyhow::{bail, Context, Result};
 use indicatif::{ProgressBar, ProgressStyle};
 use mcp_core::Tool;
 use std::collections::HashMap;
-use std::collections::VecDeque;
 use std::env;
 use std::fs;
 use std::future::Future;
 use std::path::PathBuf;
 use std::process::Command;
-use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
-use tokio::sync::Mutex;
 
-// Agent pool for reusing agents across dataset rows
-#[derive(Clone)]
-struct AgentPool {
-    agents: Arc<Mutex<VecDeque<BenchAgent>>>,
-    max_size: usize,
-}
-
-impl AgentPool {
-    fn new(size: usize) -> Self {
-        Self {
-            agents: Arc::new(Mutex::new(VecDeque::new())),
-            max_size: size,
-        }
-    }
-
-    async fn get_agent(&self) -> Option<BenchAgent> {
-        let mut agents = self.agents.lock().await;
-        let agent = agents.pop_front();
-        if agent.is_some() {
-            tracing::debug!(pool_size = agents.len(), "Agent retrieved from pool");
-        }
-        agent
-    }
-
-    async fn return_agent(&self, mut agent: BenchAgent) {
-        // Reset agent state before returning to pool
-        match agent.reset_for_reuse().await {
-            Ok(()) => {
-                let mut agents = self.agents.lock().await;
-                if agents.len() < self.max_size {
-                    agents.push_back(agent);
-                    tracing::debug!(pool_size = agents.len(), "Agent returned to pool");
-                } else {
-                    tracing::debug!("Pool full, discarding agent");
-                }
-            }
-            Err(e) => {
-                tracing::warn!(error = %e, "Failed to reset agent, discarding");
-            }
-        }
-    }
+/// Clean up all mock_mcp_server processes
+fn cleanup_mock_mcp_processes() {
+    let _ = Command::new("pkill")
+        .arg("-f")
+        .arg("mock_mcp_server")
+        .output();
+    tracing::debug!("Cleaned up all mock_mcp_server processes");
 }
 
 // Configuration struct to reduce function parameter count
@@ -66,9 +29,6 @@ impl AgentPool {
 struct RowProcessingConfig<'a> {
     dataset_config: &'a crate::bench_config::BenchDataset,
     selector: String,
-    agent_pool: AgentPool,
-    all_tools: Option<HashMap<String, Vec<Tool>>>,
-    shared_table_name: Option<String>,
 }
 
 // Stateless functions for parallel processing
@@ -91,53 +51,20 @@ where
 
         let session_id = format!("{}-{}-row{}", config.selector, now_stamp, idx);
 
-        // Use pre-scanned tools if available, otherwise parse from row
-        let extensions = if let Some(ref all_tools) = config.all_tools {
-            all_tools.clone()
-        } else {
-            parse_extensions_stateless(&row, &config.dataset_config.tools_column)?
-        };
+        // Parse extensions for this specific row
+        let extensions = parse_extensions_stateless(&row, &config.dataset_config.tools_column)
+            .unwrap_or_default();
 
-        // Try to get an agent from the pool, otherwise create a new one
-        let mut agent = if let Some(pooled_agent) = config.agent_pool.get_agent().await {
-            tracing::debug!(row_idx = idx, "Retrieved agent from pool");
-            pooled_agent
-        } else {
-            tracing::debug!(
-                row_idx = idx,
-                "No agent available in pool, creating new one"
-            );
-            // Set environment variables for shared vector database if available
-            let _env_guards = if let Some(table_name) = &config.shared_table_name {
-                let router_guard = env::var("GOOSE_ROUTER_TOOL_SELECTION_STRATEGY")
-                    .map(|_| None)
-                    .unwrap_or_else(|_| {
-                        env::set_var("GOOSE_ROUTER_TOOL_SELECTION_STRATEGY", "vector");
-                        Some("GOOSE_ROUTER_TOOL_SELECTION_STRATEGY")
-                    });
-
-                // Set table name as a temporary environment variable for the agent
-                env::set_var("GOOSE_BENCH_SHARED_TABLE", table_name);
-                vec![router_guard, Some("GOOSE_BENCH_SHARED_TABLE")]
-            } else {
-                vec![]
-            };
-
-            let agent = agent_generator(
-                ExtensionRequirements::default(),
-                session_id,
-                true,
-                Some(extensions),
-            )
-            .await;
-
-            // Clean up environment variables
-            for guard in _env_guards.into_iter().flatten() {
-                env::remove_var(guard);
-            }
-
-            agent
-        };
+        // Create a fresh agent for each row
+        tracing::debug!(row_idx = idx, "Creating fresh agent for row");
+        
+        let mut agent = agent_generator(
+            ExtensionRequirements::default(),
+            session_id,
+            true,
+            Some(extensions),
+        )
+        .await;
 
         if let Some(system_prompt) =
             get_dataset_system_prompt_stateless(&row, &config.dataset_config.system_prompt_column)
@@ -177,7 +104,7 @@ where
         // Row-level rate limiting is now handled by the global rate limiter
 
         // Add timeout to prevent hanging on LLM clarifying questions
-        let prompt_timeout = tokio::time::Duration::from_secs(300);
+        let prompt_timeout = tokio::time::Duration::from_secs(900);
         let result = match tokio::time::timeout(prompt_timeout, async {
             agent.prompt_multi_turn(prompts).await
         })
@@ -192,9 +119,12 @@ where
             )),
         };
 
-        // Return agent to pool instead of shutting it down
-        config.agent_pool.return_agent(agent).await;
-        tracing::debug!(row_idx = idx, "Returned agent to pool");
+        // Clean up agent and its extension processes
+        if let Err(e) = agent.shutdown().await {
+            tracing::warn!(row_idx = idx, error = %e, "Failed to shutdown agent cleanly");
+        } else {
+            tracing::debug!(row_idx = idx, "Agent cleaned up successfully");
+        }
 
         Ok::<(Result<Vec<goose::message::Message>>, bool), anyhow::Error>((result, false))
     }
@@ -289,7 +219,15 @@ pub struct EvalRunner {
 }
 
 impl EvalRunner {
-    pub fn from(config: String) -> Result<EvalRunner> {
+    pub fn from(config_path: PathBuf) -> Result<EvalRunner> {
+        tracing::info!("Loading config from: {}", config_path.display());
+        let config = BenchRunConfig::from(config_path.clone())
+            .context("Failed to parse evaluation configuration from file")?;
+        tracing::info!("Config loaded successfully");
+        Ok(EvalRunner { config })
+    }
+    
+    pub fn from_string(config: String) -> Result<EvalRunner> {
         let config = BenchRunConfig::from_string(config)
             .context("Failed to parse evaluation configuration")?;
         Ok(EvalRunner { config })
@@ -336,11 +274,13 @@ impl EvalRunner {
             + Clone,
         Fut: Future<Output = BenchAgent> + Send,
     {
+        tracing::info!("Starting eval runner");
         let bench_eval = self
             .config
             .evals
             .first()
             .context("No evaluations specified in configuration")?;
+        tracing::info!("Running evaluation: {}", bench_eval.selector);
 
         if self.config.dataset.is_some() {
             return self.run_dataset(agent_generator).await;
@@ -495,28 +435,7 @@ impl EvalRunner {
 
         work_dir.set_eval(&bench_eval.selector, run_id);
 
-        // Now scan the TRUNCATED rows to collect all unique tools/extensions
-        let mut all_tools: HashMap<String, Vec<Tool>> = HashMap::new();
-        if dataset_config.tools_column.is_some() {
-            tracing::info!(row_count = rows.len(), "Starting tool scanning");
-            for row in &rows {
-                if let Ok(tools) = parse_extensions_stateless(row, &dataset_config.tools_column) {
-                    for (ext_name, tools_vec) in tools {
-                        let entry = all_tools.entry(ext_name).or_default();
-                        // Union tools, avoiding duplicates based on tool name
-                        for tool in tools_vec {
-                            if !entry.iter().any(|t| t.name == tool.name) {
-                                entry.push(tool);
-                            }
-                        }
-                    }
-                }
-            }
-            tracing::info!(tools_found = all_tools.len(), "Tool scanning completed");
-        }
-
-        // Skip shared vector database creation since tool_vectordb module is private
-        let shared_table_name: Option<String> = None;
+        // No need to scan for tools in advance - each agent will handle its own extensions
 
         // Process all rows with maximum parallelism using chunked approach
         let max_concurrent = self
@@ -532,93 +451,36 @@ impl EvalRunner {
             .context("No evaluations specified")?;
         let selector = bench_eval.selector.clone();
 
-        // Initialize global rate limiter if configured
+        // Initialize global rate limiter with configured or default settings
         if let Some(dataset_cfg) = self.get_dataset_config() {
             if let Some(rate_limit_rps) = dataset_cfg.rate_limit_rps {
-                // Use a reasonable burst capacity (2x the rate or minimum 10)
+                // Use configured rate limit
                 let burst_capacity = ((rate_limit_rps * 2.0).ceil() as u32).max(10);
                 crate::rate_limiter::initialize_global_rate_limiter(
                     rate_limit_rps,
                     Some(burst_capacity),
                 );
+                tracing::info!(rate_limit_rps = rate_limit_rps, "Rate limiter enabled with configured rate");
             } else {
-                crate::rate_limiter::disable_global_rate_limiter();
+                // Use conservative default rate limit to prevent API overload
+                let default_rps = 10.0;
+                crate::rate_limiter::initialize_global_rate_limiter(default_rps, Some(20));
+                tracing::warn!(
+                    default_rps = default_rps,
+                    "No rate_limit_rps configured - using conservative default to prevent API overload"
+                );
             }
         } else {
-            crate::rate_limiter::disable_global_rate_limiter();
+            // Use conservative default rate limit to prevent API overload
+            let default_rps = 10.0;
+            crate::rate_limiter::initialize_global_rate_limiter(default_rps, Some(20));
+            tracing::warn!(
+                default_rps = default_rps,
+                "No dataset config found - using conservative default rate limit to prevent API overload"
+            );
         }
 
-        // Create and pre-warm agent pool with size equal to max_concurrent
-        let agent_pool = AgentPool::new(max_concurrent);
-
-        // Pre-warm the pool by creating all agents upfront
-        tracing::info!(pool_size = max_concurrent, "Pre-warming agent pool");
-
-        // Create progress bar for agent pool warming
-        let warmup_progress = ProgressBar::new(max_concurrent as u64);
-        warmup_progress.set_style(
-            ProgressStyle::default_bar()
-                .template(
-                    "{bar:40.green/blue} {pos}/{len} agents ({percent}%) [{elapsed_precise}] {msg}",
-                )
-                .unwrap()
-                .progress_chars("##-"),
-        );
-        warmup_progress.set_message("Initializing agents with extensions");
-
-        for i in 0..max_concurrent {
-            let warmup_session_id = format!("{}-warmup-{}", selector, i);
-
-            // Set environment variables for shared vector database if available
-            let _env_guards = if let Some(table_name) = &shared_table_name {
-                let router_guard = env::var("GOOSE_ROUTER_TOOL_SELECTION_STRATEGY")
-                    .map(|_| None)
-                    .unwrap_or_else(|_| {
-                        env::set_var("GOOSE_ROUTER_TOOL_SELECTION_STRATEGY", "vector");
-                        Some("GOOSE_ROUTER_TOOL_SELECTION_STRATEGY")
-                    });
-
-                env::set_var("GOOSE_BENCH_SHARED_TABLE", table_name);
-                vec![router_guard, Some("GOOSE_BENCH_SHARED_TABLE")]
-            } else {
-                vec![]
-            };
-
-            let agent = agent_generator(
-                ExtensionRequirements::default(),
-                warmup_session_id,
-                true,
-                if all_tools.is_empty() {
-                    None
-                } else {
-                    Some(all_tools.clone())
-                },
-            )
-            .await;
-
-            // Clean up environment variables
-            for guard in _env_guards.into_iter().flatten() {
-                env::remove_var(guard);
-            }
-
-            // Add the pre-warmed agent to the pool
-            agent_pool.return_agent(agent).await;
-
-            // Update progress
-            warmup_progress.inc(1);
-            let progress_msg = format!("Agent {} ready", i + 1);
-            warmup_progress.set_message(progress_msg);
-
-            tracing::debug!(agent_index = i, "Agent pre-warmed and added to pool");
-        }
-
-        // Finish progress bar
-        warmup_progress.finish_with_message("Agent pool ready for processing");
-
-        tracing::info!(
-            pool_size = max_concurrent,
-            "Agent pool pre-warming completed"
-        );
+        tracing::info!(max_concurrent = max_concurrent, "Processing with fresh agents per row");
 
         let mut all_results = Vec::new();
         let chunk_size = max_concurrent;
@@ -647,7 +509,6 @@ impl EvalRunner {
                 .enumerate()
                 .map(|(chunk_idx, row)| {
                     let global_idx = chunk_num * chunk_size + chunk_idx;
-                    let pool_clone = agent_pool.clone();
                     process_single_dataset_row_stateless(
                         global_idx,
                         row.clone(),
@@ -655,13 +516,6 @@ impl EvalRunner {
                         RowProcessingConfig {
                             dataset_config,
                             selector: selector.clone(),
-                            agent_pool: pool_clone,
-                            all_tools: if all_tools.is_empty() {
-                                None
-                            } else {
-                                Some(all_tools.clone())
-                            },
-                            shared_table_name: shared_table_name.clone(),
                         },
                     )
                 })
@@ -669,6 +523,16 @@ impl EvalRunner {
 
             let chunk_results = futures::future::join_all(futures).await;
             all_results.extend(chunk_results);
+            
+            // Log rate limiter stats to check saturation
+            if let Some(stats) = crate::rate_limiter::global_rate_limiter_stats().await {
+                tracing::info!(
+                    available_tokens = stats.available_tokens,
+                    waiting_requests = stats.waiting_requests,
+                    capacity = stats.capacity,
+                    "Rate limiter stats after chunk completion"
+                );
+            }
 
             tracing::info!(
                 chunk_num = chunk_num,
@@ -678,6 +542,9 @@ impl EvalRunner {
 
             // Update progress bar by the number of rows completed in this chunk
             progress.inc(chunk.len() as u64);
+
+            // Clean up any remaining mock_mcp_server processes after chunk completion
+            cleanup_mock_mcp_processes();
 
             // Chunk delays are now handled by the global rate limiter
         }
@@ -689,6 +556,10 @@ impl EvalRunner {
 
         // Finish progress bar
         progress.finish_with_message("Dataset processing complete");
+
+        // All agents have been cleaned up individually
+        // Final cleanup of any remaining mock_mcp_server processes
+        cleanup_mock_mcp_processes();
 
         self.write_dataset_results(&bench_eval.selector, vec![all_results])
             .await
