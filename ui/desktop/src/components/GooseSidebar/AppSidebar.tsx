@@ -22,7 +22,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/Tooltip';
 import ThemeSelector from './ThemeSelector';
 import GooseLogo from '../GooseLogo';
 import { useChatContext } from '../../contexts/ChatContext';
-import { fetchSessions, type Session } from '../../sessions';
 
 interface SidebarProps {
   onSelectSession: (sessionId: string) => void;
@@ -41,11 +40,8 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
   const [saveRecipeName, setSaveRecipeName] = useState('');
   const [saveGlobal, setSaveGlobal] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [recentSessions, setRecentSessions] = useState<Session[]>([]);
   const { remove } = useConfig();
   const { hasActiveSession, resetChat } = useChatContext();
-
-  const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     // Trigger animation after a small delay
@@ -54,74 +50,6 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
     }, 100);
     return () => clearTimeout(timer);
   }, []);
-
-  // Debounced refresh function
-  const debouncedRefresh = useCallback(() => {
-    console.log('AppSidebar: Debounced refresh triggered');
-    // Clear any existing timeout
-    if (refreshTimeoutRef.current) {
-      clearTimeout(refreshTimeoutRef.current);
-    }
-
-    // Set new timeout - reduced to 200ms for faster response
-    refreshTimeoutRef.current = setTimeout(() => {
-      console.log('AppSidebar: Executing debounced refresh');
-      loadRecentSessions();
-      refreshTimeoutRef.current = null;
-    }, 200);
-  }, []);
-
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (refreshTimeoutRef.current) {
-        clearTimeout(refreshTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  // Load recent sessions
-  const loadRecentSessions = async () => {
-    try {
-      const sessions = await fetchSessions();
-      // Take only the last 5 sessions
-      setRecentSessions(sessions.slice(0, 5));
-    } catch (error) {
-      console.error('Failed to load recent sessions:', error);
-      setRecentSessions([]);
-    }
-  };
-
-  useEffect(() => {
-    console.log('AppSidebar: Initial load');
-    loadRecentSessions();
-  }, []);
-
-  // Add effect to listen for session creation events
-  useEffect(() => {
-    const handleSessionCreated = () => {
-      console.log('AppSidebar: Session created event received');
-      // Immediately refresh to show the new session
-      loadRecentSessions();
-    };
-
-    const handleMessageStreamFinish = () => {
-      console.log('AppSidebar: Message stream finished event received');
-      // Always refresh when message stream finishes
-      debouncedRefresh();
-    };
-
-    // Listen for custom events that indicate a session was created
-    window.addEventListener('session-created', handleSessionCreated);
-
-    // Also listen for message stream finish events
-    window.addEventListener('message-stream-finished', handleMessageStreamFinish);
-
-    return () => {
-      window.removeEventListener('session-created', handleSessionCreated);
-      window.removeEventListener('message-stream-finished', handleMessageStreamFinish);
-    };
-  }, [debouncedRefresh]);
 
   const handleSaveRecipe = async () => {
     if (!saveRecipeName.trim()) {
@@ -198,51 +126,63 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
         {/* Menu */}
         <div className="px-1 py-0 pt-14 space-y-2 relative">
           <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                onClick={() => {
-                  // If we're not on the chat page and have an active session, just navigate back to chat
-                  if (currentPath !== '/' && hasActiveSession) {
-                    navigate('/');
-                  } else if (hasActiveSession) {
-                    // If we're already on the chat page and have an active session, create a new session
-                    resetChat();
-                    navigate('/');
-                  } else {
-                    // Navigate to home if no active session
-                    navigate('/');
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.1 }}
+            >
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  onClick={() => {
+                    // If we're not on the chat page and have an active session, just navigate back to chat
+                    if (currentPath !== '/' && hasActiveSession) {
+                      navigate('/');
+                    } else if (hasActiveSession) {
+                      // If we're already on the chat page and have an active session, create a new session
+                      resetChat();
+                      navigate('/');
+                    } else {
+                      // Navigate to home if no active session
+                      navigate('/');
+                    }
+                  }}
+                  isActive={isActivePath('/')}
+                  tooltip={
+                    currentPath !== '/' && hasActiveSession
+                      ? 'Return to chat'
+                      : hasActiveSession
+                        ? 'Create a new session'
+                        : 'Go back to the main chat screen'
                   }
-                }}
-                isActive={isActivePath('/')}
-                tooltip={
-                  currentPath !== '/' && hasActiveSession
-                    ? 'Return to chat'
-                    : hasActiveSession
-                      ? 'Create a new session'
-                      : 'Go back to the main chat screen'
-                }
-                className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200"
-              >
-                <Home className="w-4 h-4" />
-                <span>Home</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
+                  className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200"
+                >
+                  <Home className="w-4 h-4" />
+                  <span>Home</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </motion.div>
 
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                onClick={() => {
-                  window.electron.createChatWindow(
-                    undefined,
-                    window.appConfig.get('GOOSE_WORKING_DIR') as string | undefined
-                  );
-                }}
-                tooltip="Start a new session in a new window"
-                className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200"
-              >
-                <ChatSmart className="w-4 h-4" />
-                <span>New window</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.15 }}
+            >
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  onClick={() => {
+                    window.electron.createChatWindow(
+                      undefined,
+                      window.appConfig.get('GOOSE_WORKING_DIR') as string | undefined
+                    );
+                  }}
+                  tooltip="Start a new session in a new window"
+                  className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200"
+                >
+                  <ChatSmart className="w-4 h-4" />
+                  <span>New window</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </motion.div>
 
             {/* <SidebarMenuItem>
               <SidebarMenuButton
@@ -256,146 +196,81 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
               </SidebarMenuButton>
             </SidebarMenuItem> */}
 
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                onClick={() => navigate('/sessions')}
-                isActive={isActivePath('/sessions')}
-                tooltip="View and share previous sessions"
-                className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200"
-              >
-                <Time className="w-4 h-4" />
-                <span>History</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-
-            {process.env.ALPHA && (
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.2 }}
+            >
               <SidebarMenuItem>
                 <SidebarMenuButton
-                  onClick={() => navigate('/schedules')}
-                  isActive={isActivePath('/schedules')}
-                  tooltip="Manage scheduled runs"
+                  onClick={() => navigate('/sessions')}
+                  isActive={isActivePath('/sessions')}
+                  tooltip="View and share previous sessions"
                   className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200"
                 >
-                  <Clock className="w-4 h-4" />
-                  <span>Scheduler</span>
+                  <Time className="w-4 h-4" />
+                  <span>History</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+            </motion.div>
+
+            {process.env.ALPHA && (
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.25 }}
+              >
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    onClick={() => navigate('/schedules')}
+                    isActive={isActivePath('/schedules')}
+                    tooltip="Manage scheduled runs"
+                    className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200"
+                  >
+                    <Clock className="w-4 h-4" />
+                    <span>Scheduler</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </motion.div>
             )}
 
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                onClick={() => navigate('/recipes')}
-                isActive={isActivePath('/recipes')}
-                tooltip="Browse your saved recipes"
-                className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200"
-              >
-                <FileText className="w-4 h-4" />
-                <span>Recipe library</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.3 }}
+            >
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  onClick={() => navigate('/recipes')}
+                  isActive={isActivePath('/recipes')}
+                  tooltip="Browse your saved recipes"
+                  className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200"
+                >
+                  <FileText className="w-4 h-4" />
+                  <span>Recipe library</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </motion.div>
 
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                onClick={() => navigate('/settings')}
-                isActive={isActivePath('/settings')}
-                tooltip="View all settings and options"
-                className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200"
-              >
-                <Gear className="w-4 h-4" />
-                <span>Settings</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.35 }}
+            >
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  onClick={() => navigate('/settings')}
+                  isActive={isActivePath('/settings')}
+                  tooltip="View all settings and options"
+                  className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200"
+                >
+                  <Gear className="w-4 h-4" />
+                  <span>Settings</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </motion.div>
           </SidebarMenu>
         </div>
-
-        {/* Recent Sessions */}
-        {recentSessions.length > 0 && (
-          <div className="mt-4">
-            <SidebarGroup>
-              <SidebarGroupLabel className="text-xs uppercase text-text-muted px-3">
-                Recent
-              </SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  <AnimatePresence mode="popLayout">
-                    {recentSessions.map((session, index) => {
-                      const hasDescription =
-                        session.metadata.description && session.metadata.description.trim() !== '';
-                      const isNewSession = session.id.match(/^\d{8}_\d{6}$/);
-                      const messageCount = session.metadata.message_count || 0;
-                      // Show loading for new sessions with few messages and no description
-                      // Only show loading for sessions created in the last 5 minutes
-                      // Backend generates descriptions for sessions with < 4 user messages
-                      const sessionDate = new Date(session.modified);
-                      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-                      const isRecentSession = sessionDate > fiveMinutesAgo;
-                      const shouldShowLoading =
-                        !hasDescription && isNewSession && messageCount <= 3 && isRecentSession;
-
-                      return (
-                        <motion.div
-                          key={session.id}
-                          initial={{
-                            opacity: 0,
-                            y: -20,
-                            scale: 0.95,
-                          }}
-                          animate={{
-                            opacity: 1,
-                            y: 0,
-                            scale: 1,
-                          }}
-                          exit={{
-                            opacity: 0,
-                            y: 20,
-                            scale: 0.95,
-                          }}
-                          transition={{
-                            type: 'spring',
-                            stiffness: 300,
-                            damping: 25,
-                            delay: index * 0.05,
-                          }}
-                          layout
-                        >
-                          <SidebarMenuItem>
-                            <SidebarMenuButton
-                              onClick={() => {
-                                const workingDir = session.metadata.working_dir;
-                                if (workingDir) {
-                                  window.electron.createChatWindow(
-                                    undefined,
-                                    workingDir,
-                                    undefined,
-                                    session.id
-                                  );
-                                }
-                              }}
-                              tooltip={`Resume session: ${session.metadata.description || session.id}`}
-                              className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200"
-                            >
-                              <MessageCircle className="w-4 h-4" />
-                              <span className="truncate">
-                                {shouldShowLoading ? (
-                                  <div className="flex items-center gap-2">
-                                    <Loader2 className="w-3 h-3 animate-spin" />
-                                    <span className="animate-pulse">Generating description...</span>
-                                  </div>
-                                ) : (
-                                  session.metadata.description || session.id
-                                )}
-                              </span>
-                            </SidebarMenuButton>
-                          </SidebarMenuItem>
-                        </motion.div>
-                      );
-                    })}
-                  </AnimatePresence>
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          </div>
-        )}
 
         {/* Theme Selector */}
         <div className="mt-4 opacity-0">
@@ -404,12 +279,12 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
       </SidebarContent>
 
       <SidebarFooter>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-8 duration-500">
           <GooseLogo size="small" />
           <span className="text-base">codename goose</span>
         </div>
 
-        <div className="pb-4">
+        <div className="pb-4 animate-in fade-in slide-in-from-right-8 duration-500">
           <div className="flex gap-2">
             <Tooltip delayDuration={500}>
               <TooltipTrigger asChild>

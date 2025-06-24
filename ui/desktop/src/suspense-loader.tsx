@@ -11,10 +11,10 @@ export default function SuspenseLoader() {
         exit={{ opacity: 0, y: -20 }}
         transition={{ duration: 0.3, ease: 'easeOut' }}
       >
-        <div className="flex gap-2 items-center justify-end">
+        {/* <div className="flex gap-2 items-center justify-end">
           <GooseLogo size="small" />
           <span className="text-text-muted">Loading...</span>
-        </div>
+        </div> */}
       </motion.div>
     </AnimatePresence>
   );

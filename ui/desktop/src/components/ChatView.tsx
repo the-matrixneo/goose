@@ -816,7 +816,7 @@ function ChatContentWithSidebar({
           )}
         </div>
         <div className="relative z-10 animate-[fadein_400ms_ease-in_forwards]">
-          {isLoading && <LoadingGoose />}
+          {/* {isLoading && <LoadingGoose />} */}
 
           {/* Splash component at the bottom when no messages
           {messages.length === 0 && (

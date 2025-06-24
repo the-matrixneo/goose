@@ -203,7 +203,7 @@ export default function BottomMenu({
   }, [isModelMenuOpen]);
 
   return (
-    <div className="flex w-full justify-between items-center pb-2 pr-3 transition-colors relative text-xs align-middle animate-in fade-in slide-in-from-bottom-8 duration-500">
+    <div className="flex w-full justify-between items-center pb-2 pr-3 transition-colors relative text-xs align-middle animate-in fade-in slide-in-from-right-8 duration-500">
       <div>
         <DirSwitcher hasMessages={messages.length > 0} />
       </div>
