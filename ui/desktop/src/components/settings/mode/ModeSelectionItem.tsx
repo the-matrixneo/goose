@@ -61,7 +61,7 @@ export function ModeSelectionItem({
   return (
     <div className="group hover:cursor-pointer">
       <div
-        className="flex items-center justify-between text-textStandard py-2 hover:bg-bgSubtle"
+        className="flex items-center justify-between text-text-default py-2 px-4 bg-background-default hover:bg-background-muted"
         onClick={() => handleModeChange(mode.key)}
       >
         <div className="flex">

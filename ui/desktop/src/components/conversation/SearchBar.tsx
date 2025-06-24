@@ -143,7 +143,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
 
   return (
     <div
-      className={`sticky top-0 bg-bgAppInverse text-textProminentInverse z-50 ${
+      className={`sticky top-0 bg-background-defaultInverse text-textProminentInverse z-50 ${
         isExiting ? 'search-bar-exit' : 'search-bar-enter'
       }`}
     >
@@ -159,7 +159,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
               onChange={handleSearch}
               onKeyDown={handleKeyDown}
               placeholder="Search conversation..."
-              className="w-full text-sm pl-9 pr-24 py-3 bg-bgAppInverse
+              className="w-full text-sm pl-9 pr-24 py-3 bg-background-defaultInverse
                       placeholder:text-textSubtleInverse focus:outline-none 
                        active:border-borderProminent"
             />

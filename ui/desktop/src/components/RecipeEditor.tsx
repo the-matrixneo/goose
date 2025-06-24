@@ -205,10 +205,10 @@ export default function RecipeEditor({ config }: RecipeEditorProps) {
     ? "You can edit the recipe below to change the agent's behavior in a new session."
     : 'Your custom agent recipe can be shared with others. Fill in the sections below to create!';
   return (
-    <div className="flex flex-col w-full h-screen bg-bgApp max-w-3xl mx-auto">
+    <div className="flex flex-col w-full h-screen bg-background-default max-w-3xl mx-auto">
       {activeSection === 'none' && (
         <div className="flex flex-col items-center mb-2 px-6 pt-10">
-          <div className="w-16 h-16 bg-bgApp rounded-full flex items-center justify-center mb-4">
+          <div className="w-16 h-16 bg-background-default rounded-full flex items-center justify-center mb-4">
             <Geese className="w-12 h-12 text-iconProminent" />
           </div>
           <h1 className="text-2xl font-medium text-center text-textProminent">{page_title}</h1>
@@ -233,7 +233,7 @@ export default function RecipeEditor({ config }: RecipeEditorProps) {
                   setErrors({ ...errors, title: undefined });
                 }
               }}
-              className={`w-full p-3 border rounded-lg bg-bgApp text-textStandard focus:outline-none focus:ring-2 focus:ring-borderProminent ${
+              className={`w-full p-3 border rounded-lg bg-background-default text-textStandard focus:outline-none focus:ring-2 focus:ring-borderProminent ${
                 errors.title ? 'border-red-500' : 'border-borderSubtle'
               }`}
               placeholder="Agent Recipe Title (required)"
@@ -256,7 +256,7 @@ export default function RecipeEditor({ config }: RecipeEditorProps) {
                   setErrors({ ...errors, description: undefined });
                 }
               }}
-              className={`w-full p-3 border rounded-lg bg-bgApp text-textStandard focus:outline-none focus:ring-2 focus:ring-borderProminent ${
+              className={`w-full p-3 border rounded-lg bg-background-default text-textStandard focus:outline-none focus:ring-2 focus:ring-borderProminent ${
                 errors.description ? 'border-red-500' : 'border-borderSubtle'
               }`}
               placeholder="Description (required)"
@@ -311,7 +311,7 @@ export default function RecipeEditor({ config }: RecipeEditorProps) {
                   onClick={() => validateForm() && handleCopy()}
                   variant="ghost"
                   size="sm"
-                  className="ml-4 p-2 hover:bg-bgApp rounded-lg transition-colors flex items-center disabled:opacity-50 disabled:hover:bg-transparent"
+                  className="ml-4 p-2 hover:bg-background-default rounded-lg transition-colors flex items-center disabled:opacity-50 disabled:hover:bg-transparent"
                 >
                   {copied ? (
                     <Check className="w-4 h-4 text-green-500" />

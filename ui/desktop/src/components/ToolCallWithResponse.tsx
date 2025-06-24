@@ -292,7 +292,7 @@ function ToolResultView({ result, isStartExpanded }: ToolResultViewProps) {
       label={<span className="pl-[19px] py-1">Output</span>}
       isStartExpanded={isStartExpanded}
     >
-      <div className="bg-bgApp rounded-b pl-[19px] pr-2 py-4">
+      <div className="bg-background-default rounded-b pl-[19px] pr-2 py-4">
         {result.type === 'text' && result.text && (
           <MarkdownContent
             content={result.text}
@@ -354,7 +354,7 @@ function ToolLogsView({
     >
       <div
         ref={boxRef}
-        className={`flex flex-col items-start space-y-2 overflow-y-auto ${working ? 'max-h-[4rem]' : 'max-h-[20rem]'} bg-bgApp`}
+        className={`flex flex-col items-start space-y-2 overflow-y-auto ${working ? 'max-h-[4rem]' : 'max-h-[20rem]'} bg-background-default`}
       >
         {logs.map((log, i) => (
           <span key={i} className="font-mono text-sm text-textSubtle">

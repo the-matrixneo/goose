@@ -568,7 +568,7 @@ p > code.bg-inline-code {
 
 /* chat connectors */
 
-.user:has(+ .assistant) {
+/* .user:has(+ .assistant) {
   position: relative;
 }
 
@@ -629,7 +629,7 @@ p > code.bg-inline-code {
   height: 6px;
   border-radius: 50%;
   background-color: var(--background-medium);
-}
+} */
 
 /* .assistant:has(+ .assistant)::after {
   content: '';
@@ -656,14 +656,14 @@ p > code.bg-inline-code {
   background-color: var(--border-default);
 } */
 
-@keyframes grow-height {
+/* @keyframes grow-height {
   from {
     height: 0;
   }
   to {
     height: calc(100% + 16px);
   }
-}
+} */
 
 /* Virtualized list styles */
 .virtualized-list {

@@ -128,7 +128,7 @@ export default function ModelsBottomBar({ dropdownRef, setView }: ModelsBottomBa
 
         {/* Dropdown Menu */}
         {isModelMenuOpen && (
-          <div className="absolute bottom-[24px] right-[-55px] w-[300px] bg-bgApp rounded-lg border">
+          <div className="absolute bottom-[24px] right-[-55px] w-[300px] z-50 bg-background-default rounded-lg border">
             <div className="">
               <div className="text-sm text-textProminent mt-2 ml-2">Current:</div>
               <div className="flex items-center justify-between text-sm ml-2">

@@ -302,9 +302,9 @@ const SessionListView: React.FC<SessionListViewProps> = ({ setView, onSelectSess
         return (
           <div
             style={style}
-            className="sticky top-0 z-10 bg-background-default/95 backdrop-blur-sm py-2"
+            className="sticky top-0 z-10 bg-background-default/95 backdrop-blur-sm py-2 pt-3"
           >
-            <h2 className="text-sm text-text-muted">{group.label}</h2>
+            <h2 className="text-xs uppercase text-text-muted">{group.label}</h2>
           </div>
         );
       } else {

@@ -15,7 +15,6 @@ import { type View, ViewOptions } from '../App';
 import LoadingGoose from './LoadingGoose';
 import { ScrollAreaHandle } from './ui/scroll-area';
 import UserMessage from './UserMessage';
-import Splash from './Splash';
 import { SearchView } from './conversation/SearchView';
 import { createRecipe } from '../recipe';
 import { AgentHeader } from './AgentHeader';
@@ -707,7 +706,7 @@ function ChatContentWithSidebar({
         </div>
 
         <div
-          className="flex flex-col min-w-0 flex-1 overflow-y-scroll relative pl-6 pr-4 pb-16 pt-6"
+          className="flex flex-col min-w-0 flex-1 overflow-y-scroll relative pl-6 pr-4 pb-16 pt-2"
           onDrop={handleDrop}
           onDragOver={handleDragOver}
         >
@@ -742,7 +741,7 @@ function ChatContentWithSidebar({
                   return (
                     <div
                       key={message.id || index}
-                      className={`px-4 relative ${index === 0 ? 'mt-0' : 'mt-4'} ${isUser ? 'user' : 'assistant'}`}
+                      className={`relative ${index === 0 ? 'mt-0' : 'mt-4'} ${isUser ? 'user' : 'assistant'}`}
                       data-testid="message-container"
                     >
                       {isUser ? (

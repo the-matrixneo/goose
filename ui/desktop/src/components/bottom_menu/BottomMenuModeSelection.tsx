@@ -2,8 +2,6 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { all_goose_modes, ModeSelectionItem } from '../settings/mode/ModeSelectionItem';
 import { useConfig } from '../ConfigContext';
 import { View, ViewOptions } from '../../App';
-import { Orbit } from 'lucide-react';
-import { Button } from '../ui/button';
 
 interface BottomMenuModeSelectionProps {
   setView: (view: View, viewOptions?: ViewOptions) => void;
@@ -95,7 +93,7 @@ export const BottomMenuModeSelection = ({ setView }: BottomMenuModeSelectionProp
 
       {/* Dropdown Menu */}
       {isGooseModeMenuOpen && (
-        <div className="absolute bottom-[24px] right-0 w-[240px] py-2 bg-bgApp rounded-lg border border-borderSubtle">
+        <div className="absolute bottom-[24px] right-0 w-[240px] z-50 py-2 bg-background-default rounded-lg border border-border-default">
           <div>
             {all_goose_modes.map((mode) => (
               <ModeSelectionItem

@@ -103,7 +103,7 @@ export default function PermissionModal({ extensionName, onClose }: PermissionMo
     <Dialog.Root open={true} onOpenChange={(open) => !open && onClose()}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/30 dark:bg-white/20 transition-colors animate-[fadein_200ms_ease-in_forwards]" />
-        <Dialog.Content className="fixed top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] w-[500px] max-w-[90vw] bg-bgApp rounded-xl shadow-xl max-h-[90vh] flex flex-col overflow-y-auto">
+        <Dialog.Content className="fixed top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] w-[500px] max-w-[90vw] bg-background-default rounded-xl shadow-xl max-h-[90vh] flex flex-col overflow-y-auto">
           <div className="p-6">
             <Dialog.Title className="DialogTitle flex justify-start items-center mb-6">
               <SlidersHorizontal className="text-iconStandard" size={24} />
@@ -183,7 +183,7 @@ export default function PermissionModal({ extensionName, onClose }: PermissionMo
               )}
             </div>
             {footerContent && (
-              <div className="border-t border-borderSubtle bg-bgApp w-full rounded-b-xl overflow-hidden">
+              <div className="border-t border-borderSubtle bg-background-default w-full rounded-b-xl overflow-hidden">
                 {footerContent}
               </div>
             )}

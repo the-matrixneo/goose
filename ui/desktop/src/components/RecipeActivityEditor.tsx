@@ -32,7 +32,7 @@ export default function RecipeActivityEditor({
           {activities.map((activity, index) => (
             <div
               key={index}
-              className="inline-flex items-center bg-bgApp border-2 border-borderSubtle rounded-full px-4 py-2 text-sm text-textStandard"
+              className="inline-flex items-center bg-background-default border-2 border-borderSubtle rounded-full px-4 py-2 text-sm text-textStandard"
               title={activity.length > 100 ? activity : undefined}
             >
               <span>{activity.length > 100 ? activity.slice(0, 100) + '...' : activity}</span>
@@ -53,12 +53,12 @@ export default function RecipeActivityEditor({
             value={newActivity}
             onChange={(e) => setNewActivity(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleAddActivity()}
-            className="flex-1 px-4 py-3 border rounded-lg bg-bgApp text-textStandard placeholder-textPlaceholder focus:outline-none focus:ring-2 focus:ring-borderProminent"
+            className="flex-1 px-4 py-3 border rounded-lg bg-background-default text-textStandard placeholder-textPlaceholder focus:outline-none focus:ring-2 focus:ring-borderProminent"
             placeholder="Add new activity..."
           />
           <Button
             onClick={handleAddActivity}
-            className="px-5 py-1.5 text-sm bg-bgAppInverse text-textProminentInverse rounded-xl hover:bg-bgStandardInverse transition-colors"
+            className="px-5 py-1.5 text-sm bg-background-defaultInverse text-textProminentInverse rounded-xl hover:bg-bgStandardInverse transition-colors"
           >
             Add activity
           </Button>

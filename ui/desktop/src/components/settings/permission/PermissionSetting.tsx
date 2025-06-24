@@ -84,7 +84,7 @@ export default function PermissionSettingsView({ onClose }: { onClose: () => voi
         <div className="flex flex-col pb-24">
           <div className="px-8 pt-6 pb-4">
             <BackButton onClick={() => onClose()} className="mb-4" />
-            <div className="rounded-full bg-bgAppInverse w-16 h-16 flex items-center justify-center mb-4">
+            <div className="rounded-full bg-background-defaultInverse w-16 h-16 flex items-center justify-center mb-4">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="24"

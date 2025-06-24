@@ -500,7 +500,7 @@ export const CreateScheduleModal: React.FC<CreateScheduleModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md bg-bgApp shadow-xl rounded-3xl z-50 flex flex-col max-h-[90vh] overflow-hidden">
+      <Card className="w-full max-w-md bg-background-default shadow-xl rounded-3xl z-50 flex flex-col max-h-[90vh] overflow-hidden">
         <div className="px-8 pt-8 pb-4 flex-shrink-0 text-center">
           <div className="flex flex-col items-center">
             <img src={ClockIcon} alt="Clock" className="w-11 h-11 mb-2" />

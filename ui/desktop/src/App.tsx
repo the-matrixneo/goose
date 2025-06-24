@@ -804,7 +804,7 @@ export default function App() {
           toastClassName={() =>
             `relative min-h-16 mb-4 p-2 rounded-lg
              flex justify-between overflow-hidden cursor-pointer
-             text-textProminentInverse bg-bgStandardInverse dark:bg-bgAppInverse
+             text-textProminentInverse bg-bgStandardInverse dark:bg-background-defaultInverse
             `
           }
           style={{ width: '380px' }}

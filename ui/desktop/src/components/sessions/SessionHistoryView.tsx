@@ -185,7 +185,7 @@ const SessionHistoryView: React.FC<SessionHistoryViewProps> = ({
       </MainPanelLayout>
 
       <Modal open={isShareModalOpen} onOpenChange={setIsShareModalOpen}>
-        <ModalContent className="sm:max-w-md p-0 bg-bgApp dark:bg-bgApp dark:border-borderSubtle">
+        <ModalContent className="sm:max-w-md p-0 bg-background-default dark:bg-background-default dark:border-borderSubtle">
           <div className="flex justify-center mt-4">
             <Share2 className="w-6 h-6 text-textStandard" />
           </div>

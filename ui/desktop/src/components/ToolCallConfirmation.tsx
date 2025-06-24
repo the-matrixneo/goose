@@ -68,7 +68,7 @@ export default function ToolConfirmation({
         Goose would like to call the above tool. Allow?
       </div>
       {clicked ? (
-        <div className="goose-message-tool bg-bgApp border border-borderSubtle dark:border-gray-700 rounded-b-2xl px-4 pt-2 pb-2 flex items-center justify-between">
+        <div className="goose-message-tool bg-background-default border border-borderSubtle dark:border-gray-700 rounded-b-2xl px-4 pt-2 pb-2 flex items-center justify-between">
           <div className="flex items-center">
             {status === 'always_allow' && (
               <svg
@@ -119,7 +119,7 @@ export default function ToolConfirmation({
           </div>
         </div>
       ) : (
-        <div className="goose-message-tool bg-bgApp border border-borderSubtle dark:border-gray-700 rounded-b-2xl px-4 pt-2 pb-2 flex gap-2 items-center">
+        <div className="goose-message-tool bg-background-default border border-borderSubtle dark:border-gray-700 rounded-b-2xl px-4 pt-2 pb-2 flex gap-2 items-center">
           <Button
             className="bg-black text-white dark:bg-white dark:text-black rounded-full px-6 py-2 transition"
             onClick={() => handleButtonClick(ALWAYS_ALLOW)}

@@ -255,7 +255,7 @@ export default function MoreMenu({
             className={`z-[150] fixed inset-0 bg-black transition-all animate-in duration-500 fade-in-0 opacity-50`}
           />
           <PopoverContent
-            className="z-[200] w-[375px] overflow-hidden rounded-lg bg-bgApp border border-borderSubtle text-textStandard !zoom-in-100 !slide-in-from-right-4 !slide-in-from-top-0"
+            className="z-[200] w-[375px] overflow-hidden rounded-lg bg-background-default border border-borderSubtle text-textStandard !zoom-in-100 !slide-in-from-right-4 !slide-in-from-top-0"
             align="end"
             sideOffset={5}
           >
@@ -403,7 +403,7 @@ export default function MoreMenu({
       {/* Save Recipe Dialog */}
       {showSaveDialog && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-bgApp border border-borderSubtle rounded-lg p-6 w-96 max-w-[90vw]">
+          <div className="bg-background-default border border-borderSubtle rounded-lg p-6 w-96 max-w-[90vw]">
             <h3 className="text-lg font-medium text-textProminent mb-4">Save Recipe</h3>
 
             <div className="space-y-4">
@@ -419,7 +419,7 @@ export default function MoreMenu({
                   type="text"
                   value={saveRecipeName}
                   onChange={(e) => setSaveRecipeName(e.target.value)}
-                  className="w-full p-3 border border-borderSubtle rounded-lg bg-bgApp text-textStandard focus:outline-none focus:ring-2 focus:ring-borderProminent"
+                  className="w-full p-3 border border-borderSubtle rounded-lg bg-background-default text-textStandard focus:outline-none focus:ring-2 focus:ring-borderProminent"
                   placeholder="Enter recipe name"
                   autoFocus
                 />

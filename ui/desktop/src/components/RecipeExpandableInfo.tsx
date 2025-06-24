@@ -39,7 +39,7 @@ export default function RecipeExpandableInfo({
         </label>
       </div>
 
-      <div className="relative rounded-lg bg-bgApp text-textStandard">
+      <div className="relative rounded-lg bg-background-default text-textStandard">
         {infoValue && (
           <>
             <div
@@ -68,7 +68,7 @@ export default function RecipeExpandableInfo({
               setValueExpanded(true);
               onClickEdit();
             }}
-            className="w-36 px-3 py-3 bg-bgAppInverse text-sm text-textProminentInverse rounded-xl hover:bg-bgStandardInverse transition-colors"
+            className="w-36 px-3 py-3 bg-background-defaultInverse text-sm text-textProminentInverse rounded-xl hover:bg-bgStandardInverse transition-colors"
           >
             {infoValue ? 'Edit' : 'Add'} {infoLabel.toLowerCase()}
           </Button>

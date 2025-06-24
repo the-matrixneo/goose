@@ -374,7 +374,7 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({ onClose }) => {
           <div className="flex flex-col md:flex-row gap-2 mb-8">
             <Button
               onClick={handleOpenCreateModal}
-              className="w-full md:w-auto flex items-center gap-2 justify-center text-white dark:text-black bg-bgAppInverse hover:bg-bgStandardInverse [&>svg]:!size-4"
+              className="w-full md:w-auto flex items-center gap-2 justify-center text-white dark:text-black bg-background-defaultInverse hover:bg-bgStandardInverse [&>svg]:!size-4"
             >
               <Plus className="h-4 w-4" /> Create New Schedule
             </Button>
