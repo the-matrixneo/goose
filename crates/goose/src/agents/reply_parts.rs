@@ -36,6 +36,7 @@ impl Agent {
                 Some(RouterToolSelectionStrategy::VectorWithExtensionPassthrough)
             }
             "llm_passthrough" => Some(RouterToolSelectionStrategy::LlmPassthrough),
+            "llm_parallel" => Some(RouterToolSelectionStrategy::LlmParallel),
             _ => None,
         };
 
@@ -67,6 +68,10 @@ impl Agent {
                 self.list_tools_for_router(Some(RouterToolSelectionStrategy::LlmPassthrough))
                     .await
             }
+            Some(RouterToolSelectionStrategy::LlmParallel) => {
+                self.list_tools_for_router(Some(RouterToolSelectionStrategy::LlmParallel))
+                    .await
+            }
             _ => self.list_tools(None).await,
         };
         // Add frontend tools
@@ -89,6 +94,8 @@ impl Agent {
             tool_selection_strategy,
             Some(RouterToolSelectionStrategy::VectorWithExtension)
                 | Some(RouterToolSelectionStrategy::VectorWithExtensionPassthrough)
+                | Some(RouterToolSelectionStrategy::LlmParallel)
+                | Some(RouterToolSelectionStrategy::Llm)
         );
         let mut system_prompt = prompt_manager.build_system_prompt(
             extensions_info,
