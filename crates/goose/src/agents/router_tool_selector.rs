@@ -236,7 +236,12 @@ impl RouterToolSelector for VectorToolSelector {
         extension_description: Option<&str>,
     ) -> Result<(), ToolError> {
         let extension_context = extension_description
-            .map(|desc| format!(" Extension: {} - {}", extension_name, desc))
+            .map(|desc| {
+                format!(
+                    " Extension Name: {}\nExtension Description: {}",
+                    extension_name, desc
+                )
+            })
             .unwrap_or_else(|| format!(" Extension: {}", extension_name));
 
         let texts_to_embed: Vec<String> = tools
@@ -245,8 +250,8 @@ impl RouterToolSelector for VectorToolSelector {
                 let schema_str = serde_json::to_string_pretty(&tool.input_schema)
                     .unwrap_or_else(|_| "{}".to_string());
                 format!(
-                    "{} {} {}{}",
-                    tool.name, tool.description, schema_str, extension_context
+                    "{}\nTool Name:{}\nTool Description:{}\nTool Schema:{}\n",
+                    extension_context, tool.name, tool.description, schema_str,
                 )
             })
             .collect();
