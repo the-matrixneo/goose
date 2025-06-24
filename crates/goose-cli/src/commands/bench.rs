@@ -248,6 +248,7 @@ async fn standard_agent(
         debug: false,
         max_tool_repetitions: None,
         interactive: false, // Benchmarking is non-interactive
+        scheduled_job_id: None,
         quiet: false,
     })
     .await;

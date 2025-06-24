@@ -108,6 +108,7 @@ function ChatContent({
   const [sessionTokenCount, setSessionTokenCount] = useState<number>(0);
   const [ancestorMessages, setAncestorMessages] = useState<Message[]>([]);
   const [droppedFiles, setDroppedFiles] = useState<string[]>([]);
+  const [readyForAutoUserPrompt, setReadyForAutoUserPrompt] = useState(false);
 
   const scrollRef = useRef<ScrollAreaHandle>(null);
 
@@ -127,6 +128,8 @@ function ChatContent({
     window.electron.logInfo(
       'Initial messages when resuming session: ' + JSON.stringify(chat.messages, null, 2)
     );
+    // Set ready for auto user prompt after component initialization
+    setReadyForAutoUserPrompt(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Empty dependency array means this runs once on mount;
 
@@ -160,7 +163,11 @@ function ChatContent({
   } = useMessageStream({
     api: getApiUrl('/reply'),
     initialMessages: chat.messages,
-    body: { session_id: chat.id, session_working_dir: window.appConfig.get('GOOSE_WORKING_DIR') },
+    body: {
+      session_id: chat.id,
+      session_working_dir: window.appConfig.get('GOOSE_WORKING_DIR'),
+      ...(recipeConfig?.scheduledJobId && { scheduled_job_id: recipeConfig.scheduledJobId }),
+    },
     onFinish: async (_message, _reason) => {
       window.electron.stopPowerSaveBlocker();
 
@@ -304,6 +311,40 @@ function ChatContent({
   const initialPrompt = useMemo(() => {
     return recipeConfig?.prompt || '';
   }, [recipeConfig?.prompt]);
+
+  // Auto-send the prompt for scheduled executions
+  useEffect(() => {
+    if (
+      recipeConfig?.isScheduledExecution &&
+      recipeConfig?.prompt &&
+      messages.length === 0 &&
+      !isLoading &&
+      readyForAutoUserPrompt
+    ) {
+      console.log('Auto-sending prompt for scheduled execution:', recipeConfig.prompt);
+
+      // Create and send the user message
+      const userMessage = createUserMessage(recipeConfig.prompt);
+      setLastInteractionTime(Date.now());
+      window.electron.startPowerSaveBlocker();
+      append(userMessage);
+
+      // Scroll to bottom after sending
+      setTimeout(() => {
+        if (scrollRef.current?.scrollToBottom) {
+          scrollRef.current.scrollToBottom();
+        }
+      }, 100);
+    }
+  }, [
+    recipeConfig?.isScheduledExecution,
+    recipeConfig?.prompt,
+    messages.length,
+    isLoading,
+    readyForAutoUserPrompt,
+    append,
+    setLastInteractionTime,
+  ]);
 
   // Handle submit
   const handleSubmit = (e: React.FormEvent) => {

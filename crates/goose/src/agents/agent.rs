@@ -366,6 +366,31 @@ impl Agent {
     ) -> (String, Result<Vec<Content>, ToolError>) {
         let mut extension_manager = self.extension_manager.lock().await;
 
+        let selector = self.router_tool_selector.lock().await.clone();
+        if ToolRouterIndexManager::is_tool_router_enabled(&selector) {
+            if let Some(selector) = selector {
+                let selector_action = if action == "disable" { "remove" } else { "add" };
+                let extension_manager = self.extension_manager.lock().await;
+                let selector = Arc::new(selector);
+                if let Err(e) = ToolRouterIndexManager::update_extension_tools(
+                    &selector,
+                    &extension_manager,
+                    &extension_name,
+                    selector_action,
+                )
+                .await
+                {
+                    return (
+                        request_id,
+                        Err(ToolError::ExecutionError(format!(
+                            "Failed to update vector index: {}",
+                            e
+                        ))),
+                    );
+                }
+            }
+        }
+
         if action == "disable" {
             let result = extension_manager
                 .remove_extension(&extension_name)
@@ -412,34 +437,6 @@ impl Agent {
                 ))]
             })
             .map_err(|e| ToolError::ExecutionError(e.to_string()));
-
-        // Update vector index if operation was successful and vector routing is enabled
-        if result.is_ok() {
-            let selector = self.router_tool_selector.lock().await.clone();
-            if ToolRouterIndexManager::is_tool_router_enabled(&selector) {
-                if let Some(selector) = selector {
-                    let vector_action = if action == "disable" { "remove" } else { "add" };
-                    let extension_manager = self.extension_manager.lock().await;
-                    let selector = Arc::new(selector);
-                    if let Err(e) = ToolRouterIndexManager::update_extension_tools(
-                        &selector,
-                        &extension_manager,
-                        &extension_name,
-                        vector_action,
-                    )
-                    .await
-                    {
-                        return (
-                            request_id,
-                            Err(ToolError::ExecutionError(format!(
-                                "Failed to update vector index: {}",
-                                e
-                            ))),
-                        );
-                    }
-                }
-            }
-        }
 
         (request_id, result)
     }
@@ -578,9 +575,6 @@ impl Agent {
     }
 
     pub async fn remove_extension(&self, name: &str) -> Result<()> {
-        let mut extension_manager = self.extension_manager.lock().await;
-        extension_manager.remove_extension(name).await?;
-
         // If vector tool selection is enabled, remove tools from the index
         let selector = self.router_tool_selector.lock().await.clone();
         if ToolRouterIndexManager::is_tool_router_enabled(&selector) {
@@ -595,6 +589,9 @@ impl Agent {
                 .await?;
             }
         }
+
+        let mut extension_manager = self.extension_manager.lock().await;
+        extension_manager.remove_extension(name).await?;
 
         Ok(())
     }
@@ -634,7 +631,25 @@ impl Agent {
         let (mut tools, mut toolshim_tools, mut system_prompt) =
             self.prepare_tools_and_prompt().await?;
 
-        let goose_mode = config.get_param("GOOSE_MODE").unwrap_or("auto".to_string());
+        // Get goose_mode from config, but override with execution_mode if provided in session config
+        let mut goose_mode = config.get_param("GOOSE_MODE").unwrap_or("auto".to_string());
+
+        // If this is a scheduled job with an execution_mode, override the goose_mode
+        if let Some(session_config) = &session {
+            if let Some(execution_mode) = &session_config.execution_mode {
+                // Map "foreground" to "auto" and "background" to "chat"
+                goose_mode = match execution_mode.as_str() {
+                    "foreground" => "auto".to_string(),
+                    "background" => "chat".to_string(),
+                    _ => goose_mode,
+                };
+                tracing::info!(
+                    "Using execution_mode '{}' which maps to goose_mode '{}'",
+                    execution_mode,
+                    goose_mode
+                );
+            }
+        }
 
         let (tools_with_readonly_annotation, tools_without_annotation) =
             Self::categorize_tools_by_annotation(&tools);
@@ -887,12 +902,23 @@ impl Agent {
     /// Update the provider used by this agent
     pub async fn update_provider(&self, provider: Arc<dyn Provider>) -> Result<()> {
         *self.provider.lock().await = Some(provider.clone());
-        self.update_router_tool_selector(provider).await?;
+        self.update_router_tool_selector(Some(provider), None)
+            .await?;
         Ok(())
     }
 
-    async fn update_router_tool_selector(&self, provider: Arc<dyn Provider>) -> Result<()> {
+    pub async fn update_router_tool_selector(
+        &self,
+        provider: Option<Arc<dyn Provider>>,
+        reindex_all: Option<bool>,
+    ) -> Result<()> {
         let config = Config::global();
+        let extension_manager = self.extension_manager.lock().await;
+        let provider = match provider {
+            Some(p) => p,
+            None => self.provider().await?,
+        };
+
         let router_tool_selection_strategy = config
             .get_param("GOOSE_ROUTER_TOOL_SELECTION_STRATEGY")
             .unwrap_or_else(|_| "default".to_string());
@@ -912,6 +938,13 @@ impl Agent {
         let selector = match strategy {
             Some(RouterToolSelectionStrategy::Vector) => {
                 let table_name = generate_table_id();
+                let selector = create_tool_selector(strategy, provider.clone(), Some(table_name))
+                    .await
+                    .map_err(|e| anyhow!("Failed to create tool selector: {}", e))?;
+                Arc::new(selector)
+            }
+            Some(RouterToolSelectionStrategy::VectorWithExtension) => {
+                let table_name = generate_table_id();
                 let selector = create_tool_selector(strategy, provider, Some(table_name))
                     .await
                     .map_err(|e| anyhow!("Failed to create tool selector: {}", e))?;
@@ -925,6 +958,26 @@ impl Agent {
                 Arc::new(selector)
             }
             Some(RouterToolSelectionStrategy::Llm) => {
+                let selector = create_tool_selector(strategy, provider.clone(), None)
+                    .await
+                    .map_err(|e| anyhow!("Failed to create tool selector: {}", e))?;
+                Arc::new(selector)
+            }
+            Some(RouterToolSelectionStrategy::VectorPassthrough) => {
+                let table_name = generate_table_id();
+                let selector = create_tool_selector(strategy, provider, Some(table_name))
+                    .await
+                    .map_err(|e| anyhow!("Failed to create tool selector: {}", e))?;
+                Arc::new(selector)
+            }
+            Some(RouterToolSelectionStrategy::VectorWithExtensionPassthrough) => {
+                let table_name = generate_table_id();
+                let selector = create_tool_selector(strategy, provider, Some(table_name))
+                    .await
+                    .map_err(|e| anyhow!("Failed to create tool selector: {}", e))?;
+                Arc::new(selector)
+            }
+            Some(RouterToolSelectionStrategy::LlmPassthrough) => {
                 let selector = create_tool_selector(strategy, provider, None)
                     .await
                     .map_err(|e| anyhow!("Failed to create tool selector: {}", e))?;
@@ -952,8 +1005,31 @@ impl Agent {
             }
             None => return Ok(()),
         };
-        let extension_manager = self.extension_manager.lock().await;
+
+        // First index platform tools
         ToolRouterIndexManager::index_platform_tools(&selector, &extension_manager).await?;
+
+        if reindex_all.unwrap_or(false) {
+            let enabled_extensions = extension_manager.list_extensions().await?;
+            for extension_name in enabled_extensions {
+                if let Err(e) = ToolRouterIndexManager::update_extension_tools(
+                    &selector,
+                    &extension_manager,
+                    &extension_name,
+                    "add",
+                )
+                .await
+                {
+                    tracing::error!(
+                        "Failed to index tools for extension {}: {}",
+                        extension_name,
+                        e
+                    );
+                }
+            }
+        }
+
+        // Update the selector
         *self.router_tool_selector.lock().await = Some(selector.clone());
         Ok(())
     }
