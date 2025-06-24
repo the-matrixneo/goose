@@ -224,8 +224,8 @@ pub fn generate_session_id() -> String {
 pub fn read_messages(session_file: &Path) -> Result<Vec<Message>> {
     let result = read_messages_with_truncation(session_file, Some(50000)); // 50KB limit per message content
     match &result {
-        Ok(messages) => println!("✅ [SESSION] Successfully read {} messages from: {:?}", messages.len(), session_file),
-        Err(e) => println!("❌ [SESSION] Failed to read messages from {:?}: {}", session_file, e),
+        Ok(messages) => println!("[SESSION] Successfully read {} messages from: {:?}", messages.len(), session_file),
+        Err(e) => println!("[SESSION] Failed to read messages from {:?}: {}", session_file, e),
     }
     result
 }
@@ -243,13 +243,13 @@ pub fn read_messages_with_truncation(
     // Check if there's a backup file we should restore from
     let backup_file = session_file.with_extension("backup");
     if !session_file.exists() && backup_file.exists() {
-        println!("🔄 [SESSION] Session file missing but backup exists, restoring from backup: {:?}", backup_file);
+        println!("[SESSION] Session file missing but backup exists, restoring from backup: {:?}", backup_file);
         tracing::warn!(
             "Session file missing but backup exists, restoring from backup: {:?}",
             backup_file
         );
         if let Err(e) = fs::copy(&backup_file, session_file) {
-            println!("❌ [SESSION] Failed to restore from backup: {}", e);
+            println!("[SESSION] Failed to restore from backup: {}", e);
             tracing::error!("Failed to restore from backup: {}", e);
         }
     }
@@ -282,18 +282,18 @@ pub fn read_messages_with_truncation(
                             messages.push(message);
                         }
                         Err(e) => {
-                            println!("❌ [SESSION] Failed to parse first line as message: {}", e);
-                            println!("🔄 [SESSION] Attempting to recover corrupted first line...");
+                            println!("[SESSION] Failed to parse first line as message: {}", e);
+                            println!("[SESSION] Attempting to recover corrupted first line...");
                             tracing::warn!("Failed to parse first line as message: {}", e);
                             
                             // Try to recover the corrupted line
                             match attempt_corruption_recovery(&line, max_content_size) {
                                 Ok(recovered) => {
-                                    println!("✅ [SESSION] Successfully recovered corrupted first line!");
+                                    println!("[SESSION] Successfully recovered corrupted first line!");
                                     messages.push(recovered);
                                 }
                                 Err(recovery_err) => {
-                                    println!("❌ [SESSION] Failed to recover corrupted first line: {}", recovery_err);
+                                    println!("[SESSION] Failed to recover corrupted first line: {}", recovery_err);
                                     corrupted_lines.push((line_number, line));
                                 }
                             }
