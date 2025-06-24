@@ -36,9 +36,10 @@ use crate::agents::router_tool_selector::{
     create_tool_selector, RouterToolSelectionStrategy, RouterToolSelector,
 };
 use crate::agents::router_tools::{
-    ROUTER_LLM_SEARCH_TOOL_NAME, ROUTER_VECTOR_SEARCH_TOOL_NAME, 
-    ROUTER_VECTOR_SEARCH_WITH_EXTENSION_TOOL_NAME, ROUTER_VECTOR_SEARCH_PASSTHROUGH_TOOL_NAME,
-    ROUTER_VECTOR_SEARCH_WITH_EXTENSION_PASSTHROUGH_TOOL_NAME, ROUTER_LLM_SEARCH_PASSTHROUGH_TOOL_NAME
+    ROUTER_LLM_SEARCH_PASSTHROUGH_TOOL_NAME, ROUTER_LLM_SEARCH_TOOL_NAME,
+    ROUTER_VECTOR_SEARCH_PASSTHROUGH_TOOL_NAME, ROUTER_VECTOR_SEARCH_TOOL_NAME,
+    ROUTER_VECTOR_SEARCH_WITH_EXTENSION_PASSTHROUGH_TOOL_NAME,
+    ROUTER_VECTOR_SEARCH_WITH_EXTENSION_TOOL_NAME,
 };
 use crate::agents::tool_router_index_manager::ToolRouterIndexManager;
 use crate::agents::tool_vectordb::generate_table_id;
@@ -278,21 +279,25 @@ impl Agent {
             tracing::warn!(
                 "Router tool search called: tool={}, arguments={}",
                 tool_call.name,
-                serde_json::to_string_pretty(&tool_call.arguments).unwrap_or_else(|_| "invalid json".to_string())
+                serde_json::to_string_pretty(&tool_call.arguments)
+                    .unwrap_or_else(|_| "invalid json".to_string())
             );
-            
+
             let selector = self.router_tool_selector.lock().await.clone();
-            
+
             // Determine if this is a passthrough tool
             let is_passthrough = tool_call.name == ROUTER_VECTOR_SEARCH_PASSTHROUGH_TOOL_NAME
                 || tool_call.name == ROUTER_VECTOR_SEARCH_WITH_EXTENSION_PASSTHROUGH_TOOL_NAME
                 || tool_call.name == ROUTER_LLM_SEARCH_PASSTHROUGH_TOOL_NAME;
-            
+
             let selected_tools = match selector.as_ref() {
                 Some(selector) => {
                     if is_passthrough {
                         // Pass the actual user's last message for passthrough strategies
-                        match selector.select_tools_with_context(tool_call.arguments.clone(), user_message).await {
+                        match selector
+                            .select_tools_with_context(tool_call.arguments.clone(), user_message)
+                            .await
+                        {
                             Ok(tools) => tools,
                             Err(e) => {
                                 return (
@@ -655,7 +660,7 @@ impl Agent {
             .and_then(|msg| msg.content.first())
             .and_then(|c| c.as_text())
             .map(|s| s.to_string());
-        
+
         if let Some(content) = &user_message_content {
             debug!("user_message" = content);
         }
@@ -923,7 +928,9 @@ impl Agent {
             "vector_with_extension" => Some(RouterToolSelectionStrategy::VectorWithExtension),
             "llm" => Some(RouterToolSelectionStrategy::Llm),
             "vector_passthrough" => Some(RouterToolSelectionStrategy::VectorPassthrough),
-            "vector_with_extension_passthrough" => Some(RouterToolSelectionStrategy::VectorWithExtensionPassthrough),
+            "vector_with_extension_passthrough" => {
+                Some(RouterToolSelectionStrategy::VectorWithExtensionPassthrough)
+            }
             "llm_passthrough" => Some(RouterToolSelectionStrategy::LlmPassthrough),
             _ => None,
         };

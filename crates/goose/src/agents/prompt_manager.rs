@@ -5,9 +5,9 @@ use std::collections::HashMap;
 use crate::agents::extension::ExtensionInfo;
 use crate::agents::router_tool_selector::RouterToolSelectionStrategy;
 use crate::agents::router_tools::{
-    llm_search_tool_prompt, vector_search_tool_prompt, vector_search_tool_with_extension_prompt,
-    vector_search_passthrough_tool_prompt, vector_search_with_extension_passthrough_tool_prompt,
-    llm_search_passthrough_tool_prompt
+    llm_search_passthrough_tool_prompt, llm_search_tool_prompt,
+    vector_search_passthrough_tool_prompt, vector_search_tool_prompt,
+    vector_search_tool_with_extension_prompt, vector_search_with_extension_passthrough_tool_prompt,
 };
 use crate::providers::base::get_current_model;
 use crate::{config::Config, prompt_template};
@@ -93,7 +93,10 @@ impl PromptManager {
         if vector_search_with_extension_enabled {
             context.insert("extensions", serde_json::to_value(extensions_info).unwrap());
         } else {
-            context.insert("extensions", serde_json::to_value(Vec::<ExtensionInfo>::new()).unwrap());
+            context.insert(
+                "extensions",
+                serde_json::to_value(Vec::<ExtensionInfo>::new()).unwrap(),
+            );
         }
 
         match tool_selection_strategy {
