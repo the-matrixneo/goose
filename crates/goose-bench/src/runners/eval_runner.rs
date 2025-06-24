@@ -14,18 +14,62 @@ use std::future::Future;
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::Arc;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::Mutex;
-use tracing;
+use std::collections::VecDeque;
+
+// Agent pool for reusing agents across dataset rows
+#[derive(Clone)]
+struct AgentPool {
+    agents: Arc<Mutex<VecDeque<BenchAgent>>>,
+    max_size: usize,
+}
+
+impl AgentPool {
+    fn new(size: usize) -> Self {
+        Self {
+            agents: Arc::new(Mutex::new(VecDeque::new())),
+            max_size: size,
+        }
+    }
+
+    async fn get_agent(&self) -> Option<BenchAgent> {
+        let mut agents = self.agents.lock().await;
+        let agent = agents.pop_front();
+        if agent.is_some() {
+            tracing::debug!(pool_size = agents.len(), "Agent retrieved from pool");
+        }
+        agent
+    }
+
+    async fn return_agent(&self, mut agent: BenchAgent) {
+        // Reset agent state before returning to pool
+        match agent.reset_for_reuse().await {
+            Ok(()) => {
+                let mut agents = self.agents.lock().await;
+                if agents.len() < self.max_size {
+                    agents.push_back(agent);
+                    tracing::debug!(pool_size = agents.len(), "Agent returned to pool");
+                } else {
+                    tracing::debug!("Pool full, discarding agent");
+                }
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, "Failed to reset agent, discarding");
+            }
+        }
+    }
+
+}
 
 // Configuration struct to reduce function parameter count
 #[derive(Clone)]
 struct RowProcessingConfig<'a> {
     dataset_config: &'a crate::bench_config::BenchDataset,
-    dataset_rate_config: &'a Option<crate::bench_config::BenchDatasetConfig>,
     selector: String,
-    request_delay_ms: Option<u64>,
-    agent_creation_mutex: Arc<Mutex<()>>,
+    agent_pool: AgentPool,
+    all_tools: Option<HashMap<String, Vec<Tool>>>,
+    shared_table_name: Option<String>,
 }
 
 // Stateless functions for parallel processing
@@ -48,98 +92,106 @@ where
 
         let session_id = format!("{}-{}-row{}", config.selector, now_stamp, idx);
 
-        let extensions = parse_extensions_stateless(&row, &config.dataset_config.tools_column)?;
+        // Use pre-scanned tools if available, otherwise parse from row
+        let extensions = if let Some(ref all_tools) = config.all_tools {
+            all_tools.clone()
+        } else {
+            parse_extensions_stateless(&row, &config.dataset_config.tools_column)?
+        };
 
-        // Serialize agent creation to prevent database table conflicts
-        let mut agent = {
-            let _lock = config.agent_creation_mutex.lock().await;
-            agent_generator(
+        // Try to get an agent from the pool, otherwise create a new one
+        let mut agent = if let Some(pooled_agent) = config.agent_pool.get_agent().await {
+            tracing::debug!(
+                row_idx = idx,
+                "Retrieved agent from pool"
+            );
+            pooled_agent
+        } else {
+            tracing::debug!(row_idx = idx, "No agent available in pool, creating new one");
+            // Set environment variables for shared vector database if available
+            let _env_guards = if let Some(table_name) = &config.shared_table_name {
+                let router_guard = env::var("GOOSE_ROUTER_TOOL_SELECTION_STRATEGY")
+                    .map(|_| None)
+                    .unwrap_or_else(|_| {
+                        env::set_var("GOOSE_ROUTER_TOOL_SELECTION_STRATEGY", "vector");
+                        Some("GOOSE_ROUTER_TOOL_SELECTION_STRATEGY")
+                    });
+                
+                // Set table name as a temporary environment variable for the agent
+                env::set_var("GOOSE_BENCH_SHARED_TABLE", table_name);
+                vec![router_guard, Some("GOOSE_BENCH_SHARED_TABLE")]
+            } else {
+                vec![]
+            };
+            
+            let agent = agent_generator(
                 ExtensionRequirements::default(),
                 session_id,
                 true,
                 Some(extensions),
             )
-            .await
+            .await;
+            
+            // Clean up environment variables
+            for guard in _env_guards.into_iter().flatten() {
+                env::remove_var(guard);
+            }
+            
+            agent
         };
 
         if let Some(system_prompt) = get_dataset_system_prompt_stateless(&row, &config.dataset_config.system_prompt_column) {
             agent.session.override_system_prompt(system_prompt).await;
         }
         
-        let prompt = row
-            .get(&config.dataset_config.prompt_column)
-            .and_then(|v| v.as_str())
-            .context("Missing prompt field")?;
-
-        // Log the prompt being processed
-        let verbose_conversations = std::env::var("GOOSE_BENCH_VERBOSE_CONVERSATIONS")
-            .map(|v| v == "1" || v.to_lowercase() == "true")
-            .unwrap_or(false);
-            
-        if verbose_conversations {
-            tracing::info!("Processing row {} with prompt: {}", idx, prompt);
-        } else {
-            tracing::info!("Processing row {}", idx);
+        let prompts = match row.get(&config.dataset_config.prompt_column) {
+            Some(value) => {
+                if let Some(array) = value.as_array() {
+                    // Handle array case - new format
+                    let prompt_strs: Result<Vec<&str>> = array
+                        .iter()
+                        .map(|v| v.as_str().ok_or_else(|| anyhow::anyhow!("Prompt array must contain strings")))
+                        .collect();
+                    prompt_strs?.into_iter().map(|s| s.to_string()).collect()
+                } else if let Some(single_str) = value.as_str() {
+                    // Handle single string case - backward compatibility
+                    vec![
+                        single_str.to_string(),
+                        "Please immediately do whatever you think is most sensible.".to_string(),
+                    ]
+                } else {
+                    bail!("Prompt field must be either a string or an array of strings");
+                }
+            }
+            None => bail!("Missing prompt field"),
+        };
+        
+        if prompts.is_empty() {
+            bail!("Prompt array must contain at least one string");
         }
 
-        if let Some(delay) = config.request_delay_ms {
-            tokio::time::sleep(Duration::from_millis(delay)).await;
-        }
+        // Row-level rate limiting is now handled by the global rate limiter
 
         // Add timeout to prevent hanging on LLM clarifying questions
         let prompt_timeout = tokio::time::Duration::from_secs(300);
         let result = match tokio::time::timeout(prompt_timeout, async {
-            // Use interaction limit if specified, otherwise use unlimited interactions
-            match config.dataset_rate_config.as_ref().and_then(|dc| dc.max_interactions) {
-                Some(max_interactions) => agent.prompt_with_limit(prompt.to_string(), max_interactions).await,
-                None => agent.prompt(prompt.to_string()).await,
-            }
+            agent.prompt_multi_turn(prompts).await
         }).await {
             Ok(result) => {
                 // Log conversation results
-                match &result {
-                    Ok(messages) => {
-                        tracing::info!("Row {} completed successfully with {} messages", idx, messages.len());
-                        if verbose_conversations {
-                            for (i, msg) in messages.iter().enumerate() {
-                                let role = match msg.role {
-                                    mcp_core::role::Role::User => "User",
-                                    mcp_core::role::Role::Assistant => "Assistant",
-                                };
-                                let content = msg.content.iter()
-                                    .map(|c| match c {
-                                        goose::message::MessageContent::Text(text) => text.text.clone(),
-                                        goose::message::MessageContent::ToolRequest(tool_req) => {
-                                            match &tool_req.tool_call {
-                                                Ok(tool_call) => format!("[Tool: {}]", tool_call.name),
-                                                Err(_) => "[Tool: <invalid>]".to_string(),
-                                            }
-                                        },
-                                        goose::message::MessageContent::ToolResponse(_) => "[Tool Response]".to_string(),
-                                        _ => "<other content>".to_string(),
-                                    })
-                                    .collect::<Vec<_>>()
-                                    .join(" ");
-                                tracing::info!("  Message {}: {} - {}", i, role, content);
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        tracing::warn!("Row {} failed with error: {}", idx, e);
-                    }
-                }
                 result
             }
             Err(_timeout) => {
-                tracing::warn!("Agent prompt timed out after 300 seconds for row {}", idx);
                 Err(anyhow::anyhow!("Prompt timeout - likely LLM asking for clarification"))
             }
         };
 
-        // Ensure extensions are properly shut down to prevent subprocess leaks
-        if let Err(e) = agent.shutdown().await {
-            tracing::warn!("Failed to shutdown agent extensions for row {}: {}", idx, e);
-        }
+        // Return agent to pool instead of shutting it down
+        config.agent_pool.return_agent(agent).await;
+        tracing::debug!(
+            row_idx = idx,
+            "Returned agent to pool"
+        );
 
         Ok::<(Result<Vec<goose::message::Message>>, bool), anyhow::Error>((result, false))
     }
@@ -273,6 +325,11 @@ impl EvalRunner {
         Ok(work_dir)
     }
 
+    /// Helper method to get the dataset config from the global dataset
+    fn get_dataset_config(&self) -> Option<&crate::bench_config::BenchDatasetConfig> {
+        self.config.dataset.as_ref().and_then(|d| d.config.as_ref())
+    }
+
     pub async fn run<F, Fut>(&mut self, agent_generator: F) -> Result<()>
     where
         F: Fn(ExtensionRequirements, String, bool, Option<HashMap<String, Vec<Tool>>>) -> Fut
@@ -285,7 +342,7 @@ impl EvalRunner {
             .first()
             .context("No evaluations specified in configuration")?;
 
-        if bench_eval.dataset.is_some() {
+        if self.config.dataset.is_some() {
             return self.run_dataset(agent_generator).await;
         }
 
@@ -302,7 +359,6 @@ impl EvalRunner {
 
         // create entire dir subtree for eval and cd into dir for running eval
         work_dir.set_eval(&bench_eval.selector, run_id);
-        tracing::info!("Set evaluation directory for {}", bench_eval.selector);
 
         if let Some(eval) = EvaluationSuite::from(&bench_eval.selector) {
             let now_stamp = SystemTime::now()
@@ -313,25 +369,17 @@ impl EvalRunner {
             let session_id = format!("{}-{}", bench_eval.selector.clone(), now_stamp);
             let mut agent =
                 agent_generator(eval.required_extensions(), session_id, false, None).await;
-            tracing::info!("Agent created for {}", eval.name());
 
             let mut result = EvaluationResult::new(eval.name().to_string());
 
-            match eval.run(&mut agent, &mut work_dir).await {
-                Ok(metrics) => {
-                    tracing::info!("Evaluation run successful with {} metrics", metrics.len());
-                    for (name, metric) in metrics {
-                        result.add_metric(name, metric);
-                    }
-                }
-                Err(e) => {
-                    tracing::error!("Evaluation run failed: {}", e);
+            if let Ok(metrics) = eval.run(&mut agent, &mut work_dir).await {
+                for (name, metric) in metrics {
+                    result.add_metric(name, metric);
                 }
             }
 
             // Add any errors that occurred
             let errors = agent.get_errors().await;
-            tracing::info!("Agent reported {} errors", errors.len());
             for error in errors {
                 result.add_error(error);
             }
@@ -351,17 +399,12 @@ impl EvalRunner {
                 )
             })?;
 
-            tracing::info!(
-                "Wrote evaluation results to {}",
-                eval_results_file.display()
-            );
 
             self.config.save("config.cfg".to_string());
             work_dir.save();
 
             // handle running post-process cmd if configured
             if let Some(cmd) = &bench_eval.post_process_cmd {
-                tracing::info!("Running post-process command: {:?}", cmd);
 
                 let handle = Command::new(cmd)
                     .arg(&eval_results_file)
@@ -383,9 +426,7 @@ impl EvalRunner {
                 .context("Failed to copy session file to evaluation directory")?;
 
 
-            tracing::info!("Evaluation completed successfully");
         } else {
-            tracing::error!("No evaluation found for selector: {}", bench_eval.selector);
             bail!("No evaluation found for selector: {}", bench_eval.selector);
         }
 
@@ -402,7 +443,8 @@ impl EvalRunner {
             .evals
             .first()
             .context("No evaluations specified")?;
-        let dataset_config = bench_eval
+        let dataset_config = self
+            .config
             .dataset
             .as_ref()
             .context("No dataset specified")?;
@@ -411,25 +453,41 @@ impl EvalRunner {
             bail!("Prompt column cannot be empty");
         }
 
-        let dataset: serde_json::Value =
-            serde_json::from_str(&std::fs::read_to_string(&dataset_config.path)?)?;
+        tracing::info!(path = %dataset_config.path.display(), "Loading dataset file");
+        
+        let file_content = std::fs::read_to_string(&dataset_config.path)?;
+        tracing::info!(
+            file_size_mb = file_content.len() as f64 / 1024.0 / 1024.0,
+            "Dataset file loaded"
+        );
+        
+        let dataset: serde_json::Value = serde_json::from_str(&file_content)?;
+        tracing::info!("Dataset JSON parsed");
+        
         let mut rows = dataset
             .as_array()
             .context("Dataset must be an array")?
             .clone();
 
-        if let Some(dataset_cfg) = &self.config.dataset_config {
+        // Apply debug size limit BEFORE scanning tools to avoid processing huge datasets
+        if let Some(dataset_cfg) = self.get_dataset_config() {
             if let Some(debug_size) = dataset_cfg.debug_size {
                 if debug_size > 0 {
                     let limit = debug_size as usize;
                     rows.truncate(limit);
                     tracing::info!(
-                        "Limited dataset to {} rows due to debug_size setting",
-                        limit
+                        original_size = dataset.as_array().unwrap().len(),
+                        debug_size = limit,
+                        "Applied debug size limit to dataset"
                     );
                 }
             }
         }
+        
+        tracing::info!(
+            final_row_count = rows.len(),
+            "Dataset loading completed"
+        );
 
         let mut work_dir = self
             .create_work_dir(&self.config)
@@ -443,21 +501,39 @@ impl EvalRunner {
         let run_id = format!("run-{}", run_id.clone());
 
         work_dir.set_eval(&bench_eval.selector, run_id);
-        tracing::info!("Set evaluation directory for {}", bench_eval.selector);
+
+        // Now scan the TRUNCATED rows to collect all unique tools/extensions
+        let mut all_tools: HashMap<String, Vec<Tool>> = HashMap::new();
+        if dataset_config.tools_column.is_some() {
+            tracing::info!(row_count = rows.len(), "Starting tool scanning");
+            for row in &rows {
+                if let Ok(tools) = parse_extensions_stateless(&row, &dataset_config.tools_column) {
+                    for (ext_name, tools_vec) in tools {
+                        let entry = all_tools.entry(ext_name).or_insert_with(Vec::new);
+                        // Union tools, avoiding duplicates based on tool name
+                        for tool in tools_vec {
+                            if !entry.iter().any(|t| t.name == tool.name) {
+                                entry.push(tool);
+                            }
+                        }
+                    }
+                }
+            }
+            tracing::info!(
+                tools_found = all_tools.len(),
+                "Tool scanning completed"
+            );
+        }
+
+        // Skip shared vector database creation since tool_vectordb module is private
+        let shared_table_name: Option<String> = None;
 
         // Process all rows with maximum parallelism using chunked approach
         let max_concurrent = self
-            .config
-            .dataset_config
-            .as_ref()
+            .get_dataset_config()
             .map(|dc| dc.max_concurrent)
             .unwrap_or(10);
 
-        tracing::info!(
-            "Processing {} rows with max concurrency {}",
-            rows.len(),
-            max_concurrent
-        );
 
         // Process rows in parallel with rate limiting
         let bench_eval = self
@@ -467,36 +543,88 @@ impl EvalRunner {
             .context("No evaluations specified")?;
         let selector = bench_eval.selector.clone();
 
-        let request_delay_ms = self
-            .config
-            .dataset_config
-            .as_ref()
-            .and_then(|dc| dc.requests_per_second)
-            .map(|rps| (1000.0 / rps) as u64);
+        // Initialize global rate limiter if configured
+        if let Some(dataset_cfg) = self.get_dataset_config() {
+            if let Some(rate_limit_rps) = dataset_cfg.rate_limit_rps {
+                // Use a reasonable burst capacity (2x the rate or minimum 10)
+                let burst_capacity = ((rate_limit_rps * 2.0).ceil() as u32).max(10);
+                crate::rate_limiter::initialize_global_rate_limiter(rate_limit_rps, Some(burst_capacity));
+            } else {
+                crate::rate_limiter::disable_global_rate_limiter();
+            }
+        } else {
+            crate::rate_limiter::disable_global_rate_limiter();
+        }
 
-        let chunk_delay_ms = self
-            .config
-            .dataset_config
-            .as_ref()
-            .and_then(|dc| dc.chunk_delay_ms)
-            .unwrap_or(0);
-
-        let agent_creation_mutex = Arc::new(Mutex::new(()));
+        // Create and pre-warm agent pool with size equal to max_concurrent
+        let agent_pool = AgentPool::new(max_concurrent);
+        
+        // Pre-warm the pool by creating all agents upfront
+        tracing::info!(pool_size = max_concurrent, "Pre-warming agent pool");
+        
+        // Create progress bar for agent pool warming
+        let warmup_progress = ProgressBar::new(max_concurrent as u64);
+        warmup_progress.set_style(
+            ProgressStyle::default_bar()
+                .template("{bar:40.green/blue} {pos}/{len} agents ({percent}%) [{elapsed_precise}] {msg}")
+                .unwrap()
+                .progress_chars("##-"),
+        );
+        warmup_progress.set_message("Initializing agents with extensions");
+        
+        for i in 0..max_concurrent {
+            let warmup_session_id = format!("{}-warmup-{}", selector, i);
+            
+            // Set environment variables for shared vector database if available
+            let _env_guards = if let Some(table_name) = &shared_table_name {
+                let router_guard = env::var("GOOSE_ROUTER_TOOL_SELECTION_STRATEGY")
+                    .map(|_| None)
+                    .unwrap_or_else(|_| {
+                        env::set_var("GOOSE_ROUTER_TOOL_SELECTION_STRATEGY", "vector");
+                        Some("GOOSE_ROUTER_TOOL_SELECTION_STRATEGY")
+                    });
+                
+                env::set_var("GOOSE_BENCH_SHARED_TABLE", table_name);
+                vec![router_guard, Some("GOOSE_BENCH_SHARED_TABLE")]
+            } else {
+                vec![]
+            };
+            
+            let agent = agent_generator(
+                ExtensionRequirements::default(),
+                warmup_session_id,
+                true,
+                if all_tools.is_empty() { None } else { Some(all_tools.clone()) },
+            )
+            .await;
+            
+            // Clean up environment variables
+            for guard in _env_guards.into_iter().flatten() {
+                env::remove_var(guard);
+            }
+            
+            // Add the pre-warmed agent to the pool
+            agent_pool.return_agent(agent).await;
+            
+            // Update progress
+            warmup_progress.inc(1);
+            let progress_msg = format!("Agent {} ready", i + 1);
+            warmup_progress.set_message(progress_msg);
+            
+            tracing::debug!(agent_index = i, "Agent pre-warmed and added to pool");
+        }
+        
+        // Finish progress bar
+        warmup_progress.finish_with_message("Agent pool ready for processing");
+        
+        tracing::info!(
+            pool_size = max_concurrent,
+            "Agent pool pre-warming completed"
+        );
 
         let mut all_results = Vec::new();
         let chunk_size = max_concurrent;
 
-        tracing::info!(
-            "Processing {} rows in chunks of {} with rate limiting and serialized agent creation",
-            rows.len(),
-            chunk_size
-        );
-        if let Some(delay) = request_delay_ms {
-            tracing::info!("Request delay: {}ms", delay);
-        }
-        if chunk_delay_ms > 0 {
-            tracing::info!("Chunk delay: {}ms", chunk_delay_ms);
-        }
 
         // Create progress bar
         let progress = ProgressBar::new(rows.len() as u64);
@@ -508,25 +636,27 @@ impl EvalRunner {
         );
         progress.set_message("Processing dataset");
 
+        tracing::info!(total_rows = rows.len(), "Starting row processing");
+
         for (chunk_num, chunk) in rows.chunks(chunk_size).enumerate() {
-            tracing::debug!("Processing chunk {} with {} rows", chunk_num, chunk.len());
+            tracing::debug!(chunk_num = chunk_num, chunk_size = chunk.len(), "Processing chunk");
 
             let futures: Vec<_> = chunk
                 .iter()
                 .enumerate()
                 .map(|(chunk_idx, row)| {
                     let global_idx = chunk_num * chunk_size + chunk_idx;
-                    let mutex_clone = Arc::clone(&agent_creation_mutex);
+                    let pool_clone = agent_pool.clone();
                     process_single_dataset_row_stateless(
                         global_idx,
                         row.clone(),
                         agent_generator.clone(),
                         RowProcessingConfig {
                             dataset_config,
-                            dataset_rate_config: &self.config.dataset_config,
                             selector: selector.clone(),
-                            request_delay_ms,
-                            agent_creation_mutex: mutex_clone,
+                            agent_pool: pool_clone,
+                            all_tools: if all_tools.is_empty() { None } else { Some(all_tools.clone()) },
+                            shared_table_name: shared_table_name.clone(),
                         },
                     )
                 })
@@ -534,15 +664,23 @@ impl EvalRunner {
 
             let chunk_results = futures::future::join_all(futures).await;
             all_results.extend(chunk_results);
+            
+            tracing::info!(
+                chunk_num = chunk_num,
+                rows_processed = chunk.len(),
+                "Chunk processing completed"
+            );
 
             // Update progress bar by the number of rows completed in this chunk
             progress.inc(chunk.len() as u64);
 
-            if chunk_delay_ms > 0 && chunk_num < rows.len() / chunk_size {
-                tracing::debug!("Waiting {}ms before next chunk", chunk_delay_ms);
-                tokio::time::sleep(Duration::from_millis(chunk_delay_ms)).await;
-            }
+            // Chunk delays are now handled by the global rate limiter
         }
+        
+        tracing::info!(
+            total_rows_processed = rows.len(),
+            "All row processing completed"
+        );
 
         // Finish progress bar
         progress.finish_with_message("Dataset processing complete");
@@ -558,7 +696,6 @@ impl EvalRunner {
     ) -> Result<()> {
         let results_path = format!("{}_results.json", selector);
         std::fs::write(&results_path, serde_json::to_string_pretty(&results)?)?;
-        tracing::info!("Wrote dataset evaluation results to {}", results_path);
         Ok(())
     }
 
@@ -576,4 +713,5 @@ impl EvalRunner {
         );
         PathBuf::from(eval_results_location.clone())
     }
+
 }

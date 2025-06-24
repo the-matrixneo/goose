@@ -225,6 +225,7 @@ pub async fn agent_generator(
     }
 }
 
+
 async fn standard_agent(
     requirements: ExtensionRequirements,
     session_id: String,
@@ -263,24 +264,24 @@ async fn dataset_agent(
     session_id: String,
     available_extensions: Option<HashMap<String, Vec<Tool>>>,
 ) -> BenchAgent {
+    tracing::info!(session_id = %session_id, "Starting dataset agent creation");
+
     // Set up clean config environment automatically for dataset benchmarking
     let _config_guard = setup_clean_config_for_datasets()
-        .unwrap_or_else(|e| {
-            eprintln!("Warning: Could not set up clean config for dataset benchmarking: {}", e);
-            eprintln!("Proceeding anyway, but may encounter file descriptor limits.");
-            // Return a dummy guard that doesn't modify environment
-            EnvGuard::new("GOOSE_DATASET_FALLBACK", "1")
-        });
+        .unwrap_or_else(|_| EnvGuard::new("GOOSE_DATASET_FALLBACK", "1"));
+    tracing::debug!("Config setup completed");
 
     // Create Agent directly instead of going through session
     let agent = goose::agents::Agent::new();
+    tracing::debug!("Base agent created");
     
     // Configure provider for the agent
     use goose::config::Config;
     use goose::providers::create;
     use goose::model::ModelConfig;
     
-    let config = Config::global();
+    // For dataset benchmarking, use a fresh config instance that respects GOOSE_CONFIG_DIR
+    let config = Config::default();
     let provider_name = config
         .get_param::<String>("GOOSE_PROVIDER")
         .unwrap_or_else(|_| "anthropic".to_string());
@@ -288,22 +289,21 @@ async fn dataset_agent(
         .get_param::<String>("GOOSE_MODEL")
         .unwrap_or_else(|_| "claude-3-5-sonnet-20241022".to_string());
     
-    let model_config = ModelConfig::new(model_name);
+    let model_config = ModelConfig::new(model_name.clone());
     let provider = create(&provider_name, model_config)
-        .unwrap_or_else(|e| {
-            eprintln!("Failed to create provider: {}", e);
-            std::process::exit(1);
-        });
+        .unwrap_or_else(|_| std::process::exit(1));
     
     agent.update_provider(provider).await
-        .unwrap_or_else(|e| {
-            eprintln!("Failed to update provider: {}", e);
-            std::process::exit(1);
-        });
+        .unwrap_or_else(|_| std::process::exit(1));
+    tracing::debug!(provider = %provider_name, model = %model_name, "Provider configured");
 
     // Prepare mock extensions as Stdio MCP extensions and add them to the agent
     if let Some(extensions) = available_extensions {
+        let extension_count = extensions.len();
+        tracing::debug!(extension_count = extension_count, "Starting extension setup");
+        
         for (ext_name, tools) in extensions {
+            
             // Use cached serialization and binary path for better performance
             let tools_base64 = get_cached_tools_base64(&ext_name, &tools);
             let binary_path = get_cached_binary_path();
@@ -329,7 +329,7 @@ async fn dataset_agent(
                 cmd,
                 args,
                 envs: Envs::new(HashMap::from([
-                    ("EXTENSION_NAME".to_string(), ext_name),
+                    ("EXTENSION_NAME".to_string(), ext_name.clone()),
                     ("EXTENSION_TOOLS".to_string(), tools_base64),
                 ])),
                 env_keys: vec![],
@@ -339,10 +339,26 @@ async fn dataset_agent(
             };
 
             // Add extension directly to agent
-            if let Err(e) = agent.add_extension(extension_config).await {
-                tracing::warn!("Failed to add extension: {}", e);
+            let add_result = agent.add_extension(extension_config).await;
+            
+            match add_result {
+                Ok(_) => tracing::debug!(
+                    extension = %ext_name,
+                    tools_count = tools.len(),
+                    "Extension added successfully"
+                ),
+                Err(e) => tracing::warn!(
+                    extension = %ext_name,
+                    error = %e,
+                    "Extension failed to add"
+                ),
             }
         }
+        
+        tracing::debug!(
+            extension_count = extension_count,
+            "All extensions setup completed"
+        );
     }
     
     // Create an InteractionLimitedAgent with the configured agent
@@ -356,12 +372,19 @@ async fn dataset_agent(
     
     // Wrap in BenchAgent for compatibility
     let bench_agent = BenchAgent::new(Box::new(wrapper));
+    tracing::debug!("Agent wrappers created");
 
     // Environment variable is automatically restored when _config_guard is dropped
     
     // Initialize logging with error capture
     let errors = Some(Arc::new(Mutex::new(bench_agent.get_errors().await)));
     logging::setup_logging(Some("bench"), errors).expect("Failed to initialize logging");
+    tracing::debug!("Logging setup completed");
+
+    tracing::info!(
+        session_id = %session_id,
+        "Dataset agent creation completed"
+    );
 
     bench_agent
 }

@@ -67,6 +67,19 @@ impl BenchAgent {
             self.prompt(prompt).await
         }
     }
+    
+    pub async fn prompt_multi_turn(&mut self, prompts: Vec<String>) -> anyhow::Result<Vec<Message>> {
+        // Try to downcast to InteractionLimitedAgent
+        if let Some(interaction_limited) = self.session.as_any_mut().downcast_mut::<crate::interaction_limited_agent::InteractionLimitedAgent>() {
+            interaction_limited.prompt_multi_turn(prompts).await
+        } else {
+            // Fallback to single prompt for non-InteractionLimitedAgent sessions
+            if prompts.is_empty() {
+                return Err(anyhow::anyhow!("At least one prompt is required"));
+            }
+            self.prompt(prompts.into_iter().next().unwrap()).await
+        }
+    }
 
     pub(crate) async fn get_token_usage(&self) -> Option<i32> {
         self.session.get_total_token_usage().ok().flatten()
@@ -80,9 +93,25 @@ impl BenchAgent {
         match tokio::time::timeout(cleanup_timeout, self.session.cleanup_extensions()).await {
             Ok(result) => result,
             Err(_timeout) => {
-                tracing::warn!("Extension cleanup timed out after 5 seconds");
                 Ok(())
             }
         }
+    }
+
+    /// Reset the agent state for reuse in the agent pool
+    pub async fn reset_for_reuse(&mut self) -> anyhow::Result<()> {
+        // Clear errors
+        self.clear_errors().await;
+        
+        // Clear message history
+        let messages = self.session.get_messages_mut();
+        messages.clear();
+        
+        // Try to reset InteractionLimitedAgent if that's what we have
+        if let Some(interaction_limited) = self.session.as_any_mut().downcast_mut::<crate::interaction_limited_agent::InteractionLimitedAgent>() {
+            interaction_limited.reset().await?;
+        }
+        
+        Ok(())
     }
 }

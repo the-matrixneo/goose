@@ -10,7 +10,6 @@ use std::fs::read_to_string;
 use std::path::PathBuf;
 use std::process::Child;
 use std::thread;
-use tracing;
 
 #[derive(Clone)]
 pub struct ModelRunner {
@@ -47,11 +46,8 @@ impl ModelRunner {
 
         let mut all_runs_results: Vec<BenchmarkResults> = Vec::new();
         for i in 0..self.config.repeat.unwrap_or(1) {
-            match self.collect_run_results(model.clone(), suites.clone(), i.to_string()) {
-                Ok(run_results) => all_runs_results.push(run_results),
-                Err(e) => {
-                    tracing::error!("Failed to collect results for run {}: {}", i, e)
-                }
+            if let Ok(run_results) = self.collect_run_results(model.clone(), suites.clone(), i.to_string()) {
+                all_runs_results.push(run_results);
             }
         }
 
@@ -75,6 +71,11 @@ impl ModelRunner {
             ))?;
             envs.extend(env_vars);
         }
+        
+        // Add global environment variables from config
+        let global_env_vars = BenchRunConfig::parse_env_vars(&self.config.env).context("Failed to parse global environment variables")?;
+        envs.extend(global_env_vars);
+        
         envs.push(("GOOSE_MODEL".to_string(), model.clone().name));
         envs.push(("GOOSE_PROVIDER".to_string(), model.clone().provider));
 
@@ -105,8 +106,10 @@ impl ModelRunner {
                     let cfg = config_copy
                         .to_string()
                         .context("Failed to serialize configuration")?;
-                    let mut eval_envs: Vec<_> = eval_selector.env.clone();
-                    eval_envs.extend(envs.clone());
+                    // Merge environment variables: global env, then eval-specific env (which can override global)
+                    let mut eval_envs = envs.clone();
+                    let eval_env_vars = BenchRunConfig::parse_env_vars(&eval_selector.env).context("Failed to parse eval-specific environment variables")?;
+                    eval_envs.extend(eval_env_vars);
                     let handle = parallel_bench_cmd("exec-eval".to_string(), cfg, eval_envs);
                     results_handles.get_mut(suite).unwrap().push(handle);
                 }
@@ -120,8 +123,10 @@ impl ModelRunner {
                 let cfg = config_copy
                     .to_string()
                     .context("Failed to serialize configuration")?;
-                let mut eval_envs: Vec<_> = eval_selector.env.clone();
-                eval_envs.extend(envs.clone());
+                // Merge environment variables: global env, then eval-specific env (which can override global)
+                let mut eval_envs = envs.clone();
+                let eval_env_vars = BenchRunConfig::parse_env_vars(&eval_selector.env).context("Failed to parse eval-specific environment variables")?;
+                eval_envs.extend(eval_env_vars);
 
                 let handle = parallel_bench_cmd("exec-eval".to_string(), cfg, eval_envs);
 
@@ -206,14 +211,14 @@ impl ModelRunner {
     fn collect_evals_for_run(&self) -> HashMap<String, Vec<BenchEval>> {
         let mut result: HashMap<String, Vec<BenchEval>> = HashMap::new();
 
-        let (dataset_evals, standard_evals): &(Vec<BenchEval>, Vec<BenchEval>) = &self
-            .config
-            .evals
-            .clone()
-            .into_iter()
-            .partition(|eval| eval.dataset.is_some());
+        // If a global dataset is configured, all evals are dataset evals
+        if self.config.dataset.is_some() {
+            result.insert("dataset_evals".to_string(), self.config.evals.clone());
+            return result;
+        }
 
-        result.insert("dataset_evals".to_string(), dataset_evals.clone());
+        // Otherwise, all evals are standard evals
+        let standard_evals = &self.config.evals;
 
         // convert suites map {suite_name => [eval_selector_str] to map suite_name => [BenchEval]
         for eval in standard_evals.iter() {

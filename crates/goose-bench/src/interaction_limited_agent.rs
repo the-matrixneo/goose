@@ -2,6 +2,7 @@ use anyhow::Result;
 use futures::stream::StreamExt;
 use goose::agents::{Agent, AgentEvent};
 use goose::message::{Message, MessageContent};
+use crate::rate_limiter::acquire_global_permit;
 
 pub struct InteractionLimitedAgent {
     agent: Agent,
@@ -29,11 +30,11 @@ impl InteractionLimitedAgent {
             return Ok(self.messages.clone());
         }
         
-        let verbose_conversations = std::env::var("GOOSE_BENCH_VERBOSE_CONVERSATIONS")
-            .map(|v| v == "1" || v.to_lowercase() == "true")
-            .unwrap_or(false);
         
         self.messages.push(Message::user().with_text(&prompt));
+        
+        // Acquire rate limit permit BEFORE making the LLM request
+        let _permit = acquire_global_permit().await;
         
         let mut reply_stream = self.agent.reply(&self.messages, None).await?;
         let mut interactions_count = 0;
@@ -47,31 +48,10 @@ impl InteractionLimitedAgent {
                 
                 if has_tool_requests {
                     interactions_count += 1;
-                    tracing::info!("LLM response {} with tool calls", interactions_count);
-                    
-                    // Log the message content if verbose
-                    if verbose_conversations {
-                        let content = msg.content.iter()
-                            .map(|c| match c {
-                                MessageContent::Text(text) => format!("Text: {}", text.text),
-                                MessageContent::ToolRequest(tool_req) => {
-                                    match &tool_req.tool_call {
-                                        Ok(tool_call) => format!("Tool: {}", tool_call.name),
-                                        Err(_) => "Tool: <invalid>".to_string(),
-                                    }
-                                },
-                                MessageContent::ToolResponse(_) => "ToolResponse".to_string(),
-                                _ => "Other".to_string(),
-                            })
-                            .collect::<Vec<_>>()
-                            .join(", ");
-                        tracing::info!("  Content: {}", content);
-                    }
                     
                     collected_messages.push(msg);
                     
                     if interactions_count >= limit {
-                        tracing::info!("Reached interaction limit of {} interactions. Stopping before tool execution.", limit);
                         break;
                     }
                 } else {
@@ -82,31 +62,14 @@ impl InteractionLimitedAgent {
                     
                     if !has_tool_responses && matches!(msg.role, mcp_core::role::Role::Assistant) {
                         interactions_count += 1;
-                        tracing::info!("LLM response {} without tool calls", interactions_count);
-                        
-                        // Log the message content if verbose
-                        if verbose_conversations {
-                            let content = msg.content.iter()
-                                .map(|c| match c {
-                                    MessageContent::Text(text) => text.text.clone(),
-                                    _ => "<non-text content>".to_string(),
-                                })
-                                .collect::<Vec<_>>()
-                                .join(" ");
-                            tracing::info!("  Content: {}", content);
-                        }
                         
                         collected_messages.push(msg);
                         
                         if interactions_count >= limit {
-                            tracing::info!("Reached interaction limit of {} interactions.", limit);
                             break;
                         }
                     } else {
                         // Tool responses and other messages
-                        if has_tool_responses {
-                            tracing::debug!("Received tool response");
-                        }
                         collected_messages.push(msg);
                     }
                 }
@@ -114,7 +77,6 @@ impl InteractionLimitedAgent {
         }
         
         self.messages.extend(collected_messages);
-        tracing::info!("Completed processing with {} LLM interactions", interactions_count);
         
         Ok(self.messages.clone())
     }
@@ -122,6 +84,63 @@ impl InteractionLimitedAgent {
     pub async fn prompt(&mut self, prompt: String) -> Result<Vec<Message>> {
         // Use unlimited interactions for regular prompt
         self.process_prompt(prompt, None).await
+    }
+    
+    pub async fn prompt_multi_turn(&mut self, prompts: Vec<String>) -> Result<Vec<Message>> {
+        if prompts.is_empty() {
+            return Err(anyhow::anyhow!("At least one prompt is required"));
+        }
+        
+        let mut prompt_iter = prompts.into_iter();
+        let first_prompt = prompt_iter.next().unwrap();
+        
+        // Send the first prompt
+        self.messages.push(Message::user().with_text(&first_prompt));
+        
+        let remaining_prompts: Vec<String> = prompt_iter.collect();
+        let mut remaining_prompt_index = 0;
+        
+        loop {
+            // Acquire rate limit permit BEFORE making the LLM request
+            let _permit = acquire_global_permit().await;
+            
+            let mut reply_stream = self.agent.reply(&self.messages, None).await?;
+            let mut collected_messages = Vec::new();
+            let mut got_non_tool_response = false;
+            
+            while let Some(event) = reply_stream.next().await {
+                if let AgentEvent::Message(msg) = event? {
+                    let has_tool_requests = msg.content.iter().any(|c| 
+                        matches!(c, MessageContent::ToolRequest(_))
+                    );
+                    
+                    let has_tool_responses = msg.content.iter().any(|c| 
+                        matches!(c, MessageContent::ToolResponse(_))
+                    );
+                    
+                    collected_messages.push(msg.clone());
+                    
+                    // Check if this is a non-tool assistant response
+                    if !has_tool_requests && !has_tool_responses && matches!(msg.role, mcp_core::role::Role::Assistant) {
+                        got_non_tool_response = true;
+                    }
+                }
+            }
+            
+            self.messages.extend(collected_messages);
+            
+            // If we got a non-tool response and have more prompts, send the next one
+            if got_non_tool_response && remaining_prompt_index < remaining_prompts.len() {
+                let next_prompt = &remaining_prompts[remaining_prompt_index];
+                self.messages.push(Message::user().with_text(next_prompt));
+                remaining_prompt_index += 1;
+            } else if remaining_prompt_index >= remaining_prompts.len() {
+                // No more prompts to send
+                break;
+            }
+        }
+        
+        Ok(self.messages.clone())
     }
     
     pub fn message_history(&self) -> Vec<Message> {
@@ -134,5 +153,16 @@ impl InteractionLimitedAgent {
     
     pub fn get_agent(&self) -> &Agent {
         &self.agent
+    }
+    
+    /// Reset the agent state for reuse in the agent pool
+    pub async fn reset(&mut self) -> Result<()> {
+        // Clear message history
+        self.messages.clear();
+        
+        // Reset the underlying agent state if possible
+        // The agent should clear its conversation state but keep extensions
+        
+        Ok(())
     }
 }
