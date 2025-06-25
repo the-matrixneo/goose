@@ -43,16 +43,8 @@ export const HeaderToolbar: React.FC<HeaderToolbarProps> = ({
         <DirSwitcher hasMessages={hasMessages} />
       </div>
 
-      {/* Right side - Status, Summarize, Model selection and Mode */}
+      {/* Right side - Summarize, Model selection with Status, and Mode */}
       <div className="flex items-center gap-3 pr-4" ref={dropdownRef}>
-        {/* Status Icon */}
-        {alerts.length > 0 && (
-          <>
-            <BottomMenuAlertPopover alerts={alerts} />
-            <div className="h-4 w-px bg-border-subtle" />
-          </>
-        )}
-        
         {/* Summarize Button */}
         {messages.length > 0 && setMessages && (
           <>
@@ -65,7 +57,15 @@ export const HeaderToolbar: React.FC<HeaderToolbarProps> = ({
           </>
         )}
         
-        <ModelsBottomBar dropdownRef={dropdownRef} setView={setView} />
+        {/* Model selection with Status Icon right beside it */}
+        <div className="flex items-center gap-2">
+          <ModelsBottomBar dropdownRef={dropdownRef} setView={setView} />
+          {/* Status Icon right beside model selection */}
+          {alerts.length > 0 && (
+            <BottomMenuAlertPopover alerts={alerts} />
+          )}
+        </div>
+        
         <div className="h-4 w-px bg-border-subtle" />
         <BottomMenuModeSelection setView={setView} />
       </div>
