@@ -31,8 +31,13 @@ export const HeaderToolbar: React.FC<HeaderToolbarProps> = ({
   const { open: isSidebarOpen } = useSidebar();
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  // Calculate left positioning based on sidebar state and platform
+  const leftPosition = !isSidebarOpen 
+    ? (safeIsMacOS ? 'left-20' : 'left-12') // Space for window controls when sidebar closed
+    : 'left-6'; // Normal spacing when sidebar open
+
   return (
-    <div className="absolute top-4 left-6 right-4 z-10 flex items-center justify-between">
+    <div className={`absolute top-4 right-4 z-10 flex items-center justify-between ${leftPosition}`}>
       {/* Full-width toolbar container matching chat section width */}
       <div className="flex items-center justify-between w-full bg-background-default rounded-xl border border-border-subtle shadow-sm px-4 py-2" ref={dropdownRef}>
         
