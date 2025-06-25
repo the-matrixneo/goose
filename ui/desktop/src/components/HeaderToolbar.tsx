@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { SidebarTrigger } from './ui/sidebar';
 import { DirSwitcher } from './bottom_menu/DirSwitcher';
 import ModelsBottomBar from './settings/models/bottom_bar/ModelsBottomBar';
@@ -30,6 +30,15 @@ export const HeaderToolbar: React.FC<HeaderToolbarProps> = ({
   const safeIsMacOS = (window?.electron?.platform || 'darwin') === 'darwin';
   const { open: isSidebarOpen } = useSidebar();
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  // Wait for sidebar state to be initialized to prevent layout shift
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsInitialized(true);
+    }, 50); // Small delay to let sidebar state settle
+    return () => clearTimeout(timer);
+  }, []);
 
   // Calculate positioning to match ChatInput margins (mx-6 = 24px)
   const leftPosition = !isSidebarOpen 
@@ -37,10 +46,12 @@ export const HeaderToolbar: React.FC<HeaderToolbarProps> = ({
     : 'left-6'; // Always match ChatInput left margin
 
   return (
-    <div className={`absolute top-6 right-6 z-10 flex items-center justify-between ${leftPosition}`}>
+    <div className={`absolute top-8 right-6 z-10 flex items-center justify-between ${leftPosition} transition-opacity duration-200 ${
+      isInitialized ? 'opacity-100' : 'opacity-0'
+    }`}>
       {/* Toolbar container matching ChatInput width exactly */}
       <div className={`flex items-center justify-between w-full bg-background-default rounded-xl border border-border-subtle shadow-sm py-2 ${
-        !isSidebarOpen ? 'pl-8 pr-4' : 'pl-4 pr-4' // Consistent spacing with minimal clearance for stoplight buttons
+        !isSidebarOpen ? 'pl-6 pr-4' : 'pl-4 pr-4' // Consistent spacing with minimal clearance for stoplight buttons
       }`} ref={dropdownRef}>
         
         {/* Left side - Sidebar toggle */}
