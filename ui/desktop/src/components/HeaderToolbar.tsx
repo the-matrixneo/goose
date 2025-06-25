@@ -32,9 +32,9 @@ export const HeaderToolbar: React.FC<HeaderToolbarProps> = ({
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   return (
-    <div className="h-12 flex items-center justify-between mx-4 mt-4 mb-4">
+    <div className="h-12 flex items-center justify-center mx-4 mt-4 mb-4">
       {/* Single toolbar container with all controls */}
-      <div className="flex items-center justify-between w-full bg-background-default rounded-xl border border-border-subtle shadow-sm px-4 py-2" ref={dropdownRef}>
+      <div className="flex items-center justify-between bg-background-default rounded-xl border border-border-subtle shadow-sm px-4 py-2" ref={dropdownRef}>
         
         {/* Left side - Sidebar toggle */}
         <div className="flex items-center">
