@@ -31,45 +31,46 @@ export const HeaderToolbar: React.FC<HeaderToolbarProps> = ({
   const { open: isSidebarOpen } = useSidebar();
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Calculate padding based on sidebar state and macOS
-  const headerPadding = !isSidebarOpen ? (safeIsMacOS ? 'pl-20' : 'pl-12') : 'pl-4';
-
   return (
     <div className="h-12 flex items-center justify-between mx-4 mt-4 mb-4">
-      {/* Left side - Sidebar toggle only */}
-      <div className={`flex items-center ${headerPadding}`}>
-        <SidebarTrigger className="no-drag" />
-      </div>
-
-      {/* Center - Directory, Status + Model, Mode, and Summarize */}
-      <div className="flex items-center gap-3 bg-background-default rounded-xl border border-border-subtle shadow-sm px-4 py-2" ref={dropdownRef}>
-        <DirSwitcher hasMessages={hasMessages} />
-        <div className="h-4 w-px bg-border-subtle" />
+      {/* Single toolbar container with all controls */}
+      <div className="flex items-center justify-between w-full bg-background-default rounded-xl border border-border-subtle shadow-sm px-4 py-2" ref={dropdownRef}>
         
-        {/* Model selection with Status Icon to the left */}
-        <div className="flex items-center gap-1">
-          {/* Status Icon to the left of model selection */}
-          {alerts.length > 0 && (
-            <BottomMenuAlertPopover alerts={alerts} />
-          )}
-          <ModelsBottomBar dropdownRef={dropdownRef} setView={setView} />
+        {/* Left side - Sidebar toggle */}
+        <div className="flex items-center">
+          <SidebarTrigger className="no-drag" />
         </div>
-        
-        <div className="h-4 w-px bg-border-subtle" />
-        <BottomMenuModeSelection setView={setView} />
-        
-        <div className="h-4 w-px bg-border-subtle" />
-        {/* Summarize Button - always shown, to the right of spiral icon */}
-        <ManualSummarizeButton
-          messages={messages}
-          isLoading={isLoading}
-          setMessages={setMessages}
-        />
-      </div>
 
-      {/* Right side - Empty space for balance */}
-      <div className="flex items-center gap-3 pr-4 min-w-[40px] justify-end">
-        {/* Empty space to balance the left sidebar toggle */}
+        {/* Center - Directory, Status + Model, Mode, and Summarize */}
+        <div className="flex items-center gap-3">
+          <DirSwitcher hasMessages={hasMessages} />
+          <div className="h-4 w-px bg-border-subtle" />
+          
+          {/* Model selection with Status Icon to the left */}
+          <div className="flex items-center gap-1">
+            {/* Status Icon to the left of model selection */}
+            {alerts.length > 0 && (
+              <BottomMenuAlertPopover alerts={alerts} />
+            )}
+            <ModelsBottomBar dropdownRef={dropdownRef} setView={setView} />
+          </div>
+          
+          <div className="h-4 w-px bg-border-subtle" />
+          <BottomMenuModeSelection setView={setView} />
+          
+          <div className="h-4 w-px bg-border-subtle" />
+          {/* Summarize Button - always shown, to the right of spiral icon */}
+          <ManualSummarizeButton
+            messages={messages}
+            isLoading={isLoading}
+            setMessages={setMessages}
+          />
+        </div>
+
+        {/* Right side - Empty space for balance */}
+        <div className="flex items-center min-w-[40px] justify-end">
+          {/* Empty space to balance the left sidebar toggle */}
+        </div>
       </div>
     </div>
   );
