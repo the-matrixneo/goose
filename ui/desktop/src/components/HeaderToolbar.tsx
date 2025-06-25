@@ -20,7 +20,7 @@ export const HeaderToolbar: React.FC<HeaderToolbarProps> = ({ setView, hasMessag
   const headerPadding = !isSidebarOpen ? (safeIsMacOS ? 'pl-20' : 'pl-12') : 'pl-4';
 
   return (
-    <div className="h-12 flex items-center justify-between bg-background-default rounded-xl border border-border-subtle shadow-sm mx-4 mt-4 mb-2">
+    <div className="h-12 flex items-center justify-between bg-background-default rounded-xl border border-border-subtle shadow-sm mx-4 mt-4 mb-4">
       {/* Left side - Sidebar toggle and Directory */}
       <div className={`flex items-center gap-3 ${headerPadding}`}>
         <SidebarTrigger className="no-drag" />

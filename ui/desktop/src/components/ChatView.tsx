@@ -574,10 +574,10 @@ function ChatContentWithSidebar({
   }, new Map());
 
   return (
-    <div>
-      <HeaderToolbar setView={setView} hasMessages={messages.length > 0} />
-      
-      <MainPanelLayout>        
+    <div>      
+      <MainPanelLayout>
+        <HeaderToolbar setView={setView} hasMessages={messages.length > 0} />
+        
         {/* Loader when generating recipe */}
         {isGeneratingRecipe && <LayingEggLoader />}
 
