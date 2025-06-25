@@ -43,8 +43,8 @@ export const HeaderToolbar: React.FC<HeaderToolbarProps> = ({
         <DirSwitcher hasMessages={hasMessages} />
       </div>
 
-      {/* Right side - Status + Model, Mode, and Summarize */}
-      <div className="flex items-center gap-3 pr-4" ref={dropdownRef}>
+      {/* Center - Status + Model and Mode selections */}
+      <div className="flex items-center gap-3" ref={dropdownRef}>
         {/* Model selection with Status Icon to the left */}
         <div className="flex items-center gap-1">
           {/* Status Icon to the left of model selection */}
@@ -56,19 +56,22 @@ export const HeaderToolbar: React.FC<HeaderToolbarProps> = ({
         
         <div className="h-4 w-px bg-border-subtle" />
         <BottomMenuModeSelection setView={setView} />
-        
-        {/* Summarize Button - after mode selection */}
-        {messages.length > 0 && setMessages && (
-          <>
-            <div className="h-4 w-px bg-border-subtle" />
-            <div className="text-xs">
-              <ManualSummarizeButton
-                messages={messages}
-                isLoading={isLoading}
-                setMessages={setMessages}
-              />
-            </div>
-          </>
+      </div>
+
+      {/* Right side - Summarize */}
+      <div className="flex items-center gap-3 pr-4">
+        {/* Summarize Button */}
+        {messages.length > 0 && setMessages ? (
+          <div className="text-xs">
+            <ManualSummarizeButton
+              messages={messages}
+              isLoading={isLoading}
+              setMessages={setMessages}
+            />
+          </div>
+        ) : (
+          // Empty div to maintain layout balance when no summarize button
+          <div></div>
         )}
       </div>
     </div>
