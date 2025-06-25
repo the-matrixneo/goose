@@ -31,11 +31,10 @@ function GreetingCard() {
   const greeting = selectedGreeting || { prefix: 'Hello.', message: ' How can I help you today?' };
 
   return (
-    <Card className="col-span-2 border-none animate-in fade-in slide-in-from-right-8 duration-300 bg-background-accent rounded-2xl max-w-[600px]">
+    <Card className="col-span-2 border-none animate-in fade-in slide-in-from-right-8 duration-300 bg-background-accent rounded-2xl max-w-[600px] relative">
       <CardContent className="flex flex-col justify-end items-start h-full pt-8 pb-0">
-        <div className="flex items-center gap-3 mb-4">
-          <GooseLogo size="default" />
-          <span className="text-text-on-accent text-lg font-light">codename goose</span>
+        <div className="absolute top-4 left-4">
+          <GooseLogo size="default" className="text-white" />
         </div>
         <h1 className="text-text-on-accent text-4xl font-light">
           <span>{greeting.prefix}</span>
