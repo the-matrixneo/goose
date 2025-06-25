@@ -4,6 +4,7 @@ import Modal from '../Modal';
 import { Button } from '../ui/button';
 import { useChatContextManager } from './ChatContextManager';
 import { Message } from '../../types/message';
+import { ScrollTextIcon } from '../icons/ScrollTextIcon';
 
 interface ManualSummarizeButtonProps {
   messages: Message[];
@@ -57,15 +58,14 @@ export const ManualSummarizeButton: React.FC<ManualSummarizeButtonProps> = ({
     <>
       <div className="relative flex items-center">
         <button
-          className={`flex items-center justify-center text-text-default/70 hover:text-text-default ${
+          className={`flex items-center justify-center text-text-default/70 hover:text-text-default p-1 ${
             isLoadingSummary || isLoading ? 'opacity-50 cursor-not-allowed' : ''
           }`}
           onClick={handleClick}
           disabled={isLoadingSummary || isLoading}
           title="Summarize conversation context"
         >
-          {/* <ScrollText size={16} /> */}
-          summarize
+          <ScrollTextIcon size={16} className="text-current" />
         </button>
       </div>
 

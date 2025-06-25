@@ -60,20 +60,18 @@ export const HeaderToolbar: React.FC<HeaderToolbarProps> = ({
       </div>
 
       {/* Right side - Summarize (always reserve space) */}
-      <div className="flex items-center gap-3 pr-4 min-w-[80px] justify-end">
+      <div className="flex items-center gap-3 pr-4 min-w-[40px] justify-end">
         {/* Summarize Button - always reserve space */}
         {messages.length > 0 && setMessages ? (
-          <div className="text-xs">
-            <ManualSummarizeButton
-              messages={messages}
-              isLoading={isLoading}
-              setMessages={setMessages}
-            />
-          </div>
+          <ManualSummarizeButton
+            messages={messages}
+            isLoading={isLoading}
+            setMessages={setMessages}
+          />
         ) : (
           // Invisible placeholder to maintain consistent spacing
-          <div className="text-xs opacity-0 pointer-events-none">
-            summarize
+          <div className="opacity-0 pointer-events-none p-1">
+            <div className="w-4 h-4"></div>
           </div>
         )}
       </div>
