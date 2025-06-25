@@ -58,9 +58,9 @@ export const HeaderToolbar: React.FC<HeaderToolbarProps> = ({
         <BottomMenuModeSelection setView={setView} />
       </div>
 
-      {/* Right side - Summarize */}
-      <div className="flex items-center gap-3 pr-4">
-        {/* Summarize Button */}
+      {/* Right side - Summarize (always reserve space) */}
+      <div className="flex items-center gap-3 pr-4 min-w-[80px] justify-end">
+        {/* Summarize Button - always reserve space */}
         {messages.length > 0 && setMessages ? (
           <div className="text-xs">
             <ManualSummarizeButton
@@ -70,8 +70,10 @@ export const HeaderToolbar: React.FC<HeaderToolbarProps> = ({
             />
           </div>
         ) : (
-          // Empty div to maintain layout balance when no summarize button
-          <div></div>
+          // Invisible placeholder to maintain consistent spacing
+          <div className="text-xs opacity-0 pointer-events-none">
+            summarize
+          </div>
         )}
       </div>
     </div>
