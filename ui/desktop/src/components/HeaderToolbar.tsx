@@ -41,7 +41,7 @@ export const HeaderToolbar: React.FC<HeaderToolbarProps> = ({
         <SidebarTrigger className="no-drag" />
       </div>
 
-      {/* Center - Directory, Status + Model and Mode selections */}
+      {/* Center - Directory, Status + Model, Mode, and Summarize */}
       <div className="flex items-center gap-3" ref={dropdownRef}>
         <DirSwitcher hasMessages={hasMessages} />
         <div className="h-4 w-px bg-border-subtle" />
@@ -57,23 +57,19 @@ export const HeaderToolbar: React.FC<HeaderToolbarProps> = ({
         
         <div className="h-4 w-px bg-border-subtle" />
         <BottomMenuModeSelection setView={setView} />
+        
+        <div className="h-4 w-px bg-border-subtle" />
+        {/* Summarize Button - always shown, to the right of spiral icon */}
+        <ManualSummarizeButton
+          messages={messages}
+          isLoading={isLoading}
+          setMessages={setMessages}
+        />
       </div>
 
-      {/* Right side - Summarize (always reserve space) */}
+      {/* Right side - Empty space for balance */}
       <div className="flex items-center gap-3 pr-4 min-w-[40px] justify-end">
-        {/* Summarize Button - always reserve space */}
-        {messages.length > 0 && setMessages ? (
-          <ManualSummarizeButton
-            messages={messages}
-            isLoading={isLoading}
-            setMessages={setMessages}
-          />
-        ) : (
-          // Invisible placeholder to maintain consistent spacing
-          <div className="opacity-0 pointer-events-none p-1">
-            <div className="w-4 h-4"></div>
-          </div>
-        )}
+        {/* Empty space to balance the left sidebar toggle */}
       </div>
     </div>
   );

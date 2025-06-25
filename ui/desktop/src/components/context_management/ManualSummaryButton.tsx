@@ -22,8 +22,14 @@ export const ManualSummarizeButton: React.FC<ManualSummarizeButtonProps> = ({
   const [isConfirmationOpen, setIsConfirmationOpen] = useState(false);
 
   const handleClick = () => {
-    setIsConfirmationOpen(true);
+    // Only open modal if there are messages
+    if (messages.length > 0) {
+      setIsConfirmationOpen(true);
+    }
   };
+
+  // Determine if button should be disabled
+  const isDisabled = messages.length === 0 || isLoadingSummary || isLoading;
 
   const handleSummarize = async () => {
     setIsConfirmationOpen(false);
@@ -58,12 +64,18 @@ export const ManualSummarizeButton: React.FC<ManualSummarizeButtonProps> = ({
     <>
       <div className="relative flex items-center">
         <button
-          className={`flex items-center justify-center text-text-default/70 hover:text-text-default p-1 ${
-            isLoadingSummary || isLoading ? 'opacity-50 cursor-not-allowed' : ''
+          className={`flex items-center justify-center p-1 ${
+            isDisabled 
+              ? 'opacity-30 cursor-not-allowed text-text-default/30' 
+              : 'text-text-default/70 hover:text-text-default'
           }`}
           onClick={handleClick}
-          disabled={isLoadingSummary || isLoading}
-          title="Summarize conversation context"
+          disabled={isDisabled}
+          title={
+            messages.length === 0 
+              ? "Start a conversation to summarize" 
+              : "Summarize conversation context"
+          }
         >
           <ScrollTextIcon size={16} className="text-current" />
         </button>
