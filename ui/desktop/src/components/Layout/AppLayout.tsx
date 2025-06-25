@@ -58,7 +58,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ setIsGoosehintsModalOpen }
   return (
     <SidebarProvider>
       <div className="flex flex-1 w-full relative animate-fade-in">
-        <Sidebar variant="inset" collapsible="offcanvas">
+        <Sidebar variant="inset" collapsible="icon">
           <AppSidebar
             onSelectSession={handleSelectSession}
             setView={setView}

@@ -33,7 +33,7 @@ export const HeaderToolbar: React.FC<HeaderToolbarProps> = ({
 
   // Calculate left positioning based on sidebar state and platform
   const leftPosition = !isSidebarOpen 
-    ? (safeIsMacOS ? 'left-20' : 'left-12') // Space for window controls when sidebar closed
+    ? 'left-16' // 4rem (64px) - matches SIDEBAR_WIDTH_ICON (3rem) + some margin
     : 'left-6'; // Normal spacing when sidebar open
 
   return (
