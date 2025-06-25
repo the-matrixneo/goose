@@ -85,80 +85,72 @@ export function SessionInsights() {
   }
 
   return (
-    <>
-      <div className="grid grid-cols-4 gap-4 mb-4">
-        <GreetingCard />
-      </div>
+    <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="w-full max-w-4xl">
+        <div className="grid grid-cols-4 gap-4 mb-4">
+          <GreetingCard />
+        </div>
 
-      <div className="flex flex-wrap gap-4">
-        {/* Total Sessions Card */}
-        <Card className="w-full sm:w-auto animate-in fade-in slide-in-from-right-8 duration-500 rounded-2xl min-w-[200px] max-w-[350px]">
-          <CardContent className="flex flex-col justify-end items-start h-full pt-4">
-            <div className="flex flex-col justify-end items-start">
-              <p className="text-2xl font-mono font-light flex items-end" ref={totalSessionsRef}>
-                {insights?.totalSessions}
-              </p>
-              <CardDescription>Total sessions</CardDescription>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="flex flex-wrap gap-4">
+          {/* Total Sessions Card */}
+          <Card className="w-full sm:w-auto animate-in fade-in slide-in-from-right-8 duration-500 rounded-2xl min-w-[200px] max-w-[350px]">
+            <CardContent className="flex flex-col justify-end items-start h-full pt-4">
+              <div className="flex flex-col justify-end items-start">
+                <p className="text-2xl font-mono font-light flex items-end" ref={totalSessionsRef}>
+                  {insights?.totalSessions}
+                </p>
+                <CardDescription>Total sessions</CardDescription>
+              </div>
+            </CardContent>
+          </Card>
 
-        {/* Average Duration Card */}
-        <Card className="w-full sm:w-auto animate-in fade-in slide-in-from-right-8 duration-500 rounded-2xl min-w-[200px] max-w-[350px]">
-          <CardContent className="flex flex-col justify-end items-start h-full pt-4">
-            <div className="flex flex-col justify-end items-start">
-              <p className="text-2xl font-mono font-light flex items-end">
-                <span ref={avgDurationRef}>{insights?.avgSessionDuration?.toFixed(1)}</span>
-                <span className="text-base">m</span>
-              </p>
-              <CardDescription>Avg. duration</CardDescription>
-            </div>
-          </CardContent>
-        </Card>
+          {/* Average Duration Card */}
+          <Card className="w-full sm:w-auto animate-in fade-in slide-in-from-right-8 duration-500 rounded-2xl min-w-[200px] max-w-[350px]">
+            <CardContent className="flex flex-col justify-end items-start h-full pt-4">
+              <div className="flex flex-col justify-end items-start">
+                <p className="text-2xl font-mono font-light flex items-end">
+                  <span ref={avgDurationRef}>{insights?.avgSessionDuration?.toFixed(1)}</span>
+                  <span className="text-base">m</span>
+                </p>
+                <CardDescription>Avg. duration</CardDescription>
+              </div>
+            </CardContent>
+          </Card>
 
-        {/* Total Tokens Card */}
-        <Card className="w-full sm:w-auto animate-in fade-in slide-in-from-right-8 duration-500 rounded-2xl min-w-[200px] max-w-[350px]">
-          <CardContent className="flex flex-col justify-end items-start h-full pt-4">
-            <div className="flex flex-col justify-end items-start">
-              <p className="text-2xl font-mono font-light flex items-end" ref={totalTokensRef}>
-                <span>{insights?.totalTokens ? (insights.totalTokens / 1000000).toFixed(2) : ''}</span>
-                <span className="text-base">M</span>
-              </p>
-              <CardDescription>Total tokens</CardDescription>
-            </div>
-          </CardContent>
-        </Card>
+          {/* Total Tokens Card */}
+          <Card className="w-full sm:w-auto animate-in fade-in slide-in-from-right-8 duration-500 rounded-2xl min-w-[200px] max-w-[350px]">
+            <CardContent className="flex flex-col justify-end items-start h-full pt-4">
+              <div className="flex flex-col justify-end items-start">
+                <p className="text-2xl font-mono font-light flex items-end" ref={totalTokensRef}>
+                  <span>{insights?.totalTokens ? (insights.totalTokens / 1000000).toFixed(2) : ''}</span>
+                  <span className="text-base">M</span>
+                </p>
+                <CardDescription>Total tokens</CardDescription>
+              </div>
+            </CardContent>
+          </Card>
 
-        {/* Activity Heatmap Card */}
-        {/* <Card className="w-full col-span-4">
-        <CardContent>
-          <CardDescription className="mb-4">
-            <span className="text-lg text-text-default">Activity Heatmap</span>
-          </CardDescription>
-          <ActivityHeatmap />
-        </CardContent>
-      </Card> */}
-
-        {/* Most Active Directories Card */}
-        {/* <Card className="w-full col-span-4 animate-in fade-in slide-in-from-right-8 duration-500 rounded-2xl">
-          <CardContent>
-            <CardDescription className="mb-4">
-              <span className="text-lg text-text-default">Active directories</span>
-            </CardDescription>
-            <div className="space-y-2 ">
-              {insights.mostActiveDirs.map(([dir, count], index) => (
-                <div key={index} className="flex items-center justify-between text-sm">
-                  <div className="flex items-center space-x-2">
-                    <FolderOpen className="h-4 w-4 text-text-muted" />
-                    <span className="truncate max-w-[400px] rtl">{dir}</span>
+          {/* Most Active Directories Card */}
+          {/* <Card className="w-full col-span-4 animate-in fade-in slide-in-from-right-8 duration-500 rounded-2xl">
+            <CardContent>
+              <CardDescription className="mb-4">
+                <span className="text-lg text-text-default">Active directories</span>
+              </CardDescription>
+              <div className="space-y-2 ">
+                {insights.mostActiveDirs.map(([dir, count], index) => (
+                  <div key={index} className="flex items-center justify-between text-sm">
+                    <div className="flex items-center space-x-2">
+                      <FolderOpen className="h-4 w-4 text-text-muted" />
+                      <span className="truncate max-w-[400px] rtl">{dir}</span>
+                    </div>
+                    <span className="text-text-default font-mono font-light">{count} sessions</span>
                   </div>
-                  <span className="text-text-default font-mono font-light">{count} sessions</span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card> */}
+                ))}
+              </div>
+            </CardContent>
+          </Card> */}
+        </div>
       </div>
-    </>
+    </div>
   );
 }
