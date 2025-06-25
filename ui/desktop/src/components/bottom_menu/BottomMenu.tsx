@@ -3,13 +3,10 @@ import { AlertType, useAlerts } from '../alerts';
 import { useToolCount } from '../alerts/useToolCount';
 import BottomMenuAlertPopover from './BottomMenuAlertPopover';
 import type { View, ViewOptions } from '../../App';
-import { BottomMenuModeSelection } from './BottomMenuModeSelection';
-import ModelsBottomBar from '../settings/models/bottom_bar/ModelsBottomBar';
 import { useConfig } from '../ConfigContext';
 import { useModelAndProvider } from '../ModelAndProviderContext';
 import { Message } from '../../types/message';
 import { ManualSummarizeButton } from '../context_management/ManualSummaryButton';
-import { DirSwitcher } from './DirSwitcher';
 
 const TOKEN_LIMIT_DEFAULT = 128000; // fallback for custom models that the backend doesn't know about
 const TOKEN_WARNING_THRESHOLD = 0.8; // warning shows at 80% of the token limit
@@ -33,9 +30,7 @@ export default function BottomMenu({
   isLoading?: boolean;
   setMessages: (messages: Message[]) => void;
 }) {
-  const [isModelMenuOpen, setIsModelMenuOpen] = useState(false);
   const { alerts, addAlert, clearAlerts } = useAlerts();
-  const dropdownRef = useRef<HTMLDivElement>(null);
   const toolCount = useToolCount();
   const { getProviders, read } = useConfig();
   const { getCurrentModelAndProvider, currentModel, currentProvider } = useModelAndProvider();
@@ -168,60 +163,13 @@ export default function BottomMenu({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [numTokens, toolCount, tokenLimit, isTokenLimitLoaded, addAlert, clearAlerts]);
 
-  // Add effect to handle clicks outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsModelMenuOpen(false);
-      }
-    };
-
-    if (isModelMenuOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isModelMenuOpen]);
-
-  // Add effect to handle Escape key
-  useEffect(() => {
-    const handleEsc = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setIsModelMenuOpen(false);
-      }
-    };
-
-    if (isModelMenuOpen) {
-      window.addEventListener('keydown', handleEsc);
-    }
-
-    return () => {
-      window.removeEventListener('keydown', handleEsc);
-    };
-  }, [isModelMenuOpen]);
-
   return (
-    <div className="flex w-full justify-between items-center pb-2 pr-3 transition-colors relative text-xs align-middle animate-in fade-in slide-in-from-right-8 duration-500">
-      <div>
-        <DirSwitcher hasMessages={messages.length > 0} />
-      </div>
-
+    <div className="flex w-full justify-center items-center pb-2 transition-colors relative text-xs align-middle animate-in fade-in slide-in-from-right-8 duration-500">
       <div className="flex items-center">
         {/* Tool and Token count */}
-        {<BottomMenuAlertPopover alerts={alerts} />}
+        <BottomMenuAlertPopover alerts={alerts} />
 
-        {/* Model Selector Dropdown */}
-        <ModelsBottomBar dropdownRef={dropdownRef} setView={setView} />
-
-        {/* Separator */}
-        <div className="w-1 h-1 rounded-full bg-background-accent/50 mx-2" />
-
-        {/* Goose Mode Selector Dropdown */}
-        <BottomMenuModeSelection setView={setView} />
-
-        {/* Summarize Context Button - ADD THIS */}
+        {/* Summarize Context Button */}
         {messages.length > 0 && (
           <>
             <div className="w-1 h-1 rounded-full bg-background-accent/50 mx-2" />
