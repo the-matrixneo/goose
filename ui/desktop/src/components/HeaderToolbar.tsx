@@ -35,14 +35,14 @@ export const HeaderToolbar: React.FC<HeaderToolbarProps> = ({
   const headerPadding = !isSidebarOpen ? (safeIsMacOS ? 'pl-20' : 'pl-12') : 'pl-4';
 
   return (
-    <div className="h-12 flex items-center justify-between bg-background-default rounded-xl border border-border-subtle shadow-sm mx-4 mt-4 mb-4">
+    <div className="h-12 flex items-center justify-between mx-4 mt-4 mb-4">
       {/* Left side - Sidebar toggle only */}
       <div className={`flex items-center ${headerPadding}`}>
         <SidebarTrigger className="no-drag" />
       </div>
 
       {/* Center - Directory, Status + Model, Mode, and Summarize */}
-      <div className="flex items-center gap-3" ref={dropdownRef}>
+      <div className="flex items-center gap-3 bg-background-default rounded-xl border border-border-subtle shadow-sm px-4 py-2" ref={dropdownRef}>
         <DirSwitcher hasMessages={hasMessages} />
         <div className="h-4 w-px bg-border-subtle" />
         
