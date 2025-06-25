@@ -1,0 +1,842 @@
+import React, {
+  useEffect,
+  useRef,
+  useState,
+  useMemo,
+  useCallback,
+  useContext,
+  createContext,
+} from 'react';
+import { getApiUrl } from '../config';
+import FlappyGoose from './FlappyGoose';
+import GooseMessage from './GooseMessage';
+import { type View, ViewOptions } from '../App';
+import LoadingGoose from './LoadingGoose';
+import { ScrollAreaHandle } from './ui/scroll-area';
+import UserMessage from './UserMessage';
+import { SearchView } from './conversation/SearchView';
+import { createRecipe } from '../recipe';
+import { AgentHeader } from './AgentHeader';
+import LayingEggLoader from './LayingEggLoader';
+import { fetchSessionDetails, generateSessionId } from '../sessions';
+import 'react-toastify/dist/ReactToastify.css';
+import { useMessageStream } from '../hooks/useMessageStream';
+import { SessionSummaryModal } from './context_management/SessionSummaryModal';
+import { Recipe } from '../recipe';
+import {
+  ChatContextManagerProvider,
+  useChatContextManager,
+} from './context_management/ChatContextManager';
+import { ContextHandler } from './context_management/ContextHandler';
+import { LocalMessageStorage } from '../utils/localMessageStorage';
+import {
+  Message,
+  createUserMessage,
+  ToolCall,
+  ToolCallResult,
+  ToolRequestMessageContent,
+  ToolResponseMessageContent,
+  ToolConfirmationRequestMessageContent,
+  getTextContent,
+  TextContent,
+} from '../types/message';
+import SessionsSidebar from './GooseSidebar/AppSidebar';
+import { SidebarTrigger } from './ui/sidebar';
+import BottomMenu from './bottom_menu/BottomMenu';
+import { SessionInsights } from './sessions/SessionsInsights';
+import { useSidebar } from './ui/sidebar';
+import { Button } from './ui/button';
+import { Gear, Idea } from './icons';
+import { Tooltip, TooltipContent, TooltipTrigger } from './ui/Tooltip';
+import { Bot, Folder, Save, Send } from 'lucide-react';
+import { ChatSmart } from './icons';
+import { MainPanelLayout } from './Layout/MainPanelLayout';
+import { useNavigate } from 'react-router-dom';
+
+// Context for sharing current model info
+const CurrentModelContext = createContext<{ model: string; mode: string } | null>(null);
+export const useCurrentModelInfo = () => useContext(CurrentModelContext);
+
+export interface ChatType {
+  id: string;
+  title: string;
+  messageHistoryIndex: number;
+  messages: Message[];
+}
+
+// Helper function to determine if a message is a user message
+const isUserMessage = (message: Message): boolean => {
+  if (message.role === 'assistant') {
+    return false;
+  }
+  if (message.content.every((c) => c.type === 'toolConfirmationRequest')) {
+    return false;
+  }
+  return true;
+};
+
+export default function Hub({
+  readyForAutoUserPrompt,
+  chat,
+  setChat,
+  setView,
+  setIsGoosehintsModalOpen,
+}: {
+  readyForAutoUserPrompt: boolean;
+  chat: ChatType;
+  setChat: (chat: ChatType) => void;
+  setView: (view: View, viewOptions?: ViewOptions) => void;
+  setIsGoosehintsModalOpen: (isOpen: boolean) => void;
+}) {
+  return (
+    <ChatContextManagerProvider>
+      <HubContent
+        readyForAutoUserPrompt={readyForAutoUserPrompt}
+        chat={chat}
+        setChat={setChat}
+        setView={setView}
+        setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
+      />
+    </ChatContextManagerProvider>
+  );
+}
+
+function HubContent({
+  chat,
+  setChat,
+  setView,
+  setIsGoosehintsModalOpen,
+}: {
+  readyForAutoUserPrompt: boolean;
+  chat: ChatType;
+  setChat: (chat: ChatType) => void;
+  setView: (view: View, viewOptions?: ViewOptions) => void;
+  setIsGoosehintsModalOpen: (isOpen: boolean) => void;
+}) {
+  return (
+    <HubContentWithSidebar
+      chat={chat}
+      setChat={setChat}
+      setView={setView}
+      setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
+    />
+  );
+}
+
+function HubContentWithSidebar({
+  chat,
+  setChat,
+  setView,
+  setIsGoosehintsModalOpen,
+}: {
+  chat: ChatType;
+  setChat: (chat: ChatType) => void;
+  setView: (view: View, viewOptions?: ViewOptions) => void;
+  setIsGoosehintsModalOpen: (isOpen: boolean) => void;
+}) {
+  const navigate = useNavigate();
+  const safeIsMacOS = (window?.electron?.platform || 'darwin') === 'darwin';
+  const { open: isSidebarOpen } = useSidebar();
+
+  // Calculate padding based on sidebar state and macOS
+  const headerPadding = !isSidebarOpen ? (safeIsMacOS ? 'pl-20' : 'pl-12') : 'pl-4';
+
+  const [hasMessages, setHasMessages] = useState(false);
+  const [lastInteractionTime, setLastInteractionTime] = useState<number>(Date.now());
+  const [showGame, setShowGame] = useState(false);
+  const [isGeneratingRecipe, setIsGeneratingRecipe] = useState(false);
+  const [sessionTokenCount, setSessionTokenCount] = useState<number>(0);
+  const [ancestorMessages, setAncestorMessages] = useState<Message[]>([]);
+  const [droppedFiles, setDroppedFiles] = useState<string[]>([]);
+  const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
+
+  const scrollRef = useRef<ScrollAreaHandle>(null);
+
+  const {
+    summaryContent,
+    summarizedThread,
+    isSummaryModalOpen,
+    resetMessagesWithSummary,
+    closeSummaryModal,
+    updateSummary,
+    hasContextHandlerContent,
+    getContextHandlerType,
+  } = useChatContextManager();
+
+  useEffect(() => {
+    // Log all messages when the component first mounts
+    window.electron.logInfo(
+      'Initial messages when resuming session: ' + JSON.stringify(chat.messages, null, 2)
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty dependency array means this runs once on mount;
+
+  // Get recipeConfig directly from appConfig
+  const recipeConfig = window.appConfig.get('recipeConfig') as Recipe | null;
+
+  // Store message in global history when it's added
+  const storeMessageInHistory = useCallback((message: Message) => {
+    if (isUserMessage(message)) {
+      const text = getTextContent(message);
+      if (text) {
+        LocalMessageStorage.addMessage(text);
+      }
+    }
+  }, []);
+
+  const {
+    messages,
+    append: originalAppend,
+    stop,
+    isLoading,
+    error,
+    setMessages,
+    input: _input,
+    setInput: _setInput,
+    handleInputChange: _handleInputChange,
+    handleSubmit: _submitMessage,
+    updateMessageStreamBody,
+    notifications,
+  } = useMessageStream({
+    api: getApiUrl('/reply'),
+    id: chat.id,
+    initialMessages: chat.messages,
+    body: { session_id: chat.id, session_working_dir: window.appConfig.get('GOOSE_WORKING_DIR') },
+    onFinish: async (_message, _reason) => {
+      window.electron.stopPowerSaveBlocker();
+
+      setTimeout(() => {
+        if (scrollRef.current?.scrollToBottom) {
+          scrollRef.current.scrollToBottom();
+        }
+      }, 300);
+
+      const timeSinceLastInteraction = Date.now() - lastInteractionTime;
+      window.electron.logInfo('last interaction:' + lastInteractionTime);
+      if (timeSinceLastInteraction > 60000) {
+        // 60000ms = 1 minute
+        window.electron.showNotification({
+          title: 'Goose finished the task.',
+          body: 'Click here to expand.',
+        });
+      }
+
+      // Always emit refresh event when message stream finishes for new sessions
+      // Check if this is a new session by looking at the current session ID format
+      const isNewSession = chat.id && chat.id.match(/^\d{8}_\d{6}$/);
+      if (isNewSession) {
+        console.log(
+          'Hub: Message stream finished for new session, emitting message-stream-finished event'
+        );
+        // Emit event to trigger session refresh
+        window.dispatchEvent(new CustomEvent('message-stream-finished'));
+      }
+    },
+  });
+
+  // Wrap append to store messages in global history
+  const append = useCallback(
+    (messageOrString: Message | string) => {
+      const message =
+        typeof messageOrString === 'string' ? createUserMessage(messageOrString) : messageOrString;
+      storeMessageInHistory(message);
+
+      // If this is the first message in a new session, trigger a refresh immediately
+      // Only trigger if we're starting a completely new session (no existing messages)
+      if (messages.length === 0 && chat.messages.length === 0) {
+        console.log('Hub: New session detected, emitting session-created event');
+        // Emit event to indicate a new session is being created
+        window.dispatchEvent(new CustomEvent('session-created'));
+        // Also update the refresh trigger
+        setRefreshTrigger((prev) => prev + 1);
+      }
+
+      return originalAppend(message);
+    },
+    [originalAppend, storeMessageInHistory, messages.length, chat.messages.length]
+  );
+
+  // for CLE events -- create a new session id for the next set of messages
+  useEffect(() => {
+    // If we're in a continuation session, update the chat ID
+    if (summarizedThread.length > 0) {
+      const newSessionId = generateSessionId();
+
+      // Update the session ID in the chat object
+      setChat({
+        ...chat,
+        id: newSessionId!,
+        title: `Continued from ${chat.id}`,
+        messageHistoryIndex: summarizedThread.length,
+      });
+
+      // Update the body used by useMessageStream to send future messages to the new session
+      if (summarizedThread.length > 0 && updateMessageStreamBody) {
+        updateMessageStreamBody({
+          session_id: newSessionId,
+          session_working_dir: window.appConfig.get('GOOSE_WORKING_DIR'),
+        });
+      }
+    }
+
+    // only update if summarizedThread length changes from 0 -> 1+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    summarizedThread.length > 0,
+  ]);
+
+  // Listen for make-agent-from-chat event
+  useEffect(() => {
+    const handleMakeAgent = async () => {
+      window.electron.logInfo('Making recipe from chat...');
+      setIsGeneratingRecipe(true);
+
+      try {
+        // Create recipe directly from chat messages
+        const createRecipeRequest = {
+          messages: messages,
+          title: '',
+          description: '',
+        };
+
+        const response = await createRecipe(createRecipeRequest);
+
+        if (response.error) {
+          throw new Error(`Failed to create recipe: ${response.error}`);
+        }
+
+        window.electron.logInfo('Created recipe:');
+        window.electron.logInfo(JSON.stringify(response.recipe, null, 2));
+
+        // First, verify the recipe data
+        if (!response.recipe) {
+          throw new Error('No recipe data received');
+        }
+
+        // Create a new window for the recipe editor
+        console.log('Opening recipe editor with config:', response.recipe);
+        const recipeConfig = {
+          id: response.recipe.title || 'untitled',
+          title: response.recipe.title || 'Untitled Recipe',
+          description: response.recipe.description || '',
+          instructions: response.recipe.instructions || '',
+          activities: response.recipe.activities || [],
+          prompt: response.recipe.prompt || '',
+        };
+        window.electron.createChatWindow(
+          undefined, // query
+          undefined, // dir
+          undefined, // version
+          undefined, // resumeSessionId
+          recipeConfig, // recipe config
+          'recipeEditor' // view type
+        );
+
+        window.electron.logInfo('Opening recipe editor window');
+      } catch (error) {
+        window.electron.logInfo('Failed to create recipe:');
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        window.electron.logInfo(errorMessage);
+      } finally {
+        setIsGeneratingRecipe(false);
+      }
+    };
+
+    window.addEventListener('make-agent-from-chat', handleMakeAgent);
+
+    return () => {
+      window.removeEventListener('make-agent-from-chat', handleMakeAgent);
+    };
+  }, [messages]);
+
+  // Update chat messages when they change and save to sessionStorage
+  useEffect(() => {
+    // @ts-expect-error - TypeScript being overly strict about the return type
+    setChat((prevChat: ChatType) => ({ ...prevChat, messages }));
+  }, [messages, setChat]);
+
+  useEffect(() => {
+    if (messages.length > 0) {
+      setHasMessages(true);
+    }
+  }, [messages]);
+
+  // Pre-fill input with recipe prompt instead of auto-sending it
+  const initialPrompt = useMemo(() => {
+    return recipeConfig?.prompt || '';
+  }, [recipeConfig?.prompt]);
+
+  // Handle submit
+  const handleSubmit = (e: React.FormEvent) => {
+    window.electron.startPowerSaveBlocker();
+    const customEvent = e as unknown as CustomEvent;
+    // ChatInput now sends a single 'value' field with text and appended image paths
+    const combinedTextFromInput = customEvent.detail?.value || '';
+
+    if (combinedTextFromInput.trim()) {
+      setLastInteractionTime(Date.now());
+
+      // createUserMessage was reverted to only accept text.
+      // It will create a Message with a single TextContent part containing text + paths.
+      const userMessage = createUserMessage(combinedTextFromInput.trim());
+
+      if (summarizedThread.length > 0) {
+        resetMessagesWithSummary(
+          messages,
+          setMessages,
+          ancestorMessages,
+          setAncestorMessages,
+          summaryContent
+        );
+        setTimeout(() => {
+          append(userMessage);
+          if (scrollRef.current?.scrollToBottom) {
+            scrollRef.current.scrollToBottom();
+          }
+        }, 150);
+      } else {
+        append(userMessage);
+        if (scrollRef.current?.scrollToBottom) {
+          scrollRef.current.scrollToBottom();
+        }
+      }
+    } else {
+      // If nothing was actually submitted (e.g. empty input and no images pasted)
+      window.electron.stopPowerSaveBlocker();
+    }
+  };
+
+  if (error) {
+    console.log('Error:', error);
+  }
+
+  const onStopGoose = () => {
+    stop();
+    setLastInteractionTime(Date.now());
+    window.electron.stopPowerSaveBlocker();
+
+    // Handle stopping the message stream
+    const lastMessage = messages[messages.length - 1];
+
+    // check if the last user message has any tool response(s)
+    const isToolResponse = lastMessage.content.some(
+      (content): content is ToolResponseMessageContent => content.type == 'toolResponse'
+    );
+
+    // isUserMessage also checks if the message is a toolConfirmationRequest
+    // check if the last message is a real user's message
+    if (lastMessage && isUserMessage(lastMessage) && !isToolResponse) {
+      // Get the text content from the last message before removing it
+      const textContent = lastMessage.content.find((c): c is TextContent => c.type === 'text');
+      const textValue = textContent?.text || '';
+
+      // Set the text back to the input field
+      _setInput(textValue);
+
+      // Remove the last user message if it's the most recent one
+      if (messages.length > 1) {
+        setMessages(messages.slice(0, -1));
+      } else {
+        setMessages([]);
+      }
+      // Interruption occured after a tool has completed, but no assistant reply
+      // handle his if we want to popup a message too the user
+      // } else if (lastMessage && isUserMessage(lastMessage) && isToolResponse) {
+    } else if (!isUserMessage(lastMessage)) {
+      // the last message was an assistant message
+      // check if we have any tool requests or tool confirmation requests
+      const toolRequests: [string, ToolCallResult<ToolCall>][] = lastMessage.content
+        .filter(
+          (content): content is ToolRequestMessageContent | ToolConfirmationRequestMessageContent =>
+            content.type === 'toolRequest' || content.type === 'toolConfirmationRequest'
+        )
+        .map((content) => {
+          if (content.type === 'toolRequest') {
+            return [content.id, content.toolCall];
+          } else {
+            // extract tool call from confirmation
+            const toolCall: ToolCallResult<ToolCall> = {
+              status: 'success',
+              value: {
+                name: content.toolName,
+                arguments: content.arguments,
+              },
+            };
+            return [content.id, toolCall];
+          }
+        });
+
+      if (toolRequests.length !== 0) {
+        // This means we were interrupted during a tool request
+        // Create tool responses for all interrupted tool requests
+
+        let responseMessage: Message = {
+          display: true,
+          sendToLLM: true,
+          role: 'user',
+          created: Date.now(),
+          content: [],
+        };
+
+        const notification = 'Interrupted by the user to make a correction';
+
+        // generate a response saying it was interrupted for each tool request
+        for (const [reqId, _] of toolRequests) {
+          const toolResponse: ToolResponseMessageContent = {
+            type: 'toolResponse',
+            id: reqId,
+            toolResult: {
+              status: 'error',
+              error: notification,
+            },
+          };
+
+          responseMessage.content.push(toolResponse);
+        }
+        // Use an immutable update to add the response message to the messages array
+        setMessages([...messages, responseMessage]);
+      }
+    }
+  };
+
+  // Filter out standalone tool response messages for rendering
+  // They will be shown as part of the tool invocation in the assistant message
+  const filteredMessages = [...ancestorMessages, ...messages].filter((message) => {
+    // Only filter out when display is explicitly false
+    if (message.display === false) return false;
+
+    // Keep all assistant messages and user messages that aren't just tool responses
+    if (message.role === 'assistant') return true;
+
+    // For user messages, check if they're only tool responses
+    if (message.role === 'user') {
+      const hasOnlyToolResponses = message.content.every((c) => c.type === 'toolResponse');
+      const hasTextContent = message.content.some((c) => c.type === 'text');
+      const hasToolConfirmation = message.content.every(
+        (c) => c.type === 'toolConfirmationRequest'
+      );
+
+      // Keep the message if it has text content or tool confirmation or is not just tool responses
+      return hasTextContent || !hasOnlyToolResponses || hasToolConfirmation;
+    }
+
+    return true;
+  });
+
+  const commandHistory = useMemo(() => {
+    return filteredMessages
+      .reduce<string[]>((history, message) => {
+        if (isUserMessage(message)) {
+          const textContent = message.content.find((c): c is TextContent => c.type === 'text');
+          const text = textContent?.text?.trim();
+          if (text) {
+            history.push(text);
+          }
+        }
+        return history;
+      }, [])
+      .reverse();
+  }, [filteredMessages]);
+
+  // Fetch session metadata to get token count
+  useEffect(() => {
+    const fetchSessionTokens = async () => {
+      try {
+        const sessionDetails = await fetchSessionDetails(chat.id);
+        setSessionTokenCount(sessionDetails.metadata.total_tokens || 0);
+      } catch (err) {
+        console.error('Error fetching session token count:', err);
+      }
+    };
+    if (chat.id) {
+      fetchSessionTokens();
+    }
+  }, [chat.id, messages]);
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      const paths: string[] = [];
+      for (let i = 0; i < files.length; i++) {
+        paths.push(window.electron.getPathForFile(files[i]));
+      }
+      setDroppedFiles(paths);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+  };
+
+  const toolCallNotifications = notifications.reduce((map, item) => {
+    const key = item.request_id;
+    if (!map.has(key)) {
+      map.set(key, []);
+    }
+    map.get(key).push(item);
+    return map;
+  }, new Map());
+
+  return (
+    <div>
+      <MainPanelLayout>
+        {/* Loader when generating recipe */}
+        {isGeneratingRecipe && <LayingEggLoader />}
+
+        <div className="h-12 flex items-center justify-between">
+          {/* <div className={`flex items-center ${headerPadding}`}>
+            <SidebarTrigger className="no-drag" />
+          </div> */}
+          <div className="flex items-center pr-4">
+            {messages.length > 0 && (
+              <>
+                {setIsGoosehintsModalOpen && (
+                  <Tooltip delayDuration={500}>
+                    <TooltipTrigger className="w-full">
+                      <Button
+                        onClick={() => setIsGoosehintsModalOpen(true)}
+                        className="px-3"
+                        variant="ghost"
+                        size="sm"
+                        shape="round"
+                      >
+                        <div className="flex gap-2 items-center text-text-default">
+                          <Idea className="w-4 h-4" />
+                          {/* Configure .goosehints */}
+                        </div>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">
+                      <p>Customize instructions</p>
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+
+                {recipeConfig ? (
+                  <>
+                    <Tooltip delayDuration={500}>
+                      <TooltipTrigger className="w-full">
+                        <Button
+                          onClick={() => {
+                            window.electron.createChatWindow(
+                              undefined,
+                              undefined,
+                              undefined,
+                              undefined,
+                              recipeConfig as Recipe,
+                              'recipeEditor'
+                            );
+                          }}
+                          className="px-3"
+                          variant="ghost"
+                        >
+                          <div className="flex gap-2 items-center text-text-default">
+                            <Send className="w-4 h-4" />
+                            View recipe
+                          </div>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="right">
+                        <p>View the recipe you're using</p>
+                      </TooltipContent>
+                    </Tooltip>
+
+                    <Tooltip delayDuration={500}>
+                      <TooltipTrigger className="w-full">
+                        <Button
+                          // onClick={handleSaveRecipeClick}
+                          className="px-3"
+                          variant="ghost"
+                          size="sm"
+                          shape="round"
+                        >
+                          <div className="flex gap-2 items-center text-text-default">
+                            <Save className="w-4 h-4" />
+                            Save recipe
+                          </div>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="right">
+                        <p>Save this recipe for reuse</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </>
+                ) : (
+                  <Tooltip delayDuration={500}>
+                    <TooltipTrigger className="w-full">
+                      <Button
+                        onClick={() => {
+                          window.electron.logInfo('Make Agent button clicked');
+                          window.dispatchEvent(new CustomEvent('make-agent-from-chat'));
+                        }}
+                        className="px-3"
+                        variant="ghost"
+                        size="sm"
+                        shape="round"
+                      >
+                        <div className="flex gap-2 items-center text-text-default">
+                          <Bot className="w-4 h-4" />
+                          {/* Make Agent from this session */}
+                        </div>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">
+                      <p>Make a custom agent you can share or reuse</p>
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+
+        <div
+          className="flex flex-col min-w-0 flex-1 overflow-y-scroll relative pl-6 pr-4 pb-16 pt-2"
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+        >
+          {/* Session Insights at the top */}
+          {messages.length === 0 && <SessionInsights />}
+
+          {recipeConfig?.title && messages.length > 0 && (
+            <AgentHeader
+              title={recipeConfig.title}
+              profileInfo={
+                recipeConfig.profile
+                  ? `${recipeConfig.profile} - ${recipeConfig.mcps || 12} MCPs`
+                  : undefined
+              }
+              onChangeProfile={() => {
+                // Handle profile change
+                console.log('Change profile clicked');
+              }}
+            />
+          )}
+          {messages.length === 0 ? (
+            <>
+              <SearchView>{/* Empty search view when no messages */}</SearchView>
+            </>
+          ) : (
+            <>
+              <SearchView>
+                {filteredMessages.map((message, index) => {
+                  const isUser = isUserMessage(message);
+                  const nextMessage = filteredMessages[index + 1];
+
+                  return (
+                    <div
+                      key={message.id || index}
+                      className={`relative ${index === 0 ? 'mt-0' : 'mt-4'} ${isUser ? 'user' : 'assistant'}`}
+                      data-testid="message-container"
+                    >
+                      {isUser ? (
+                        <>
+                          {hasContextHandlerContent(message) ? (
+                            <ContextHandler
+                              messages={messages}
+                              messageId={message.id ?? message.created.toString()}
+                              chatId={chat.id}
+                              workingDir={window.appConfig.get('GOOSE_WORKING_DIR') as string}
+                              contextType={getContextHandlerType(message)}
+                            />
+                          ) : (
+                            <UserMessage message={message} />
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          {/* Only render GooseMessage if it's not a message invoking some context management */}
+                          {hasContextHandlerContent(message) ? (
+                            <ContextHandler
+                              messages={messages}
+                              messageId={message.id ?? message.created.toString()}
+                              chatId={chat.id}
+                              workingDir={window.appConfig.get('GOOSE_WORKING_DIR') as string}
+                              contextType={getContextHandlerType(message)}
+                            />
+                          ) : (
+                            <GooseMessage
+                              messageHistoryIndex={chat?.messageHistoryIndex}
+                              message={message}
+                              messages={messages}
+                              append={append}
+                              appendMessage={(newMessage) => {
+                                const updatedMessages = [...messages, newMessage];
+                                setMessages(updatedMessages);
+                              }}
+                              toolCallNotifications={toolCallNotifications}
+                            />
+                          )}
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
+              </SearchView>
+
+              {error && (
+                <div className="flex flex-col items-center justify-center p-4">
+                  <div className="text-red-700 dark:text-red-300 bg-red-400/50 p-3 rounded-lg mb-2">
+                    {error.message || 'Honk! Goose experienced an error while responding'}
+                  </div>
+                  <div
+                    className="px-3 py-2 mt-2 text-center whitespace-nowrap cursor-pointer text-textStandard border border-borderSubtle hover:bg-bgSubtle rounded-full inline-block transition-all duration-150"
+                    onClick={async () => {
+                      // Find the last user message
+                      const lastUserMessage = messages.reduceRight(
+                        (found, m) => found || (m.role === 'user' ? m : null),
+                        null as Message | null
+                      );
+                      if (lastUserMessage) {
+                        append(lastUserMessage);
+                      }
+                    }}
+                  >
+                    Retry Last Message
+                  </div>
+                </div>
+              )}
+              <div className="block h-8" />
+            </>
+          )}
+        </div>
+        <div className="relative z-10 animate-[fadein_400ms_ease-in_forwards]">
+          {/* "Let's pair" button when no messages */}
+          {messages.length === 0 && (
+            <div className="flex justify-center mb-6">
+              <Button
+                onClick={() => navigate('/pair')}
+                className="px-8 py-3 text-lg font-medium bg-borderProminent text-text-on-accent rounded-lg hover:bg-opacity-90 transition-all duration-200"
+                size="lg"
+              >
+                Let's pair
+              </Button>
+            </div>
+          )}
+        </div>
+      </MainPanelLayout>
+
+      <BottomMenu
+        setView={setView}
+        numTokens={sessionTokenCount}
+        messages={messages}
+        isLoading={isLoading}
+        setMessages={setMessages}
+      />
+
+      {showGame && <FlappyGoose onClose={() => setShowGame(false)} />}
+
+      <SessionSummaryModal
+        isOpen={isSummaryModalOpen}
+        onClose={closeSummaryModal}
+        onSave={(editedContent) => {
+          updateSummary(editedContent);
+          closeSummaryModal();
+        }}
+        summaryContent={summaryContent}
+      />
+    </div>
+  );
+}

@@ -11,7 +11,8 @@ import { extractExtensionName } from './components/settings/extensions/utils';
 import { GoosehintsModal } from './components/GoosehintsModal';
 import { type ExtensionConfig } from './extensions';
 
-import ChatView, { type ChatType } from './components/ChatView';
+import Hub, { type ChatType } from './components/hub';
+import Pair from './components/pair';
 import SettingsView, { SettingsViewOptions } from './components/settings/SettingsView';
 import SessionsView from './components/sessions/SessionsView';
 import SharedSessionView from './components/sessions/SharedSessionView';
@@ -78,7 +79,7 @@ export type ViewConfig = {
 };
 
 // Route Components
-const ChatRouteWrapper = ({
+const HubRouteWrapper = ({
   chat,
   setChat,
   setIsGoosehintsModalOpen,
@@ -90,7 +91,62 @@ const ChatRouteWrapper = ({
   const navigate = useNavigate();
 
   return (
-    <ChatView
+    <Hub
+      readyForAutoUserPrompt={true}
+      chat={chat}
+      setChat={setChat}
+      setView={(view: View, options?: ViewOptions) => {
+        // Convert view to route navigation
+        switch (view) {
+          case 'chat':
+            navigate('/');
+            break;
+          case 'settings':
+            navigate('/settings', { state: options });
+            break;
+          case 'sessions':
+            navigate('/sessions');
+            break;
+          case 'schedules':
+            navigate('/schedules');
+            break;
+          case 'recipes':
+            navigate('/recipes');
+            break;
+          case 'permission':
+            navigate('/permission', { state: options });
+            break;
+          case 'ConfigureProviders':
+            navigate('/configure-providers');
+            break;
+          case 'sharedSession':
+            navigate('/shared-session', { state: options });
+            break;
+          case 'recipeEditor':
+            navigate('/recipe-editor', { state: options });
+            break;
+          default:
+            navigate('/');
+        }
+      }}
+      setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
+    />
+  );
+};
+
+const PairRouteWrapper = ({
+  chat,
+  setChat,
+  setIsGoosehintsModalOpen,
+}: {
+  chat: ChatType;
+  setChat: (chat: ChatType) => void;
+  setIsGoosehintsModalOpen: (isOpen: boolean) => void;
+}) => {
+  const navigate = useNavigate();
+
+  return (
+    <Pair
       readyForAutoUserPrompt={true}
       chat={chat}
       setChat={setChat}
@@ -838,7 +894,17 @@ export default function App() {
               <Route
                 index
                 element={
-                  <ChatRouteWrapper
+                  <HubRouteWrapper
+                    chat={chat}
+                    setChat={setChat}
+                    setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
+                  />
+                }
+              />
+              <Route
+                path="pair"
+                element={
+                  <PairRouteWrapper
                     chat={chat}
                     setChat={setChat}
                     setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}

@@ -11,6 +11,8 @@ import {
   SidebarGroup,
   SidebarGroupLabel,
   SidebarGroupContent,
+  SidebarTrigger,
+  useSidebar,
 } from '../ui/sidebar';
 import { Button } from '../ui/button';
 import { ChatSmart, Time, Gear, LinkedIn, Youtube, Discord } from '../icons';
@@ -22,6 +24,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/Tooltip';
 import ThemeSelector from './ThemeSelector';
 import GooseLogo from '../GooseLogo';
 import { useChatContext } from '../../contexts/ChatContext';
+import { Goose } from '../icons/Goose';
 
 interface SidebarProps {
   onSelectSession: (sessionId: string) => void;
@@ -42,6 +45,11 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
   const [saving, setSaving] = useState(false);
   const { remove } = useConfig();
   const { hasActiveSession, resetChat } = useChatContext();
+  const { state } = useSidebar();
+  const safeIsMacOS = (window?.electron?.platform || 'darwin') === 'darwin';
+
+  // Calculate padding based on sidebar state and macOS
+  const headerPadding = safeIsMacOS ? 'pl-8' : 'pl-4';
 
   useEffect(() => {
     // Trigger animation after a small delay
@@ -115,7 +123,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
 
   return (
     <>
-      <SidebarContent className="pr-3">
+      <SidebarContent>
         {/* <SidebarHeader>
           <div className="flex items-center gap-2 pt-12 pb-4">
             <GooseLogo size="small" />
@@ -124,7 +132,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
         </SidebarHeader> */}
 
         {/* Menu */}
-        <div className="px-1 py-0 pt-14 space-y-2 relative">
+        <div className="pt-14">
           <SidebarMenu>
             <motion.div
               initial={{ opacity: 0, x: 20 }}
@@ -158,6 +166,24 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
                 >
                   <Home className="w-4 h-4" />
                   <span>Home</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.125 }}
+            >
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  onClick={() => navigate('/pair')}
+                  isActive={isActivePath('/pair')}
+                  tooltip="Start pairing with Goose"
+                  className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200"
+                >
+                  <ChatSmart className="w-4 h-4" />
+                  <span>Pair</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </motion.div>
@@ -279,61 +305,85 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
       </SidebarContent>
 
       <SidebarFooter>
-        <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-8 duration-500">
-          <GooseLogo size="small" />
-          <span className="text-base">codename goose</span>
+        <div className="flex items-center gap-2">
+          <Goose className="w-6 h-6" />
+          <AnimatePresence mode="wait">
+            {state === 'expanded' && (
+              <motion.span
+                key="logo-text"
+                initial={{ opacity: 0, width: 0 }}
+                animate={{ opacity: 1, width: 'auto' }}
+                exit={{ opacity: 0, width: 0 }}
+                transition={{ duration: 0.2, ease: 'easeInOut' }}
+                className="text-base overflow-hidden whitespace-nowrap"
+              >
+                codename goose
+              </motion.span>
+            )}
+          </AnimatePresence>
         </div>
 
-        <div className="pb-4 animate-in fade-in slide-in-from-right-8 duration-500">
-          <div className="flex gap-2">
-            <Tooltip delayDuration={500}>
-              <TooltipTrigger asChild>
-                <a
-                  href="https://discord.gg/pvQ8S2e5"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center h-8 w-8 p-0 rounded-full hover:bg-neutral-200 transition-all duration-200"
-                >
-                  <MessageCircle className="w-4 h-4" />
-                </a>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                <p>Join our Discord</p>
-              </TooltipContent>
-            </Tooltip>
+        <div className="pb-4">
+          <AnimatePresence mode="wait">
+            {state === 'expanded' && (
+              <motion.div
+                key="social-icons"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.2, ease: 'easeInOut' }}
+                className="flex gap-2 overflow-hidden"
+              >
+                <Tooltip delayDuration={500}>
+                  <TooltipTrigger asChild>
+                    <a
+                      href="https://discord.gg/pvQ8S2e5"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center justify-center h-8 w-8 p-0 rounded-full hover:bg-neutral-200 transition-all duration-200"
+                    >
+                      <MessageCircle className="w-4 h-4" />
+                    </a>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    <p>Join our Discord</p>
+                  </TooltipContent>
+                </Tooltip>
 
-            <Tooltip delayDuration={500}>
-              <TooltipTrigger asChild>
-                <a
-                  href="https://www.linkedin.com/company/block-opensource"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center h-8 w-8 p-0 rounded-full hover:bg-neutral-200 transition-all duration-200"
-                >
-                  <LinkedIn className="w-4 h-4" />
-                </a>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                <p>Follow us on LinkedIn</p>
-              </TooltipContent>
-            </Tooltip>
+                <Tooltip delayDuration={500}>
+                  <TooltipTrigger asChild>
+                    <a
+                      href="https://www.linkedin.com/company/block-opensource"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center justify-center h-8 w-8 p-0 rounded-full hover:bg-neutral-200 transition-all duration-200"
+                    >
+                      <LinkedIn className="w-4 h-4" />
+                    </a>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    <p>Follow us on LinkedIn</p>
+                  </TooltipContent>
+                </Tooltip>
 
-            <Tooltip delayDuration={500}>
-              <TooltipTrigger asChild>
-                <a
-                  href="https://www.youtube.com/@blockopensource"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center h-8 w-8 p-0 rounded-full hover:bg-neutral-200 transition-all duration-200"
-                >
-                  <Youtube className="w-4 h-4" />
-                </a>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                <p>Watch on YouTube</p>
-              </TooltipContent>
-            </Tooltip>
-          </div>
+                <Tooltip delayDuration={500}>
+                  <TooltipTrigger asChild>
+                    <a
+                      href="https://www.youtube.com/@blockopensource"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center justify-center h-8 w-8 p-0 rounded-full hover:bg-neutral-200 transition-all duration-200"
+                    >
+                      <Youtube className="w-4 h-4" />
+                    </a>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    <p>Watch on YouTube</p>
+                  </TooltipContent>
+                </Tooltip>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </SidebarFooter>
 
