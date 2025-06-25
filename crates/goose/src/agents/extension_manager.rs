@@ -204,7 +204,8 @@ impl ExtensionManager {
                 ..
             } => {
                 let all_envs = merge_environments(envs, env_keys, &sanitized_name).await?;
-                let transport = StreamableHttpTransport::with_headers(uri, all_envs, headers.clone());
+                let transport =
+                    StreamableHttpTransport::with_headers(uri, all_envs, headers.clone());
                 let handle = transport.start().await?;
                 Box::new(
                     McpClient::connect(

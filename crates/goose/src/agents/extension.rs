@@ -227,7 +227,12 @@ impl ExtensionConfig {
         }
     }
 
-    pub fn streamable_http<S: Into<String>, T: Into<u64>>(name: S, uri: S, description: S, timeout: T) -> Self {
+    pub fn streamable_http<S: Into<String>, T: Into<u64>>(
+        name: S,
+        uri: S,
+        description: S,
+        timeout: T,
+    ) -> Self {
         Self::StreamableHttp {
             name: name.into(),
             uri: uri.into(),
@@ -309,7 +314,9 @@ impl std::fmt::Display for ExtensionConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ExtensionConfig::Sse { name, uri, .. } => write!(f, "SSE({}: {})", name, uri),
-            ExtensionConfig::StreamableHttp { name, uri, .. } => write!(f, "StreamableHttp({}: {})", name, uri),
+            ExtensionConfig::StreamableHttp { name, uri, .. } => {
+                write!(f, "StreamableHttp({}: {})", name, uri)
+            }
             ExtensionConfig::Stdio {
                 name, cmd, args, ..
             } => {
