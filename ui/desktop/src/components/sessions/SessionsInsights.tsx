@@ -85,8 +85,8 @@ export function SessionInsights() {
   }
 
   return (
-    <div className="flex items-center justify-center min-h-[60vh]">
-      <div className="w-full max-w-4xl">
+    <div className="flex items-center min-h-[60vh]">
+      <div className="w-full">
         <div className="grid grid-cols-4 gap-4 mb-4">
           <GreetingCard />
         </div>
