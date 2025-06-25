@@ -31,15 +31,17 @@ export const HeaderToolbar: React.FC<HeaderToolbarProps> = ({
   const { open: isSidebarOpen } = useSidebar();
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Calculate left positioning based on sidebar state and platform
+  // Calculate positioning to match ChatInput margins (mx-6 = 24px)
   const leftPosition = !isSidebarOpen 
-    ? 'left-14' // 3.5rem (56px) - closer to collapsed sidebar (3rem + small margin)
-    : 'left-6'; // Normal spacing when sidebar open
+    ? 'left-6' // Match ChatInput left margin when sidebar collapsed
+    : 'left-6'; // Always match ChatInput left margin
 
   return (
-    <div className={`absolute top-4 right-4 z-10 flex items-center justify-between ${leftPosition}`}>
-      {/* Full-width toolbar container matching chat section width */}
-      <div className="flex items-center justify-between w-full bg-background-default rounded-xl border border-border-subtle shadow-sm px-4 py-2" ref={dropdownRef}>
+    <div className={`absolute top-6 right-6 z-10 flex items-center justify-between ${leftPosition}`}>
+      {/* Toolbar container matching ChatInput width exactly */}
+      <div className={`flex items-center justify-between w-full bg-background-default rounded-xl border border-border-subtle shadow-sm py-2 ${
+        !isSidebarOpen ? 'pl-8 pr-4' : 'pl-4 pr-4' // Consistent spacing with minimal clearance for stoplight buttons
+      }`} ref={dropdownRef}>
         
         {/* Left side - Sidebar toggle */}
         <div className="flex items-center">

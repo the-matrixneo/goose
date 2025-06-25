@@ -116,8 +116,8 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
     <>
       <SidebarContent className="pr-3 group-data-[collapsible=icon]:px-0">
         {/* Menu */}
-        <div className="px-1 py-0 pt-14 space-y-2 relative group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:items-center">
-          <SidebarMenu>
+        <div className="px-1 py-0 pt-14 space-y-2 relative group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:items-start group-data-[collapsible=icon]:pl-[26px] group-data-[collapsible=icon]:space-y-1">
+          <SidebarMenu className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:space-y-1">
             <motion.div
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -146,7 +146,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
                         ? 'Create a new session'
                         : 'Go back to the main chat screen'
                   }
-                  className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200"
+                  className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:w-4 group-data-[collapsible=icon]:h-8"
                 >
                   <Home className="w-4 h-4" />
                   <span>Home</span>
@@ -168,7 +168,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
                     );
                   }}
                   tooltip="Start a new session in a new window"
-                  className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200"
+                  className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:w-4 group-data-[collapsible=icon]:h-8"
                 >
                   <ChatSmart className="w-4 h-4" />
                   <span>New window</span>
@@ -198,7 +198,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
                   onClick={() => navigate('/sessions')}
                   isActive={isActivePath('/sessions')}
                   tooltip="View and share previous sessions"
-                  className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200"
+                  className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:w-4 group-data-[collapsible=icon]:h-8"
                 >
                   <Time className="w-4 h-4" />
                   <span>History</span>
@@ -217,7 +217,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
                     onClick={() => navigate('/schedules')}
                     isActive={isActivePath('/schedules')}
                     tooltip="Manage scheduled runs"
-                    className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200"
+                    className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:w-4 group-data-[collapsible=icon]:h-8"
                   >
                     <Clock className="w-4 h-4" />
                     <span>Scheduler</span>
@@ -236,7 +236,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
                   onClick={() => navigate('/recipes')}
                   isActive={isActivePath('/recipes')}
                   tooltip="Browse your saved recipes"
-                  className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200"
+                  className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:w-4 group-data-[collapsible=icon]:h-8"
                 >
                   <FileText className="w-4 h-4" />
                   <span>Recipe library</span>
@@ -254,7 +254,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
                   onClick={() => navigate('/settings')}
                   isActive={isActivePath('/settings')}
                   tooltip="View all settings and options"
-                  className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200"
+                  className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:w-4 group-data-[collapsible=icon]:h-8"
                 >
                   <Gear className="w-4 h-4" />
                   <span>Settings</span>
@@ -270,9 +270,9 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
         </div>
       </SidebarContent>
 
-      <SidebarFooter className="group-data-[collapsible=icon]:px-0">
-        <div className="pb-4 animate-in fade-in slide-in-from-right-8 duration-500 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
-          <div className="flex gap-2 group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:gap-1">
+      <SidebarFooter className="group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:pl-[26px]">
+        <div className="pb-4 animate-in fade-in slide-in-from-right-8 duration-500 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-start">
+          <div className="flex gap-2 group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:gap-1 group-data-[collapsible=icon]:items-start">
             <Tooltip delayDuration={500}>
               <TooltipTrigger asChild>
                 <a
