@@ -52,6 +52,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from './ui/Tooltip';
 import { Bot, Folder, Save, Send } from 'lucide-react';
 import { ChatSmart } from './icons';
 import { MainPanelLayout } from './Layout/MainPanelLayout';
+import { HeaderToolbar } from './HeaderToolbar';
 
 // Context for sharing current model info
 const CurrentModelContext = createContext<{ model: string; mode: string } | null>(null);
@@ -134,12 +135,6 @@ function ChatContentWithSidebar({
   setView: (view: View, viewOptions?: ViewOptions) => void;
   setIsGoosehintsModalOpen: (isOpen: boolean) => void;
 }) {
-  const safeIsMacOS = (window?.electron?.platform || 'darwin') === 'darwin';
-  const { open: isSidebarOpen } = useSidebar();
-
-  // Calculate padding based on sidebar state and macOS
-  const headerPadding = !isSidebarOpen ? (safeIsMacOS ? 'pl-20' : 'pl-12') : 'pl-4';
-
   const [hasMessages, setHasMessages] = useState(false);
   const [lastInteractionTime, setLastInteractionTime] = useState<number>(Date.now());
   const [showGame, setShowGame] = useState(false);
@@ -579,131 +574,12 @@ function ChatContentWithSidebar({
   }, new Map());
 
   return (
-    <div>
+    <div>      
       <MainPanelLayout>
+        <HeaderToolbar setView={setView} hasMessages={messages.length > 0} />
+        
         {/* Loader when generating recipe */}
-
         {isGeneratingRecipe && <LayingEggLoader />}
-
-        <div className="h-12 flex items-center justify-between">
-          <div className={`flex items-center ${headerPadding}`}>
-            <SidebarTrigger className="no-drag" />
-          </div>
-          <div className="flex items-center pr-4">
-            {messages.length > 0 && (
-              <>
-                {setIsGoosehintsModalOpen && (
-                  <Tooltip delayDuration={500}>
-                    <TooltipTrigger className="w-full">
-                      <Button
-                        onClick={() => setIsGoosehintsModalOpen(true)}
-                        className="px-3"
-                        variant="ghost"
-                        size="sm"
-                        shape="round"
-                      >
-                        <div className="flex gap-2 items-center text-text-default">
-                          <Idea className="w-4 h-4" />
-                          {/* Configure .goosehints */}
-                        </div>
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="right">
-                      <p>Customize instructions</p>
-                    </TooltipContent>
-                  </Tooltip>
-                )}
-
-                {recipeConfig ? (
-                  <>
-                    <Tooltip delayDuration={500}>
-                      <TooltipTrigger className="w-full">
-                        <Button
-                          onClick={() => {
-                            window.electron.createChatWindow(
-                              undefined,
-                              undefined,
-                              undefined,
-                              undefined,
-                              recipeConfig as Recipe,
-                              'recipeEditor'
-                            );
-                          }}
-                          className="px-3"
-                          variant="ghost"
-                        >
-                          <div className="flex gap-2 items-center text-text-default">
-                            <Send className="w-4 h-4" />
-                            View recipe
-                          </div>
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="right">
-                        <p>View the recipe you're using</p>
-                      </TooltipContent>
-                    </Tooltip>
-
-                    <Tooltip delayDuration={500}>
-                      <TooltipTrigger className="w-full">
-                        <Button
-                          // onClick={handleSaveRecipeClick}
-                          className="px-3"
-                          variant="ghost"
-                          size="sm"
-                          shape="round"
-                        >
-                          <div className="flex gap-2 items-center text-text-default">
-                            <Save className="w-4 h-4" />
-                            Save recipe
-                          </div>
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="right">
-                        <p>Save this recipe for reuse</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </>
-                ) : (
-                  <Tooltip delayDuration={500}>
-                    <TooltipTrigger className="w-full">
-                      <Button
-                        onClick={() => {
-                          window.electron.logInfo('Make Agent button clicked');
-                          window.dispatchEvent(new CustomEvent('make-agent-from-chat'));
-                        }}
-                        className="px-3"
-                        variant="ghost"
-                        size="sm"
-                        shape="round"
-                      >
-                        <div className="flex gap-2 items-center text-text-default">
-                          <Bot className="w-4 h-4" />
-                          {/* Make Agent from this session */}
-                        </div>
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="right">
-                      <p>Make a custom agent you can share or reuse</p>
-                    </TooltipContent>
-                  </Tooltip>
-                )}
-              </>
-            )}
-
-            {/* <Button
-            onClick={async () => {
-              await remove('GOOSE_PROVIDER', false);
-              await remove('GOOSE_MODEL', false);
-              setView?.('welcome');
-            }}
-            className="px-3 hover:shadow-default hover:bg-background-default transition-all duration-200 text-red-400 hover:text-red-300"
-            variant="ghost"
-            shape="round"
-          >
-            <Refresh />
-          </Button> */}
-          </div>
-        </div>
 
         <div
           className="flex flex-col min-w-0 flex-1 overflow-y-scroll relative pl-6 pr-4 pb-16 pt-2"
