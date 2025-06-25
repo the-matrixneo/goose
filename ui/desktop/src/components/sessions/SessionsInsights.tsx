@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui
 import { FolderOpen } from 'lucide-react';
 import { getApiUrl, getSecretKey } from '../../config';
 import { useTextAnimator } from '../../hooks/use-text-animator';
+import GooseLogo from '../GooseLogo';
 
 interface SessionInsights {
   totalSessions: number;
@@ -32,6 +33,10 @@ function GreetingCard() {
   return (
     <Card className="col-span-2 border-none animate-in fade-in slide-in-from-right-8 duration-300 bg-background-accent rounded-2xl max-w-[600px]">
       <CardContent className="flex flex-col justify-end items-start h-full pt-8 pb-0">
+        <div className="flex items-center gap-3 mb-4">
+          <GooseLogo size="default" />
+          <span className="text-text-on-accent text-lg font-light">codename goose</span>
+        </div>
         <h1 className="text-text-on-accent text-4xl font-light">
           <span>{greeting.prefix}</span>
         </h1>
