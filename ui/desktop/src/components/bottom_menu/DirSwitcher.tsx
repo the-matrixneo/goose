@@ -26,7 +26,7 @@ export const DirSwitcher: React.FC<DirSwitcherProps> = ({
       <Tooltip open={isTooltipOpen} onOpenChange={setIsTooltipOpen}>
         <TooltipTrigger asChild>
           <button
-            className={`z-[100] hover:cursor-pointer text-text-default/70 hover:text-text-default text-xs flex items-center transition-colors pl-1 [&>svg]:size-4 ${className}`}
+            className={`z-[100] hover:cursor-pointer text-text-default/70 hover:text-text-default text-xs flex items-center transition-colors pl-6 [&>svg]:size-4 ${className}`}
             onClick={handleDirectoryChange}
           >
             <Document className="mr-1" />

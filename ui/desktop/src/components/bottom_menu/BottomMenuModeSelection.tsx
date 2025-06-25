@@ -85,7 +85,7 @@ export const BottomMenuModeSelection = ({ setView }: BottomMenuModeSelectionProp
   return (
     <div className="relative flex items-center" ref={gooseModeDropdownRef}>
       <span
-        className="flex items-center cursor-pointer [&_svg]:size-4 text-text-default/70 hover:text-text-default hover:scale-100 hover:bg-transparent text-xs"
+        className="flex items-center cursor-pointer [&_svg]:size-4 text-text-default/70 hover:text-text-default hover:scale-100 hover:bg-transparent text-xs pr-6"
         onClick={() => setIsGooseModeMenuOpen(!isGooseModeMenuOpen)}
       >
         {getValueByKey(gooseMode).toLowerCase()}
