@@ -114,9 +114,9 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
 
   return (
     <>
-      <SidebarContent className="pr-3">
+      <SidebarContent className="pr-3 group-data-[collapsible=icon]:px-0">
         {/* Menu */}
-        <div className="px-1 py-0 pt-14 space-y-2 relative">
+        <div className="px-1 py-0 pt-14 space-y-2 relative group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:items-center">
           <SidebarMenu>
             <motion.div
               initial={{ opacity: 0, x: 20 }}
@@ -270,9 +270,9 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
         </div>
       </SidebarContent>
 
-      <SidebarFooter>
-        <div className="pb-4 animate-in fade-in slide-in-from-right-8 duration-500">
-          <div className="flex gap-2">
+      <SidebarFooter className="group-data-[collapsible=icon]:px-0">
+        <div className="pb-4 animate-in fade-in slide-in-from-right-8 duration-500 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
+          <div className="flex gap-2 group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:gap-1">
             <Tooltip delayDuration={500}>
               <TooltipTrigger asChild>
                 <a
