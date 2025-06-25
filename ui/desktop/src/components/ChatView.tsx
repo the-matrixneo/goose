@@ -593,7 +593,7 @@ function ChatContentWithSidebar({
         {isGeneratingRecipe && <LayingEggLoader />}
 
         <div
-          className="flex flex-col min-w-0 flex-1 overflow-y-scroll relative pl-6 pr-4 pb-16 pt-2"
+          className="flex flex-col min-w-0 flex-1 overflow-y-scroll relative pl-6 pr-4 pb-16 pt-20"
           onDrop={handleDrop}
           onDragOver={handleDragOver}
         >
