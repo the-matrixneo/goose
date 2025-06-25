@@ -14,6 +14,7 @@ pub const ROUTER_VECTOR_SEARCH_PASSTHROUGH_TOOL_NAME: &str = "router__vector_sea
 pub const ROUTER_VECTOR_SEARCH_WITH_EXTENSION_PASSTHROUGH_TOOL_NAME: &str =
     "router__vector_search_with_extension_passthrough";
 pub const ROUTER_LLM_SEARCH_PASSTHROUGH_TOOL_NAME: &str = "router__llm_search_passthrough";
+pub const ROUTER_LLM_SEARCH_PARALLEL_TOOL_NAME: &str = "router__llm_search_parallel";
 
 pub fn vector_search_tool_with_extension() -> Tool {
     Tool::new(
@@ -368,6 +369,75 @@ pub fn llm_search_passthrough_tool_prompt() -> String {
     
     The LLM will intelligently match tools based on the combined user message and additional context.
     Example: User asks "explore how routing works" → extension_name: "available_dev_extension", additional_context: "code exploration development files programming"
+    
+    Platform extension tools available: {}, {}, {}, {}
+    "#,
+        PLATFORM_SEARCH_AVAILABLE_EXTENSIONS_TOOL_NAME,
+        PLATFORM_MANAGE_EXTENSIONS_TOOL_NAME,
+        PLATFORM_READ_RESOURCE_TOOL_NAME,
+        PLATFORM_LIST_RESOURCES_TOOL_NAME
+    )
+}
+
+pub fn llm_search_parallel_tool() -> Tool {
+    Tool::new(
+        ROUTER_LLM_SEARCH_PARALLEL_TOOL_NAME.to_string(),
+        indoc! {r#"
+            Searches for relevant tools based on the user's messages across multiple extensions in parallel.
+            Format a query to search for the most relevant tools based on the user's messages.
+            Pay attention to the keywords in the user's messages, especially the last message and potential tools they are asking for.
+            This tool should be invoked when the user's messages suggest they are asking for a tool to be run.
+            Use the extension_names parameter to specify multiple extensions to search across simultaneously.
+            For example, if the user is asking for a tool that could be in either "developer" or "data" extensions, you can search both.
+            Example: {"User": "list the files in the current directory", "Query": "list files in current directory", "Extension Names": ["developer", "system"], "k": 5}
+            Extension names array is not optional, it is required.
+            The returned result will be a list of tool names, descriptions, and schemas from all specified extensions.
+            If none of the tools are appropriate, then respond with 'no tools relevant'.
+        "#}
+        .to_string(),
+        json!({
+            "type": "object",
+            "required": ["query", "extension_names"],
+            "properties": {
+                "extension_names": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Array of extension names to search across in parallel"
+                },
+                "query": {"type": "string", "description": "The query to search for the most relevant tools based on the user's messages"},
+                "k": {"type": "integer", "description": "The number of tools to retrieve (defaults to 5)", "default": 5}
+            }
+        }),
+        Some(ToolAnnotations {
+            title: Some("LLM parallel search for relevant tools across multiple extensions".to_string()),
+            read_only_hint: true,
+            destructive_hint: false,
+            idempotent_hint: false,
+            open_world_hint: false,
+        }),
+    )
+}
+
+pub fn llm_search_parallel_tool_prompt() -> String {
+    format!(
+        r#"# LLM Parallel Tool Selection Instructions
+    Important: the user has opted to dynamically enable tools with parallel search capability.
+    This allows you to search across multiple extensions simultaneously, which is useful when the user's request could be fulfilled by tools from different extensions.
+    
+    Use the extension_names parameter to specify multiple extensions to search across:
+    - For broad searches: Include multiple relevant extensions like ["developer", "data", "system"]
+    - For specific domains: Focus on related extensions like ["developer", "automation"] for coding tasks
+    - For exploration: Cast a wide net with all available extensions
+    
+    Extension categories to consider:
+    - Development-focused: Programming, coding, file editing, shell commands, debugging, code exploration
+    - Data/automation-focused: Data processing, documents, web scraping, automation scripts
+    - System/platform: Extension management, system configuration, resource access
+    
+    Be sure to format a query packed with relevant keywords to search for the most relevant tools.
+    The system will fire off parallel LLM requests to each specified extension and collect all relevant tools.
+    
+    If none of the tools across all extensions are appropriate, the system will respond with 'no tools relevant'.
     
     Platform extension tools available: {}, {}, {}, {}
     "#,

@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use crate::agents::extension::ExtensionInfo;
 use crate::agents::router_tool_selector::RouterToolSelectionStrategy;
 use crate::agents::router_tools::{
-    llm_search_passthrough_tool_prompt, llm_search_tool_prompt,
+    llm_search_parallel_tool_prompt, llm_search_passthrough_tool_prompt, llm_search_tool_prompt,
     vector_search_passthrough_tool_prompt, vector_search_tool_prompt,
     vector_search_tool_with_extension_prompt, vector_search_with_extension_passthrough_tool_prompt,
 };
@@ -134,6 +134,12 @@ impl PromptManager {
                 context.insert(
                     "tool_selection_strategy",
                     Value::String(llm_search_passthrough_tool_prompt()),
+                );
+            }
+            Some(RouterToolSelectionStrategy::LlmParallel) => {
+                context.insert(
+                    "tool_selection_strategy",
+                    Value::String(llm_search_parallel_tool_prompt()),
                 );
             }
             None => {}

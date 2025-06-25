@@ -36,9 +36,9 @@ use crate::agents::router_tool_selector::{
     create_tool_selector, RouterToolSelectionStrategy, RouterToolSelector,
 };
 use crate::agents::router_tools::{
-    ROUTER_LLM_SEARCH_PASSTHROUGH_TOOL_NAME, ROUTER_LLM_SEARCH_TOOL_NAME,
-    ROUTER_VECTOR_SEARCH_PASSTHROUGH_TOOL_NAME, ROUTER_VECTOR_SEARCH_TOOL_NAME,
-    ROUTER_VECTOR_SEARCH_WITH_EXTENSION_PASSTHROUGH_TOOL_NAME,
+    ROUTER_LLM_SEARCH_PARALLEL_TOOL_NAME, ROUTER_LLM_SEARCH_PASSTHROUGH_TOOL_NAME,
+    ROUTER_LLM_SEARCH_TOOL_NAME, ROUTER_VECTOR_SEARCH_PASSTHROUGH_TOOL_NAME,
+    ROUTER_VECTOR_SEARCH_TOOL_NAME, ROUTER_VECTOR_SEARCH_WITH_EXTENSION_PASSTHROUGH_TOOL_NAME,
     ROUTER_VECTOR_SEARCH_WITH_EXTENSION_TOOL_NAME,
 };
 use crate::agents::tool_router_index_manager::ToolRouterIndexManager;
@@ -271,6 +271,7 @@ impl Agent {
         } else if tool_call.name == ROUTER_VECTOR_SEARCH_TOOL_NAME
             || tool_call.name == ROUTER_VECTOR_SEARCH_WITH_EXTENSION_TOOL_NAME
             || tool_call.name == ROUTER_LLM_SEARCH_TOOL_NAME
+            || tool_call.name == ROUTER_LLM_SEARCH_PARALLEL_TOOL_NAME
             || tool_call.name == ROUTER_VECTOR_SEARCH_PASSTHROUGH_TOOL_NAME
             || tool_call.name == ROUTER_VECTOR_SEARCH_WITH_EXTENSION_PASSTHROUGH_TOOL_NAME
             || tool_call.name == ROUTER_LLM_SEARCH_PASSTHROUGH_TOOL_NAME
@@ -547,6 +548,9 @@ impl Agent {
             }
             Some(RouterToolSelectionStrategy::LlmPassthrough) => {
                 prefixed_tools.push(router_tools::llm_search_passthrough_tool());
+            }
+            Some(RouterToolSelectionStrategy::LlmParallel) => {
+                prefixed_tools.push(router_tools::llm_search_parallel_tool());
             }
             None => {}
         }
@@ -932,6 +936,7 @@ impl Agent {
                 Some(RouterToolSelectionStrategy::VectorWithExtensionPassthrough)
             }
             "llm_passthrough" => Some(RouterToolSelectionStrategy::LlmPassthrough),
+            "llm_parallel" => Some(RouterToolSelectionStrategy::LlmParallel),
             _ => None,
         };
 
@@ -939,13 +944,6 @@ impl Agent {
             Some(RouterToolSelectionStrategy::Vector) => {
                 let table_name = generate_table_id();
                 let selector = create_tool_selector(strategy, provider.clone(), Some(table_name))
-                    .await
-                    .map_err(|e| anyhow!("Failed to create tool selector: {}", e))?;
-                Arc::new(selector)
-            }
-            Some(RouterToolSelectionStrategy::VectorWithExtension) => {
-                let table_name = generate_table_id();
-                let selector = create_tool_selector(strategy, provider, Some(table_name))
                     .await
                     .map_err(|e| anyhow!("Failed to create tool selector: {}", e))?;
                 Arc::new(selector)
@@ -983,21 +981,7 @@ impl Agent {
                     .map_err(|e| anyhow!("Failed to create tool selector: {}", e))?;
                 Arc::new(selector)
             }
-            Some(RouterToolSelectionStrategy::VectorPassthrough) => {
-                let table_name = generate_table_id();
-                let selector = create_tool_selector(strategy, provider, Some(table_name))
-                    .await
-                    .map_err(|e| anyhow!("Failed to create tool selector: {}", e))?;
-                Arc::new(selector)
-            }
-            Some(RouterToolSelectionStrategy::VectorWithExtensionPassthrough) => {
-                let table_name = generate_table_id();
-                let selector = create_tool_selector(strategy, provider, Some(table_name))
-                    .await
-                    .map_err(|e| anyhow!("Failed to create tool selector: {}", e))?;
-                Arc::new(selector)
-            }
-            Some(RouterToolSelectionStrategy::LlmPassthrough) => {
+            Some(RouterToolSelectionStrategy::LlmParallel) => {
                 let selector = create_tool_selector(strategy, provider, None)
                     .await
                     .map_err(|e| anyhow!("Failed to create tool selector: {}", e))?;
