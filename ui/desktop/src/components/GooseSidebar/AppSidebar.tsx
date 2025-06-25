@@ -20,7 +20,6 @@ import { Recipe } from '../../recipe';
 import { saveRecipe, generateRecipeFilename } from '../../recipe/recipeStorage';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/Tooltip';
 import ThemeSelector from './ThemeSelector';
-import GooseLogo from '../GooseLogo';
 import { useChatContext } from '../../contexts/ChatContext';
 
 interface SidebarProps {
@@ -116,13 +115,6 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
   return (
     <>
       <SidebarContent className="pr-3">
-        {/* <SidebarHeader>
-          <div className="flex items-center gap-2 pt-12 pb-4">
-            <GooseLogo size="small" />
-            <span className="text-base">codename goose</span>
-          </div>
-        </SidebarHeader> */}
-
         {/* Menu */}
         <div className="px-1 py-0 pt-14 space-y-2 relative">
           <SidebarMenu>
@@ -279,11 +271,6 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
       </SidebarContent>
 
       <SidebarFooter>
-        <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-8 duration-500">
-          <GooseLogo size="small" />
-          <span className="text-base">codename goose</span>
-        </div>
-
         <div className="pb-4 animate-in fade-in slide-in-from-right-8 duration-500">
           <div className="flex gap-2">
             <Tooltip delayDuration={500}>
