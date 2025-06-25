@@ -34,11 +34,13 @@ function GreetingCard() {
     <Card className="col-span-2 border-none animate-in fade-in slide-in-from-right-8 duration-300 bg-background-accent rounded-2xl max-w-[600px] relative">
       <CardContent className="flex flex-col justify-end items-start h-full pt-8 pb-0">
         <div className="absolute top-4 left-4">
-          <GooseLogo size="default" className="text-white" />
+          <GooseLogo size="small" className="text-white w-6 h-6" />
         </div>
-        <h1 className="text-text-on-accent text-4xl font-light">
-          <span>{greeting.prefix}</span>
-        </h1>
+        <div className="pt-16">
+          <h1 className="text-text-on-accent text-4xl font-light">
+            <span>{greeting.prefix}</span>
+          </h1>
+        </div>
         {/* <p className="text-text-on-accent font-light text-lg">{greeting.message}</p> */}
       </CardContent>
     </Card>
