@@ -22,6 +22,7 @@ import LayingEggLoader from './LayingEggLoader';
 import { fetchSessionDetails, generateSessionId } from '../sessions';
 import 'react-toastify/dist/ReactToastify.css';
 import { useMessageStream } from '../hooks/useMessageStream';
+import { useStatusAlerts } from '../hooks/useStatusAlerts';
 import { SessionSummaryModal } from './context_management/SessionSummaryModal';
 import { Recipe } from '../recipe';
 import {
@@ -143,6 +144,9 @@ function ChatContentWithSidebar({
   const [ancestorMessages, setAncestorMessages] = useState<Message[]>([]);
   const [droppedFiles, setDroppedFiles] = useState<string[]>([]);
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
+
+  // Use status alerts hook
+  const { alerts } = useStatusAlerts(sessionTokenCount, setView);
 
   const scrollRef = useRef<ScrollAreaHandle>(null);
 
@@ -576,7 +580,14 @@ function ChatContentWithSidebar({
   return (
     <div>      
       <MainPanelLayout>
-        <HeaderToolbar setView={setView} hasMessages={messages.length > 0} />
+        <HeaderToolbar 
+          setView={setView} 
+          hasMessages={messages.length > 0}
+          alerts={alerts}
+          messages={messages}
+          isLoading={isLoading}
+          setMessages={setMessages}
+        />
         
         {/* Loader when generating recipe */}
         {isGeneratingRecipe && <LayingEggLoader />}

@@ -5,13 +5,28 @@ import ModelsBottomBar from './settings/models/bottom_bar/ModelsBottomBar';
 import { BottomMenuModeSelection } from './bottom_menu/BottomMenuModeSelection';
 import { useSidebar } from './ui/sidebar';
 import { View, ViewOptions } from '../App';
+import BottomMenuAlertPopover from './bottom_menu/BottomMenuAlertPopover';
+import { ManualSummarizeButton } from './context_management/ManualSummaryButton';
+import { Alert } from './alerts';
+import { Message } from '../types/message';
 
 interface HeaderToolbarProps {
   setView: (view: View, viewOptions?: ViewOptions) => void;
   hasMessages?: boolean;
+  alerts?: Alert[];
+  messages?: Message[];
+  isLoading?: boolean;
+  setMessages?: (messages: Message[]) => void;
 }
 
-export const HeaderToolbar: React.FC<HeaderToolbarProps> = ({ setView, hasMessages = false }) => {
+export const HeaderToolbar: React.FC<HeaderToolbarProps> = ({ 
+  setView, 
+  hasMessages = false,
+  alerts = [],
+  messages = [],
+  isLoading = false,
+  setMessages
+}) => {
   const safeIsMacOS = (window?.electron?.platform || 'darwin') === 'darwin';
   const { open: isSidebarOpen } = useSidebar();
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -28,8 +43,28 @@ export const HeaderToolbar: React.FC<HeaderToolbarProps> = ({ setView, hasMessag
         <DirSwitcher hasMessages={hasMessages} />
       </div>
 
-      {/* Right side - Model selection and Mode */}
+      {/* Right side - Status, Summarize, Model selection and Mode */}
       <div className="flex items-center gap-3 pr-4" ref={dropdownRef}>
+        {/* Status Icon */}
+        {alerts.length > 0 && (
+          <>
+            <BottomMenuAlertPopover alerts={alerts} />
+            <div className="h-4 w-px bg-border-subtle" />
+          </>
+        )}
+        
+        {/* Summarize Button */}
+        {messages.length > 0 && setMessages && (
+          <>
+            <ManualSummarizeButton
+              messages={messages}
+              isLoading={isLoading}
+              setMessages={setMessages}
+            />
+            <div className="h-4 w-px bg-border-subtle" />
+          </>
+        )}
+        
         <ModelsBottomBar dropdownRef={dropdownRef} setView={setView} />
         <div className="h-4 w-px bg-border-subtle" />
         <BottomMenuModeSelection setView={setView} />
