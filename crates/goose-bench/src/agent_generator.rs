@@ -15,44 +15,8 @@ use mcp_core::Tool;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tokio::sync::{Mutex, OnceCell};
+use tokio::sync::Mutex;
 
-// Shared table name for all benchmark agents to prevent collisions
-static SHARED_VECTOR_TABLE: OnceCell<String> = OnceCell::const_new();
-
-async fn ensure_shared_vector_table_exists() -> anyhow::Result<()> {
-    // Check if we've already initialized the shared table
-    if SHARED_VECTOR_TABLE.get().is_some() {
-        return Ok(());
-    }
-
-    // Simple approach: Create a throwaway agent to get any table created
-    // and let all subsequent agents reuse that same LanceDB database
-    // Since they all use the same GOOSE_VECTOR_DB_PATH, they'll share the same database
-    let throwaway_agent = Agent::new();
-    
-    // Configure the throwaway agent to trigger vector table creation
-    let config = Config::global();
-    let provider_name = config
-        .get_param::<String>("GOOSE_PROVIDER")
-        .unwrap_or_else(|_| "anthropic".to_string());
-    let model_name = config
-        .get_param::<String>("GOOSE_MODEL")
-        .unwrap_or_else(|_| "claude-3-5-sonnet-20241022".to_string());
-
-    let model_config = ModelConfig::new(model_name);
-    let provider = create(&provider_name, model_config)?;
-    
-    // This will trigger tool selector creation and table initialization
-    // The first table created will be reused by all subsequent agents
-    throwaway_agent.update_provider(provider).await?;
-    
-    // Mark as initialized
-    SHARED_VECTOR_TABLE.set("initialized".to_string())
-        .map_err(|_| anyhow::anyhow!("Failed to mark table as initialized"))?;
-    
-    Ok(())
-}
 
 fn get_tools_base64(tools: &[Tool]) -> String {
     let tools_json = serde_json::to_string(tools).expect("Failed to serialize tools");
@@ -141,10 +105,6 @@ pub async fn agent_generator(
     available_extensions: Option<HashMap<String, Vec<Tool>>>,
 ) -> BenchAgent {
     if dataset {
-        // For dataset agents, ensure shared vector table exists first to prevent collisions
-        if let Err(e) = ensure_shared_vector_table_exists().await {
-            eprintln!("⚠️ Warning: Failed to setup shared vector table: {}", e);
-        }
         dataset_agent(requirements, session_id, available_extensions).await
     } else {
         standard_agent(requirements, session_id, available_extensions).await
@@ -254,8 +214,15 @@ async fn dataset_agent(
     };
 
     if let Err(e) = agent.update_provider(provider).await {
-        eprintln!("❌ Failed to update provider: {}", e);
-        return create_default_agent(session_id, Some(2));
+        let error_msg = e.to_string();
+        if error_msg.contains("already exists") {
+            // Table already exists - this is fine, another agent created it first
+            // Continue with this agent using the existing table
+        } else {
+            // This is a real error
+            eprintln!("❌ Failed to update provider: {}", e);
+            return create_default_agent(session_id, Some(2));
+        }
     }
 
 
