@@ -149,9 +149,9 @@ const ShareDeveloperView: React.FC<ShareDeveloperViewProps> = ({ onClose }) => {
                 <Server className="w-6 h-6 text-textStandard" />
               </div>
             </div>
-            <h1 className="text-xl font-medium text-textStandard mb-1">Share Developer Agent</h1>
+            <h1 className="text-xl font-medium text-textStandard mb-1">Share MCPs</h1>
             <p className="text-sm text-textSubtle">
-              Your developer agent is running and ready to be shared.
+              Your local MCPs are running and ready to be shared.
             </p>
           </div>
 
