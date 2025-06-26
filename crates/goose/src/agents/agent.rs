@@ -17,13 +17,9 @@ use crate::permission::permission_judge::check_tool_permissions;
 use crate::permission::PermissionConfirmation;
 use crate::providers::base::Provider;
 use crate::providers::errors::ProviderError;
-<<<<<<< baxen/leadworker
 use crate::providers::lead_worker::LeadWorkerMode;
-use crate::recipe::{Author, Recipe, Settings};
-=======
 use crate::recipe::{Author, Recipe, Settings, SubRecipe};
 use crate::scheduler_trait::SchedulerTrait;
->>>>>>> main
 use crate::tool_monitor::{ToolCall, ToolMonitor};
 use regex::Regex;
 use serde_json::Value;
