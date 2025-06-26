@@ -219,7 +219,7 @@ pub struct EvalRunner {
 }
 
 impl EvalRunner {
-    pub fn from(config_path: PathBuf) -> Result<EvalRunner> {
+    pub fn new(config_path: PathBuf) -> Result<EvalRunner> {
         tracing::info!("Loading config from: {}", config_path.display());
         let config = BenchRunConfig::from(config_path.clone())
             .context("Failed to parse evaluation configuration from file")?;
@@ -227,7 +227,7 @@ impl EvalRunner {
         Ok(EvalRunner { config })
     }
     
-    pub fn from_string(config: String) -> Result<EvalRunner> {
+    pub fn from(config: String) -> Result<EvalRunner> {
         let config = BenchRunConfig::from_string(config)
             .context("Failed to parse evaluation configuration")?;
         Ok(EvalRunner { config })
@@ -275,13 +275,16 @@ impl EvalRunner {
         Fut: Future<Output = BenchAgent> + Send,
     {
         tracing::info!("Starting eval runner");
+        // Find the first active evaluation
         let bench_eval = self
             .config
             .evals
-            .first()
-            .context("No evaluations specified in configuration")?;
-        tracing::info!("Running evaluation: {}", bench_eval.selector);
-
+            .iter()
+            .find(|eval| eval.active)
+            .context("No active evaluations found in configuration")?;
+        
+        println!("Running evaluation: {}", bench_eval.selector);
+        
         if self.config.dataset.is_some() {
             return self.run_dataset(agent_generator).await;
         }
@@ -374,11 +377,15 @@ impl EvalRunner {
             + Clone,
         Fut: Future<Output = BenchAgent> + Send,
     {
+        // Find the first active evaluation
         let bench_eval = self
             .config
             .evals
-            .first()
-            .context("No evaluations specified")?;
+            .iter()
+            .find(|eval| eval.active)
+            .context("No active evaluations found")?;
+        
+        println!("Running dataset evaluation: {}", bench_eval.selector);
         let dataset_config = self
             .config
             .dataset

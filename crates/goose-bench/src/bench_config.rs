@@ -47,6 +47,12 @@ pub struct BenchEval {
     pub selector: String,
     pub post_process_cmd: Option<PathBuf>,
     pub parallel_safe: bool,
+    #[serde(default = "default_active")]
+    pub active: bool,
+}
+
+fn default_active() -> bool {
+    true
 }
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct BenchRunConfig {
@@ -90,6 +96,7 @@ impl Default for BenchRunConfig {
                 selector: "core".into(),
                 post_process_cmd: None,
                 parallel_safe: true,
+                active: true,
             }],
             env: vec![],
             dataset: None,
@@ -154,7 +161,8 @@ impl BenchRunConfig {
         });
     }
     pub fn from(cfg: PathBuf) -> anyhow::Result<Self> {
-        let config = Self::from_string(read_to_string(cfg)?)?;
+        let content = read_to_string(&cfg)?;
+        let config = Self::from_string(content)?;
         Ok(config)
     }
 

@@ -1,3 +1,4 @@
+pub mod agent_generator;
 pub mod bench_config;
 pub mod bench_session;
 pub mod bench_work_dir;

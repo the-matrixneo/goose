@@ -44,13 +44,14 @@ impl BenchRunner {
         Ok(BenchRunner { config })
     }
 
-    pub fn run(&mut self) -> anyhow::Result<()> {
+    pub async fn run(&mut self) -> anyhow::Result<()> {
         let (parallel_models, serial_models): (Vec<BenchModel>, Vec<BenchModel>) = self
             .config
             .models
             .clone()
             .into_iter()
             .partition(|model| model.parallel_safe);
+
 
         let mut parallel_handles = Vec::new();
         for (idx, model) in parallel_models.into_iter().enumerate() {
@@ -72,7 +73,7 @@ impl BenchRunner {
                 .join(format!("temp_model_config_serial_{}.json", idx));
             fs::write(&config_path, self.config.to_string()?)
                 .context("Failed to write temporary config file")?;
-            ModelRunner::from(config_path)?.run()?;
+            ModelRunner::new(config_path.clone())?.run().await?;
         }
 
         await_process_exits(&mut parallel_handles, Vec::new());
