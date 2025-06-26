@@ -11,6 +11,7 @@ import {
   Tray,
   App,
   globalShortcut,
+  Event,
 } from 'electron';
 import type { OpenDialogReturnValue } from 'electron';
 import { Buffer } from 'node:buffer';
@@ -24,6 +25,7 @@ import { startGoosed } from './goosed';
 import { getBinaryPath } from './utils/binaryPath';
 import { loadShellEnv } from './utils/loadEnv';
 import log from './utils/logger';
+import { ensureWinShims } from './utils/winShims';
 import { addRecentDir, loadRecentDirs } from './utils/recentDirs';
 import {
   createEnvironmentMenu,
@@ -31,6 +33,8 @@ import {
   loadSettings,
   saveSettings,
   updateEnvironmentVariables,
+  updateSchedulingEngineEnvironment,
+  SchedulingEngine,
 } from './utils/settings';
 import * as crypto from 'crypto';
 import * as electron from 'electron';
@@ -154,6 +158,14 @@ if (process.platform === 'win32') {
             if (configParam) {
               try {
                 recipeConfig = JSON.parse(Buffer.from(configParam, 'base64').toString('utf-8'));
+
+                // Check if this is a scheduled job
+                const scheduledJobId = parsedUrl.searchParams.get('scheduledJob');
+                if (scheduledJobId) {
+                  console.log(`[main] Opening scheduled job: ${scheduledJobId}`);
+                  recipeConfig.scheduledJobId = scheduledJobId;
+                  recipeConfig.isScheduledExecution = true;
+                }
               } catch (e) {
                 console.error('Failed to parse bot config:', e);
               }
@@ -249,6 +261,14 @@ function processProtocolUrl(parsedUrl: URL, window: BrowserWindow) {
     if (configParam) {
       try {
         recipeConfig = JSON.parse(Buffer.from(configParam, 'base64').toString('utf-8'));
+
+        // Check if this is a scheduled job
+        const scheduledJobId = parsedUrl.searchParams.get('scheduledJob');
+        if (scheduledJobId) {
+          console.log(`[main] Opening scheduled job: ${scheduledJobId}`);
+          recipeConfig.scheduledJobId = scheduledJobId;
+          recipeConfig.isScheduledExecution = true;
+        }
       } catch (e) {
         console.error('Failed to parse bot config:', e);
       }
@@ -273,6 +293,14 @@ app.on('open-url', async (_event, url) => {
       if (configParam) {
         try {
           recipeConfig = JSON.parse(Buffer.from(base64, 'base64').toString('utf-8'));
+
+          // Check if this is a scheduled job
+          const scheduledJobId = parsedUrl.searchParams.get('scheduledJob');
+          if (scheduledJobId) {
+            console.log(`[main] Opening scheduled job: ${scheduledJobId}`);
+            recipeConfig.scheduledJobId = scheduledJobId;
+            recipeConfig.isScheduledExecution = true;
+          }
         } catch (e) {
           console.error('Failed to parse bot config:', e);
         }
@@ -302,6 +330,67 @@ app.on('open-url', async (_event, url) => {
     }
   }
 });
+
+// Handle macOS drag-and-drop onto dock icon
+app.on('will-finish-launching', () => {
+  if (process.platform === 'darwin') {
+    app.setAboutPanelOptions({
+      applicationName: 'Goose',
+      applicationVersion: app.getVersion(),
+    });
+  }
+});
+
+// Handle drag-and-drop onto dock icon
+app.on('open-file', async (event, filePath) => {
+  event.preventDefault();
+  await handleFileOpen(filePath);
+});
+
+// Handle multiple files/folders
+app.on('open-files', async (event: Event, filePaths: string[]) => {
+  event.preventDefault();
+  for (const filePath of filePaths) {
+    await handleFileOpen(filePath);
+  }
+});
+
+async function handleFileOpen(filePath: string) {
+  try {
+    if (!filePath || typeof filePath !== 'string') {
+      return;
+    }
+
+    const stats = fsSync.lstatSync(filePath);
+    let targetDir = filePath;
+
+    // If it's a file, use its parent directory
+    if (stats.isFile()) {
+      targetDir = path.dirname(filePath);
+    }
+
+    // Add to recent directories
+    addRecentDir(targetDir);
+
+    // Create new window for the directory
+    const newWindow = await createChat(app, undefined, targetDir);
+
+    // Focus the new window
+    if (newWindow) {
+      newWindow.show();
+      newWindow.focus();
+      newWindow.moveTop();
+    }
+  } catch (error) {
+    console.error('Failed to handle file open:', error);
+
+    // Show user-friendly error notification
+    new Notification({
+      title: 'Goose',
+      body: `Could not open directory: ${path.basename(filePath)}`,
+    }).show();
+  }
+}
 
 declare var MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare var MAIN_WINDOW_VITE_NAME: string;
@@ -421,8 +510,17 @@ const createChat = async (
   } else {
     // Apply current environment settings before creating chat
     updateEnvironmentVariables(envToggles);
+
+    // Apply scheduling engine setting
+    const settings = loadSettings();
+    updateSchedulingEngineEnvironment(settings.schedulingEngine);
+
     // Start new Goosed process for regular windows
-    const [newPort, newWorkingDir, newGoosedProcess] = await startGoosed(app, dir);
+    // Pass through scheduling engine environment variables
+    const envVars = {
+      GOOSE_SCHEDULER_TYPE: process.env.GOOSE_SCHEDULER_TYPE,
+    };
+    const [newPort, newWorkingDir, newGoosedProcess] = await startGoosed(app, dir, envVars);
     port = newPort;
     working_dir = newWorkingDir;
     goosedProcess = newGoosedProcess;
@@ -678,7 +776,7 @@ const openDirectoryDialog = async (
   replaceWindow: boolean = false
 ): Promise<OpenDialogReturnValue> => {
   const result = (await dialog.showOpenDialog({
-    properties: ['openFile', 'openDirectory'],
+    properties: ['openFile', 'openDirectory', 'createDirectory'],
   })) as unknown as OpenDialogReturnValue;
 
   if (!result.canceled && result.filePaths.length > 0) {
@@ -747,6 +845,33 @@ ipcMain.on('react-ready', () => {
 // Handle directory chooser
 ipcMain.handle('directory-chooser', (_event, replace: boolean = false) => {
   return openDirectoryDialog(replace);
+});
+
+// Handle scheduling engine settings
+ipcMain.handle('get-settings', () => {
+  try {
+    const settings = loadSettings();
+    return settings;
+  } catch (error) {
+    console.error('Error getting settings:', error);
+    return null;
+  }
+});
+
+ipcMain.handle('set-scheduling-engine', async (_event, engine: string) => {
+  try {
+    const settings = loadSettings();
+    settings.schedulingEngine = engine as SchedulingEngine;
+    saveSettings(settings);
+
+    // Update the environment variable immediately
+    updateSchedulingEngineEnvironment(settings.schedulingEngine);
+
+    return true;
+  } catch (error) {
+    console.error('Error setting scheduling engine:', error);
+    return false;
+  }
 });
 
 // Handle menu bar icon visibility
@@ -869,6 +994,29 @@ ipcMain.handle('open-notifications-settings', async () => {
   } catch (error) {
     console.error('Error opening notification settings:', error);
     return false;
+  }
+});
+
+// Handle quit confirmation setting
+ipcMain.handle('set-quit-confirmation', async (_event, show: boolean) => {
+  try {
+    const settings = loadSettings();
+    settings.showQuitConfirmation = show;
+    saveSettings(settings);
+    return true;
+  } catch (error) {
+    console.error('Error setting quit confirmation:', error);
+    return false;
+  }
+});
+
+ipcMain.handle('get-quit-confirmation-state', () => {
+  try {
+    const settings = loadSettings();
+    return settings.showQuitConfirmation ?? true;
+  } catch (error) {
+    console.error('Error getting quit confirmation state:', error);
+    return true;
   }
 });
 
@@ -1145,7 +1293,12 @@ ipcMain.handle('get-binary-path', (_event, binaryName) => {
 
 ipcMain.handle('read-file', (_event, filePath) => {
   return new Promise((resolve) => {
-    const cat = spawn('cat', [filePath]);
+    // Expand tilde to home directory
+    const expandedPath = filePath.startsWith('~')
+      ? path.join(app.getPath('home'), filePath.slice(1))
+      : filePath;
+
+    const cat = spawn('cat', [expandedPath]);
     let output = '';
     let errorOutput = '';
 
@@ -1160,32 +1313,77 @@ ipcMain.handle('read-file', (_event, filePath) => {
     cat.on('close', (code) => {
       if (code !== 0) {
         // File not found or error
-        resolve({ file: '', filePath, error: errorOutput || null, found: false });
+        resolve({ file: '', filePath: expandedPath, error: errorOutput || null, found: false });
         return;
       }
-      resolve({ file: output, filePath, error: null, found: true });
+      resolve({ file: output, filePath: expandedPath, error: null, found: true });
     });
 
     cat.on('error', (error) => {
       console.error('Error reading file:', error);
-      resolve({ file: '', filePath, error, found: false });
+      resolve({ file: '', filePath: expandedPath, error, found: false });
     });
   });
 });
 
 ipcMain.handle('write-file', (_event, filePath, content) => {
   return new Promise((resolve) => {
+    // Expand tilde to home directory
+    const expandedPath = filePath.startsWith('~')
+      ? path.join(app.getPath('home'), filePath.slice(1))
+      : filePath;
+
     // Create a write stream to the file
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const fsNode = require('fs'); // Using require for fs in this specific handler from original
     try {
-      fsNode.writeFileSync(filePath, content, { encoding: 'utf8' });
+      fsNode.writeFileSync(expandedPath, content, { encoding: 'utf8' });
       resolve(true);
     } catch (error) {
       console.error('Error writing to file:', error);
       resolve(false);
     }
   });
+});
+
+// Enhanced file operations
+ipcMain.handle('ensure-directory', async (_event, dirPath) => {
+  try {
+    // Expand tilde to home directory
+    const expandedPath = dirPath.startsWith('~')
+      ? path.join(app.getPath('home'), dirPath.slice(1))
+      : dirPath;
+
+    await fs.mkdir(expandedPath, { recursive: true });
+    return true;
+  } catch (error) {
+    console.error('Error creating directory:', error);
+    return false;
+  }
+});
+
+ipcMain.handle('list-files', async (_event, dirPath, extension) => {
+  try {
+    // Expand tilde to home directory
+    const expandedPath = dirPath.startsWith('~')
+      ? path.join(app.getPath('home'), dirPath.slice(1))
+      : dirPath;
+
+    const files = await fs.readdir(expandedPath);
+    if (extension) {
+      return files.filter((file) => file.endsWith(extension));
+    }
+    return files;
+  } catch (error) {
+    console.error('Error listing files:', error);
+    return [];
+  }
+});
+
+// Handle message box dialogs
+ipcMain.handle('show-message-box', async (_event, options) => {
+  const result = await dialog.showMessageBox(options);
+  return result;
 });
 
 // Handle allowed extensions list fetching
@@ -1240,6 +1438,9 @@ const registerGlobalHotkey = (accelerator: string) => {
 };
 
 app.whenReady().then(async () => {
+  // Ensure Windows shims are available before any MCP processes are spawned
+  await ensureWinShims();
+
   // Register update IPC handlers once (but don't setup auto-updater yet)
   registerUpdateIpcHandlers();
 
@@ -1820,6 +2021,12 @@ app.on('before-quit', async (event) => {
   // Skip confirmation dialog in development mode
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     return; // Allow normal quit behavior in dev mode
+  }
+
+  // Check if quit confirmation is enabled in settings
+  const settings = loadSettings();
+  if (!settings.showQuitConfirmation) {
+    return; // Allow normal quit behavior if confirmation is disabled
   }
 
   // Prevent the default quit behavior
