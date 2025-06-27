@@ -321,95 +321,125 @@ export default function GoosIN() {
     animationRef.current = requestAnimationFrame(gameLoop);
   }, [gameState]);
 
-  // Draw sprites in 3D space
+  // Draw sprites in 3D space with proper occlusion
   const drawSprites = (ctx: CanvasRenderingContext2D, player: Player, bugs: Bug[], bread: Bread[]) => {
-    // Draw bugs as scary pixelated creatures
+    // Collect all sprites with distance for depth sorting
+    const allSprites: Array<{
+      x: number;
+      y: number;
+      distance: number;
+      type: 'bug' | 'bread';
+      data: Bug | Bread;
+    }> = [];
+    
+    // Add bugs to sprite list
     bugs.forEach(bug => {
       const dx = bug.x - player.x;
       const dy = bug.y - player.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
-      
-      if (distance < MAX_DEPTH) {
-        const angle = Math.atan2(dy, dx) - player.angle;
-        const normalizedAngle = ((angle + Math.PI) % (2 * Math.PI)) - Math.PI;
-        
-        if (Math.abs(normalizedAngle) < FOV / 2) {
-          const screenX = (normalizedAngle / (FOV / 2)) * (CANVAS_WIDTH / 2) + CANVAS_WIDTH / 2;
-          const spriteHeight = (CELL_SIZE / 2 * CANVAS_HEIGHT) / distance;
-          const spriteY = CANVAS_HEIGHT / 2 - spriteHeight / 2;
-          const spriteWidth = spriteHeight * 0.8;
-          
-          // Draw scary bug creature (pixelated style)
-          const pixelSize = Math.max(1, spriteHeight / 16);
-          
-          // Body (dark red/brown)
-          ctx.fillStyle = '#7F1D1D';
-          ctx.fillRect(screenX - spriteWidth/2, spriteY + spriteHeight*0.3, spriteWidth, spriteHeight*0.5);
-          
-          // Head (darker)
-          ctx.fillStyle = '#450A0A';
-          ctx.fillRect(screenX - spriteWidth/3, spriteY, spriteWidth*0.66, spriteHeight*0.4);
-          
-          // Eyes (glowing red)
-          ctx.fillStyle = '#DC2626';
-          const eyeSize = Math.max(1, pixelSize * 2);
-          ctx.fillRect(screenX - spriteWidth/4, spriteY + spriteHeight*0.1, eyeSize, eyeSize);
-          ctx.fillRect(screenX + spriteWidth/6, spriteY + spriteHeight*0.1, eyeSize, eyeSize);
-          
-          // Legs/appendages
-          ctx.fillStyle = '#7F1D1D';
-          for (let i = 0; i < 4; i++) {
-            const legX = screenX - spriteWidth/2 + (i * spriteWidth/4);
-            ctx.fillRect(legX, spriteY + spriteHeight*0.8, pixelSize, spriteHeight*0.2);
-          }
-        }
-      }
+      allSprites.push({ x: bug.x, y: bug.y, distance, type: 'bug', data: bug });
     });
     
-    // Draw bread as pixelated slices
+    // Add bread to sprite list
     bread.forEach(breadSlice => {
       if (!breadSlice.collected) {
         const dx = breadSlice.x - player.x;
         const dy = breadSlice.y - player.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
+        allSprites.push({ x: breadSlice.x, y: breadSlice.y, distance, type: 'bread', data: breadSlice });
+      }
+    });
+    
+    // Sort sprites by distance (far to near)
+    allSprites.sort((a, b) => b.distance - a.distance);
+    
+    // Draw each sprite with occlusion checking
+    allSprites.forEach(sprite => {
+      if (sprite.distance < MAX_DEPTH) {
+        const dx = sprite.x - player.x;
+        const dy = sprite.y - player.y;
+        const angle = Math.atan2(dy, dx) - player.angle;
+        const normalizedAngle = ((angle + Math.PI) % (2 * Math.PI)) - Math.PI;
         
-        if (distance < MAX_DEPTH) {
-          const angle = Math.atan2(dy, dx) - player.angle;
-          const normalizedAngle = ((angle + Math.PI) % (2 * Math.PI)) - Math.PI;
+        if (Math.abs(normalizedAngle) < FOV / 2) {
+          // Check if sprite is occluded by casting a ray to it
+          const rayDistance = castRay(player.angle + normalizedAngle, player.x, player.y);
           
-          if (Math.abs(normalizedAngle) < FOV / 2) {
+          // Only draw if sprite is closer than the wall
+          if (sprite.distance < rayDistance - 10) { // Small buffer to prevent z-fighting
             const screenX = (normalizedAngle / (FOV / 2)) * (CANVAS_WIDTH / 2) + CANVAS_WIDTH / 2;
-            const spriteHeight = (CELL_SIZE / 3 * CANVAS_HEIGHT) / distance;
-            const spriteY = CANVAS_HEIGHT / 2 - spriteHeight / 2;
-            const spriteWidth = spriteHeight * 0.7;
             
-            // Draw pixelated bread slice
-            const pixelSize = Math.max(1, spriteHeight / 12);
-            
-            // Bread crust (dark brown)
-            ctx.fillStyle = '#92400E';
-            ctx.fillRect(screenX - spriteWidth/2, spriteY, spriteWidth, spriteHeight);
-            
-            // Bread interior (light brown/beige)
-            ctx.fillStyle = '#FDE68A';
-            ctx.fillRect(
-              screenX - spriteWidth/2 + pixelSize, 
-              spriteY + pixelSize, 
-              spriteWidth - pixelSize*2, 
-              spriteHeight - pixelSize*2
-            );
-            
-            // Bread texture (darker spots)
-            ctx.fillStyle = '#F59E0B';
-            for (let i = 0; i < 3; i++) {
-              const spotX = screenX - spriteWidth/4 + (i * spriteWidth/6);
-              const spotY = spriteY + spriteHeight/3 + (i % 2) * spriteHeight/4;
-              ctx.fillRect(spotX, spotY, pixelSize, pixelSize);
+            if (sprite.type === 'bug') {
+              drawBugSprite(ctx, screenX, sprite.distance);
+            } else {
+              drawBreadSprite(ctx, screenX, sprite.distance);
             }
           }
         }
       }
     });
+  };
+  
+  // Draw bug sprite
+  const drawBugSprite = (ctx: CanvasRenderingContext2D, screenX: number, distance: number) => {
+    const spriteHeight = (CELL_SIZE / 2 * CANVAS_HEIGHT) / distance;
+    const spriteY = CANVAS_HEIGHT / 2 - spriteHeight / 2;
+    const spriteWidth = spriteHeight * 0.8;
+    
+    // Draw scary bug creature (pixelated style)
+    const pixelSize = Math.max(1, spriteHeight / 16);
+    
+    // Body (dark red/brown)
+    ctx.fillStyle = '#7F1D1D';
+    ctx.fillRect(screenX - spriteWidth/2, spriteY + spriteHeight*0.3, spriteWidth, spriteHeight*0.5);
+    
+    // Head (darker)
+    ctx.fillStyle = '#450A0A';
+    ctx.fillRect(screenX - spriteWidth/3, spriteY, spriteWidth*0.66, spriteHeight*0.4);
+    
+    // Eyes (glowing red)
+    ctx.fillStyle = '#DC2626';
+    const eyeSize = Math.max(1, pixelSize * 2);
+    ctx.fillRect(screenX - spriteWidth/4, spriteY + spriteHeight*0.1, eyeSize, eyeSize);
+    ctx.fillRect(screenX + spriteWidth/6, spriteY + spriteHeight*0.1, eyeSize, eyeSize);
+    
+    // Legs/appendages
+    ctx.fillStyle = '#7F1D1D';
+    for (let i = 0; i < 4; i++) {
+      const legX = screenX - spriteWidth/2 + (i * spriteWidth/4);
+      ctx.fillRect(legX, spriteY + spriteHeight*0.8, pixelSize, spriteHeight*0.2);
+    }
+  };
+  
+  // Draw bread sprite
+  const drawBreadSprite = (ctx: CanvasRenderingContext2D, screenX: number, distance: number) => {
+    const spriteHeight = (CELL_SIZE / 3 * CANVAS_HEIGHT) / distance;
+    const spriteY = CANVAS_HEIGHT / 2 - spriteHeight / 2;
+    const spriteWidth = spriteHeight * 0.7;
+    
+    // Draw pixelated bread slice
+    const pixelSize = Math.max(1, spriteHeight / 12);
+    
+    // Bread crust (dark brown)
+    ctx.fillStyle = '#92400E';
+    ctx.fillRect(screenX - spriteWidth/2, spriteY, spriteWidth, spriteHeight);
+    
+    // Bread interior (light brown/beige)
+    ctx.fillStyle = '#FDE68A';
+    ctx.fillRect(
+      screenX - spriteWidth/2 + pixelSize, 
+      spriteY + pixelSize, 
+      spriteWidth - pixelSize*2, 
+      spriteHeight - pixelSize*2
+    );
+    
+    // Bread texture (darker spots)
+    ctx.fillStyle = '#F59E0B';
+    for (let i = 0; i < 3; i++) {
+      const spotX = screenX - spriteWidth/4 + (i * spriteWidth/6);
+      const spotY = spriteY + spriteHeight/3 + (i % 2) * spriteHeight/4;
+      ctx.fillRect(spotX, spotY, pixelSize, pixelSize);
+    }
   };
 
   // Draw enhanced HUD
