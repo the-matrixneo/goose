@@ -5,6 +5,7 @@ import { getApiUrl, getSecretKey } from '../../config';
 import { useTextAnimator } from '../../hooks/use-text-animator';
 import GooseLogo from '../GooseLogo';
 import GoosIN from '../games/GoosIN';
+import CircularTile from '../ui/CircularTile';
 
 interface SessionInsights {
   totalSessions: number;
@@ -169,8 +170,20 @@ export function SessionInsights() {
             </CardContent>
           </Card>
 
-          {/* GOOSIN Game */}
-          <GoosIN />
+          {/* GOOSIN Game with Circular Tile */}
+          <div className="flex items-start gap-4">
+            <GoosIN />
+            <div className="flex flex-col items-center gap-2 animate-in fade-in slide-in-from-right-8 duration-700">
+              <CircularTile 
+                size="medium"
+                onClick={() => {
+                  console.log('Circular tile clicked!');
+                  // Add your click handler here
+                }}
+              />
+              <span className="text-xs text-text-muted font-mono">Explore</span>
+            </div>
+          </div>
         </div>
 
         {/* Most Active Directories Card */}
