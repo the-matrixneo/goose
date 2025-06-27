@@ -1328,13 +1328,17 @@ const floatingButtons = new Map<string, BrowserWindow>();
 
 // Handle creating floating draggable button
 ipcMain.handle('create-floating-button', async (event, data) => {
+  console.log('Main process: create-floating-button called with data:', data);
   try {
     const { buttonId, x, y, size, imageData } = data;
     const parentWindow = BrowserWindow.fromWebContents(event.sender);
     
     if (!parentWindow) {
+      console.error('Main process: Parent window not found');
       throw new Error('Parent window not found');
     }
+
+    console.log('Main process: Creating floating window at position:', { x, y });
 
     // Create a small frameless window for the floating button
     const floatingWindow = new BrowserWindow({
@@ -1365,6 +1369,8 @@ ipcMain.handle('create-floating-button', async (event, data) => {
         ]
       }
     });
+
+    console.log('Main process: Floating window created with ID:', floatingWindow.id);
 
     // Create the HTML content for the floating button
     const floatingButtonHTML = `

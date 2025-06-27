@@ -48,6 +48,8 @@ export default function CircularTile({ onClick, className = '', size = 'medium' 
     const startPos = { x: e.clientX, y: e.clientY };
     let hasDragged = false;
 
+    console.log('Mouse down at:', startPos);
+
     const handleMouseMove = (moveEvent: MouseEvent) => {
       const deltaX = Math.abs(moveEvent.clientX - startPos.x);
       const deltaY = Math.abs(moveEvent.clientY - startPos.y);
@@ -56,6 +58,7 @@ export default function CircularTile({ onClick, className = '', size = 'medium' 
       if (deltaX > 5 || deltaY > 5) {
         hasDragged = true;
         setIsDragging(true);
+        console.log('Dragging started, current pos:', { x: moveEvent.clientX, y: moveEvent.clientY });
       }
     };
 
@@ -63,15 +66,17 @@ export default function CircularTile({ onClick, className = '', size = 'medium' 
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
       
+      console.log('Mouse up at:', { x: upEvent.clientX, y: upEvent.clientY });
+      console.log('Window dimensions:', { width: window.innerWidth, height: window.innerHeight });
+      console.log('Had dragged:', hasDragged);
+      
       if (hasDragged) {
-        // Check if mouse is outside the window
-        const isOutsideWindow = 
-          upEvent.clientX < 0 || 
-          upEvent.clientY < 0 || 
-          upEvent.clientX > window.innerWidth || 
-          upEvent.clientY > window.innerHeight;
+        // For testing: always create floating button when dragging
+        // Later we can add back the outside detection
+        console.log('Creating floating button (test mode - always create when dragging)');
         
-        if (isOutsideWindow && window.electron?.createFloatingButton) {
+        if (window.electron?.createFloatingButton) {
+          console.log('Creating floating button...');
           try {
             // Convert the background image to base64 data URL
             const canvas = document.createElement('canvas');
@@ -84,10 +89,11 @@ export default function CircularTile({ onClick, className = '', size = 'medium' 
               ctx?.drawImage(img, 0, 0);
               const imageData = canvas.toDataURL();
               
-              // Calculate screen position
-              const rect = (e.target as HTMLElement).getBoundingClientRect();
-              const screenX = window.screenX + rect.left + (rect.width / 2);
-              const screenY = window.screenY + rect.top + (rect.height / 2);
+              // Calculate screen position using screen coordinates
+              const screenX = upEvent.screenX || (window.screenX + upEvent.clientX);
+              const screenY = upEvent.screenY || (window.screenY + upEvent.clientY);
+              
+              console.log('Screen position:', { screenX, screenY });
               
               const result = await window.electron.createFloatingButton({
                 buttonId,
@@ -99,18 +105,25 @@ export default function CircularTile({ onClick, className = '', size = 'medium' 
               
               if (result.success) {
                 setFloatingButtonId(buttonId);
-                console.log('Floating button created:', result.windowId);
+                console.log('Floating button created successfully:', result.windowId);
               } else {
                 console.error('Failed to create floating button:', result.error);
               }
+            };
+            
+            img.onerror = (error) => {
+              console.error('Failed to load image:', error);
             };
             
             img.src = circularTileImage;
           } catch (error) {
             console.error('Error creating floating button:', error);
           }
+        } else {
+          console.error('window.electron.createFloatingButton not available');
         }
       } else {
+        console.log('Was a click, not a drag');
         // This was a click, not a drag - trigger click after a small delay
         setTimeout(() => {
           onClick?.();
