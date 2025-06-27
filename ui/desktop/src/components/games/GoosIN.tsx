@@ -305,31 +305,31 @@ export default function GoosIN() {
       const wallHeight = (CELL_SIZE * CANVAS_HEIGHT) / distance;
       const wallTop = (CANVAS_HEIGHT - wallHeight) / 2;
       
-      // Light gray walls matching UI theme with pixelated texture
-      const brightness = Math.max(0.4, 1 - distance / MAX_DEPTH);
+      // Very light gray walls matching UI theme with pixelated texture
+      const brightness = Math.max(0.5, 1 - distance / MAX_DEPTH);
       
-      // UI-matching gray wall colors (lighter palette)
-      const baseGray = Math.floor(156 * brightness);  // Base gray-400 level
+      // Much lighter UI-matching gray wall colors
+      const baseGray = Math.floor(200 * brightness);  // Base gray-200/300 level
       
       // Add pixelated texture to walls
       const wallSlice = i * (CANVAS_WIDTH / RAYS);
       const sliceWidth = Math.ceil(CANVAS_WIDTH / RAYS);
       
-      // Main wall color (light gray)
+      // Main wall color (very light gray)
       ctx.fillStyle = `rgb(${baseGray}, ${baseGray}, ${baseGray})`;
       ctx.fillRect(wallSlice, wallTop, sliceWidth, wallHeight);
       
       // Add vertical pixelated lines for texture (slightly darker)
       if (i % 3 === 0) {
-        const darkerGray = Math.floor(baseGray * 0.85);
+        const darkerGray = Math.floor(baseGray * 0.9);
         ctx.fillStyle = `rgb(${darkerGray}, ${darkerGray}, ${darkerGray})`;
         ctx.fillRect(wallSlice, wallTop, 1, wallHeight);
       }
       
-      // Add horizontal brick-like pattern (subtle)
+      // Add horizontal brick-like pattern (very subtle)
       for (let brick = wallTop; brick < wallTop + wallHeight; brick += 8) {
         if (Math.floor(brick / 8) % 2 === Math.floor(i / 4) % 2) {
-          const lighterGray = Math.floor(baseGray * 1.1);
+          const lighterGray = Math.floor(Math.min(255, baseGray * 1.05));
           ctx.fillStyle = `rgb(${lighterGray}, ${lighterGray}, ${lighterGray})`;
           ctx.fillRect(wallSlice, brick, sliceWidth, 1);
         }
