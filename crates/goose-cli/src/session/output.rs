@@ -144,7 +144,7 @@ pub fn render_message(message: &Message, debug: bool, porcelain: bool) {
             MessageContent::Thinking(thinking) => {
                 if std::env::var("GOOSE_CLI_SHOW_THINKING").is_ok() {
                     if porcelain {
-                        eprintln!("\n{}", "Thinking:");
+                        eprintln!("\n{}", style("Thinking:").dim().italic());
                     } else {
                         println!("\n{}", style("Thinking:").dim().italic());
                     }
@@ -153,7 +153,7 @@ pub fn render_message(message: &Message, debug: bool, porcelain: bool) {
             }
             MessageContent::RedactedThinking(_) => {
                 if porcelain {
-                    eprintln!("\n{}", "Thinking:");
+                    eprintln!("\n{}", style("Thinking:").dim().italic());
                 } else {
                     println!("\n{}", style("Thinking:").dim().italic());
                 }
@@ -180,18 +180,19 @@ pub fn render_text(text: &str, color: Option<Color>, dim: bool, porcelain: bool)
 }
 
 pub fn render_text_no_newlines(text: &str, color: Option<Color>, dim: bool, porcelain: bool) {
-    if porcelain {
-        eprint!("{}", text);
+    let mut styled = style(text);
+    if dim {
+        styled = styled.dim();
+    }
+    if let Some(color) = color {
+        styled = styled.fg(color);
     } else {
-        let mut styled = style(text);
-        if dim {
-            styled = styled.dim();
-        }
-        if let Some(color) = color {
-            styled = styled.fg(color);
-        } else {
-            styled = styled.green();
-        }
+        styled = styled.green();
+    }
+    
+    if porcelain {
+        eprint!("{}", styled);
+    } else {
         print!("{}", styled);
     };
 }
@@ -276,7 +277,7 @@ fn render_tool_response(resp: &ToolResponse, theme: Theme, debug: bool, porcelai
 
 pub fn render_error(message: &str, porcelain: bool) {
     if porcelain {
-        eprintln!("\n  {} {}\n", "error:", message);
+        eprintln!("\n  {} {}\n", style("error:").red().bold(), message);
     } else {
         println!("\n  {} {}\n", style("error:").red().bold(), message);
     }
@@ -379,7 +380,11 @@ fn render_text_editor_request(call: &ToolCall, debug: bool, porcelain: bool) {
     // Print path first with special formatting
     if let Some(Value::String(path)) = call.arguments.get("path") {
         if porcelain {
-            eprintln!("path: {}", shorten_path(path, debug));
+            eprintln!(
+                "{}: {}",
+                style("path").dim(),
+                style(shorten_path(path, debug)).green()
+            );
         } else {
             println!(
                 "{}: {}",
@@ -412,7 +417,7 @@ fn render_shell_request(call: &ToolCall, debug: bool, porcelain: bool) {
     match call.arguments.get("command") {
         Some(Value::String(s)) => {
             if porcelain {
-                eprintln!("command: {}", s);
+                eprintln!("{}: {}", style("command").dim(), style(s).green());
             } else {
                 println!("{}: {}", style("command").dim(), style(s).green());
             }
@@ -437,27 +442,15 @@ fn print_tool_header(call: &ToolCall, porcelain: bool) {
     let parts: Vec<_> = call.name.rsplit("__").collect();
     let tool_header = format!(
         "─── {} | {} ──────────────────────────",
-        if porcelain {
-            parts.first().unwrap_or(&"unknown").to_string()
-        } else {
-            style(parts.first().unwrap_or(&"unknown")).to_string()
-        },
-        if porcelain {
+        style(parts.first().unwrap_or(&"unknown")),
+        style(
             parts
                 .split_first()
                 .map(|(_, s)| s.iter().rev().copied().collect::<Vec<_>>().join("__"))
                 .unwrap_or_else(|| "unknown".to_string())
-        } else {
-            style(
-                parts
-                    .split_first()
-                    .map(|(_, s)| s.iter().rev().copied().collect::<Vec<_>>().join("__"))
-                    .unwrap_or_else(|| "unknown".to_string())
-            )
-            .magenta()
-            .dim()
-            .to_string()
-        },
+        )
+        .magenta()
+        .dim(),
     );
     if porcelain {
         eprintln!();
@@ -476,8 +469,15 @@ pub fn env_no_color() -> bool {
 
 fn print_markdown(content: &str, theme: Theme, porcelain: bool) {
     if porcelain {
-        // In porcelain mode, output raw text to stderr without formatting
-        eprint!("{}", content);
+        // In porcelain mode, use bat for markdown formatting
+        bat::PrettyPrinter::new()
+            .input(bat::Input::from_bytes(content.as_bytes()))
+            .theme(theme.as_str())
+            .colored_output(env_no_color())
+            .language("Markdown")
+            .wrapping_mode(WrappingMode::NoWrapping(true))
+            .print()
+            .unwrap();
     } else {
         // Normal mode uses bat for markdown formatting
         bat::PrettyPrinter::new()
@@ -509,7 +509,7 @@ fn print_params(value: &Value, depth: usize, debug: bool, porcelain: bool) {
                 match val {
                     Value::Object(_) => {
                         if porcelain {
-                            eprintln!("{}{}:", indent, key);
+                            eprintln!("{}{}:", indent, style(key).dim());
                         } else {
                             println!("{}{}:", indent, style(key).dim());
                         }
@@ -517,7 +517,7 @@ fn print_params(value: &Value, depth: usize, debug: bool, porcelain: bool) {
                     }
                     Value::Array(arr) => {
                         if porcelain {
-                            eprintln!("{}{}:", indent, key);
+                            eprintln!("{}{}:", indent, style(key).dim());
                         } else {
                             println!("{}{}:", indent, style(key).dim());
                         }
@@ -533,13 +533,13 @@ fn print_params(value: &Value, depth: usize, debug: bool, porcelain: bool) {
                     Value::String(s) => {
                         if !debug && s.len() > get_tool_params_max_length() {
                             if porcelain {
-                                eprintln!("{}{}: ...", indent, key);
+                                eprintln!("{}{}: {}", indent, style(key).dim(), style("...").dim());
                             } else {
                                 println!("{}{}: {}", indent, style(key).dim(), style("...").dim());
                             }
                         } else {
                             if porcelain {
-                                eprintln!("{}{}: {}", indent, key, s);
+                                eprintln!("{}{}: {}", indent, style(key).dim(), style(s).green());
                             } else {
                                 println!("{}{}: {}", indent, style(key).dim(), style(s).green());
                             }
@@ -547,21 +547,21 @@ fn print_params(value: &Value, depth: usize, debug: bool, porcelain: bool) {
                     }
                     Value::Number(n) => {
                         if porcelain {
-                            eprintln!("{}{}: {}", indent, key, n);
+                            eprintln!("{}{}: {}", indent, style(key).dim(), style(n).blue());
                         } else {
                             println!("{}{}: {}", indent, style(key).dim(), style(n).blue());
                         }
                     }
                     Value::Bool(b) => {
                         if porcelain {
-                            eprintln!("{}{}: {}", indent, key, b);
+                            eprintln!("{}{}: {}", indent, style(key).dim(), style(b).blue());
                         } else {
                             println!("{}{}: {}", indent, style(key).dim(), style(b).blue());
                         }
                     }
                     Value::Null => {
                         if porcelain {
-                            eprintln!("{}{}: null", indent, key);
+                            eprintln!("{}{}: {}", indent, style(key).dim(), style("null").dim());
                         } else {
                             println!("{}{}: {}", indent, style(key).dim(), style("null").dim());
                         }
@@ -583,9 +583,9 @@ fn print_params(value: &Value, depth: usize, debug: bool, porcelain: bool) {
             if !debug && s.len() > get_tool_params_max_length() {
                 if porcelain {
                     eprintln!(
-                        "{}[REDACTED: {} chars]",
+                        "{}{}",
                         indent,
-                        s.len()
+                        style(format!("[REDACTED: {} chars]", s.len())).yellow()
                     );
                 } else {
                     println!(
@@ -596,7 +596,7 @@ fn print_params(value: &Value, depth: usize, debug: bool, porcelain: bool) {
                 }
             } else {
                 if porcelain {
-                    eprintln!("{}{}", indent, s);
+                    eprintln!("{}{}", indent, style(s).green());
                 } else {
                     println!("{}{}", indent, style(s).green());
                 }
@@ -604,21 +604,21 @@ fn print_params(value: &Value, depth: usize, debug: bool, porcelain: bool) {
         }
         Value::Number(n) => {
             if porcelain {
-                eprintln!("{}{}", indent, n);
+                eprintln!("{}{}", indent, style(n).yellow());
             } else {
                 println!("{}{}", indent, style(n).yellow());
             }
         }
         Value::Bool(b) => {
             if porcelain {
-                eprintln!("{}{}", indent, b);
+                eprintln!("{}{}", indent, style(b).yellow());
             } else {
                 println!("{}{}", indent, style(b).yellow());
             }
         }
         Value::Null => {
             if porcelain {
-                eprintln!("{}null", indent);
+                eprintln!("{}{}", indent, style("null").dim());
             } else {
                 println!("{}{}", indent, style("null").dim());
             }
