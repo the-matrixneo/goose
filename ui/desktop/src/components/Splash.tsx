@@ -1,5 +1,5 @@
 import { useTextAnimator } from '../hooks/use-text-animator';
-import { Card } from './ui/card';
+import { Card, CardContent, CardDescription } from './ui/card';
 import { useState, useEffect } from 'react';
 import { gsap } from 'gsap';
 
@@ -29,6 +29,8 @@ export default function Splash({ append, activities, title }: SplashProps) {
     prefix: string;
     message: string;
   } | null>(null);
+
+  const [currentTime, setCurrentTime] = useState<string>('');
 
   // Select a random greeting on component mount
   useEffect(() => {
@@ -66,6 +68,24 @@ export default function Splash({ append, activities, title }: SplashProps) {
     });
   }, []);
 
+  // Update time every minute
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      const timeString = now.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      });
+      setCurrentTime(timeString);
+    };
+
+    updateTime(); // Set initial time
+    const interval = setInterval(updateTime, 60000); // Update every minute
+
+    return () => clearInterval(interval);
+  }, []);
+
   const getGreeting = () => {
     return selectedGreeting || { prefix: 'Hello.', message: ' How can I help you today?' };
   };
@@ -91,12 +111,26 @@ export default function Splash({ append, activities, title }: SplashProps) {
         </div>
       )}
 
-      {/* Compact greeting section */}
-      <div className="flex flex-col px-6 mb-0">
-        <h1 className="text-text-prominent text-4xl font-light mb-2">
-          <span>{greeting.prefix}</span>
-          {/* <span className="text-text-muted">{greeting.message}</span> */}
-        </h1>
+      {/* Compact greeting section with time tile */}
+      <div className="flex items-start justify-between px-6 mb-0 gap-4">
+        <div className="flex-1">
+          <h1 className="text-text-prominent text-4xl font-light mb-2">
+            <span>{greeting.prefix}</span>
+            {/* <span className="text-text-muted">{greeting.message}</span> */}
+          </h1>
+        </div>
+        
+        {/* Time tile matching total sessions card style */}
+        <Card className="animate-in fade-in slide-in-from-right-8 duration-500 rounded-2xl min-w-[120px] max-w-[150px]">
+          <CardContent className="flex flex-col justify-end items-start h-full pt-4">
+            <div className="flex flex-col justify-end items-start">
+              <p className="text-2xl font-mono font-light flex items-end">
+                {currentTime}
+              </p>
+              <CardDescription>Current time</CardDescription>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="flex flex-col">

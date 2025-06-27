@@ -50,6 +50,7 @@ function GreetingCard() {
 export function SessionInsights() {
   const [insights, setInsights] = useState<SessionInsights | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [currentTime, setCurrentTime] = useState<string>('');
 
   // Add text animator effects for each number
   const totalSessionsRef = useTextAnimator({ text: insights?.totalSessions.toString() ?? '' });
@@ -59,6 +60,24 @@ export function SessionInsights() {
   const totalTokensRef = useTextAnimator({
     text: insights?.totalTokens ? (insights.totalTokens / 1000000).toFixed(2) : '',
   });
+
+  // Update time every minute
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      const timeString = now.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      });
+      setCurrentTime(timeString);
+    };
+
+    updateTime(); // Set initial time
+    const interval = setInterval(updateTime, 60000); // Update every minute
+
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     const loadInsights = async () => {
@@ -132,6 +151,18 @@ export function SessionInsights() {
                   <span className="text-base">M</span>
                 </p>
                 <CardDescription>Total tokens</CardDescription>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Current Time Card */}
+          <Card className="w-full sm:w-auto animate-in fade-in slide-in-from-right-8 duration-500 rounded-2xl min-w-[200px] max-w-[350px]">
+            <CardContent className="flex flex-col justify-end items-start h-full pt-4">
+              <div className="flex flex-col justify-end items-start">
+                <p className="text-2xl font-mono font-light flex items-end">
+                  {currentTime}
+                </p>
+                <CardDescription>Current time</CardDescription>
               </div>
             </CardContent>
           </Card>
