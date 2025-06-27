@@ -65,12 +65,12 @@ export function SessionInsights() {
   useEffect(() => {
     const updateTime = () => {
       const now = new Date();
-      const timeString = now.toLocaleTimeString('en-US', {
+      const time = now.toLocaleTimeString('en-US', {
         hour: 'numeric',
         minute: '2-digit',
         hour12: true,
       });
-      setCurrentTime(timeString);
+      setCurrentTime(time);
     };
 
     updateTime(); // Set initial time
@@ -160,7 +160,8 @@ export function SessionInsights() {
             <CardContent className="flex flex-col justify-end items-start h-full pt-4">
               <div className="flex flex-col justify-end items-start">
                 <p className="text-2xl font-mono font-light flex items-end">
-                  {currentTime}
+                  <span>{currentTime.replace(/ (AM|PM)$/, '')}</span>
+                  <span className="text-base">{currentTime.match(/ (AM|PM)$/)?.[1] || ''}</span>
                 </p>
                 <CardDescription>Current time</CardDescription>
               </div>
