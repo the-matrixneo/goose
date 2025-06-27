@@ -1,8 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Copy, Check, Server } from 'lucide-react';
+import { Copy, Check, Server, Play, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 
 interface ShareDeveloperViewProps {
   onClose?: () => void;
+}
+
+interface ToolCallInfo {
+  tool_name: string;
+  request_id: string;
+  status: 'Running' | 'Completed' | 'Failed';
+  started_at: number;
+  completed_at?: number;
+  error?: string;
 }
 
 const ShareDeveloperView: React.FC<ShareDeveloperViewProps> = ({ onClose }) => {
@@ -10,6 +19,7 @@ const ShareDeveloperView: React.FC<ShareDeveloperViewProps> = ({ onClose }) => {
   const [connectionString, setConnectionString] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [toolCallHistory, setToolCallHistory] = useState<ToolCallInfo[]>([]);
 
   // Theme management - same logic as MoreMenu.tsx
   const [themeMode, _] = useState<'light' | 'dark' | 'system'>(() => {
@@ -83,6 +93,81 @@ const ShareDeveloperView: React.FC<ShareDeveloperViewProps> = ({ onClose }) => {
 
     generateConnectionString();
   }, []);
+
+  // Poll for tool call status
+  useEffect(() => {
+    const pollToolCallStatus = async () => {
+      try {
+        const config = window.electron.getConfig();
+        const port = config.GOOSE_PORT as number;
+        const secretKey = config.secretKey as string;
+
+        if (!port || !secretKey) {
+          return;
+        }
+
+        const response = await fetch(`http://127.0.0.1:${port}/agent/tool_call_status`, {
+          headers: {
+            'X-Secret-Key': secretKey,
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data) {
+            setToolCallHistory((prevHistory) => {
+              // Check if this tool call already exists in history
+              const existingIndex = prevHistory.findIndex(
+                (call) => call.request_id === data.request_id
+              );
+
+              if (existingIndex >= 0) {
+                // Update existing tool call
+                const updatedHistory = [...prevHistory];
+                updatedHistory[existingIndex] = data;
+                return updatedHistory;
+              } else {
+                // Add new tool call and keep only the most recent 3
+                const newHistory = [data, ...prevHistory].slice(0, 3);
+                return newHistory;
+              }
+            });
+          }
+        }
+      } catch (err) {
+        console.error('Error polling tool call status:', err);
+      }
+    };
+
+    // Initial poll
+    pollToolCallStatus();
+
+    // Set up polling interval (every 1 second)
+    const interval = setInterval(pollToolCallStatus, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const renderStatusIcon = (status: 'Running' | 'Completed' | 'Failed') => {
+    switch (status) {
+      case 'Running':
+        return <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />;
+      case 'Completed':
+        return <CheckCircle className="w-4 h-4 text-green-500" />;
+      case 'Failed':
+        return <XCircle className="w-4 h-4 text-red-500" />;
+      default:
+        return <Play className="w-4 h-4 text-gray-500" />;
+    }
+  };
+
+  const formatToolName = (toolName: string) => {
+    // Remove common prefixes and format nicely
+    return toolName
+      .replace(/^(platform__|developer__)/, '')
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (l) => l.toUpperCase());
+  };
 
   const handleCopy = async () => {
     try {
@@ -174,6 +259,38 @@ const ShareDeveloperView: React.FC<ShareDeveloperViewProps> = ({ onClose }) => {
               </button>
             </div>
           </div>
+
+          {/* Tool Call History */}
+          {toolCallHistory.length > 0 && (
+            <div className="mt-4">
+              <h3 className="text-sm font-medium text-textStandard mb-2">Recent Tool Calls</h3>
+              <div className="max-h-32 overflow-y-auto space-y-2 pr-1">
+                {toolCallHistory.map((toolCall, index) => (
+                  <div
+                    key={`${toolCall.request_id}-${index}`}
+                    className="p-3 border border-borderSubtle rounded-lg bg-bgSubtle"
+                  >
+                    <div className="flex items-center gap-2">
+                      {renderStatusIcon(toolCall.status)}
+                      <span className="text-sm text-textStandard truncate">
+                        {formatToolName(toolCall.tool_name)}
+                      </span>
+                      <span className="text-xs text-textSubtle">
+                        {toolCall.status === 'Running'
+                          ? 'running...'
+                          : toolCall.status === 'Completed'
+                            ? 'completed'
+                            : 'failed'}
+                      </span>
+                    </div>
+                    {toolCall.error && (
+                      <div className="mt-2 text-xs text-red-500 break-words">{toolCall.error}</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

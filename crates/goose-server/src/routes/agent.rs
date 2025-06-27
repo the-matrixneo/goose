@@ -1,5 +1,5 @@
 use super::utils::verify_secret_key;
-use crate::state::AppState;
+use crate::state::{AppState, ToolCallInfo};
 use axum::{
     extract::{Query, State},
     http::{HeaderMap, StatusCode},
@@ -218,7 +218,7 @@ async fn call_tool(
         .map_err(|_| StatusCode::PRECONDITION_FAILED)?;
 
     // Create a ToolCall from the request
-    let tool_call = ToolCall::new(payload.tool_name, payload.arguments);
+    let tool_call = ToolCall::new(payload.tool_name.clone(), payload.arguments);
 
     // Generate a request ID if not provided
     let request_id = payload.request_id.unwrap_or_else(|| {
@@ -230,33 +230,53 @@ async fn call_tool(
         format!("tool_call_{}", timestamp)
     });
 
+    // Track the tool call as running
+    state
+        .set_tool_call_running(payload.tool_name.clone(), request_id.clone())
+        .await;
+
     // Dispatch the tool call
-    let (returned_id, result) = agent.dispatch_tool_call(tool_call, request_id).await;
+    let (returned_id, result) = agent.dispatch_tool_call(tool_call, request_id.clone()).await;
 
     match result {
         Ok(tool_call_result) => {
             // Wait for the result future to complete
             match tool_call_result.result.await {
-                Ok(contents) => Ok(Json(CallToolResponse {
-                    request_id: returned_id,
-                    success: true,
-                    result: Some(contents),
-                    error: None,
-                })),
-                Err(tool_error) => Ok(Json(CallToolResponse {
-                    request_id: returned_id,
-                    success: false,
-                    result: None,
-                    error: Some(tool_error.to_string()),
-                })),
+                Ok(contents) => {
+                    // Mark the tool call as completed
+                    state.complete_tool_call(&returned_id).await;
+                    
+                    Ok(Json(CallToolResponse {
+                        request_id: returned_id,
+                        success: true,
+                        result: Some(contents),
+                        error: None,
+                    }))
+                }
+                Err(tool_error) => {
+                    // Mark the tool call as failed
+                    state.fail_tool_call(&returned_id, tool_error.to_string()).await;
+                    
+                    Ok(Json(CallToolResponse {
+                        request_id: returned_id,
+                        success: false,
+                        result: None,
+                        error: Some(tool_error.to_string()),
+                    }))
+                }
             }
         }
-        Err(tool_error) => Ok(Json(CallToolResponse {
-            request_id: returned_id,
-            success: false,
-            result: None,
-            error: Some(tool_error.to_string()),
-        })),
+        Err(tool_error) => {
+            // Mark the tool call as failed
+            state.fail_tool_call(&returned_id, tool_error.to_string()).await;
+            
+            Ok(Json(CallToolResponse {
+                request_id: returned_id,
+                success: false,
+                result: None,
+                error: Some(tool_error.to_string()),
+            }))
+        }
     }
 }
 
@@ -344,6 +364,25 @@ async fn update_router_tool_selector(
     ))
 }
 
+#[utoipa::path(
+    get,
+    path = "/agent/tool_call_status",
+    responses(
+        (status = 200, description = "Latest tool call status retrieved successfully", body = Option<ToolCallInfo>),
+        (status = 401, description = "Unauthorized - invalid secret key"),
+        (status = 500, description = "Internal server error")
+    )
+)]
+async fn get_tool_call_status(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Result<Json<Option<ToolCallInfo>>, StatusCode> {
+    verify_secret_key(&headers, &state)?;
+
+    let tool_call_info = state.get_latest_tool_call().await;
+    Ok(Json(tool_call_info))
+}
+
 pub fn routes(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/agent/versions", get(get_versions))
@@ -351,6 +390,7 @@ pub fn routes(state: Arc<AppState>) -> Router {
         .route("/agent/prompt", post(extend_prompt))
         .route("/agent/tools", get(get_tools))
         .route("/agent/call_tool", post(call_tool))
+        .route("/agent/tool_call_status", get(get_tool_call_status))
         .route("/agent/update_provider", post(update_agent_provider))
         .route(
             "/agent/update_router_tool_selector",

@@ -1758,11 +1758,11 @@ app.whenReady().then(async () => {
 
     fileMenu.submenu.insert(3, new MenuItem({ type: 'separator' }));
 
-    // Add Share Developer menu item
+    // Add Share MCPs menu item
     fileMenu.submenu.insert(
       4,
       new MenuItem({
-        label: 'Share Developer',
+        label: 'Share MCPs',
         click() {
           createShareDeveloperWindow();
         },
