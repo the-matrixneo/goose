@@ -127,38 +127,52 @@ pub fn set_thinking_message(s: &String) {
 }
 
 pub fn render_message(message: &Message, debug: bool, porcelain: bool) {
-    if porcelain {
-        // In porcelain mode, suppress normal message rendering
-        return;
-    }
-    
     let theme = get_theme();
 
     for content in &message.content {
         match content {
-            MessageContent::Text(text) => print_markdown(&text.text, theme),
-            MessageContent::ToolRequest(req) => render_tool_request(req, theme, debug),
-            MessageContent::ToolResponse(resp) => render_tool_response(resp, theme, debug),
+            MessageContent::Text(text) => print_markdown(&text.text, theme, porcelain),
+            MessageContent::ToolRequest(req) => render_tool_request(req, theme, debug, porcelain),
+            MessageContent::ToolResponse(resp) => render_tool_response(resp, theme, debug, porcelain),
             MessageContent::Image(image) => {
-                println!("Image: [data: {}, type: {}]", image.data, image.mime_type);
+                if porcelain {
+                    eprintln!("Image: [data: {}, type: {}]", image.data, image.mime_type);
+                } else {
+                    println!("Image: [data: {}, type: {}]", image.data, image.mime_type);
+                }
             }
             MessageContent::Thinking(thinking) => {
                 if std::env::var("GOOSE_CLI_SHOW_THINKING").is_ok() {
-                    println!("\n{}", style("Thinking:").dim().italic());
-                    print_markdown(&thinking.thinking, theme);
+                    if porcelain {
+                        eprintln!("\n{}", "Thinking:");
+                    } else {
+                        println!("\n{}", style("Thinking:").dim().italic());
+                    }
+                    print_markdown(&thinking.thinking, theme, porcelain);
                 }
             }
             MessageContent::RedactedThinking(_) => {
-                // For redacted thinking, print thinking was redacted
-                println!("\n{}", style("Thinking:").dim().italic());
-                print_markdown("Thinking was redacted", theme);
+                if porcelain {
+                    eprintln!("\n{}", "Thinking:");
+                } else {
+                    println!("\n{}", style("Thinking:").dim().italic());
+                }
+                print_markdown("Thinking was redacted", theme, porcelain);
             }
             _ => {
-                println!("WARNING: Message content type could not be rendered");
+                if porcelain {
+                    eprintln!("WARNING: Message content type could not be rendered");
+                } else {
+                    println!("WARNING: Message content type could not be rendered");
+                }
             }
         }
     }
-    println!();
+    if porcelain {
+        eprintln!();
+    } else {
+        println!();
+    }
 }
 
 pub fn render_text(text: &str, color: Option<Color>, dim: bool, porcelain: bool) {
@@ -209,18 +223,18 @@ pub fn goose_mode_message(text: &str) {
     println!("\n{}", style(text).yellow(),);
 }
 
-fn render_tool_request(req: &ToolRequest, theme: Theme, debug: bool) {
+fn render_tool_request(req: &ToolRequest, theme: Theme, debug: bool, porcelain: bool) {
     match &req.tool_call {
         Ok(call) => match call.name.as_str() {
-            "developer__text_editor" => render_text_editor_request(call, debug),
-            "developer__shell" => render_shell_request(call, debug),
-            _ => render_default_request(call, debug),
+            "developer__text_editor" => render_text_editor_request(call, debug, porcelain),
+            "developer__shell" => render_shell_request(call, debug, porcelain),
+            _ => render_default_request(call, debug, porcelain),
         },
-        Err(e) => print_markdown(&e.to_string(), theme),
+        Err(e) => print_markdown(&e.to_string(), theme, porcelain),
     }
 }
 
-fn render_tool_response(resp: &ToolResponse, theme: Theme, debug: bool) {
+fn render_tool_response(resp: &ToolResponse, theme: Theme, debug: bool, porcelain: bool) {
     let config = Config::global();
 
     match &resp.tool_result {
@@ -246,13 +260,17 @@ fn render_tool_response(resp: &ToolResponse, theme: Theme, debug: bool) {
                 }
 
                 if debug {
-                    println!("{:#?}", content);
+                    if porcelain {
+                        eprintln!("{:#?}", content);
+                    } else {
+                        println!("{:#?}", content);
+                    }
                 } else if let mcp_core::content::Content::Text(text) = content {
-                    print_markdown(&text.text, theme);
+                    print_markdown(&text.text, theme, porcelain);
                 }
             }
         }
-        Err(e) => print_markdown(&e.to_string(), theme),
+        Err(e) => print_markdown(&e.to_string(), theme, porcelain),
     }
 }
 
@@ -355,16 +373,20 @@ pub fn render_builtin_error(names: &str, error: &str) {
     println!();
 }
 
-fn render_text_editor_request(call: &ToolCall, debug: bool) {
-    print_tool_header(call);
+fn render_text_editor_request(call: &ToolCall, debug: bool, porcelain: bool) {
+    print_tool_header(call, porcelain);
 
     // Print path first with special formatting
     if let Some(Value::String(path)) = call.arguments.get("path") {
-        println!(
-            "{}: {}",
-            style("path").dim(),
-            style(shorten_path(path, debug)).green()
-        );
+        if porcelain {
+            eprintln!("path: {}", shorten_path(path, debug));
+        } else {
+            println!(
+                "{}: {}",
+                style("path").dim(),
+                style(shorten_path(path, debug)).green()
+            );
+        }
     }
 
     // Print other arguments normally, excluding path
@@ -375,46 +397,75 @@ fn render_text_editor_request(call: &ToolCall, debug: bool) {
                 other_args.insert(k.clone(), v.clone());
             }
         }
-        print_params(&Value::Object(other_args), 0, debug);
+        print_params(&Value::Object(other_args), 0, debug, porcelain);
     }
-    println!();
+    if porcelain {
+        eprintln!();
+    } else {
+        println!();
+    }
 }
 
-fn render_shell_request(call: &ToolCall, debug: bool) {
-    print_tool_header(call);
+fn render_shell_request(call: &ToolCall, debug: bool, porcelain: bool) {
+    print_tool_header(call, porcelain);
 
     match call.arguments.get("command") {
         Some(Value::String(s)) => {
-            println!("{}: {}", style("command").dim(), style(s).green());
+            if porcelain {
+                eprintln!("command: {}", s);
+            } else {
+                println!("{}: {}", style("command").dim(), style(s).green());
+            }
         }
-        _ => print_params(&call.arguments, 0, debug),
+        _ => print_params(&call.arguments, 0, debug, porcelain),
     }
 }
 
-fn render_default_request(call: &ToolCall, debug: bool) {
-    print_tool_header(call);
-    print_params(&call.arguments, 0, debug);
-    println!();
+fn render_default_request(call: &ToolCall, debug: bool, porcelain: bool) {
+    print_tool_header(call, porcelain);
+    print_params(&call.arguments, 0, debug, porcelain);
+    if porcelain {
+        eprintln!();
+    } else {
+        println!();
+    }
 }
 
 // Helper functions
 
-fn print_tool_header(call: &ToolCall) {
+fn print_tool_header(call: &ToolCall, porcelain: bool) {
     let parts: Vec<_> = call.name.rsplit("__").collect();
     let tool_header = format!(
         "─── {} | {} ──────────────────────────",
-        style(parts.first().unwrap_or(&"unknown")),
-        style(
+        if porcelain {
+            parts.first().unwrap_or(&"unknown").to_string()
+        } else {
+            style(parts.first().unwrap_or(&"unknown")).to_string()
+        },
+        if porcelain {
             parts
                 .split_first()
                 .map(|(_, s)| s.iter().rev().copied().collect::<Vec<_>>().join("__"))
                 .unwrap_or_else(|| "unknown".to_string())
-        )
-        .magenta()
-        .dim(),
+        } else {
+            style(
+                parts
+                    .split_first()
+                    .map(|(_, s)| s.iter().rev().copied().collect::<Vec<_>>().join("__"))
+                    .unwrap_or_else(|| "unknown".to_string())
+            )
+            .magenta()
+            .dim()
+            .to_string()
+        },
     );
-    println!();
-    println!("{}", tool_header);
+    if porcelain {
+        eprintln!();
+        eprintln!("{}", tool_header);
+    } else {
+        println!();
+        println!("{}", tool_header);
+    }
 }
 
 // Respect NO_COLOR, as https://crates.io/crates/console already does
@@ -423,15 +474,21 @@ pub fn env_no_color() -> bool {
     std::env::var_os("NO_COLOR").is_none()
 }
 
-fn print_markdown(content: &str, theme: Theme) {
-    bat::PrettyPrinter::new()
-        .input(bat::Input::from_bytes(content.as_bytes()))
-        .theme(theme.as_str())
-        .colored_output(env_no_color())
-        .language("Markdown")
-        .wrapping_mode(WrappingMode::NoWrapping(true))
-        .print()
-        .unwrap();
+fn print_markdown(content: &str, theme: Theme, porcelain: bool) {
+    if porcelain {
+        // In porcelain mode, output raw text to stderr without formatting
+        eprint!("{}", content);
+    } else {
+        // Normal mode uses bat for markdown formatting
+        bat::PrettyPrinter::new()
+            .input(bat::Input::from_bytes(content.as_bytes()))
+            .theme(theme.as_str())
+            .colored_output(env_no_color())
+            .language("Markdown")
+            .wrapping_mode(WrappingMode::NoWrapping(true))
+            .print()
+            .unwrap();
+    }
 }
 
 const INDENT: &str = "    ";
@@ -443,7 +500,7 @@ fn get_tool_params_max_length() -> usize {
         .unwrap_or(40)
 }
 
-fn print_params(value: &Value, depth: usize, debug: bool) {
+fn print_params(value: &Value, depth: usize, debug: bool, porcelain: bool) {
     let indent = INDENT.repeat(depth);
 
     match value {
@@ -451,60 +508,120 @@ fn print_params(value: &Value, depth: usize, debug: bool) {
             for (key, val) in map {
                 match val {
                     Value::Object(_) => {
-                        println!("{}{}:", indent, style(key).dim());
-                        print_params(val, depth + 1, debug);
+                        if porcelain {
+                            eprintln!("{}{}:", indent, key);
+                        } else {
+                            println!("{}{}:", indent, style(key).dim());
+                        }
+                        print_params(val, depth + 1, debug, porcelain);
                     }
                     Value::Array(arr) => {
-                        println!("{}{}:", indent, style(key).dim());
+                        if porcelain {
+                            eprintln!("{}{}:", indent, key);
+                        } else {
+                            println!("{}{}:", indent, style(key).dim());
+                        }
                         for item in arr.iter() {
-                            println!("{}{}- ", indent, INDENT);
-                            print_params(item, depth + 2, debug);
+                            if porcelain {
+                                eprintln!("{}{}- ", indent, INDENT);
+                            } else {
+                                println!("{}{}- ", indent, INDENT);
+                            }
+                            print_params(item, depth + 2, debug, porcelain);
                         }
                     }
                     Value::String(s) => {
                         if !debug && s.len() > get_tool_params_max_length() {
-                            println!("{}{}: {}", indent, style(key).dim(), style("...").dim());
+                            if porcelain {
+                                eprintln!("{}{}: ...", indent, key);
+                            } else {
+                                println!("{}{}: {}", indent, style(key).dim(), style("...").dim());
+                            }
                         } else {
-                            println!("{}{}: {}", indent, style(key).dim(), style(s).green());
+                            if porcelain {
+                                eprintln!("{}{}: {}", indent, key, s);
+                            } else {
+                                println!("{}{}: {}", indent, style(key).dim(), style(s).green());
+                            }
                         }
                     }
                     Value::Number(n) => {
-                        println!("{}{}: {}", indent, style(key).dim(), style(n).blue());
+                        if porcelain {
+                            eprintln!("{}{}: {}", indent, key, n);
+                        } else {
+                            println!("{}{}: {}", indent, style(key).dim(), style(n).blue());
+                        }
                     }
                     Value::Bool(b) => {
-                        println!("{}{}: {}", indent, style(key).dim(), style(b).blue());
+                        if porcelain {
+                            eprintln!("{}{}: {}", indent, key, b);
+                        } else {
+                            println!("{}{}: {}", indent, style(key).dim(), style(b).blue());
+                        }
                     }
                     Value::Null => {
-                        println!("{}{}: {}", indent, style(key).dim(), style("null").dim());
+                        if porcelain {
+                            eprintln!("{}{}: null", indent, key);
+                        } else {
+                            println!("{}{}: {}", indent, style(key).dim(), style("null").dim());
+                        }
                     }
                 }
             }
         }
         Value::Array(arr) => {
             for (i, item) in arr.iter().enumerate() {
-                println!("{}{}.", indent, i + 1);
-                print_params(item, depth + 1, debug);
+                if porcelain {
+                    eprintln!("{}{}.", indent, i + 1);
+                } else {
+                    println!("{}{}.", indent, i + 1);
+                }
+                print_params(item, depth + 1, debug, porcelain);
             }
         }
         Value::String(s) => {
             if !debug && s.len() > get_tool_params_max_length() {
-                println!(
-                    "{}{}",
-                    indent,
-                    style(format!("[REDACTED: {} chars]", s.len())).yellow()
-                );
+                if porcelain {
+                    eprintln!(
+                        "{}[REDACTED: {} chars]",
+                        indent,
+                        s.len()
+                    );
+                } else {
+                    println!(
+                        "{}{}",
+                        indent,
+                        style(format!("[REDACTED: {} chars]", s.len())).yellow()
+                    );
+                }
             } else {
-                println!("{}{}", indent, style(s).green());
+                if porcelain {
+                    eprintln!("{}{}", indent, s);
+                } else {
+                    println!("{}{}", indent, style(s).green());
+                }
             }
         }
         Value::Number(n) => {
-            println!("{}{}", indent, style(n).yellow());
+            if porcelain {
+                eprintln!("{}{}", indent, n);
+            } else {
+                println!("{}{}", indent, style(n).yellow());
+            }
         }
         Value::Bool(b) => {
-            println!("{}{}", indent, style(b).yellow());
+            if porcelain {
+                eprintln!("{}{}", indent, b);
+            } else {
+                println!("{}{}", indent, style(b).yellow());
+            }
         }
         Value::Null => {
-            println!("{}{}", indent, style("null").dim());
+            if porcelain {
+                eprintln!("{}null", indent);
+            } else {
+                println!("{}{}", indent, style("null").dim());
+            }
         }
     }
 }
