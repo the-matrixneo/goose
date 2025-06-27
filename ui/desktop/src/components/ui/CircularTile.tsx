@@ -23,7 +23,8 @@ export default function CircularTile({ onClick, className = '', size = 'medium' 
 
   // Listen for docking events
   useEffect(() => {
-    const handleDocking = (_event: any, data: { buttonId: string }) => {
+    const handleDocking = (_event: any, ...args: unknown[]) => {
+      const data = args[0] as { buttonId: string };
       if (data.buttonId === floatingButtonId) {
         setFloatingButtonId(null);
         console.log('Button docked back to window');
@@ -41,103 +42,100 @@ export default function CircularTile({ onClick, className = '', size = 'medium' 
     };
   }, [floatingButtonId]);
 
-  const handleDragStart = (e: React.DragEvent<HTMLButtonElement>) => {
-    setIsDragging(true);
-    
-    // Create a drag image using the circular tile itself
-    const dragImage = e.currentTarget.cloneNode(true) as HTMLElement;
-    dragImage.style.transform = 'none';
-    dragImage.style.opacity = '0.8';
-    document.body.appendChild(dragImage);
-    
-    // Set the drag image
-    e.dataTransfer.setDragImage(dragImage, 40, 40); // Center the drag image
-    
-    // Set drag data for different drop targets
-    e.dataTransfer.setData('text/plain', 'Goose Assistant');
-    e.dataTransfer.setData('text/uri-list', 'goose://assistant');
-    
-    // Custom data for our desktop shortcut creation
-    e.dataTransfer.setData('application/x-goose-tile', JSON.stringify({
-      type: 'goose-assistant',
-      title: 'Goose Assistant',
-      description: 'AI Assistant Tile',
-      iconPath: circularTileImage
-    }));
-    
-    // Clean up drag image after a short delay
-    setTimeout(() => {
-      if (document.body.contains(dragImage)) {
-        document.body.removeChild(dragImage);
-      }
-    }, 100);
-  };
+  // Mouse-based drag handling instead of HTML5 drag
+  const handleMouseDown = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    const startPos = { x: e.clientX, y: e.clientY };
+    let hasDragged = false;
 
-  const handleDragEnd = async (e: React.DragEvent<HTMLButtonElement>) => {
-    setIsDragging(false);
-    
-    // Check if the drag ended outside the window (potential floating button creation)
-    const isOutsideWindow = 
-      e.clientX < 0 || 
-      e.clientY < 0 || 
-      e.clientX > window.innerWidth || 
-      e.clientY > window.innerHeight;
-    
-    if (isOutsideWindow && window.electron?.createFloatingButton) {
-      try {
-        // Convert the background image to base64 data URL
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        const img = new Image();
-        
-        img.onload = async () => {
-          canvas.width = img.width;
-          canvas.height = img.height;
-          ctx?.drawImage(img, 0, 0);
-          const imageData = canvas.toDataURL();
-          
-          // Calculate position where the drag ended (in screen coordinates)
-          const screenX = e.screenX;
-          const screenY = e.screenY;
-          
-          const result = await window.electron.createFloatingButton({
-            buttonId,
-            x: screenX - 40, // Center the button on cursor
-            y: screenY - 40,
-            size,
-            imageData
-          });
-          
-          if (result.success) {
-            setFloatingButtonId(buttonId);
-            console.log('Floating button created:', result.windowId);
-          } else {
-            console.error('Failed to create floating button:', result.error);
-          }
-        };
-        
-        img.src = circularTileImage;
-      } catch (error) {
-        console.error('Error creating floating button:', error);
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const deltaX = Math.abs(moveEvent.clientX - startPos.x);
+      const deltaY = Math.abs(moveEvent.clientY - startPos.y);
+      
+      // Start dragging if moved more than 5px
+      if (deltaX > 5 || deltaY > 5) {
+        hasDragged = true;
+        setIsDragging(true);
       }
-    }
+    };
+
+    const handleMouseUp = async (upEvent: MouseEvent) => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      
+      if (hasDragged) {
+        // Check if mouse is outside the window
+        const isOutsideWindow = 
+          upEvent.clientX < 0 || 
+          upEvent.clientY < 0 || 
+          upEvent.clientX > window.innerWidth || 
+          upEvent.clientY > window.innerHeight;
+        
+        if (isOutsideWindow && window.electron?.createFloatingButton) {
+          try {
+            // Convert the background image to base64 data URL
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const img = new Image();
+            
+            img.onload = async () => {
+              canvas.width = img.width;
+              canvas.height = img.height;
+              ctx?.drawImage(img, 0, 0);
+              const imageData = canvas.toDataURL();
+              
+              // Calculate screen position
+              const rect = (e.target as HTMLElement).getBoundingClientRect();
+              const screenX = window.screenX + rect.left + (rect.width / 2);
+              const screenY = window.screenY + rect.top + (rect.height / 2);
+              
+              const result = await window.electron.createFloatingButton({
+                buttonId,
+                x: screenX - 40, // Center the button
+                y: screenY - 40,
+                size,
+                imageData
+              });
+              
+              if (result.success) {
+                setFloatingButtonId(buttonId);
+                console.log('Floating button created:', result.windowId);
+              } else {
+                console.error('Failed to create floating button:', result.error);
+              }
+            };
+            
+            img.src = circularTileImage;
+          } catch (error) {
+            console.error('Error creating floating button:', error);
+          }
+        }
+      } else {
+        // This was a click, not a drag - trigger click after a small delay
+        setTimeout(() => {
+          onClick?.();
+        }, 0);
+      }
+      
+      setIsDragging(false);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
   };
 
   const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-    // Prevent click if we were dragging
+    // Prevent default click if we handled it in mouse events
     if (isDragging) {
       e.preventDefault();
       return;
     }
-    onClick?.();
   };
 
   return (
     <button
       onClick={handleClick}
-      draggable={true}
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
+      onMouseDown={handleMouseDown}
       className={`
         ${sizeClasses[size]}
         rounded-full
