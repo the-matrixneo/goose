@@ -274,20 +274,20 @@ export default function GoosIN() {
       return;
     }
 
-    // Clear canvas with retro background
-    ctx.fillStyle = '#D4D4AA'; // Retro beige/tan
+    // Clear canvas with light UI-matching background
+    ctx.fillStyle = '#F8F9FA'; // Light background matching UI
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
     
-    // Draw ceiling (darker retro brown)
-    ctx.fillStyle = '#8B7355';
+    // Draw ceiling (light gray matching UI)
+    ctx.fillStyle = '#E5E7EB';
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT / 2);
     
-    // Draw floor (classic Doom gray with dithering pattern)
-    ctx.fillStyle = '#696969';
+    // Draw floor (medium gray with subtle dithering)
+    ctx.fillStyle = '#D1D5DB';
     ctx.fillRect(0, CANVAS_HEIGHT / 2, CANVAS_WIDTH, CANVAS_HEIGHT / 2);
     
-    // Add floor dithering pattern for retro feel
-    ctx.fillStyle = '#5A5A5A';
+    // Add subtle floor dithering pattern for retro feel
+    ctx.fillStyle = '#C4C4C4';
     for (let x = 0; x < CANVAS_WIDTH; x += 4) {
       for (let y = CANVAS_HEIGHT / 2; y < CANVAS_HEIGHT; y += 4) {
         if ((x + y) % 8 === 0) {
@@ -305,32 +305,32 @@ export default function GoosIN() {
       const wallHeight = (CELL_SIZE * CANVAS_HEIGHT) / distance;
       const wallTop = (CANVAS_HEIGHT - wallHeight) / 2;
       
-      // Retro wall colors with more contrast and pixelated feel
-      const brightness = Math.max(0.3, 1 - distance / MAX_DEPTH);
+      // Light gray walls matching UI theme with pixelated texture
+      const brightness = Math.max(0.4, 1 - distance / MAX_DEPTH);
       
-      // Classic Doom-style wall colors (browns and grays)
-      const baseRed = Math.floor(101 * brightness);   // Brown base
-      const baseGreen = Math.floor(67 * brightness);  // Brown base  
-      const baseBlue = Math.floor(33 * brightness);   // Brown base
+      // UI-matching gray wall colors (lighter palette)
+      const baseGray = Math.floor(156 * brightness);  // Base gray-400 level
       
       // Add pixelated texture to walls
       const wallSlice = i * (CANVAS_WIDTH / RAYS);
       const sliceWidth = Math.ceil(CANVAS_WIDTH / RAYS);
       
-      // Main wall color
-      ctx.fillStyle = `rgb(${baseRed}, ${baseGreen}, ${baseBlue})`;
+      // Main wall color (light gray)
+      ctx.fillStyle = `rgb(${baseGray}, ${baseGray}, ${baseGray})`;
       ctx.fillRect(wallSlice, wallTop, sliceWidth, wallHeight);
       
-      // Add vertical pixelated lines for texture
+      // Add vertical pixelated lines for texture (slightly darker)
       if (i % 3 === 0) {
-        ctx.fillStyle = `rgb(${Math.floor(baseRed * 1.2)}, ${Math.floor(baseGreen * 1.2)}, ${Math.floor(baseBlue * 1.2)})`;
+        const darkerGray = Math.floor(baseGray * 0.85);
+        ctx.fillStyle = `rgb(${darkerGray}, ${darkerGray}, ${darkerGray})`;
         ctx.fillRect(wallSlice, wallTop, 1, wallHeight);
       }
       
-      // Add horizontal brick-like pattern
+      // Add horizontal brick-like pattern (subtle)
       for (let brick = wallTop; brick < wallTop + wallHeight; brick += 8) {
         if (Math.floor(brick / 8) % 2 === Math.floor(i / 4) % 2) {
-          ctx.fillStyle = `rgb(${Math.floor(baseRed * 0.8)}, ${Math.floor(baseGreen * 0.8)}, ${Math.floor(baseBlue * 0.8)})`;
+          const lighterGray = Math.floor(baseGray * 1.1);
+          ctx.fillStyle = `rgb(${lighterGray}, ${lighterGray}, ${lighterGray})`;
           ctx.fillRect(wallSlice, brick, sliceWidth, 1);
         }
       }
@@ -483,40 +483,40 @@ export default function GoosIN() {
     }
   };
 
-  // Draw retro HUD
+  // Draw UI-matching HUD with retro pixelated feel
   const drawHUD = (ctx: CanvasRenderingContext2D, player: Player) => {
-    // Retro HUD background bar
-    ctx.fillStyle = '#2F2F2F';
-    ctx.fillRect(0, CANVAS_HEIGHT - 30, CANVAS_WIDTH, 30);
+    // Subtle HUD background bar
+    ctx.fillStyle = 'rgba(107, 114, 128, 0.8)'; // Semi-transparent gray
+    ctx.fillRect(0, CANVAS_HEIGHT - 25, CANVAS_WIDTH, 25);
     
-    // Health bar with retro styling
-    ctx.fillStyle = '#8B0000'; // Dark red background
-    ctx.fillRect(5, CANVAS_HEIGHT - 25, 60, 8);
-    ctx.fillStyle = '#FF4500'; // Bright orange/red health
-    ctx.fillRect(5, CANVAS_HEIGHT - 25, (player.health / 100) * 60, 8);
+    // Health bar with UI-matching colors
+    ctx.fillStyle = '#D1D5DB'; // Light gray background
+    ctx.fillRect(5, CANVAS_HEIGHT - 20, 60, 6);
+    ctx.fillStyle = '#EF4444'; // Red health (matching UI red)
+    ctx.fillRect(5, CANVAS_HEIGHT - 20, (player.health / 100) * 60, 6);
     
-    // Health text in retro green
-    ctx.fillStyle = '#00FF00';
-    ctx.font = 'bold 10px monospace';
+    // Health text in UI gray
+    ctx.fillStyle = '#374151';
+    ctx.font = 'bold 9px monospace';
     ctx.fillText(`HP ${player.health}`, 5, CANVAS_HEIGHT - 5);
     
-    // Bread counter in retro yellow
-    ctx.fillStyle = '#FFFF00';
-    ctx.font = 'bold 10px monospace';
-    ctx.fillText(`BREAD ${player.breadCollected}/7`, CANVAS_WIDTH - 80, CANVAS_HEIGHT - 5);
+    // Bread counter in UI gray
+    ctx.fillStyle = '#374151';
+    ctx.font = 'bold 9px monospace';
+    ctx.fillText(`BREAD ${player.breadCollected}/7`, CANVAS_WIDTH - 75, CANVAS_HEIGHT - 5);
     
-    // Retro crosshair with thicker lines
-    ctx.strokeStyle = '#00FF00';
+    // Subtle crosshair matching UI colors
+    ctx.strokeStyle = '#6B7280';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(CANVAS_WIDTH / 2 - 6, CANVAS_HEIGHT / 2);
-    ctx.lineTo(CANVAS_WIDTH / 2 + 6, CANVAS_HEIGHT / 2);
-    ctx.moveTo(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 6);
-    ctx.lineTo(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 6);
+    ctx.moveTo(CANVAS_WIDTH / 2 - 5, CANVAS_HEIGHT / 2);
+    ctx.lineTo(CANVAS_WIDTH / 2 + 5, CANVAS_HEIGHT / 2);
+    ctx.moveTo(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 5);
+    ctx.lineTo(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 5);
     ctx.stroke();
     
-    // Add retro scanlines effect
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+    // Subtle scanlines for retro feel (much lighter)
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.03)';
     for (let y = 0; y < CANVAS_HEIGHT; y += 4) {
       ctx.fillRect(0, y, CANVAS_WIDTH, 1);
     }
@@ -582,10 +582,10 @@ export default function GoosIN() {
           ref={canvasRef}
           width={CANVAS_WIDTH}
           height={CANVAS_HEIGHT}
-          className="block bg-gray-800 rounded w-full"
+          className="block bg-background-muted rounded w-full"
           style={{
             imageRendering: 'pixelated',
-            filter: gameState.isPlaying ? 'contrast(1.1) saturate(1.2)' : 'brightness(0.8) contrast(1.1)',
+            filter: gameState.isPlaying ? 'contrast(1.05) saturate(1.1)' : 'brightness(0.8) contrast(1.05)',
           }}
         />
         
