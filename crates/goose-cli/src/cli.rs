@@ -512,7 +512,6 @@ enum Command {
 
         /// Porcelain mode - redirect all CLI output to stderr and only output final text message to stdout
         #[arg(
-            short = 'p',
             long = "porcelain",
             help = "Porcelain mode. Redirect all CLI output to stderr and only output final text message to stdout"
         )]

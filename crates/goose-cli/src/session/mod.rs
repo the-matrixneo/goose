@@ -146,7 +146,7 @@ impl Session {
         // Summarize messages to fit within context length
         let (summarized_messages, _) = agent.summarize_context(messages).await?;
         let msg = format!("Context maxed out\n{}\n{}", "-".repeat(50), message_suffix);
-        output::render_text_with_porcelain(&msg, Some(Color::Yellow), true, porcelain);
+        output::render_text(&msg, Some(Color::Yellow), true, porcelain);
         *messages = summarized_messages;
 
         Ok(())
@@ -501,7 +501,7 @@ impl Session {
 
                     match self.list_prompts(extension).await {
                         Ok(prompts) => output::render_prompts(&prompts),
-                        Err(e) => output::render_error_with_porcelain(&e.to_string(), self.porcelain),
+                        Err(e) => output::render_error(&e.to_string(), self.porcelain),
                     }
                 }
                 input::InputResult::GooseMode(mode) => {
@@ -512,7 +512,7 @@ impl Session {
 
                     // Check if mode is valid
                     if !["auto", "approve", "chat", "smart_approve"].contains(&mode.as_str()) {
-                        output::render_error_with_porcelain(&format!(
+                        output::render_error(&format!(
                             "Invalid mode '{}'. Mode must be one of: auto, approve, chat",
                             mode
                         ), self.porcelain);
@@ -553,6 +553,7 @@ impl Session {
                     output::render_message(
                         &Message::assistant().with_text("Chat context cleared."),
                         self.debug,
+                        self.porcelain,
                     );
                     continue;
                 }
@@ -670,7 +671,7 @@ impl Session {
         let plan_prompt = self.agent.get_plan_prompt().await?;
         output::show_thinking();
         let (plan_response, _usage) = reasoner.complete(&plan_prompt, &plan_messages, &[]).await?;
-        output::render_message(&plan_response, self.debug);
+        output::render_message(&plan_response, self.debug, self.porcelain);
         output::hide_thinking();
         let planner_response_type =
             classify_planner_response(plan_response.as_concat_text(), self.agent.provider().await?)
@@ -801,7 +802,7 @@ impl Session {
                                 };
 
                                 if permission == Permission::Cancel {
-                                    output::render_text_with_porcelain("Tool call cancelled. Returning to chat...", Some(Color::Yellow), true, self.porcelain);
+                                    output::render_text("Tool call cancelled. Returning to chat...", Some(Color::Yellow), true, self.porcelain);
 
                                     let mut response_message = Message::user();
                                     response_message.content.push(MessageContent::tool_response(
@@ -855,7 +856,7 @@ impl Session {
                                         } else {
                                             format!("Session cleared.\n{}", "-".repeat(50))
                                         };
-                                        output::render_text_with_porcelain(&msg, Some(Color::Yellow), true, self.porcelain);
+                                        output::render_text(&msg, Some(Color::Yellow), true, self.porcelain);
                                         break;  // exit the loop to hand back control to the user
                                     }
                                     "truncate" => {
@@ -866,8 +867,8 @@ impl Session {
                                         } else {
                                             format!("Context maxed out\n{}\nGoose tried its best to truncate messages for you.", "-".repeat(50))
                                         };
-                                        output::render_text_with_porcelain("", Some(Color::Yellow), true, self.porcelain);
-                                        output::render_text_with_porcelain(&msg, Some(Color::Yellow), true, self.porcelain);
+                                        output::render_text("", Some(Color::Yellow), true, self.porcelain);
+                                        output::render_text(&msg, Some(Color::Yellow), true, self.porcelain);
                                         self.messages = truncated_messages;
                                     }
                                     "summarize" => {
@@ -910,7 +911,7 @@ impl Session {
 
                                 if interactive {output::hide_thinking()};
                                 let _ = progress_bars.hide();
-                                output::render_message_with_porcelain(&message, self.debug, self.porcelain);
+                                output::render_message(&message, self.debug, self.porcelain);
                                 if interactive {output::show_thinking()};
                             }
                         }
@@ -1047,7 +1048,7 @@ impl Session {
                             if let Err(e) = self.handle_interrupted_messages(false).await {
                                 eprintln!("Error handling interruption: {}", e);
                             }
-                            output::render_error_with_porcelain(
+                            output::render_error(
                                 "The error above was an exception we were not able to handle.\n\
                                 These errors are often related to connection or authentication\n\
                                 We've removed the conversation up to the most recent user message\n\
@@ -1137,7 +1138,7 @@ impl Session {
             )
             .await?;
 
-            output::render_message(&Message::assistant().with_text(&prompt), self.debug);
+            output::render_message(&Message::assistant().with_text(&prompt), self.debug, self.porcelain);
         } else {
             // An interruption occurred outside of a tool request-response.
             if let Some(last_msg) = self.messages.last() {
@@ -1160,6 +1161,7 @@ impl Session {
                             output::render_message(
                                 &Message::assistant().with_text(prompt),
                                 self.debug,
+                                self.porcelain,
                             );
                         }
                         Some(_) => {
@@ -1169,6 +1171,7 @@ impl Session {
                             output::render_message(
                                 &Message::assistant().with_text(prompt),
                                 self.debug,
+                                self.porcelain,
                             );
                         }
                         None => panic!("No content in last message"),
@@ -1248,7 +1251,7 @@ impl Session {
 
         // Render each message
         for message in &self.messages {
-            output::render_message(message, self.debug);
+            output::render_message(message, self.debug, self.porcelain);
         }
 
         // Add a visual separator after restored messages
@@ -1297,14 +1300,14 @@ impl Session {
     async fn handle_prompt_command(&mut self, opts: input::PromptCommandOptions) -> Result<()> {
         // name is required
         if opts.name.is_empty() {
-            output::render_error_with_porcelain("Prompt name argument is required", self.porcelain);
+            output::render_error("Prompt name argument is required", self.porcelain);
             return Ok(());
         }
 
         if opts.info {
             match self.get_prompt_info(&opts.name).await? {
                 Some(info) => output::render_prompt_info(&info),
-                None => output::render_error_with_porcelain(&format!("Prompt '{}' not found", opts.name), self.porcelain),
+                None => output::render_error(&format!("Prompt '{}' not found", opts.name), self.porcelain),
             }
         } else {
             // Convert the arguments HashMap to a Value
@@ -1325,7 +1328,7 @@ impl Session {
                         };
 
                         if msg.role != expected_role {
-                            output::render_error_with_porcelain(&format!(
+                            output::render_error(&format!(
                                 "Expected {:?} message at position {}, but found {:?}",
                                 expected_role, i, msg.role
                             ), self.porcelain);
@@ -1336,7 +1339,7 @@ impl Session {
                         }
 
                         if msg.role == mcp_core::Role::User {
-                            output::render_message(&msg, self.debug);
+                            output::render_message(&msg, self.debug, self.porcelain);
                         }
                         self.messages.push(msg);
                     }
@@ -1347,7 +1350,7 @@ impl Session {
                         output::hide_thinking();
                     }
                 }
-                Err(e) => output::render_error_with_porcelain(&e.to_string(), self.porcelain),
+                Err(e) => output::render_error(&e.to_string(), self.porcelain),
             }
         }
 

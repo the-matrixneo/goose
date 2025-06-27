@@ -126,11 +126,7 @@ pub fn set_thinking_message(s: &String) {
     });
 }
 
-pub fn render_message(message: &Message, debug: bool) {
-    render_message_with_porcelain(message, debug, false);
-}
-
-pub fn render_message_with_porcelain(message: &Message, debug: bool, porcelain: bool) {
+pub fn render_message(message: &Message, debug: bool, porcelain: bool) {
     if porcelain {
         // In porcelain mode, suppress normal message rendering
         return;
@@ -165,39 +161,25 @@ pub fn render_message_with_porcelain(message: &Message, debug: bool, porcelain: 
     println!();
 }
 
-pub fn render_text(text: &str, color: Option<Color>, dim: bool) {
-    render_text_with_porcelain(text, color, dim, false);
+pub fn render_text(text: &str, color: Option<Color>, dim: bool, porcelain: bool) {
+    render_text_no_newlines(&format!("\n{}\n\n", text), color, dim, porcelain);
 }
 
-pub fn render_text_with_porcelain(text: &str, color: Option<Color>, dim: bool, porcelain: bool) {
+pub fn render_text_no_newlines(text: &str, color: Option<Color>, dim: bool, porcelain: bool) {
     if porcelain {
-        // In porcelain mode, redirect to stderr
-        eprint!("\n{}\n\n", text);
-    } else {
-        render_text_no_newlines(format!("\n{}\n\n", text).as_str(), color, dim);
-    }
-}
-
-pub fn render_text_no_newlines(text: &str, color: Option<Color>, dim: bool) {
-    render_text_no_newlines_with_porcelain(text, color, dim, false);
-}
-
-pub fn render_text_no_newlines_with_porcelain(text: &str, color: Option<Color>, dim: bool, porcelain: bool) {
-    if porcelain {
-        // In porcelain mode, redirect to stderr
         eprint!("{}", text);
     } else {
-        let mut styled_text = style(text);
+        let mut styled = style(text);
         if dim {
-            styled_text = styled_text.dim();
+            styled = styled.dim();
         }
         if let Some(color) = color {
-            styled_text = styled_text.fg(color);
+            styled = styled.fg(color);
         } else {
-            styled_text = styled_text.green();
+            styled = styled.green();
         }
-        print!("{}", styled_text);
-    }
+        print!("{}", styled);
+    };
 }
 
 pub fn render_enter_plan_mode() {
@@ -274,11 +256,7 @@ fn render_tool_response(resp: &ToolResponse, theme: Theme, debug: bool) {
     }
 }
 
-pub fn render_error(message: &str) {
-    render_error_with_porcelain(message, false);
-}
-
-pub fn render_error_with_porcelain(message: &str, porcelain: bool) {
+pub fn render_error(message: &str, porcelain: bool) {
     if porcelain {
         eprintln!("\n  {} {}\n", "error:", message);
     } else {
@@ -814,3 +792,4 @@ mod tests {
         );
     }
 }
+
