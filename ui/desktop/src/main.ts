@@ -1356,15 +1356,23 @@ ipcMain.handle('create-floating-button', async (event, data) => {
     const targetDisplay = screen.getDisplayNearestPoint({ x: Math.round(x), y: Math.round(y) });
     console.log('Main process: Target display for position:', targetDisplay.bounds);
 
-    // For debugging, let's also try a known good position on the primary display
-    const testX = primaryDisplay.bounds.x + 100;
-    const testY = primaryDisplay.bounds.y + 100;
-    console.log('Main process: Test position on primary display:', { testX, testY });
+    // Use the actual coordinates provided by the user, with bounds checking
+    let finalX = Math.round(x);
+    let finalY = Math.round(y);
 
-    // Use the test position for now to ensure visibility
-    const finalX = testX; // Use test position instead of x
-    const finalY = testY; // Use test position instead of y
-    console.log('Main process: Using final position:', { finalX, finalY });
+    // Ensure the window stays within screen bounds
+    const minX = targetDisplay.bounds.x;
+    const maxX = targetDisplay.bounds.x + targetDisplay.bounds.width - windowSize;
+    const minY = targetDisplay.bounds.y;
+    const maxY = targetDisplay.bounds.y + targetDisplay.bounds.height - windowSize;
+
+    finalX = Math.max(minX, Math.min(maxX, finalX));
+    finalY = Math.max(minY, Math.min(maxY, finalY));
+
+    console.log('Main process: Using user-specified position (bounds-checked):', {
+      finalX,
+      finalY,
+    });
 
     // Create a small frameless window for the floating button
     const floatingWindow = new BrowserWindow({
