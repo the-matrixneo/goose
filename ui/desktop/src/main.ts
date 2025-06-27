@@ -1392,6 +1392,7 @@ ipcMain.handle('create-floating-button', async (event, data) => {
       focusable: true,
       show: true,
       movable: true, // Ensure the window can be moved
+      hasShadow: false, // Disable system shadow for better transparency
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
@@ -1535,18 +1536,16 @@ ipcMain.handle('create-floating-button', async (event, data) => {
       \`;
     }
     
-    // Handle dragging with better visual feedback
-    let isDragging = false;
-    let dragStartTime = 0;
-    let dragMoved = false;
+    // Handle click vs drag detection without interfering with native drag
+    let clickStartTime = 0;
+    let hasMouseMoved = false;
     
     document.addEventListener('mousedown', (e) => {
       console.log('Mouse down on floating button');
-      isDragging = true;
-      dragStartTime = Date.now();
-      dragMoved = false;
+      clickStartTime = Date.now();
+      hasMouseMoved = false;
       
-      // Add visual feedback
+      // Add visual feedback for the press
       document.body.classList.add('dragging');
       const floatingButton = document.querySelector('.floating-button');
       if (floatingButton) {
@@ -1555,48 +1554,36 @@ ipcMain.handle('create-floating-button', async (event, data) => {
     });
     
     document.addEventListener('mousemove', (e) => {
-      if (isDragging) {
-        dragMoved = true;
-      }
+      hasMouseMoved = true;
     });
     
     document.addEventListener('mouseup', (e) => {
-      if (isDragging) {
-        const dragDuration = Date.now() - dragStartTime;
-        console.log('Mouse up - drag duration:', dragDuration, 'moved:', dragMoved);
-        
-        // Remove visual feedback
-        document.body.classList.remove('dragging');
-        const floatingButton = document.querySelector('.floating-button');
-        if (floatingButton) {
-          floatingButton.classList.remove('dragging');
-        }
-        
-        isDragging = false;
-        
-        // If it was a quick click without movement, treat as click
-        if (dragDuration < 200 && !dragMoved) {
-          console.log('Quick click detected - focusing parent');
-          if (window.electronFloating) {
-            window.electronFloating.focusParent();
-          }
-        } else if (dragMoved) {
-          console.log('Drag detected - checking docking');
-          if (window.electronFloating) {
-            window.electronFloating.checkDocking();
-          }
+      const clickDuration = Date.now() - clickStartTime;
+      console.log('Mouse up - duration:', clickDuration, 'moved:', hasMouseMoved);
+      
+      // Remove visual feedback
+      document.body.classList.remove('dragging');
+      const floatingButton = document.querySelector('.floating-button');
+      if (floatingButton) {
+        floatingButton.classList.remove('dragging');
+      }
+      
+      // Only treat as click if it was quick and didn't move
+      if (clickDuration < 300 && !hasMouseMoved) {
+        console.log('Click detected - focusing parent');
+        if (window.electronFloating) {
+          window.electronFloating.focusParent();
         }
       }
+      // Note: Dragging is handled natively by Electron via -webkit-app-region: drag
     });
     
-    // Handle drag leave to clean up visual state
+    // Clean up visual state on mouse leave
     document.addEventListener('mouseleave', (e) => {
-      if (isDragging) {
-        document.body.classList.remove('dragging');
-        const floatingButton = document.querySelector('.floating-button');
-        if (floatingButton) {
-          floatingButton.classList.remove('dragging');
-        }
+      document.body.classList.remove('dragging');
+      const floatingButton = document.querySelector('.floating-button');
+      if (floatingButton) {
+        floatingButton.classList.remove('dragging');
       }
     });
     
