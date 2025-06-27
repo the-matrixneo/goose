@@ -365,8 +365,10 @@ export default function GoosIN() {
           // Check if sprite is occluded by casting a ray to it
           const rayDistance = castRay(player.angle + normalizedAngle, player.x, player.y);
           
-          // Only draw if sprite is closer than the wall
-          if (sprite.distance < rayDistance - 10) { // Small buffer to prevent z-fighting
+          // More generous occlusion test - only hide if clearly behind a wall
+          const isVisible = sprite.distance < rayDistance - 3 || rayDistance > MAX_DEPTH - 50;
+          
+          if (isVisible) {
             const screenX = (normalizedAngle / (FOV / 2)) * (CANVAS_WIDTH / 2) + CANVAS_WIDTH / 2;
             
             if (sprite.type === 'bug') {
