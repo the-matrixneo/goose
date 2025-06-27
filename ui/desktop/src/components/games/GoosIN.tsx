@@ -453,28 +453,21 @@ export default function GoosIN() {
 
   // Draw enhanced HUD
   const drawHUD = (ctx: CanvasRenderingContext2D, player: Player) => {
-    // Game title at top center
-    ctx.fillStyle = '#6B7280';
-    ctx.font = '14px monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText('GOOSIN', CANVAS_WIDTH / 2, 15);
-    ctx.textAlign = 'left'; // Reset alignment
-    
-    // Health bar (top left, moved down to avoid title)
+    // Health bar (top left)
     ctx.fillStyle = '#EF4444';
-    ctx.fillRect(5, 25, (player.health / 100) * 60, 4);
+    ctx.fillRect(5, 5, (player.health / 100) * 60, 4);
     ctx.strokeStyle = '#6B7280';
-    ctx.strokeRect(5, 25, 60, 4);
+    ctx.strokeRect(5, 5, 60, 4);
     
     // Health text
     ctx.fillStyle = '#6B7280';
     ctx.font = '10px monospace';
-    ctx.fillText(`HP: ${player.health}`, 5, 40);
+    ctx.fillText(`HP: ${player.health}`, 5, 20);
     
-    // Bread counter (top right, moved down to avoid title)
+    // Bread counter (top right)
     ctx.fillStyle = '#6B7280';
     ctx.font = '12px monospace';
-    ctx.fillText(`BREAD: ${player.breadCollected}/7`, CANVAS_WIDTH - 80, 35);
+    ctx.fillText(`BREAD: ${player.breadCollected}/7`, CANVAS_WIDTH - 80, 15);
     
     // Simple crosshair
     ctx.strokeStyle = '#6B7280';
@@ -583,6 +576,11 @@ export default function GoosIN() {
         {/* Start Game Overlay */}
         {!gameState.isPlaying && !gameState.gameOver && !gameState.gameWon && (
           <div className="absolute inset-4 flex flex-col justify-end items-start bg-background-default bg-opacity-90 rounded">
+            <div className="mb-auto pt-4 w-full text-center">
+              <h2 className="text-text-default font-mono text-2xl font-bold tracking-wider mb-2" style={{ fontFamily: 'monospace', imageRendering: 'pixelated' }}>
+                GOOSIN
+              </h2>
+            </div>
             <div className="text-text-muted font-mono text-xs mb-2">COLLECT BREAD • AVOID BUGS</div>
             <button
               onClick={toggleGame}
