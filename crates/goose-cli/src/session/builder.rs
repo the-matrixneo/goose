@@ -47,6 +47,8 @@ pub struct SessionBuilderConfig {
     pub interactive: bool,
     /// Quiet mode - suppress non-response output
     pub quiet: bool,
+    /// Porcelain mode - redirect all CLI output to stderr and only output final text message to stdout
+    pub porcelain: bool,
     /// Sub-recipes to add to the session
     pub sub_recipes: Option<Vec<SubRecipe>>,
 }
@@ -120,7 +122,7 @@ async fn offer_extension_debugging_help(
         std::env::temp_dir().join(format!("goose_debug_extension_{}.jsonl", extension_name));
 
     // Create the debugging session
-    let mut debug_session = Session::new(debug_agent, temp_session_file.clone(), false, None);
+    let mut debug_session = Session::new(debug_agent, temp_session_file.clone(), false, false, None);
 
     // Process the debugging request
     println!("{}", style("Analyzing the extension failure...").yellow());
@@ -365,6 +367,7 @@ pub async fn build_session(session_config: SessionBuilderConfig) -> Session {
         agent,
         session_file.clone(),
         session_config.debug,
+        session_config.porcelain,
         session_config.scheduled_job_id.clone(),
     );
 
@@ -484,8 +487,8 @@ pub async fn build_session(session_config: SessionBuilderConfig) -> Session {
         session.agent.override_system_prompt(override_prompt).await;
     }
 
-    // Display session information unless in quiet mode
-    if !session_config.quiet {
+    // Display session information unless in quiet or porcelain mode
+    if !session_config.quiet && !session_config.porcelain {
         output::display_session_info(
             session_config.resume,
             &provider_name,
@@ -518,6 +521,7 @@ mod tests {
             scheduled_job_id: None,
             interactive: true,
             quiet: false,
+            porcelain: false,
             sub_recipes: None,
         };
 
@@ -529,6 +533,7 @@ mod tests {
         assert!(config.scheduled_job_id.is_none());
         assert!(config.interactive);
         assert!(!config.quiet);
+        assert!(!config.porcelain);
     }
 
     #[test]
@@ -548,6 +553,7 @@ mod tests {
         assert!(config.scheduled_job_id.is_none());
         assert!(!config.interactive);
         assert!(!config.quiet);
+        assert!(!config.porcelain);
     }
 
     #[tokio::test]

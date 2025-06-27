@@ -49,7 +49,8 @@ pub struct Session {
     session_file: PathBuf,
     // Cache for completion data - using std::sync for thread safety without async
     completion_cache: Arc<std::sync::RwLock<CompletionCache>>,
-    debug: bool, // New field for debug mode
+    debug: bool,
+    porcelain: bool,
     run_mode: RunMode,
     scheduled_job_id: Option<String>, // ID of the scheduled job that triggered this session
 }
@@ -112,6 +113,7 @@ impl Session {
         agent: Agent,
         session_file: PathBuf,
         debug: bool,
+        porcelain: bool,
         scheduled_job_id: Option<String>,
     ) -> Self {
         let messages = match session::read_messages(&session_file) {
@@ -128,6 +130,7 @@ impl Session {
             session_file,
             completion_cache: Arc::new(std::sync::RwLock::new(CompletionCache::new())),
             debug,
+            porcelain,
             run_mode: RunMode::Normal,
             scheduled_job_id,
         }
@@ -138,11 +141,12 @@ impl Session {
         messages: &mut Vec<Message>,
         agent: &Agent,
         message_suffix: &str,
+        porcelain: bool,
     ) -> Result<()> {
         // Summarize messages to fit within context length
         let (summarized_messages, _) = agent.summarize_context(messages).await?;
         let msg = format!("Context maxed out\n{}\n{}", "-".repeat(50), message_suffix);
-        output::render_text(&msg, Some(Color::Yellow), true);
+        output::render_text_with_porcelain(&msg, Some(Color::Yellow), true, porcelain);
         *messages = summarized_messages;
 
         Ok(())
@@ -470,15 +474,21 @@ impl Session {
                     let current = output::get_theme();
                     let new_theme = match current {
                         output::Theme::Light => {
-                            println!("Switching to Dark theme");
+                            if !self.porcelain {
+                                println!("Switching to Dark theme");
+                            }
                             output::Theme::Dark
                         }
                         output::Theme::Dark => {
-                            println!("Switching to Ansi theme");
+                            if !self.porcelain {
+                                println!("Switching to Ansi theme");
+                            }
                             output::Theme::Ansi
                         }
                         output::Theme::Ansi => {
-                            println!("Switching to Light theme");
+                            if !self.porcelain {
+                                println!("Switching to Light theme");
+                            }
                             output::Theme::Light
                         }
                     };
@@ -491,7 +501,7 @@ impl Session {
 
                     match self.list_prompts(extension).await {
                         Ok(prompts) => output::render_prompts(&prompts),
-                        Err(e) => output::render_error(&e.to_string()),
+                        Err(e) => output::render_error_with_porcelain(&e.to_string(), self.porcelain),
                     }
                 }
                 input::InputResult::GooseMode(mode) => {
@@ -502,10 +512,10 @@ impl Session {
 
                     // Check if mode is valid
                     if !["auto", "approve", "chat", "smart_approve"].contains(&mode.as_str()) {
-                        output::render_error(&format!(
+                        output::render_error_with_porcelain(&format!(
                             "Invalid mode '{}'. Mode must be one of: auto, approve, chat",
                             mode
-                        ));
+                        ), self.porcelain);
                         continue;
                     }
 
@@ -643,10 +653,12 @@ impl Session {
             }
         }
 
-        println!(
-            "\nClosing session. Recorded to {}",
-            self.session_file.display()
-        );
+        if !self.porcelain {
+            println!(
+                "\nClosing session. Recorded to {}",
+                self.session_file.display()
+            );
+        }
         Ok(())
     }
 
@@ -729,7 +741,12 @@ impl Session {
 
     /// Process a single message and exit
     pub async fn headless(&mut self, message: String) -> Result<()> {
-        self.process_message(message).await
+        let result = self.process_message(message).await;
+        
+        // Output final message if in porcelain mode
+        self.output_final_message();
+        
+        result
     }
 
     async fn process_agent_response(&mut self, interactive: bool) -> Result<()> {
@@ -784,7 +801,7 @@ impl Session {
                                 };
 
                                 if permission == Permission::Cancel {
-                                    output::render_text("Tool call cancelled. Returning to chat...", Some(Color::Yellow), true);
+                                    output::render_text_with_porcelain("Tool call cancelled. Returning to chat...", Some(Color::Yellow), true, self.porcelain);
 
                                     let mut response_message = Message::user();
                                     response_message.content.push(MessageContent::tool_response(
@@ -838,7 +855,7 @@ impl Session {
                                         } else {
                                             format!("Session cleared.\n{}", "-".repeat(50))
                                         };
-                                        output::render_text(&msg, Some(Color::Yellow), true);
+                                        output::render_text_with_porcelain(&msg, Some(Color::Yellow), true, self.porcelain);
                                         break;  // exit the loop to hand back control to the user
                                     }
                                     "truncate" => {
@@ -849,8 +866,8 @@ impl Session {
                                         } else {
                                             format!("Context maxed out\n{}\nGoose tried its best to truncate messages for you.", "-".repeat(50))
                                         };
-                                        output::render_text("", Some(Color::Yellow), true);
-                                        output::render_text(&msg, Some(Color::Yellow), true);
+                                        output::render_text_with_porcelain("", Some(Color::Yellow), true, self.porcelain);
+                                        output::render_text_with_porcelain(&msg, Some(Color::Yellow), true, self.porcelain);
                                         self.messages = truncated_messages;
                                     }
                                     "summarize" => {
@@ -862,7 +879,7 @@ impl Session {
                                         } else {
                                             "Goose automatically summarized messages to continue processing."
                                         };
-                                        Self::summarize_context_messages(&mut self.messages, &self.agent, message_suffix).await?;
+                                        Self::summarize_context_messages(&mut self.messages, &self.agent, message_suffix, self.porcelain).await?;
                                     }
                                     _ => {
                                         unreachable!()
@@ -893,7 +910,7 @@ impl Session {
 
                                 if interactive {output::hide_thinking()};
                                 let _ = progress_bars.hide();
-                                output::render_message(&message, self.debug);
+                                output::render_message_with_porcelain(&message, self.debug, self.porcelain);
                                 if interactive {output::show_thinking()};
                             }
                         }
@@ -975,7 +992,11 @@ impl Session {
                                             // Show subagent notifications immediately (no buffering) with compact spacing
                                             if interactive {
                                                 let _ = progress_bars.hide();
-                                                println!("{}", console::style(&formatted_message).green().dim());
+                                                if self.porcelain {
+                                                    eprintln!("{}", &formatted_message);
+                                                } else {
+                                                    println!("{}", console::style(&formatted_message).green().dim());
+                                                }
                                             } else {
                                                 progress_bars.log(&formatted_message);
                                             }
@@ -983,7 +1004,11 @@ impl Session {
                                             // Non-subagent notification, display immediately with compact spacing
                                             if interactive {
                                                 let _ = progress_bars.hide();
-                                                println!("{}", console::style(&formatted_message).green().dim());
+                                                if self.porcelain {
+                                                    eprintln!("{}", &formatted_message);
+                                                } else {
+                                                    println!("{}", console::style(&formatted_message).green().dim());
+                                                }
                                             } else {
                                                 progress_bars.log(&formatted_message);
                                             }
@@ -1022,11 +1047,12 @@ impl Session {
                             if let Err(e) = self.handle_interrupted_messages(false).await {
                                 eprintln!("Error handling interruption: {}", e);
                             }
-                            output::render_error(
+                            output::render_error_with_porcelain(
                                 "The error above was an exception we were not able to handle.\n\
                                 These errors are often related to connection or authentication\n\
                                 We've removed the conversation up to the most recent user message\n\
                                 - depending on the error you may be able to continue",
+                                self.porcelain,
                             );
                             break;
                         }
@@ -1208,6 +1234,11 @@ impl Session {
             return;
         }
 
+        if self.porcelain {
+            // In porcelain mode, suppress session history rendering
+            return;
+        }
+
         // Print session restored message
         println!(
             "\n{} {} messages loaded into context.",
@@ -1266,14 +1297,14 @@ impl Session {
     async fn handle_prompt_command(&mut self, opts: input::PromptCommandOptions) -> Result<()> {
         // name is required
         if opts.name.is_empty() {
-            output::render_error("Prompt name argument is required");
+            output::render_error_with_porcelain("Prompt name argument is required", self.porcelain);
             return Ok(());
         }
 
         if opts.info {
             match self.get_prompt_info(&opts.name).await? {
                 Some(info) => output::render_prompt_info(&info),
-                None => output::render_error(&format!("Prompt '{}' not found", opts.name)),
+                None => output::render_error_with_porcelain(&format!("Prompt '{}' not found", opts.name), self.porcelain),
             }
         } else {
             // Convert the arguments HashMap to a Value
@@ -1294,10 +1325,10 @@ impl Session {
                         };
 
                         if msg.role != expected_role {
-                            output::render_error(&format!(
+                            output::render_error_with_porcelain(&format!(
                                 "Expected {:?} message at position {}, but found {:?}",
                                 expected_role, i, msg.role
-                            ));
+                            ), self.porcelain);
                             valid = false;
                             // get rid of everything we added to messages
                             self.messages.truncate(start_len);
@@ -1316,7 +1347,7 @@ impl Session {
                         output::hide_thinking();
                     }
                 }
-                Err(e) => output::render_error(&e.to_string()),
+                Err(e) => output::render_error_with_porcelain(&e.to_string(), self.porcelain),
             }
         }
 
@@ -1364,6 +1395,23 @@ impl Session {
         serde_yaml::to_writer(file, recipe).context("Failed to save recipe")?;
 
         Ok(path)
+    }
+
+    pub fn output_final_message(&self) {
+        if self.porcelain {
+            // Find the last assistant message with text content
+            for message in self.messages.iter().rev() {
+                if message.role == mcp_core::role::Role::Assistant {
+                    for content in &message.content {
+                        if let MessageContent::Text(text) = content {
+                            // Output to stdout without any formatting
+                            println!("{}", text.text);
+                            return;
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

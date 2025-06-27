@@ -510,6 +510,14 @@ enum Command {
         )]
         quiet: bool,
 
+        /// Porcelain mode - redirect all CLI output to stderr and only output final text message to stdout
+        #[arg(
+            short = 'p',
+            long = "porcelain",
+            help = "Porcelain mode. Redirect all CLI output to stderr and only output final text message to stdout"
+        )]
+        porcelain: bool,
+
         /// Scheduled job ID (used internally for scheduled executions)
         #[arg(
             long = "scheduled-job-id",
@@ -675,6 +683,7 @@ pub async fn cli() -> Result<()> {
                         scheduled_job_id: None,
                         interactive: true,
                         quiet: false,
+                        porcelain: false,
                         sub_recipes: None,
                     })
                     .await;
@@ -723,6 +732,7 @@ pub async fn cli() -> Result<()> {
             render_recipe,
             scheduled_job_id,
             quiet,
+            porcelain,
         }) => {
             let (input_config, session_settings, sub_recipes) = match (
                 instructions,
@@ -828,6 +838,7 @@ pub async fn cli() -> Result<()> {
                 scheduled_job_id,
                 interactive, // Use the interactive flag from the Run command
                 quiet,
+                porcelain,
                 sub_recipes,
             })
             .await;
@@ -947,6 +958,7 @@ pub async fn cli() -> Result<()> {
                     scheduled_job_id: None,
                     interactive: true, // Default case is always interactive
                     quiet: false,
+                    porcelain: false,
                     sub_recipes: None,
                 })
                 .await;
