@@ -362,11 +362,18 @@ export default function GoosIN() {
         const normalizedAngle = ((angle + Math.PI) % (2 * Math.PI)) - Math.PI;
         
         if (Math.abs(normalizedAngle) < FOV / 2) {
-          // Check if sprite is occluded by casting a ray to it
-          const rayDistance = castRay(player.angle + normalizedAngle, player.x, player.y);
+          // Cast multiple rays around the sprite position for better occlusion detection
+          const centerRayDistance = castRay(player.angle + normalizedAngle, player.x, player.y);
+          const leftRayDistance = castRay(player.angle + normalizedAngle - 0.02, player.x, player.y);
+          const rightRayDistance = castRay(player.angle + normalizedAngle + 0.02, player.x, player.y);
           
-          // More generous occlusion test - only hide if clearly behind a wall
-          const isVisible = sprite.distance < rayDistance - 3 || rayDistance > MAX_DEPTH - 50;
+          // Use the closest wall distance from multiple rays
+          const minWallDistance = Math.min(centerRayDistance, leftRayDistance, rightRayDistance);
+          
+          // More generous visibility test - sprite is visible if any ray shows it's not blocked
+          const isVisible = sprite.distance < minWallDistance - 2 || 
+                           sprite.distance < centerRayDistance - 5 ||
+                           minWallDistance > MAX_DEPTH - 100;
           
           if (isVisible) {
             const screenX = (normalizedAngle / (FOV / 2)) * (CANVAS_WIDTH / 2) + CANVAS_WIDTH / 2;
