@@ -84,11 +84,21 @@ export default function CircularTile({ onClick, className = '', size = 'medium' 
       console.log('Had dragged:', hasDragged);
       
       if (hasDragged) {
-        // For testing: always create floating button when dragging
-        // Later we can add back the outside detection
-        console.log('Creating floating button (test mode - always create when dragging)');
+        // Check if mouse ended outside the window for floating button creation
+        const threshold = 20; // pixels from edge
+        const isNearOrOutsideWindow = 
+          upEvent.clientX < threshold || 
+          upEvent.clientY < threshold || 
+          upEvent.clientX > (window.innerWidth - threshold) || 
+          upEvent.clientY > (window.innerHeight - threshold) ||
+          upEvent.clientX < 0 || 
+          upEvent.clientY < 0 || 
+          upEvent.clientX > window.innerWidth || 
+          upEvent.clientY > window.innerHeight;
         
-        if (window.electron?.createFloatingButton) {
+        console.log('Is near or outside window:', isNearOrOutsideWindow);
+        
+        if (isNearOrOutsideWindow && window.electron?.createFloatingButton) {
           console.log('Creating floating button...');
           try {
             // Convert the background image to base64 data URL
@@ -133,7 +143,7 @@ export default function CircularTile({ onClick, className = '', size = 'medium' 
             console.error('Error creating floating button:', error);
           }
         } else {
-          console.error('window.electron.createFloatingButton not available');
+          console.log('Drag ended inside window, not creating floating button');
         }
       } else {
         console.log('Was a click, not a drag');
