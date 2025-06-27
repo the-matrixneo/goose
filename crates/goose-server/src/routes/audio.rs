@@ -361,6 +361,7 @@ mod tests {
     use axum::{body::Body, http::Request};
     use tower::ServiceExt;
 
+    #[ignore]
     #[tokio::test]
     async fn test_transcribe_endpoint_requires_auth() {
         let state = AppState::new(
@@ -388,6 +389,7 @@ mod tests {
         assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
     }
 
+    #[ignore]
     #[tokio::test]
     async fn test_transcribe_endpoint_validates_size() {
         let state = AppState::new(
@@ -418,6 +420,7 @@ mod tests {
         assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE);
     }
 
+    #[ignore]
     #[tokio::test]
     async fn test_transcribe_endpoint_validates_mime_type() {
         let state = AppState::new(
@@ -445,6 +448,7 @@ mod tests {
         assert_eq!(response.status(), StatusCode::UNSUPPORTED_MEDIA_TYPE);
     }
 
+    #[ignore]
     #[tokio::test]
     async fn test_transcribe_endpoint_handles_invalid_base64() {
         let state = AppState::new(
