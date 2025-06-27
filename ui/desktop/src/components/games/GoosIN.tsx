@@ -453,21 +453,28 @@ export default function GoosIN() {
 
   // Draw enhanced HUD
   const drawHUD = (ctx: CanvasRenderingContext2D, player: Player) => {
-    // Health bar (top left)
+    // Game title at top center
+    ctx.fillStyle = '#6B7280';
+    ctx.font = '14px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('GOOSIN', CANVAS_WIDTH / 2, 15);
+    ctx.textAlign = 'left'; // Reset alignment
+    
+    // Health bar (top left, moved down to avoid title)
     ctx.fillStyle = '#EF4444';
-    ctx.fillRect(5, 5, (player.health / 100) * 60, 4);
+    ctx.fillRect(5, 25, (player.health / 100) * 60, 4);
     ctx.strokeStyle = '#6B7280';
-    ctx.strokeRect(5, 5, 60, 4);
+    ctx.strokeRect(5, 25, 60, 4);
     
     // Health text
     ctx.fillStyle = '#6B7280';
     ctx.font = '10px monospace';
-    ctx.fillText(`HP: ${player.health}`, 5, 20);
+    ctx.fillText(`HP: ${player.health}`, 5, 40);
     
-    // Bread counter (top right)
+    // Bread counter (top right, moved down to avoid title)
     ctx.fillStyle = '#6B7280';
     ctx.font = '12px monospace';
-    ctx.fillText(`BREAD: ${player.breadCollected}/7`, CANVAS_WIDTH - 80, 15);
+    ctx.fillText(`BREAD: ${player.breadCollected}/7`, CANVAS_WIDTH - 80, 35);
     
     // Simple crosshair
     ctx.strokeStyle = '#6B7280';
