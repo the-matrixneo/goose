@@ -487,14 +487,15 @@ pub async fn build_session(session_config: SessionBuilderConfig) -> Session {
         session.agent.override_system_prompt(override_prompt).await;
     }
 
-    // Display session information unless in quiet or porcelain mode
-    if !session_config.quiet && !session_config.porcelain {
+    // Display session information unless in quiet mode
+    if !session_config.quiet {
         output::display_session_info(
             session_config.resume,
             &provider_name,
             &model_name,
             &session_file,
             Some(&provider_for_display),
+            session_config.porcelain,
         );
     }
     session

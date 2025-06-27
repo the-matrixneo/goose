@@ -399,7 +399,7 @@ impl Session {
                 }
             };
 
-        output::display_greeting();
+        output::display_greeting(self.porcelain);
         loop {
             // Display context usage before each prompt
             self.display_context_usage().await?;
@@ -641,11 +641,11 @@ impl Session {
             }
         }
 
-        if !self.porcelain {
-            println!(
-                "\nClosing session. Recorded to {}",
-                self.session_file.display()
-            );
+        let message = format!("\nClosing session. Recorded to {}", self.session_file.display());
+        if self.porcelain {
+            eprintln!("{}", message);
+        } else {
+            println!("{}", message);
         }
         Ok(())
     }
@@ -1283,11 +1283,10 @@ impl Session {
         match self.get_metadata() {
             Ok(metadata) => {
                 let total_tokens = metadata.total_tokens.unwrap_or(0) as usize;
-
-                output::display_context_usage(total_tokens, context_limit);
+                output::display_context_usage(total_tokens, context_limit, self.porcelain);
             }
             Err(_) => {
-                output::display_context_usage(0, context_limit);
+                output::display_context_usage(0, context_limit, self.porcelain);
             }
         }
 

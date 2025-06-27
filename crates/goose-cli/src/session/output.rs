@@ -801,6 +801,7 @@ pub fn display_session_info(
     model: &str,
     session_file: &Path,
     provider_instance: Option<&Arc<dyn goose::providers::base::Provider>>,
+    porcelain: bool,
 ) {
     let start_session_msg = if resume {
         "resuming session |"
@@ -810,11 +811,11 @@ pub fn display_session_info(
         "starting session |"
     };
 
-    // Check if we have lead/worker mode
-    if let Some(provider_inst) = provider_instance {
-        if let Some(lead_worker) = provider_inst.as_lead_worker() {
+    // Build the main session info string
+    let session_info = match provider_instance.and_then(|p| p.as_lead_worker()) {
+        Some(lead_worker) => {
             let (lead_model, worker_model) = lead_worker.get_model_info();
-            println!(
+            format!(
                 "{} {} {} {} {} {} {}",
                 style(start_session_msg).dim(),
                 style("provider:").dim(),
@@ -823,56 +824,70 @@ pub fn display_session_info(
                 style(&lead_model).cyan().dim(),
                 style("worker model:").dim(),
                 style(&worker_model).cyan().dim(),
-            );
-        } else {
-            println!(
+            )
+        }
+        None => {
+            format!(
                 "{} {} {} {} {}",
                 style(start_session_msg).dim(),
                 style("provider:").dim(),
                 style(provider).cyan().dim(),
                 style("model:").dim(),
                 style(model).cyan().dim(),
-            );
+            )
         }
+    };
+    if porcelain {
+        eprintln!("{}", session_info);
     } else {
-        // Fallback to original behavior if no provider instance
-        println!(
-            "{} {} {} {} {}",
-            style(start_session_msg).dim(),
-            style("provider:").dim(),
-            style(provider).cyan().dim(),
-            style("model:").dim(),
-            style(model).cyan().dim(),
-        );
+        println!("{}", session_info);
     }
 
     if session_file.to_str() != Some("/dev/null") && session_file.to_str() != Some("NUL") {
-        println!(
+        let logging_info = format!(
             "    {} {}",
             style("logging to").dim(),
             style(session_file.display()).dim().cyan(),
         );
+        if porcelain {
+            eprintln!("{}", logging_info);
+        } else {
+            println!("{}", logging_info);
+        }
     }
 
-    println!(
+    let working_dir_info = format!(
         "    {} {}",
         style("working directory:").dim(),
         style(std::env::current_dir().unwrap().display())
             .cyan()
             .dim()
     );
+    if porcelain {
+        eprintln!("{}", working_dir_info);
+    } else {
+        println!("{}", working_dir_info);
+    }
 }
 
-pub fn display_greeting() {
-    println!("\nGoose is running! Enter your instructions, or try asking what goose can do.\n");
+pub fn display_greeting(porcelain: bool) {
+    if porcelain {
+        eprintln!("\nGoose is running! Enter your instructions, or try asking what goose can do.\n");
+    } else {
+        println!("\nGoose is running! Enter your instructions, or try asking what goose can do.\n");
+    }
 }
 
 /// Display context window usage with both current and session totals
-pub fn display_context_usage(total_tokens: usize, context_limit: usize) {
+pub fn display_context_usage(total_tokens: usize, context_limit: usize, porcelain: bool) {
     use console::style;
 
     if context_limit == 0 {
-        println!("Context: Error - context limit is zero");
+        if porcelain {
+            eprintln!("Context: Error - context limit is zero");
+        } else {
+            println!("Context: Error - context limit is zero");
+        }
         return;
     }
 
@@ -900,10 +915,17 @@ pub fn display_context_usage(total_tokens: usize, context_limit: usize) {
     };
 
     // Print the status line
-    println!(
-        "Context: {} {}% ({}/{} tokens)",
-        colored_dots, percentage, total_tokens, context_limit
-    );
+    if porcelain {
+        eprintln!(
+            "Context: {} {}% ({}/{} tokens)",
+            colored_dots, percentage, total_tokens, context_limit
+        );
+    } else {
+        println!(
+            "Context: {} {}% ({}/{} tokens)",
+            colored_dots, percentage, total_tokens, context_limit
+        );
+    }
 }
 
 pub struct McpSpinners {
