@@ -36,6 +36,32 @@ interface SaveDataUrlResponse {
   error?: string;
 }
 
+interface DesktopShortcutData {
+  title: string;
+  description: string;
+  iconPath: string;
+}
+
+interface DesktopShortcutResponse {
+  success: boolean;
+  path?: string;
+  error?: string;
+}
+
+interface FloatingButtonData {
+  buttonId: string;
+  x: number;
+  y: number;
+  size: 'small' | 'medium' | 'large';
+  imageData: string;
+}
+
+interface FloatingButtonResponse {
+  success: boolean;
+  windowId?: number;
+  error?: string;
+}
+
 const config = JSON.parse(process.argv.find((arg) => arg.startsWith('{')) || '{}');
 
 interface UpdaterEvent {
@@ -96,6 +122,11 @@ type ElectronAPI = {
   deleteTempFile: (filePath: string) => void;
   // Function to serve temp images
   getTempImage: (filePath: string) => Promise<string | null>;
+  // Desktop shortcut creation
+  createDesktopShortcut: (data: DesktopShortcutData) => Promise<DesktopShortcutResponse>;
+  // Floating button management
+  createFloatingButton: (data: FloatingButtonData) => Promise<FloatingButtonResponse>;
+  closeFloatingButton: (buttonId: string) => Promise<{ success: boolean; error?: string }>;
   // Update-related functions
   getVersion: () => string;
   checkForUpdates: () => Promise<{ updateInfo: unknown; error: string | null }>;
@@ -183,6 +214,15 @@ const electronAPI: ElectronAPI = {
   },
   getTempImage: (filePath: string): Promise<string | null> => {
     return ipcRenderer.invoke('get-temp-image', filePath);
+  },
+  createDesktopShortcut: (data: DesktopShortcutData): Promise<DesktopShortcutResponse> => {
+    return ipcRenderer.invoke('create-desktop-shortcut', data);
+  },
+  createFloatingButton: (data: FloatingButtonData): Promise<FloatingButtonResponse> => {
+    return ipcRenderer.invoke('create-floating-button', data);
+  },
+  closeFloatingButton: (buttonId: string): Promise<{ success: boolean; error?: string }> => {
+    return ipcRenderer.invoke('close-floating-button', buttonId);
   },
   getVersion: (): string => {
     return config.GOOSE_VERSION || ipcRenderer.sendSync('get-app-version') || '';
