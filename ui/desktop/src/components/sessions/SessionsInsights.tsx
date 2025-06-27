@@ -168,10 +168,8 @@ export function SessionInsights() {
               </div>
             </CardContent>
           </Card>
-        </div>
 
-        {/* GOOSIN Game */}
-        <div className="flex justify-center">
+          {/* GOOSIN Game */}
           <GoosIN />
         </div>
 
