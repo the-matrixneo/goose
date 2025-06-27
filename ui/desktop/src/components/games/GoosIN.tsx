@@ -540,7 +540,7 @@ export default function GoosIN() {
         
         {/* Game Over Overlay */}
         {gameState.gameOver && (
-          <div className="absolute inset-4 flex flex-col items-center justify-center bg-red-50 bg-opacity-95 rounded">
+          <div className="absolute inset-4 flex flex-col justify-end items-start bg-red-50 bg-opacity-95 rounded">
             <div className="text-red-600 font-mono text-sm mb-2">GAME OVER</div>
             <button
               onClick={toggleGame}
@@ -553,7 +553,7 @@ export default function GoosIN() {
         
         {/* Win Overlay */}
         {gameState.gameWon && (
-          <div className="absolute inset-4 flex flex-col items-center justify-center bg-green-50 bg-opacity-95 rounded">
+          <div className="absolute inset-4 flex flex-col justify-end items-start bg-green-50 bg-opacity-95 rounded">
             <div className="text-green-600 font-mono text-sm mb-2">VICTORY</div>
             <button
               onClick={toggleGame}
@@ -566,7 +566,7 @@ export default function GoosIN() {
         
         {/* Start Game Overlay */}
         {!gameState.isPlaying && !gameState.gameOver && !gameState.gameWon && (
-          <div className="absolute inset-4 flex flex-col items-center justify-center bg-background-default bg-opacity-90 rounded">
+          <div className="absolute inset-4 flex flex-col justify-end items-start bg-background-default bg-opacity-90 rounded">
             <div className="text-text-muted font-mono text-xs mb-2">COLLECT BREAD • AVOID BUGS</div>
             <button
               onClick={toggleGame}
