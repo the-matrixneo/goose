@@ -275,26 +275,16 @@ export default function GoosIN() {
     }
 
     // Clear canvas with light UI-matching background
-    ctx.fillStyle = '#F8F9FA'; // Light background matching UI
+    ctx.fillStyle = '#FAFAFA'; // Even lighter background
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
     
-    // Draw ceiling (light gray matching UI)
-    ctx.fillStyle = '#E5E7EB';
+    // Draw ceiling (very light gray)
+    ctx.fillStyle = '#F5F5F5';
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT / 2);
     
-    // Draw floor (medium gray with subtle dithering)
-    ctx.fillStyle = '#D1D5DB';
+    // Draw floor (clean light gray, no patterns)
+    ctx.fillStyle = '#EEEEEE';
     ctx.fillRect(0, CANVAS_HEIGHT / 2, CANVAS_WIDTH, CANVAS_HEIGHT / 2);
-    
-    // Add subtle floor dithering pattern for retro feel
-    ctx.fillStyle = '#C4C4C4';
-    for (let x = 0; x < CANVAS_WIDTH; x += 4) {
-      for (let y = CANVAS_HEIGHT / 2; y < CANVAS_HEIGHT; y += 4) {
-        if ((x + y) % 8 === 0) {
-          ctx.fillRect(x, y, 2, 2);
-        }
-      }
-    }
 
     // Cast rays for 3D rendering
     for (let i = 0; i < RAYS; i++) {
@@ -305,35 +295,18 @@ export default function GoosIN() {
       const wallHeight = (CELL_SIZE * CANVAS_HEIGHT) / distance;
       const wallTop = (CANVAS_HEIGHT - wallHeight) / 2;
       
-      // Very light gray walls matching UI theme with pixelated texture
-      const brightness = Math.max(0.5, 1 - distance / MAX_DEPTH);
+      // Very light walls with subtle depth shading only
+      const brightness = Math.max(0.7, 1 - distance / MAX_DEPTH);
       
-      // Much lighter UI-matching gray wall colors
-      const baseGray = Math.floor(200 * brightness);  // Base gray-200/300 level
+      // Much lighter wall colors - almost white
+      const baseGray = Math.floor(240 * brightness);  // Very light gray base
       
-      // Add pixelated texture to walls
       const wallSlice = i * (CANVAS_WIDTH / RAYS);
       const sliceWidth = Math.ceil(CANVAS_WIDTH / RAYS);
       
-      // Main wall color (very light gray)
+      // Clean wall color (no patterns)
       ctx.fillStyle = `rgb(${baseGray}, ${baseGray}, ${baseGray})`;
       ctx.fillRect(wallSlice, wallTop, sliceWidth, wallHeight);
-      
-      // Add vertical pixelated lines for texture (slightly darker)
-      if (i % 3 === 0) {
-        const darkerGray = Math.floor(baseGray * 0.9);
-        ctx.fillStyle = `rgb(${darkerGray}, ${darkerGray}, ${darkerGray})`;
-        ctx.fillRect(wallSlice, wallTop, 1, wallHeight);
-      }
-      
-      // Add horizontal brick-like pattern (very subtle)
-      for (let brick = wallTop; brick < wallTop + wallHeight; brick += 8) {
-        if (Math.floor(brick / 8) % 2 === Math.floor(i / 4) % 2) {
-          const lighterGray = Math.floor(Math.min(255, baseGray * 1.05));
-          ctx.fillStyle = `rgb(${lighterGray}, ${lighterGray}, ${lighterGray})`;
-          ctx.fillRect(wallSlice, brick, sliceWidth, 1);
-        }
-      }
     }
 
     // Draw sprites (bugs and bread)
@@ -483,14 +456,14 @@ export default function GoosIN() {
     }
   };
 
-  // Draw UI-matching HUD with retro pixelated feel
+  // Draw UI-matching HUD with clean design
   const drawHUD = (ctx: CanvasRenderingContext2D, player: Player) => {
     // Subtle HUD background bar
-    ctx.fillStyle = 'rgba(107, 114, 128, 0.8)'; // Semi-transparent gray
+    ctx.fillStyle = 'rgba(107, 114, 128, 0.6)'; // More transparent
     ctx.fillRect(0, CANVAS_HEIGHT - 25, CANVAS_WIDTH, 25);
     
     // Health bar with UI-matching colors
-    ctx.fillStyle = '#D1D5DB'; // Light gray background
+    ctx.fillStyle = '#E5E5E5'; // Very light gray background
     ctx.fillRect(5, CANVAS_HEIGHT - 20, 60, 6);
     ctx.fillStyle = '#EF4444'; // Red health (matching UI red)
     ctx.fillRect(5, CANVAS_HEIGHT - 20, (player.health / 100) * 60, 6);
@@ -506,7 +479,7 @@ export default function GoosIN() {
     ctx.fillText(`BREAD ${player.breadCollected}/7`, CANVAS_WIDTH - 75, CANVAS_HEIGHT - 5);
     
     // Subtle crosshair matching UI colors
-    ctx.strokeStyle = '#6B7280';
+    ctx.strokeStyle = '#9CA3AF';
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(CANVAS_WIDTH / 2 - 5, CANVAS_HEIGHT / 2);
@@ -514,12 +487,6 @@ export default function GoosIN() {
     ctx.moveTo(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 5);
     ctx.lineTo(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 5);
     ctx.stroke();
-    
-    // Subtle scanlines for retro feel (much lighter)
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.03)';
-    for (let y = 0; y < CANVAS_HEIGHT; y += 4) {
-      ctx.fillRect(0, y, CANVAS_WIDTH, 1);
-    }
   };
 
   // Start/stop/restart game
