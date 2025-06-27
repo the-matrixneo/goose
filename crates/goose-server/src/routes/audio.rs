@@ -361,9 +361,13 @@ mod tests {
     use axum::{body::Body, http::Request};
     use tower::ServiceExt;
 
-    #[ignore]
+    use crate::mock_env::env::MockEnv;
+    use serial_test::serial;
+
     #[tokio::test]
+    #[serial]
     async fn test_transcribe_endpoint_requires_auth() {
+        let _env = MockEnv::set("OPENAI_API_KEY", "test-openai-key");
         let state = AppState::new(
             Arc::new(goose::agents::Agent::new()),
             "test-secret".to_string(),
@@ -389,9 +393,10 @@ mod tests {
         assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
     }
 
-    #[ignore]
     #[tokio::test]
+    #[serial]
     async fn test_transcribe_endpoint_validates_size() {
+        let _env = MockEnv::set("OPENAI_API_KEY", "test-openai-key");
         let state = AppState::new(
             Arc::new(goose::agents::Agent::new()),
             "test-secret".to_string(),
@@ -420,9 +425,10 @@ mod tests {
         assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE);
     }
 
-    #[ignore]
     #[tokio::test]
+    #[serial]
     async fn test_transcribe_endpoint_validates_mime_type() {
+        let _env = MockEnv::set("OPENAI_API_KEY", "test-openai-key");
         let state = AppState::new(
             Arc::new(goose::agents::Agent::new()),
             "test-secret".to_string(),
@@ -448,9 +454,10 @@ mod tests {
         assert_eq!(response.status(), StatusCode::UNSUPPORTED_MEDIA_TYPE);
     }
 
-    #[ignore]
     #[tokio::test]
+    #[serial]
     async fn test_transcribe_endpoint_handles_invalid_base64() {
+        let _env = MockEnv::set("OPENAI_API_KEY", "test-openai-key");
         let state = AppState::new(
             Arc::new(goose::agents::Agent::new()),
             "test-secret".to_string(),

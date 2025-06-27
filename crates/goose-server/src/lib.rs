@@ -5,3 +5,6 @@ pub mod state;
 // Re-export commonly used items
 pub use openapi::*;
 pub use state::*;
+
+#[cfg(test)]
+mod mock_env;
