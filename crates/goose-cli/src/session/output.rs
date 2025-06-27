@@ -180,20 +180,20 @@ pub fn render_text(text: &str, color: Option<Color>, dim: bool, porcelain: bool)
 }
 
 pub fn render_text_no_newlines(text: &str, color: Option<Color>, dim: bool, porcelain: bool) {
-    let mut styled = style(text);
+    let mut styled_text = style(text);
     if dim {
-        styled = styled.dim();
+        styled_text = styled_text.dim();
     }
     if let Some(color) = color {
-        styled = styled.fg(color);
+        styled_text = styled_text.fg(color);
     } else {
-        styled = styled.green();
+        styled_text = styled_text.green();
     }
     
     if porcelain {
-        eprint!("{}", styled);
+        eprint!("{}", styled_text);
     } else {
-        print!("{}", styled);
+        print!("{}", styled_text);
     };
 }
 
@@ -335,59 +335,55 @@ pub fn render_prompts(prompts: &HashMap<String, Vec<String>>, porcelain: bool) {
 pub fn render_prompt_info(info: &PromptInfo, porcelain: bool) {
     if porcelain {
         eprintln!();
+    } else {
+        println!();
+    }
 
-        if let Some(ext) = &info.extension {
+    if let Some(ext) = &info.extension {
+        if porcelain {
             eprintln!(" {}: {}", style("Extension").green(), ext);
+        } else {
+            println!(" {}: {}", style("Extension").green(), ext);
         }
+    }
 
+    if porcelain {
         eprintln!(" Prompt: {}", style(&info.name).cyan().bold());
+    } else {
+        println!(" Prompt: {}", style(&info.name).cyan().bold());
+    }
 
-        if let Some(desc) = &info.description {
+    if let Some(desc) = &info.description {
+        if porcelain {
             eprintln!("\n {}", desc);
+        } else {
+            println!("\n {}", desc);
         }
+    }
 
-        if let Some(args) = &info.arguments {
+    if let Some(args) = &info.arguments {
+        if porcelain {
             eprintln!("\n Arguments:");
-            for arg in args {
-                let required = arg.required.unwrap_or(false);
-                let req_str = if required {
-                    style("(required)").red()
-                } else {
-                    style("(optional)").dim()
-                };
+        } else {
+            println!("\n Arguments:");
+        }
+        
+        for arg in args {
+            let required = arg.required.unwrap_or(false);
+            let req_str = if required {
+                style("(required)").red()
+            } else {
+                style("(optional)").dim()
+            };
 
+            if porcelain {
                 eprintln!(
                     "  {} {} {}",
                     style(&arg.name).yellow(),
                     req_str,
                     arg.description.as_deref().unwrap_or("")
                 );
-            }
-        }
-        eprintln!();
-    } else {
-        println!();
-
-        if let Some(ext) = &info.extension {
-            println!(" {}: {}", style("Extension").green(), ext);
-        }
-
-        println!(" Prompt: {}", style(&info.name).cyan().bold());
-
-        if let Some(desc) = &info.description {
-            println!("\n {}", desc);
-        }
-
-        if let Some(args) = &info.arguments {
-            println!("\n Arguments:");
-            for arg in args {
-                let required = arg.required.unwrap_or(false);
-                let req_str = if required {
-                    style("(required)").red()
-                } else {
-                    style("(optional)").dim()
-                };
-
+            } else {
                 println!(
                     "  {} {} {}",
                     style(&arg.name).yellow(),
@@ -396,6 +392,11 @@ pub fn render_prompt_info(info: &PromptInfo, porcelain: bool) {
                 );
             }
         }
+    }
+    
+    if porcelain {
+        eprintln!();
+    } else {
         println!();
     }
 }

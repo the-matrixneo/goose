@@ -445,7 +445,7 @@ impl Session {
                         RunMode::Plan => {
                             let mut plan_messages = self.messages.clone();
                             plan_messages.push(Message::user().with_text(&content));
-                            let reasoner = get_reasoner()?;
+                            let reasoner = get_reasoner(self.porcelain)?;
                             self.plan_with_reasoner_model(plan_messages, reasoner)
                                 .await?;
                         }
@@ -474,20 +474,26 @@ impl Session {
                     let current = output::get_theme();
                     let new_theme = match current {
                         output::Theme::Light => {
-                            if !self.porcelain {
-                                output::render_text("Switching to Dark theme", None, false, self.porcelain);
+                            if self.porcelain {
+                                eprintln!("Switching to Dark theme");
+                            } else {
+                                println!("Switching to Dark theme");
                             }
                             output::Theme::Dark
                         }
                         output::Theme::Dark => {
-                            if !self.porcelain {
-                                output::render_text("Switching to Ansi theme", None, false, self.porcelain);
+                            if self.porcelain {
+                                eprintln!("Switching to Ansi theme");
+                            } else {
+                                println!("Switching to Ansi theme");
                             }
                             output::Theme::Ansi
                         }
                         output::Theme::Ansi => {
-                            if !self.porcelain {
-                                output::render_text("Switching to Light theme", None, false, self.porcelain);
+                            if self.porcelain {
+                                eprintln!("Switching to Light theme");
+                            } else {
+                                println!("Switching to Light theme");
                             }
                             output::Theme::Light
                         }
@@ -536,7 +542,7 @@ impl Session {
                     let mut plan_messages = self.messages.clone();
                     plan_messages.push(Message::user().with_text(&message_text));
 
-                    let reasoner = get_reasoner()?;
+                    let reasoner = get_reasoner(self.porcelain)?;
                     self.plan_with_reasoner_model(plan_messages, reasoner)
                         .await?;
                 }
@@ -562,7 +568,11 @@ impl Session {
                     self.handle_prompt_command(opts).await?;
                 }
                 InputResult::Recipe(filepath_opt) => {
-                    output::render_text("Generating Recipe", Some(Color::Green), false, self.porcelain);
+                    if self.porcelain {
+                        eprintln!("{}", console::style("Generating Recipe").green());
+                    } else {
+                        println!("{}", console::style("Generating Recipe").green());
+                    }
 
                     output::show_thinking();
                     let recipe = self.agent.create_recipe(self.messages.clone()).await;
@@ -575,10 +585,19 @@ impl Session {
                             match self.save_recipe(&recipe, filepath_str) {
                                 Ok(path) => {
                                     let msg = format!("Saved recipe to {}", path.display());
-                                    output::render_text(&msg, Some(Color::Green), false, self.porcelain);
+                                    if self.porcelain {
+                                        eprintln!("{}", console::style(&msg).green());
+                                    } else {
+                                        println!("{}", console::style(&msg).green());
+                                    }
                                 }
                                 Err(e) => {
-                                    output::render_text(&e.to_string(), Some(Color::Red), false, self.porcelain);
+                                    let msg = format!("Failed to generate recipe: {:?}", e);
+                                    if self.porcelain {
+                                        eprintln!("{}", console::style(&msg).red());
+                                    } else {
+                                        println!("{}", console::style(&msg).red());
+                                    }
                                 }
                             }
                         }
@@ -607,7 +626,11 @@ impl Session {
                         };
 
                     if should_summarize {
-                        output::render_text("Summarizing conversation...", Some(Color::Yellow), false, self.porcelain);
+                        if self.porcelain {
+                            eprintln!("{}", console::style("Summarizing conversation...").yellow());
+                        } else {
+                            println!("{}", console::style("Summarizing conversation...").yellow());
+                        }
                         output::show_thinking();
 
                         // Get the provider for summarization
@@ -630,10 +653,19 @@ impl Session {
                         .await?;
 
                         output::hide_thinking();
-                        output::render_text("Conversation has been summarized.", Some(Color::Green), false, self.porcelain);
-                        output::render_text("Key information has been preserved while reducing context length.", Some(Color::Green), false, self.porcelain);
+                        if self.porcelain {
+                            eprintln!("{}", console::style("Conversation has been summarized.").green());
+                            eprintln!("{}", console::style("Key information has been preserved while reducing context length.").green());
+                        } else {
+                            println!("{}", console::style("Conversation has been summarized.").green());
+                            println!("{}", console::style("Key information has been preserved while reducing context length.").green());
+                        }
                     } else {
-                        output::render_text("Summarization cancelled.", Some(Color::Yellow), false, self.porcelain);
+                        if self.porcelain {
+                            eprintln!("{}", console::style("Summarization cancelled.").yellow());
+                        } else {
+                            println!("{}", console::style("Summarization cancelled.").yellow());
+                        }
                     }
 
                     continue;
@@ -1228,17 +1260,20 @@ impl Session {
             return;
         }
 
-        if self.porcelain {
-            // In porcelain mode, suppress session history rendering
-            return;
-        }
-
         // Print session restored message
-        println!(
-            "\n{} {} messages loaded into context.",
-            console::style("Session restored:").green().bold(),
-            console::style(self.messages.len()).green()
-        );
+        if self.porcelain {
+            eprintln!(
+                "\n{} {} messages loaded into context.",
+                console::style("Session restored:").green().bold(),
+                console::style(self.messages.len()).green()
+            );
+        } else {
+            println!(
+                "\n{} {} messages loaded into context.",
+                console::style("Session restored:").green().bold(),
+                console::style(self.messages.len()).green()
+            );
+        }
 
         // Render each message
         for message in &self.messages {
@@ -1415,7 +1450,7 @@ impl Session {
     }
 }
 
-fn get_reasoner() -> Result<Arc<dyn Provider>, anyhow::Error> {
+fn get_reasoner(porcelain: bool) -> Result<Arc<dyn Provider>, anyhow::Error> {
     use goose::model::ModelConfig;
     use goose::providers::create;
 
@@ -1425,7 +1460,11 @@ fn get_reasoner() -> Result<Arc<dyn Provider>, anyhow::Error> {
     let provider = if let Ok(provider) = config.get_param::<String>("GOOSE_PLANNER_PROVIDER") {
         provider
     } else {
-        eprintln!("WARNING: GOOSE_PLANNER_PROVIDER not found. Using default provider...");
+        if porcelain {
+            eprintln!("WARNING: GOOSE_PLANNER_PROVIDER not found. Using default provider...");
+        } else {
+            println!("WARNING: GOOSE_PLANNER_PROVIDER not found. Using default provider...");
+        }
         config
             .get_param::<String>("GOOSE_PROVIDER")
             .expect("No provider configured. Run 'goose configure' first")
@@ -1435,7 +1474,11 @@ fn get_reasoner() -> Result<Arc<dyn Provider>, anyhow::Error> {
     let model = if let Ok(model) = config.get_param::<String>("GOOSE_PLANNER_MODEL") {
         model
     } else {
-        eprintln!("WARNING: GOOSE_PLANNER_MODEL not found. Using default model...");
+        if porcelain {
+            eprintln!("WARNING: GOOSE_PLANNER_MODEL not found. Using default model...");
+        } else {
+            println!("WARNING: GOOSE_PLANNER_MODEL not found. Using default model...");
+        }
         config
             .get_param::<String>("GOOSE_MODEL")
             .expect("No model configured. Run 'goose configure' first")
