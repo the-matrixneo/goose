@@ -122,7 +122,8 @@ async fn offer_extension_debugging_help(
         std::env::temp_dir().join(format!("goose_debug_extension_{}.jsonl", extension_name));
 
     // Create the debugging session
-    let mut debug_session = Session::new(debug_agent, temp_session_file.clone(), false, false, None);
+    let mut debug_session =
+        Session::new(debug_agent, temp_session_file.clone(), false, false, None);
 
     // Process the debugging request
     println!("{}", style("Analyzing the extension failure...").yellow());
@@ -214,7 +215,10 @@ pub async fn build_session(session_config: SessionBuilderConfig) -> Session {
         .update_provider(new_provider)
         .await
         .unwrap_or_else(|e| {
-            output::render_error(&format!("Failed to initialize agent: {}", e), session_config.porcelain);
+            output::render_error(
+                &format!("Failed to initialize agent: {}", e),
+                session_config.porcelain,
+            );
             process::exit(1);
         });
 
@@ -239,15 +243,21 @@ pub async fn build_session(session_config: SessionBuilderConfig) -> Session {
             let session_file = match session::get_path(identifier) {
                 Ok(path) => path,
                 Err(e) => {
-                    output::render_error(&format!("Invalid session identifier: {}", e), session_config.porcelain);
+                    output::render_error(
+                        &format!("Invalid session identifier: {}", e),
+                        session_config.porcelain,
+                    );
                     process::exit(1);
                 }
             };
             if !session_file.exists() {
-                output::render_error(&format!(
-                    "Cannot resume session {} - no such session exists",
-                    style(session_file.display()).cyan()
-                ), session_config.porcelain);
+                output::render_error(
+                    &format!(
+                        "Cannot resume session {} - no such session exists",
+                        style(session_file.display()).cyan()
+                    ),
+                    session_config.porcelain,
+                );
                 process::exit(1);
             }
 
@@ -257,7 +267,10 @@ pub async fn build_session(session_config: SessionBuilderConfig) -> Session {
             match session::get_most_recent_session() {
                 Ok(file) => file,
                 Err(_) => {
-                    output::render_error("Cannot resume - no previous sessions found", session_config.porcelain);
+                    output::render_error(
+                        "Cannot resume - no previous sessions found",
+                        session_config.porcelain,
+                    );
                     process::exit(1);
                 }
             }
@@ -273,7 +286,10 @@ pub async fn build_session(session_config: SessionBuilderConfig) -> Session {
         match session::get_path(id) {
             Ok(path) => path,
             Err(e) => {
-                output::render_error(&format!("Failed to create session path: {}", e), session_config.porcelain);
+                output::render_error(
+                    &format!("Failed to create session path: {}", e),
+                    session_config.porcelain,
+                );
                 process::exit(1);
             }
         }
@@ -282,7 +298,10 @@ pub async fn build_session(session_config: SessionBuilderConfig) -> Session {
     if session_config.resume && !session_config.no_session {
         // Read the session metadata
         let metadata = session::read_metadata(&session_file).unwrap_or_else(|e| {
-            output::render_error(&format!("Failed to read session metadata: {}", e), session_config.porcelain);
+            output::render_error(
+                &format!("Failed to read session metadata: {}", e),
+                session_config.porcelain,
+            );
             process::exit(1);
         });
 
@@ -296,15 +315,18 @@ pub async fn build_session(session_config: SessionBuilderConfig) -> Session {
 
             if change_workdir {
                 if !metadata.working_dir.exists() {
-                    output::render_error(&format!(
-                        "Cannot switch to original working directory - {} no longer exists",
-                        style(metadata.working_dir.display()).cyan()
-                    ), session_config.porcelain);
+                    output::render_error(
+                        &format!(
+                            "Cannot switch to original working directory - {} no longer exists",
+                            style(metadata.working_dir.display()).cyan()
+                        ),
+                        session_config.porcelain,
+                    );
                 } else if let Err(e) = std::env::set_current_dir(&metadata.working_dir) {
-                    output::render_error(&format!(
-                        "Failed to switch to original working directory: {}",
-                        e
-                    ), session_config.porcelain);
+                    output::render_error(
+                        &format!("Failed to switch to original working directory: {}", e),
+                        session_config.porcelain,
+                    );
                 }
             }
         }

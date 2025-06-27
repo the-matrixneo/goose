@@ -135,9 +135,16 @@ pub fn render_message(message: &Message, debug: bool, porcelain: bool) {
         match content {
             MessageContent::Text(text) => print_markdown(&text.text, theme, porcelain),
             MessageContent::ToolRequest(req) => render_tool_request(req, theme, debug, porcelain),
-            MessageContent::ToolResponse(resp) => render_tool_response(resp, theme, debug, porcelain),
+            MessageContent::ToolResponse(resp) => {
+                render_tool_response(resp, theme, debug, porcelain)
+            }
             MessageContent::Image(image) => {
-                cli_println!(porcelain, "Image: [data: {}, type: {}]", image.data, image.mime_type);
+                cli_println!(
+                    porcelain,
+                    "Image: [data: {}, type: {}]",
+                    image.data,
+                    image.mime_type
+                );
             }
             MessageContent::Thinking(thinking) => {
                 if std::env::var("GOOSE_CLI_SHOW_THINKING").is_ok() {
@@ -150,7 +157,10 @@ pub fn render_message(message: &Message, debug: bool, porcelain: bool) {
                 print_markdown("Thinking was redacted", theme, porcelain);
             }
             _ => {
-                cli_println!(porcelain, "WARNING: Message content type could not be rendered");
+                cli_println!(
+                    porcelain,
+                    "WARNING: Message content type could not be rendered"
+                );
             }
         }
     }
@@ -171,12 +181,8 @@ pub fn render_text_no_newlines(text: &str, color: Option<Color>, dim: bool, porc
     } else {
         styled_text = styled_text.green();
     }
-    
-    if porcelain {
-        eprint!("{}", styled_text);
-    } else {
-        print!("{}", styled_text);
-    };
+
+    cli_println!(porcelain, "{}", styled_text);
 }
 
 pub fn render_enter_plan_mode(porcelain: bool) {
@@ -201,7 +207,11 @@ pub fn render_act_on_plan(porcelain: bool) {
 }
 
 pub fn render_exit_plan_mode(porcelain: bool) {
-    cli_println!(porcelain, "\n{}\n", style("Exiting plan mode.").green().bold());
+    cli_println!(
+        porcelain,
+        "\n{}\n",
+        style("Exiting plan mode.").green().bold()
+    );
 }
 
 pub fn goose_mode_message(text: &str, porcelain: bool) {
@@ -256,7 +266,12 @@ fn render_tool_response(resp: &ToolResponse, theme: Theme, debug: bool, porcelai
 }
 
 pub fn render_error(message: &str, porcelain: bool) {
-    cli_println!(porcelain, "\n  {} {}\n", style("error:").red().bold(), message);
+    cli_println!(
+        porcelain,
+        "\n  {} {}\n",
+        style("error:").red().bold(),
+        message
+    );
 }
 
 pub fn render_prompts(prompts: &HashMap<String, Vec<String>>, porcelain: bool) {
@@ -285,7 +300,7 @@ pub fn render_prompt_info(info: &PromptInfo, porcelain: bool) {
 
     if let Some(args) = &info.arguments {
         cli_println!(porcelain, "\n Arguments:");
-        
+
         for arg in args {
             let required = arg.required.unwrap_or(false);
             let req_str = if required {
@@ -303,7 +318,7 @@ pub fn render_prompt_info(info: &PromptInfo, porcelain: bool) {
             );
         }
     }
-    
+
     cli_println!(porcelain, "");
 }
 
@@ -388,7 +403,12 @@ fn render_shell_request(call: &ToolCall, debug: bool, porcelain: bool) {
 
     match call.arguments.get("command") {
         Some(Value::String(s)) => {
-            cli_println!(porcelain, "{}: {}", style("command").dim(), style(s).green());
+            cli_println!(
+                porcelain,
+                "{}: {}",
+                style("command").dim(),
+                style(s).green()
+            );
         }
         _ => print_params(&call.arguments, 0, debug, porcelain),
     }
@@ -480,19 +500,49 @@ fn print_params(value: &Value, depth: usize, debug: bool, porcelain: bool) {
                     }
                     Value::String(s) => {
                         if !debug && s.len() > get_tool_params_max_length() {
-                            cli_println!(porcelain, "{}{}: {}", indent, style(key).dim(), style("...").dim());
+                            cli_println!(
+                                porcelain,
+                                "{}{}: {}",
+                                indent,
+                                style(key).dim(),
+                                style("...").dim()
+                            );
                         } else {
-                            cli_println!(porcelain, "{}{}: {}", indent, style(key).dim(), style(s).green());
+                            cli_println!(
+                                porcelain,
+                                "{}{}: {}",
+                                indent,
+                                style(key).dim(),
+                                style(s).green()
+                            );
                         }
                     }
                     Value::Number(n) => {
-                        cli_println!(porcelain, "{}{}: {}", indent, style(key).dim(), style(n).blue());
+                        cli_println!(
+                            porcelain,
+                            "{}{}: {}",
+                            indent,
+                            style(key).dim(),
+                            style(n).blue()
+                        );
                     }
                     Value::Bool(b) => {
-                        cli_println!(porcelain, "{}{}: {}", indent, style(key).dim(), style(b).blue());
+                        cli_println!(
+                            porcelain,
+                            "{}{}: {}",
+                            indent,
+                            style(key).dim(),
+                            style(b).blue()
+                        );
                     }
                     Value::Null => {
-                        cli_println!(porcelain, "{}{}: {}", indent, style(key).dim(), style("null").dim());
+                        cli_println!(
+                            porcelain,
+                            "{}{}: {}",
+                            indent,
+                            style(key).dim(),
+                            style("null").dim()
+                        );
                     }
                 }
             }
@@ -641,7 +691,10 @@ pub fn display_session_info(
 }
 
 pub fn display_greeting(porcelain: bool) {
-    cli_println!(porcelain, "\nGoose is running! Enter your instructions, or try asking what goose can do.\n");
+    cli_println!(
+        porcelain,
+        "\nGoose is running! Enter your instructions, or try asking what goose can do.\n"
+    );
 }
 
 /// Display context window usage with both current and session totals
@@ -680,7 +733,10 @@ pub fn display_context_usage(total_tokens: usize, context_limit: usize, porcelai
     cli_println!(
         porcelain,
         "Context: {} {}% ({}/{} tokens)",
-        colored_dots, percentage, total_tokens, context_limit
+        colored_dots,
+        percentage,
+        total_tokens,
+        context_limit
     );
 }
 
@@ -806,4 +862,3 @@ mod tests {
         );
     }
 }
-
