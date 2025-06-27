@@ -146,16 +146,16 @@ export default function GoosIN() {
       newPlayer.angle += rotSpeed;
     }
 
-    // Clear canvas with classic Doom gray
-    ctx.fillStyle = '#5A5A5A';
+    // Clear canvas with light background
+    ctx.fillStyle = '#F8F9FA';
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
     
-    // Draw ceiling (darker gray)
-    ctx.fillStyle = '#404040';
+    // Draw ceiling (light gray)
+    ctx.fillStyle = '#E9ECEF';
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT / 2);
     
-    // Draw floor (brown)
-    ctx.fillStyle = '#8B4513';
+    // Draw floor (subtle beige)
+    ctx.fillStyle = '#F5F5F5';
     ctx.fillRect(0, CANVAS_HEIGHT / 2, CANVAS_WIDTH, CANVAS_HEIGHT / 2);
 
     // Cast rays for 3D rendering
@@ -167,11 +167,12 @@ export default function GoosIN() {
       const wallHeight = (CELL_SIZE * CANVAS_HEIGHT) / distance;
       const wallTop = (CANVAS_HEIGHT - wallHeight) / 2;
       
-      // Wall color based on distance (darker = further)
-      const brightness = Math.max(0.2, 1 - distance / MAX_DEPTH);
-      const wallColor = Math.floor(139 * brightness); // Brown walls
+      // Wall color based on distance (lighter theme)
+      const brightness = Math.max(0.4, 1 - distance / MAX_DEPTH);
+      const baseColor = 180; // Light gray base
+      const wallColor = Math.floor(baseColor * brightness);
       
-      ctx.fillStyle = `rgb(${wallColor}, ${Math.floor(wallColor * 0.7)}, ${Math.floor(wallColor * 0.3)})`;
+      ctx.fillStyle = `rgb(${wallColor}, ${wallColor}, ${wallColor})`;
       ctx.fillRect(i * (CANVAS_WIDTH / RAYS), wallTop, CANVAS_WIDTH / RAYS + 1, wallHeight);
     }
 
@@ -187,37 +188,16 @@ export default function GoosIN() {
     animationRef.current = requestAnimationFrame(gameLoop);
   }, [gameState]);
 
-  // Draw classic Doom-style HUD
+  // Draw minimalist HUD
   const drawHUD = (ctx: CanvasRenderingContext2D, player: Player) => {
-    // HUD background
-    ctx.fillStyle = '#2F2F2F';
-    ctx.fillRect(0, CANVAS_HEIGHT - 40, CANVAS_WIDTH, 40);
-    
-    // Health bar
-    ctx.fillStyle = '#FF0000';
-    ctx.fillRect(10, CANVAS_HEIGHT - 30, 2, 20);
-    ctx.fillStyle = '#00FF00';
-    ctx.fillRect(10, CANVAS_HEIGHT - 30, (player.health / 100) * 60, 8);
-    
-    // Ammo counter
-    ctx.fillStyle = '#FFFF00';
-    ctx.fillRect(10, CANVAS_HEIGHT - 20, 2, 10);
-    ctx.fillRect(10, CANVAS_HEIGHT - 20, (player.ammo / 50) * 60, 4);
-    
-    // Text
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = '8px monospace';
-    ctx.fillText(`HP: ${player.health}`, 80, CANVAS_HEIGHT - 22);
-    ctx.fillText(`AMMO: ${player.ammo}`, 80, CANVAS_HEIGHT - 12);
-    
-    // Crosshair
-    ctx.strokeStyle = '#FFFFFF';
+    // Simple crosshair
+    ctx.strokeStyle = '#6B7280';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(CANVAS_WIDTH / 2 - 5, CANVAS_HEIGHT / 2);
-    ctx.lineTo(CANVAS_WIDTH / 2 + 5, CANVAS_HEIGHT / 2);
-    ctx.moveTo(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 5);
-    ctx.lineTo(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 5);
+    ctx.moveTo(CANVAS_WIDTH / 2 - 4, CANVAS_HEIGHT / 2);
+    ctx.lineTo(CANVAS_WIDTH / 2 + 4, CANVAS_HEIGHT / 2);
+    ctx.moveTo(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 4);
+    ctx.lineTo(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 4);
     ctx.stroke();
   };
 
@@ -253,36 +233,27 @@ export default function GoosIN() {
   }, [gameState.isPlaying, gameLoop, handleKeyDown, handleKeyUp]);
 
   return (
-    <Card className="w-full sm:w-auto animate-in fade-in slide-in-from-right-8 duration-500 rounded-2xl min-w-[340px] max-w-[380px] bg-gray-900 border-gray-700">
+    <Card className="w-full sm:w-auto animate-in fade-in slide-in-from-right-8 duration-500 rounded-2xl min-w-[340px] max-w-[380px]">
       <CardContent className="flex flex-col items-center p-4">
-        <div className="mb-2">
-          <h3 className="text-green-400 font-mono text-lg font-bold tracking-wider">
-            🦆 GOOSIN
-          </h3>
-          <p className="text-gray-400 text-xs font-mono text-center">
-            Classic FPS • WASD + Arrows
-          </p>
-        </div>
-        
-        <div className="relative border-2 border-gray-600 rounded">
+        <div className="relative border border-border-subtle rounded">
           <canvas
             ref={canvasRef}
             width={CANVAS_WIDTH}
             height={CANVAS_HEIGHT}
-            className="block bg-gray-800"
+            className="block bg-background-muted"
             style={{
               imageRendering: 'pixelated',
-              filter: gameState.isPlaying ? 'none' : 'brightness(0.5)',
+              filter: gameState.isPlaying ? 'none' : 'brightness(0.8)',
             }}
           />
           
           {!gameState.isPlaying && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-75 rounded">
+            <div className="absolute inset-0 flex items-center justify-center bg-background-default bg-opacity-90 rounded">
               <button
                 onClick={toggleGame}
-                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-mono text-sm rounded border-2 border-red-400 transition-colors"
+                className="px-3 py-2 bg-background-accent hover:bg-background-accent/80 text-text-on-accent font-mono text-sm rounded border border-border-subtle transition-colors shadow-sm"
               >
-                ▶ START GAME
+                ▶ Play
               </button>
             </div>
           )}
@@ -291,17 +262,11 @@ export default function GoosIN() {
         {gameState.isPlaying && (
           <button
             onClick={toggleGame}
-            className="mt-2 px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white font-mono text-xs rounded transition-colors"
+            className="mt-2 px-2 py-1 bg-background-subtle hover:bg-background-muted text-text-muted font-mono text-xs rounded transition-colors"
           >
-            ⏸ PAUSE
+            ⏸ Pause
           </button>
         )}
-        
-        <div className="mt-2 text-center">
-          <p className="text-gray-500 text-xs font-mono">
-            Navigate the maze • Avoid the walls
-          </p>
-        </div>
       </CardContent>
     </Card>
   );
