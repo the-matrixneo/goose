@@ -323,7 +323,7 @@ export default function GoosIN() {
 
   // Draw sprites in 3D space
   const drawSprites = (ctx: CanvasRenderingContext2D, player: Player, bugs: Bug[], bread: Bread[]) => {
-    // Draw bugs
+    // Draw bugs as scary pixelated creatures
     bugs.forEach(bug => {
       const dx = bug.x - player.x;
       const dy = bug.y - player.y;
@@ -337,17 +337,36 @@ export default function GoosIN() {
           const screenX = (normalizedAngle / (FOV / 2)) * (CANVAS_WIDTH / 2) + CANVAS_WIDTH / 2;
           const spriteHeight = (CELL_SIZE / 2 * CANVAS_HEIGHT) / distance;
           const spriteY = CANVAS_HEIGHT / 2 - spriteHeight / 2;
+          const spriteWidth = spriteHeight * 0.8;
           
-          // Draw bug as red circle
+          // Draw scary bug creature (pixelated style)
+          const pixelSize = Math.max(1, spriteHeight / 16);
+          
+          // Body (dark red/brown)
+          ctx.fillStyle = '#7F1D1D';
+          ctx.fillRect(screenX - spriteWidth/2, spriteY + spriteHeight*0.3, spriteWidth, spriteHeight*0.5);
+          
+          // Head (darker)
+          ctx.fillStyle = '#450A0A';
+          ctx.fillRect(screenX - spriteWidth/3, spriteY, spriteWidth*0.66, spriteHeight*0.4);
+          
+          // Eyes (glowing red)
           ctx.fillStyle = '#DC2626';
-          ctx.beginPath();
-          ctx.arc(screenX, spriteY + spriteHeight / 2, spriteHeight / 4, 0, Math.PI * 2);
-          ctx.fill();
+          const eyeSize = Math.max(1, pixelSize * 2);
+          ctx.fillRect(screenX - spriteWidth/4, spriteY + spriteHeight*0.1, eyeSize, eyeSize);
+          ctx.fillRect(screenX + spriteWidth/6, spriteY + spriteHeight*0.1, eyeSize, eyeSize);
+          
+          // Legs/appendages
+          ctx.fillStyle = '#7F1D1D';
+          for (let i = 0; i < 4; i++) {
+            const legX = screenX - spriteWidth/2 + (i * spriteWidth/4);
+            ctx.fillRect(legX, spriteY + spriteHeight*0.8, pixelSize, spriteHeight*0.2);
+          }
         }
       }
     });
     
-    // Draw bread
+    // Draw bread as pixelated slices
     bread.forEach(breadSlice => {
       if (!breadSlice.collected) {
         const dx = breadSlice.x - player.x;
@@ -362,10 +381,31 @@ export default function GoosIN() {
             const screenX = (normalizedAngle / (FOV / 2)) * (CANVAS_WIDTH / 2) + CANVAS_WIDTH / 2;
             const spriteHeight = (CELL_SIZE / 3 * CANVAS_HEIGHT) / distance;
             const spriteY = CANVAS_HEIGHT / 2 - spriteHeight / 2;
+            const spriteWidth = spriteHeight * 0.7;
             
-            // Draw bread as golden rectangle
+            // Draw pixelated bread slice
+            const pixelSize = Math.max(1, spriteHeight / 12);
+            
+            // Bread crust (dark brown)
+            ctx.fillStyle = '#92400E';
+            ctx.fillRect(screenX - spriteWidth/2, spriteY, spriteWidth, spriteHeight);
+            
+            // Bread interior (light brown/beige)
+            ctx.fillStyle = '#FDE68A';
+            ctx.fillRect(
+              screenX - spriteWidth/2 + pixelSize, 
+              spriteY + pixelSize, 
+              spriteWidth - pixelSize*2, 
+              spriteHeight - pixelSize*2
+            );
+            
+            // Bread texture (darker spots)
             ctx.fillStyle = '#F59E0B';
-            ctx.fillRect(screenX - spriteHeight / 4, spriteY, spriteHeight / 2, spriteHeight);
+            for (let i = 0; i < 3; i++) {
+              const spotX = screenX - spriteWidth/4 + (i * spriteWidth/6);
+              const spotY = spriteY + spriteHeight/3 + (i % 2) * spriteHeight/4;
+              ctx.fillRect(spotX, spotY, pixelSize, pixelSize);
+            }
           }
         }
       }
@@ -380,10 +420,15 @@ export default function GoosIN() {
     ctx.strokeStyle = '#6B7280';
     ctx.strokeRect(5, 5, 60, 4);
     
+    // Health text
+    ctx.fillStyle = '#6B7280';
+    ctx.font = '10px monospace';
+    ctx.fillText(`HP: ${player.health}`, 5, 20);
+    
     // Bread counter (top right)
     ctx.fillStyle = '#6B7280';
     ctx.font = '12px monospace';
-    ctx.fillText(`🍞 ${player.breadCollected}/7`, CANVAS_WIDTH - 60, 15);
+    ctx.fillText(`BREAD: ${player.breadCollected}/7`, CANVAS_WIDTH - 80, 15);
     
     // Simple crosshair
     ctx.strokeStyle = '#6B7280';
@@ -466,12 +511,12 @@ export default function GoosIN() {
         {/* Game Over Overlay */}
         {gameState.gameOver && (
           <div className="absolute inset-4 flex flex-col items-center justify-center bg-red-50 bg-opacity-95 rounded">
-            <div className="text-red-600 font-mono text-sm mb-2">💀 Game Over</div>
+            <div className="text-red-600 font-mono text-sm mb-2">GAME OVER</div>
             <button
               onClick={toggleGame}
               className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white font-mono text-sm rounded border border-red-400 transition-colors shadow-sm"
             >
-              🔄 Try Again
+              TRY AGAIN
             </button>
           </div>
         )}
@@ -479,12 +524,12 @@ export default function GoosIN() {
         {/* Win Overlay */}
         {gameState.gameWon && (
           <div className="absolute inset-4 flex flex-col items-center justify-center bg-green-50 bg-opacity-95 rounded">
-            <div className="text-green-600 font-mono text-sm mb-2">🎉 You Won!</div>
+            <div className="text-green-600 font-mono text-sm mb-2">VICTORY</div>
             <button
               onClick={toggleGame}
               className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white font-mono text-sm rounded border border-green-400 transition-colors shadow-sm"
             >
-              🔄 Play Again
+              PLAY AGAIN
             </button>
           </div>
         )}
@@ -492,12 +537,12 @@ export default function GoosIN() {
         {/* Start Game Overlay */}
         {!gameState.isPlaying && !gameState.gameOver && !gameState.gameWon && (
           <div className="absolute inset-4 flex flex-col items-center justify-center bg-background-default bg-opacity-90 rounded">
-            <div className="text-text-muted font-mono text-xs mb-2">Collect 🍞 • Avoid 🐛</div>
+            <div className="text-text-muted font-mono text-xs mb-2">COLLECT BREAD • AVOID BUGS</div>
             <button
               onClick={toggleGame}
               className="px-3 py-2 bg-background-accent hover:bg-background-accent/80 text-text-on-accent font-mono text-sm rounded border border-border-subtle transition-colors shadow-sm"
             >
-              ▶ Play
+              PLAY
             </button>
           </div>
         )}
