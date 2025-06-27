@@ -456,16 +456,16 @@ impl Session {
                     save_history(&mut editor);
 
                     match self.add_extension(cmd.clone()).await {
-                        Ok(_) => output::render_extension_success(&cmd),
-                        Err(e) => output::render_extension_error(&cmd, &e.to_string()),
+                        Ok(_) => output::render_extension_success(&cmd, self.porcelain),
+                        Err(e) => output::render_extension_error(&cmd, &e.to_string(), self.porcelain),
                     }
                 }
                 input::InputResult::AddBuiltin(names) => {
                     save_history(&mut editor);
 
                     match self.add_builtin(names.clone()).await {
-                        Ok(_) => output::render_builtin_success(&names),
-                        Err(e) => output::render_builtin_error(&names, &e.to_string()),
+                        Ok(_) => output::render_builtin_success(&names, self.porcelain),
+                        Err(e) => output::render_builtin_error(&names, &e.to_string(), self.porcelain),
                     }
                 }
                 input::InputResult::ToggleTheme => {
@@ -475,19 +475,19 @@ impl Session {
                     let new_theme = match current {
                         output::Theme::Light => {
                             if !self.porcelain {
-                                println!("Switching to Dark theme");
+                                output::render_text("Switching to Dark theme", None, false, self.porcelain);
                             }
                             output::Theme::Dark
                         }
                         output::Theme::Dark => {
                             if !self.porcelain {
-                                println!("Switching to Ansi theme");
+                                output::render_text("Switching to Ansi theme", None, false, self.porcelain);
                             }
                             output::Theme::Ansi
                         }
                         output::Theme::Ansi => {
                             if !self.porcelain {
-                                println!("Switching to Light theme");
+                                output::render_text("Switching to Light theme", None, false, self.porcelain);
                             }
                             output::Theme::Light
                         }
@@ -500,7 +500,7 @@ impl Session {
                     save_history(&mut editor);
 
                     match self.list_prompts(extension).await {
-                        Ok(prompts) => output::render_prompts(&prompts),
+                        Ok(prompts) => output::render_prompts(&prompts, self.porcelain),
                         Err(e) => output::render_error(&e.to_string(), self.porcelain),
                     }
                 }
@@ -522,12 +522,12 @@ impl Session {
                     config
                         .set_param("GOOSE_MODE", Value::String(mode.to_string()))
                         .unwrap();
-                    output::goose_mode_message(&format!("Goose mode set to '{}'", mode));
+                    output::goose_mode_message(&format!("Goose mode set to '{}'", mode), self.porcelain);
                     continue;
                 }
                 input::InputResult::Plan(options) => {
                     self.run_mode = RunMode::Plan;
-                    output::render_enter_plan_mode();
+                    output::render_enter_plan_mode(self.porcelain);
 
                     let message_text = options.message_text;
                     if message_text.is_empty() {
@@ -542,7 +542,7 @@ impl Session {
                 }
                 input::InputResult::EndPlan => {
                     self.run_mode = RunMode::Normal;
-                    output::render_exit_plan_mode();
+                    output::render_exit_plan_mode(self.porcelain);
                     continue;
                 }
                 input::InputResult::Clear => {
@@ -562,7 +562,7 @@ impl Session {
                     self.handle_prompt_command(opts).await?;
                 }
                 InputResult::Recipe(filepath_opt) => {
-                    println!("{}", console::style("Generating Recipe").green());
+                    output::render_text("Generating Recipe", Some(Color::Green), false, self.porcelain);
 
                     output::show_thinking();
                     let recipe = self.agent.create_recipe(self.messages.clone()).await;
@@ -573,22 +573,18 @@ impl Session {
                             // Use provided filepath or default
                             let filepath_str = filepath_opt.as_deref().unwrap_or("recipe.yaml");
                             match self.save_recipe(&recipe, filepath_str) {
-                                Ok(path) => println!(
-                                    "{}",
-                                    console::style(format!("Saved recipe to {}", path.display()))
-                                        .green()
-                                ),
+                                Ok(path) => {
+                                    let msg = format!("Saved recipe to {}", path.display());
+                                    output::render_text(&msg, Some(Color::Green), false, self.porcelain);
+                                }
                                 Err(e) => {
-                                    println!("{}", console::style(e).red());
+                                    output::render_text(&e.to_string(), Some(Color::Red), false, self.porcelain);
                                 }
                             }
                         }
                         Err(e) => {
-                            println!(
-                                "{}: {:?}",
-                                console::style("Failed to generate recipe").red(),
-                                e
-                            );
+                            let msg = format!("Failed to generate recipe: {:?}", e);
+                            output::render_text(&msg, Some(Color::Red), false, self.porcelain);
                         }
                     }
 
@@ -611,7 +607,7 @@ impl Session {
                         };
 
                     if should_summarize {
-                        println!("{}", console::style("Summarizing conversation...").yellow());
+                        output::render_text("Summarizing conversation...", Some(Color::Yellow), false, self.porcelain);
                         output::show_thinking();
 
                         // Get the provider for summarization
@@ -634,19 +630,10 @@ impl Session {
                         .await?;
 
                         output::hide_thinking();
-                        println!(
-                            "{}",
-                            console::style("Conversation has been summarized.").green()
-                        );
-                        println!(
-                            "{}",
-                            console::style(
-                                "Key information has been preserved while reducing context length."
-                            )
-                            .green()
-                        );
+                        output::render_text("Conversation has been summarized.", Some(Color::Green), false, self.porcelain);
+                        output::render_text("Key information has been preserved while reducing context length.", Some(Color::Green), false, self.porcelain);
                     } else {
-                        println!("{}", console::style("Summarization cancelled.").yellow());
+                        output::render_text("Summarization cancelled.", Some(Color::Yellow), false, self.porcelain);
                     }
 
                     continue;
@@ -679,7 +666,11 @@ impl Session {
 
         match planner_response_type {
             PlannerResponseType::Plan => {
-                println!();
+                if self.porcelain {
+                    eprintln!();
+                } else {
+                    println!();
+                }
                 let should_act = match cliclack::confirm(
                     "Do you want to clear message history & act on this plan?",
                 )
@@ -696,7 +687,7 @@ impl Session {
                     }
                 };
                 if should_act {
-                    output::render_act_on_plan();
+                    output::render_act_on_plan(self.porcelain);
                     self.run_mode = RunMode::Normal;
                     // set goose mode: auto if that isn't already the case
                     let config = Config::global();
@@ -1255,10 +1246,17 @@ impl Session {
         }
 
         // Add a visual separator after restored messages
-        println!(
-            "\n{}\n",
-            console::style("──────── New Messages ────────").dim()
-        );
+        if self.porcelain {
+            eprintln!(
+                "\n{}\n",
+                console::style("──────── New Messages ────────").dim()
+            );
+        } else {
+            println!(
+                "\n{}\n",
+                console::style("──────── New Messages ────────").dim()
+            );
+        }
     }
 
     /// Get the session metadata
@@ -1306,7 +1304,7 @@ impl Session {
 
         if opts.info {
             match self.get_prompt_info(&opts.name).await? {
-                Some(info) => output::render_prompt_info(&info),
+                Some(info) => output::render_prompt_info(&info, self.porcelain),
                 None => output::render_error(&format!("Prompt '{}' not found", opts.name), self.porcelain),
             }
         } else {
@@ -1428,7 +1426,7 @@ fn get_reasoner() -> Result<Arc<dyn Provider>, anyhow::Error> {
     let provider = if let Ok(provider) = config.get_param::<String>("GOOSE_PLANNER_PROVIDER") {
         provider
     } else {
-        println!("WARNING: GOOSE_PLANNER_PROVIDER not found. Using default provider...");
+        eprintln!("WARNING: GOOSE_PLANNER_PROVIDER not found. Using default provider...");
         config
             .get_param::<String>("GOOSE_PROVIDER")
             .expect("No provider configured. Run 'goose configure' first")
@@ -1438,7 +1436,7 @@ fn get_reasoner() -> Result<Arc<dyn Provider>, anyhow::Error> {
     let model = if let Ok(model) = config.get_param::<String>("GOOSE_PLANNER_MODEL") {
         model
     } else {
-        println!("WARNING: GOOSE_PLANNER_MODEL not found. Using default model...");
+        eprintln!("WARNING: GOOSE_PLANNER_MODEL not found. Using default model...");
         config
             .get_param::<String>("GOOSE_MODEL")
             .expect("No model configured. Run 'goose configure' first")

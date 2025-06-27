@@ -197,31 +197,58 @@ pub fn render_text_no_newlines(text: &str, color: Option<Color>, dim: bool, porc
     };
 }
 
-pub fn render_enter_plan_mode() {
-    println!(
-        "\n{} {}\n",
-        style("Entering plan mode.").green().bold(),
-        style("You can provide instructions to create a plan and then act on it. To exit early, type /endplan")
-            .green()
-            .dim()
-    );
+pub fn render_enter_plan_mode(porcelain: bool) {
+    if porcelain {
+        eprintln!(
+            "\n{} {}\n",
+            style("Entering plan mode.").green().bold(),
+            style("You can provide instructions to create a plan and then act on it. To exit early, type /endplan")
+                .green()
+                .dim()
+        );
+    } else {
+        println!(
+            "\n{} {}\n",
+            style("Entering plan mode.").green().bold(),
+            style("You can provide instructions to create a plan and then act on it. To exit early, type /endplan")
+                .green()
+                .dim()
+        );
+    }
 }
 
-pub fn render_act_on_plan() {
-    println!(
-        "\n{}\n",
-        style("Exiting plan mode and acting on the above plan")
-            .green()
-            .bold(),
-    );
+pub fn render_act_on_plan(porcelain: bool) {
+    if porcelain {
+        eprintln!(
+            "\n{}\n",
+            style("Exiting plan mode and acting on the above plan")
+                .green()
+                .bold(),
+        );
+    } else {
+        println!(
+            "\n{}\n",
+            style("Exiting plan mode and acting on the above plan")
+                .green()
+                .bold(),
+        );
+    }
 }
 
-pub fn render_exit_plan_mode() {
-    println!("\n{}\n", style("Exiting plan mode.").green().bold());
+pub fn render_exit_plan_mode(porcelain: bool) {
+    if porcelain {
+        eprintln!("\n{}\n", style("Exiting plan mode.").green().bold());
+    } else {
+        println!("\n{}\n", style("Exiting plan mode.").green().bold());
+    }
 }
 
-pub fn goose_mode_message(text: &str) {
-    println!("\n{}", style(text).yellow(),);
+pub fn goose_mode_message(text: &str, porcelain: bool) {
+    if porcelain {
+        eprintln!("\n{}", style(text).yellow(),);
+    } else {
+        println!("\n{}", style(text).yellow(),);
+    }
 }
 
 fn render_tool_request(req: &ToolRequest, theme: Theme, debug: bool, porcelain: bool) {
@@ -283,95 +310,186 @@ pub fn render_error(message: &str, porcelain: bool) {
     }
 }
 
-pub fn render_prompts(prompts: &HashMap<String, Vec<String>>) {
-    println!();
-    for (extension, prompts) in prompts {
-        println!(" {}", style(extension).green());
-        for prompt in prompts {
-            println!("  - {}", style(prompt).cyan());
+pub fn render_prompts(prompts: &HashMap<String, Vec<String>>, porcelain: bool) {
+    if porcelain {
+        eprintln!();
+        for (extension, prompts) in prompts {
+            eprintln!(" {}", style(extension).green());
+            for prompt in prompts {
+                eprintln!("  - {}", style(prompt).cyan());
+            }
         }
-    }
-    println!();
-}
-
-pub fn render_prompt_info(info: &PromptInfo) {
-    println!();
-
-    if let Some(ext) = &info.extension {
-        println!(" {}: {}", style("Extension").green(), ext);
-    }
-
-    println!(" Prompt: {}", style(&info.name).cyan().bold());
-
-    if let Some(desc) = &info.description {
-        println!("\n {}", desc);
-    }
-
-    if let Some(args) = &info.arguments {
-        println!("\n Arguments:");
-        for arg in args {
-            let required = arg.required.unwrap_or(false);
-            let req_str = if required {
-                style("(required)").red()
-            } else {
-                style("(optional)").dim()
-            };
-
-            println!(
-                "  {} {} {}",
-                style(&arg.name).yellow(),
-                req_str,
-                arg.description.as_deref().unwrap_or("")
-            );
+        eprintln!();
+    } else {
+        println!();
+        for (extension, prompts) in prompts {
+            println!(" {}", style(extension).green());
+            for prompt in prompts {
+                println!("  - {}", style(prompt).cyan());
+            }
         }
+        println!();
     }
-    println!();
 }
 
-pub fn render_extension_success(name: &str) {
-    println!();
-    println!(
-        "  {} extension `{}`",
-        style("added").green(),
-        style(name).cyan(),
-    );
-    println!();
+pub fn render_prompt_info(info: &PromptInfo, porcelain: bool) {
+    if porcelain {
+        eprintln!();
+
+        if let Some(ext) = &info.extension {
+            eprintln!(" {}: {}", style("Extension").green(), ext);
+        }
+
+        eprintln!(" Prompt: {}", style(&info.name).cyan().bold());
+
+        if let Some(desc) = &info.description {
+            eprintln!("\n {}", desc);
+        }
+
+        if let Some(args) = &info.arguments {
+            eprintln!("\n Arguments:");
+            for arg in args {
+                let required = arg.required.unwrap_or(false);
+                let req_str = if required {
+                    style("(required)").red()
+                } else {
+                    style("(optional)").dim()
+                };
+
+                eprintln!(
+                    "  {} {} {}",
+                    style(&arg.name).yellow(),
+                    req_str,
+                    arg.description.as_deref().unwrap_or("")
+                );
+            }
+        }
+        eprintln!();
+    } else {
+        println!();
+
+        if let Some(ext) = &info.extension {
+            println!(" {}: {}", style("Extension").green(), ext);
+        }
+
+        println!(" Prompt: {}", style(&info.name).cyan().bold());
+
+        if let Some(desc) = &info.description {
+            println!("\n {}", desc);
+        }
+
+        if let Some(args) = &info.arguments {
+            println!("\n Arguments:");
+            for arg in args {
+                let required = arg.required.unwrap_or(false);
+                let req_str = if required {
+                    style("(required)").red()
+                } else {
+                    style("(optional)").dim()
+                };
+
+                println!(
+                    "  {} {} {}",
+                    style(&arg.name).yellow(),
+                    req_str,
+                    arg.description.as_deref().unwrap_or("")
+                );
+            }
+        }
+        println!();
+    }
 }
 
-pub fn render_extension_error(name: &str, error: &str) {
-    println!();
-    println!(
-        "  {} to add extension {}",
-        style("failed").red(),
-        style(name).red()
-    );
-    println!();
-    println!("{}", style(error).dim());
-    println!();
+pub fn render_extension_success(name: &str, porcelain: bool) {
+    if porcelain {
+        eprintln!();
+        eprintln!(
+            "  {} extension `{}`",
+            style("added").green(),
+            style(name).cyan(),
+        );
+        eprintln!();
+    } else {
+        println!();
+        println!(
+            "  {} extension `{}`",
+            style("added").green(),
+            style(name).cyan(),
+        );
+        println!();
+    }
 }
 
-pub fn render_builtin_success(names: &str) {
-    println!();
-    println!(
-        "  {} builtin{}: {}",
-        style("added").green(),
-        if names.contains(',') { "s" } else { "" },
-        style(names).cyan()
-    );
-    println!();
+pub fn render_extension_error(name: &str, error: &str, porcelain: bool) {
+    if porcelain {
+        eprintln!();
+        eprintln!(
+            "  {} to add extension {}",
+            style("failed").red(),
+            style(name).red()
+        );
+        eprintln!();
+        eprintln!("{}", style(error).dim());
+        eprintln!();
+    } else {
+        println!();
+        println!(
+            "  {} to add extension {}",
+            style("failed").red(),
+            style(name).red()
+        );
+        println!();
+        println!("{}", style(error).dim());
+        println!();
+    }
 }
 
-pub fn render_builtin_error(names: &str, error: &str) {
-    println!();
-    println!(
-        "  {} to add builtin{}: {}",
-        style("failed").red(),
-        if names.contains(',') { "s" } else { "" },
-        style(names).red()
-    );
-    println!();
-    println!("{}", style(error).dim());
-    println!();
+pub fn render_builtin_success(names: &str, porcelain: bool) {
+    if porcelain {
+        eprintln!();
+        eprintln!(
+            "  {} builtin{}: {}",
+            style("added").green(),
+            if names.contains(',') { "s" } else { "" },
+            style(names).cyan()
+        );
+        eprintln!();
+    } else {
+        println!();
+        println!(
+            "  {} builtin{}: {}",
+            style("added").green(),
+            if names.contains(',') { "s" } else { "" },
+            style(names).cyan()
+        );
+        println!();
+    }
+}
+
+pub fn render_builtin_error(names: &str, error: &str, porcelain: bool) {
+    if porcelain {
+        eprintln!();
+        eprintln!(
+            "  {} to add builtin{}: {}",
+            style("failed").red(),
+            if names.contains(',') { "s" } else { "" },
+            style(names).red()
+        );
+        eprintln!();
+        eprintln!("{}", style(error).dim());
+        eprintln!();
+    } else {
+        println!();
+        println!(
+            "  {} to add builtin{}: {}",
+            style("failed").red(),
+            if names.contains(',') { "s" } else { "" },
+            style(names).red()
+        );
+        println!();
+        println!("{}", style(error).dim());
+        println!();
+    }
 }
 
 fn render_text_editor_request(call: &ToolCall, debug: bool, porcelain: bool) {
