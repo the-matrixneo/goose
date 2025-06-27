@@ -4,9 +4,15 @@ import type { View } from '../App';
 import Stop from './ui/Stop';
 import { Attach, Send, Close } from './icons';
 import { debounce } from 'lodash';
-import BottomMenu from './bottom_menu/BottomMenu';
 import { LocalMessageStorage } from '../utils/localMessageStorage';
 import { Message } from '../types/message';
+import { DirSwitcher } from './bottom_menu/DirSwitcher';
+import BottomMenuAlertPopover from './bottom_menu/BottomMenuAlertPopover';
+import ModelsBottomBar from './settings/models/bottom_bar/ModelsBottomBar';
+import { BottomMenuModeSelection } from './bottom_menu/BottomMenuModeSelection';
+import { ManualSummarizeButton } from './context_management/ManualSummaryButton';
+import { useAlerts } from './alerts';
+import { useToolCount } from './alerts/useToolCount';
 
 interface PastedImage {
   id: string;
@@ -41,11 +47,19 @@ export default function ChatInput({
   commandHistory = [],
   initialValue = '',
   droppedFiles = [],
+  setView,
+  numTokens,
+  hasMessages,
+  messages = [],
+  setMessages,
 }: ChatInputProps) {
   const [_value, setValue] = useState(initialValue);
   const [displayValue, setDisplayValue] = useState(initialValue); // For immediate visual feedback
   const [isFocused, setIsFocused] = useState(false);
   const [pastedImages, setPastedImages] = useState<PastedImage[]>([]);
+  const { alerts, addAlert, clearAlerts } = useAlerts();
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const toolCount = useToolCount();
 
   // Update internal value when initialValue changes
   useEffect(() => {
@@ -434,7 +448,11 @@ export default function ChatInput({
           : 'border-borderSubtle hover:border-borderStandard'
       } z-10`}
     >
-      <form onSubmit={onFormSubmit}>
+      {/* DirSwitcher at the top */}
+      <div className="p-2 pb-0">
+        <DirSwitcher hasMessages={messages.length > 0} />
+      </div>
+      <form onSubmit={onFormSubmit} className="flex flex-col">
         <textarea
           data-testid="chat-input"
           autoFocus
@@ -455,30 +473,8 @@ export default function ChatInput({
             maxHeight: `${maxHeight}px`,
             overflowY: 'auto',
           }}
-          className="w-full pl-4 pr-[68px] outline-none border-none focus:ring-0 bg-transparent pt-3 pb-1.5 text-sm resize-none text-textStandard placeholder:text-textPlaceholder"
+          className="w-full outline-none border-none focus:ring-0 bg-transparent px-3 pt-3 pb-1.5 text-sm resize-none text-textStandard placeholder:text-textPlaceholder"
         />
-
-        <div className="flex items-center gap-1 absolute right-2 top-1/2 -translate-y-1/2">
-          <Button type="button" shape="round" size="sm" variant="ghost" onClick={handleFileSelect}>
-            <Attach />
-          </Button>
-
-          {isLoading ? (
-            <Button type="button" onClick={onStop} shape="round" size="sm" variant="ghost">
-              <Stop />
-            </Button>
-          ) : (
-            <Button
-              type="submit"
-              size="sm"
-              variant="ghost"
-              shape="round"
-              // disabled={!displayValue.trim() && pastedImages.length === 0}
-            >
-              <Send />
-            </Button>
-          )}
-        </div>
 
         {pastedImages.length > 0 && (
           <div className="flex flex-wrap gap-2 p-2 border-t border-borderSubtle">
@@ -486,7 +482,7 @@ export default function ChatInput({
               <div key={img.id} className="relative group w-20 h-20">
                 {img.dataUrl && (
                   <img
-                    src={img.dataUrl} // Use dataUrl for instant preview
+                    src={img.dataUrl}
                     alt={`Pasted image ${img.id}`}
                     className={`w-full h-full object-cover rounded border ${img.error ? 'border-red-500' : 'border-borderStandard'}`}
                   />
@@ -506,6 +502,8 @@ export default function ChatInput({
                         type="button"
                         onClick={() => handleRetryImageSave(img.id)}
                         title="Retry saving image"
+                        variant="outline"
+                        size="xs"
                       >
                         Retry
                       </Button>
@@ -519,6 +517,8 @@ export default function ChatInput({
                     onClick={() => handleRemovePastedImage(img.id)}
                     className="absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity z-10"
                     aria-label="Remove image"
+                    variant="outline"
+                    size="xs"
                   >
                     <Close />
                   </Button>
@@ -527,6 +527,37 @@ export default function ChatInput({
             ))}
           </div>
         )}
+
+        {/* Actions and model/mode/alerts row below input */}
+        <div className="flex flex-row items-center gap-1 p-2">
+          {/* Send/Attach/Stop actions */}
+          <Button type="button" size="xs" variant="outline" onClick={handleFileSelect}>
+            <Attach />
+          </Button>
+          {isLoading ? (
+            <Button type="button" onClick={onStop} size="xs" variant="outline">
+              <Stop />
+            </Button>
+          ) : (
+            <Button type="submit" size="xs" variant="outline">
+              <Send />
+            </Button>
+          )}
+
+          {/* Model selector, mode selector, alerts, summarize button */}
+          <div className="flex flex-row items-center gap-2 ml-4">
+            <ModelsBottomBar dropdownRef={dropdownRef} setView={setView} />
+            <BottomMenuModeSelection setView={setView} />
+            <BottomMenuAlertPopover alerts={alerts} />
+            {messages.length > 0 && (
+              <ManualSummarizeButton
+                messages={messages}
+                isLoading={isLoading}
+                setMessages={setMessages}
+              />
+            )}
+          </div>
+        </div>
       </form>
     </div>
   );

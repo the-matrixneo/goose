@@ -11,22 +11,28 @@ const buttonVariants = cva(
         default: 'bg-background-accent text-text-on-accent hover:bg-background-accent/90 shadow-xs',
         destructive:
           'bg-background-danger text-white hover:bg-background-danger/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-background-danger/60 shadow-xs',
-        outline: 'border hover:bg-background-default hover:shadow-default hover:border-transparent',
+        outline: 'border hover:bg-background-muted',
         secondary: 'bg-background-muted text-text-default hover:bg-background-muted/80 shadow-xs',
         ghost: 'hover:bg-background-muted dark:hover:bg-background-muted/50',
         link: 'text-text-accent underline-offset-4 hover:underline',
       },
       size: {
+        xs: 'h-6 gap-1 ![&_svg:not([class*="size-"])]:size-3',
         default: 'h-9',
         sm: 'h-8 gap-1.5',
         lg: 'h-10',
       },
       shape: {
-        pill: 'rounded-full',
+        pill: 'rounded-lg',
         round: '',
       },
     },
     compoundVariants: [
+      {
+        shape: 'pill',
+        size: 'xs',
+        className: 'px-2 has-[>svg]:px-2',
+      },
       {
         shape: 'pill',
         size: 'default',
@@ -41,6 +47,11 @@ const buttonVariants = cva(
         shape: 'pill',
         size: 'lg',
         className: 'px-6 has-[>svg]:px-6',
+      },
+      {
+        shape: 'round',
+        size: 'xs',
+        className: 'w-6 h-6 p-0 rounded-full',
       },
       {
         shape: 'round',

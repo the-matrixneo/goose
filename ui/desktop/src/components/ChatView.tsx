@@ -43,7 +43,6 @@ import {
 } from '../types/message';
 import SessionsSidebar from './GooseSidebar/AppSidebar';
 import { SidebarTrigger } from './ui/sidebar';
-import BottomMenu from './bottom_menu/BottomMenu';
 import { SessionInsights } from './sessions/SessionsInsights';
 import { useSidebar } from './ui/sidebar';
 import { Button } from './ui/button';
@@ -417,6 +416,11 @@ function ChatContentWithSidebar({
 
     // Handle stopping the message stream
     const lastMessage = messages[messages.length - 1];
+
+    // Check if there are any messages before proceeding
+    if (!lastMessage) {
+      return;
+    }
 
     // check if the last user message has any tool response(s)
     const isToolResponse = lastMessage.content.some(
@@ -846,14 +850,6 @@ function ChatContentWithSidebar({
           />
         </div>
       </MainPanelLayout>
-
-      <BottomMenu
-        setView={setView}
-        numTokens={sessionTokenCount}
-        messages={messages}
-        isLoading={isLoading}
-        setMessages={setMessages}
-      />
 
       {showGame && <FlappyGoose onClose={() => setShowGame(false)} />}
 

@@ -1,5 +1,14 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { Folder, FileText, Clock, MessageCircle, Home, Loader2 } from 'lucide-react';
+import {
+  Folder,
+  FileText,
+  Clock,
+  MessageCircle,
+  Home,
+  Loader2,
+  AppWindowMac,
+  AppWindow,
+} from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -204,7 +213,11 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
                   tooltip="Start a new session in a new window"
                   className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200"
                 >
-                  <ChatSmart className="w-4 h-4" />
+                  {safeIsMacOS ? (
+                    <AppWindowMac className="w-4 h-4" />
+                  ) : (
+                    <AppWindow className="w-4 h-4" />
+                  )}
                   <span>New window</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>

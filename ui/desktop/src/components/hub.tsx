@@ -419,6 +419,11 @@ function HubContentWithSidebar({
     // Handle stopping the message stream
     const lastMessage = messages[messages.length - 1];
 
+    // Check if there are any messages before proceeding
+    if (!lastMessage) {
+      return;
+    }
+
     // check if the last user message has any tool response(s)
     const isToolResponse = lastMessage.content.some(
       (content): content is ToolResponseMessageContent => content.type == 'toolResponse'
@@ -585,10 +590,7 @@ function HubContentWithSidebar({
         {/* Loader when generating recipe */}
         {isGeneratingRecipe && <LayingEggLoader />}
 
-        <div className="h-12 flex items-center justify-between">
-          {/* <div className={`flex items-center ${headerPadding}`}>
-            <SidebarTrigger className="no-drag" />
-          </div> */}
+        <div className="h-12 flex items-center justify-between absolute">
           <div className="flex items-center pr-4">
             {messages.length > 0 && (
               <>
@@ -693,7 +695,7 @@ function HubContentWithSidebar({
         </div>
 
         <div
-          className="flex flex-col min-w-0 flex-1 overflow-y-scroll relative pl-6 pr-4 pb-16 pt-2"
+          className="flex flex-col min-w-0 flex-1 overflow-y-scroll relative pl-6 pr-4 pb-16"
           onDrop={handleDrop}
           onDragOver={handleDragOver}
         >

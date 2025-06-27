@@ -417,6 +417,11 @@ function PairContentWithSidebar({
     // Handle stopping the message stream
     const lastMessage = messages[messages.length - 1];
 
+    // Check if there are any messages before proceeding
+    if (!lastMessage) {
+      return;
+    }
+
     // check if the last user message has any tool response(s)
     const isToolResponse = lastMessage.content.some(
       (content): content is ToolResponseMessageContent => content.type == 'toolResponse'
@@ -584,9 +589,6 @@ function PairContentWithSidebar({
         {isGeneratingRecipe && <LayingEggLoader />}
 
         <div className="h-12 flex items-center justify-between">
-          <div className={`flex items-center ${headerPadding}`}>
-            <SidebarTrigger className="no-drag" />
-          </div>
           <div className="flex items-center pr-4">
             {messages.length > 0 && (
               <>
@@ -810,16 +812,6 @@ function PairContentWithSidebar({
           />
         </div>
       </MainPanelLayout>
-
-      <BottomMenu
-        setView={setView}
-        numTokens={sessionTokenCount}
-        messages={messages}
-        isLoading={isLoading}
-        setMessages={setMessages}
-      />
-
-      {showGame && <FlappyGoose onClose={() => setShowGame(false)} />}
 
       <SessionSummaryModal
         isOpen={isSummaryModalOpen}
