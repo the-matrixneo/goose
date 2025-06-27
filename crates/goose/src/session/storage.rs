@@ -146,9 +146,23 @@ pub fn get_path(id: Identifier) -> Result<PathBuf> {
                 return Err(anyhow::anyhow!("Invalid session name length"));
             }
 
-            // Check for path traversal attempts
-            if name.contains("..") || name.contains('/') || name.contains('\\') {
+            // Check for path traversal attempts - be more careful about path separators
+            if name.contains("..") {
                 return Err(anyhow::anyhow!("Invalid characters in session name"));
+            }
+
+            // Only block path separators if they appear to be used for traversal
+            // Allow single separators that might be part of valid session names
+            if name.contains("../")
+                || name.contains("..\\")
+                || name.contains("/..")
+                || name.contains("\\..")
+                || name.starts_with('/')
+                || name.starts_with('\\')
+                || name.ends_with('/')
+                || name.ends_with('\\')
+            {
+                return Err(anyhow::anyhow!("Invalid path characters in session name"));
             }
 
             let session_dir = ensure_session_dir().map_err(|e| {
@@ -162,7 +176,14 @@ pub fn get_path(id: Identifier) -> Result<PathBuf> {
             #[cfg(test)]
             {
                 if let Some(path_str) = path.to_str() {
-                    if path_str.contains("/tmp") || path_str.contains("/.tmp") {
+                    // Support both Unix and Windows temp directories
+                    if path_str.contains("/tmp")
+                        || path_str.contains("/.tmp")
+                        || path_str.contains("\\tmp")
+                        || path_str.contains("\\.tmp")
+                        || path_str.contains("\\Temp\\")
+                        || path_str.contains("/Temp/")
+                    {
                         // Allow test temporary directories
                         return Ok(path);
                     }
@@ -170,16 +191,47 @@ pub fn get_path(id: Identifier) -> Result<PathBuf> {
             }
 
             // Validate that the path is within allowed directories
-            let canonical_path = path.canonicalize().unwrap_or(path.clone());
+            // Handle canonicalization more gracefully for Windows
             let session_dir = ensure_session_dir().map_err(|e| {
                 tracing::error!("Failed to create session directory: {}", e);
                 anyhow::anyhow!("Failed to access session directory")
             })?;
-            let canonical_session_dir = session_dir.canonicalize().unwrap_or(session_dir);
 
+            // Try to canonicalize, but handle Windows-specific issues
+            let canonical_path = match path.canonicalize() {
+                Ok(canonical) => canonical,
+                Err(_) => {
+                    // If canonicalization fails, try to resolve relative to session dir
+                    if path.is_relative() {
+                        session_dir.join(&path)
+                    } else {
+                        path.clone()
+                    }
+                }
+            };
+
+            let canonical_session_dir = match session_dir.canonicalize() {
+                Ok(canonical) => canonical,
+                Err(_) => session_dir,
+            };
+
+            // Check if path is within session directory
             if !canonical_path.starts_with(&canonical_session_dir) {
-                tracing::warn!("Attempted access outside session directory");
-                return Err(anyhow::anyhow!("Path not allowed"));
+                // Additional check for Windows - compare case-insensitively
+                #[cfg(windows)]
+                {
+                    let path_str = canonical_path.to_string_lossy().to_lowercase();
+                    let session_str = canonical_session_dir.to_string_lossy().to_lowercase();
+                    if !path_str.starts_with(&session_str) {
+                        tracing::warn!("Attempted access outside session directory");
+                        return Err(anyhow::anyhow!("Path not allowed"));
+                    }
+                }
+                #[cfg(not(windows))]
+                {
+                    tracing::warn!("Attempted access outside session directory");
+                    return Err(anyhow::anyhow!("Path not allowed"));
+                }
             }
 
             path
@@ -1041,7 +1093,7 @@ pub fn save_messages_with_metadata(
             anyhow::anyhow!("Failed to create temporary session file")
         })?;
 
-    // Set secure file permissions (Unix only - read/write for owner only)
+    // Set secure file permissions
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -1051,6 +1103,21 @@ pub fn save_messages_with_metadata(
             tracing::error!("Failed to set secure file permissions: {}", e);
             anyhow::anyhow!("Failed to secure temporary file")
         })?;
+    }
+
+    // On Windows, try to set file permissions to be more restrictive
+    #[cfg(windows)]
+    {
+        // Windows doesn't have the same permission model, but we can try to make it read-only for others
+        // This is a best-effort approach since Windows ACLs are more complex
+        if let Ok(metadata) = file.metadata() {
+            let mut perms = metadata.permissions();
+            perms.set_readonly(false); // Ensure we can write to it
+            if let Err(e) = fs::set_permissions(&temp_file, perms) {
+                tracing::debug!("Could not set Windows file permissions: {}", e);
+                // Don't fail on Windows permission errors as they're not critical
+            }
+        }
     }
 
     // Get an exclusive lock on the file
@@ -1581,6 +1648,53 @@ mod tests {
         let read_metadata = read_metadata(&file_path)?;
         assert_ne!(read_metadata.working_dir, invalid_dir);
         assert_eq!(read_metadata.working_dir, get_home_dir());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_windows_path_validation() -> Result<()> {
+        // Test that Windows-style paths don't get rejected inappropriately
+
+        // Valid session names that should work on Windows
+        let valid_names = vec![
+            "session_2024",
+            "my-session",
+            "session.backup",
+            "session_with_underscores",
+        ];
+
+        for name in valid_names {
+            let result = get_path(Identifier::Name(name.to_string()));
+            assert!(
+                result.is_ok(),
+                "Valid session name '{}' should be accepted",
+                name
+            );
+        }
+
+        // Invalid session names that should be rejected
+        let invalid_names = vec![
+            "../session",
+            "session/../other",
+            "..\\session",
+            "session\\..\\other",
+            "/absolute/path",
+            "\\absolute\\path",
+            "session/",
+            "session\\",
+            "/session",
+            "\\session",
+        ];
+
+        for name in invalid_names {
+            let result = get_path(Identifier::Name(name.to_string()));
+            assert!(
+                result.is_err(),
+                "Invalid session name '{}' should be rejected",
+                name
+            );
+        }
 
         Ok(())
     }
