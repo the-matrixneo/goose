@@ -11,6 +11,7 @@ interface CircularTileProps {
 export default function CircularTile({ onClick, className = '', size = 'medium' }: CircularTileProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [floatingButtonId, setFloatingButtonId] = useState<string | null>(null);
+  const [dragPreview, setDragPreview] = useState<{ x: number; y: number; visible: boolean }>({ x: 0, y: 0, visible: false });
   
   const sizeClasses = {
     small: 'w-16 h-16',
@@ -42,7 +43,7 @@ export default function CircularTile({ onClick, className = '', size = 'medium' 
     };
   }, [floatingButtonId]);
 
-  // Mouse-based drag handling instead of HTML5 drag
+  // Mouse-based drag handling with visual feedback
   const handleMouseDown = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     const startPos = { x: e.clientX, y: e.clientY };
@@ -56,15 +57,27 @@ export default function CircularTile({ onClick, className = '', size = 'medium' 
       
       // Start dragging if moved more than 5px
       if (deltaX > 5 || deltaY > 5) {
-        hasDragged = true;
-        setIsDragging(true);
-        console.log('Dragging started, current pos:', { x: moveEvent.clientX, y: moveEvent.clientY });
+        if (!hasDragged) {
+          hasDragged = true;
+          setIsDragging(true);
+          console.log('Dragging started, current pos:', { x: moveEvent.clientX, y: moveEvent.clientY });
+        }
+        
+        // Update drag preview position
+        setDragPreview({
+          x: moveEvent.clientX,
+          y: moveEvent.clientY,
+          visible: true
+        });
       }
     };
 
     const handleMouseUp = async (upEvent: MouseEvent) => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
+      
+      // Hide drag preview
+      setDragPreview({ x: 0, y: 0, visible: false });
       
       console.log('Mouse up at:', { x: upEvent.clientX, y: upEvent.clientY });
       console.log('Window dimensions:', { width: window.innerWidth, height: window.innerHeight });
@@ -146,43 +159,80 @@ export default function CircularTile({ onClick, className = '', size = 'medium' 
   };
 
   return (
-    <button
-      onClick={handleClick}
-      onMouseDown={handleMouseDown}
-      className={`
-        ${sizeClasses[size]}
-        rounded-full
-        transition-all duration-300 ease-out
-        transform hover:scale-105 active:scale-95
-        border-2 border-white/50
-        relative overflow-hidden
-        group
-        cursor-grab active:cursor-grabbing
-        ${isDragging ? 'opacity-50' : ''}
-        ${floatingButtonId ? 'opacity-30 border-dashed border-blue-400' : ''}
-        ${className}
-      `}
-      style={{
-        backgroundImage: `url(${circularTileImage})`,
-        backgroundSize: 'contain',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
-        boxShadow: '0px 2px 4px 0px rgba(255, 255, 255, 0.8) inset, 0px 8px 16px 0px rgba(255, 255, 255, 0.3) inset, -2px 2px 8px 0px rgba(255, 255, 255, 0.4) inset, 0px 4px 4px 0px rgba(0, 0, 0, 0.25)',
-      }}
-    >
-      {/* Hover overlay effect */}
-      <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-full" />
-      
-      {/* Subtle shine effect */}
-      <div className="absolute top-1 left-1 w-2 h-2 bg-white/30 rounded-full opacity-60" />
-      
-      {/* 16x16 Goose logo in bottom right corner inside the circle */}
-      <div className="absolute bottom-2 w-4 h-4 text-white/90 drop-shadow-md z-10" style={{ right: '11px' }}>
-        <Goose className="w-4 h-4" />
-      </div>
-      
-      {/* Optional overlay for better contrast if needed */}
-      <div className="absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-black/5 rounded-full" />
-    </button>
+    <>
+      <button
+        onClick={handleClick}
+        onMouseDown={handleMouseDown}
+        className={`
+          ${sizeClasses[size]}
+          rounded-full
+          transition-all duration-300 ease-out
+          transform hover:scale-105 active:scale-95
+          border-2 border-white/50
+          relative overflow-hidden
+          group
+          cursor-grab active:cursor-grabbing
+          ${isDragging ? 'opacity-50' : ''}
+          ${floatingButtonId ? 'opacity-30 border-dashed border-blue-400' : ''}
+          ${className}
+        `}
+        style={{
+          backgroundImage: `url(${circularTileImage})`,
+          backgroundSize: 'contain',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          boxShadow: '0px 2px 4px 0px rgba(255, 255, 255, 0.8) inset, 0px 8px 16px 0px rgba(255, 255, 255, 0.3) inset, -2px 2px 8px 0px rgba(255, 255, 255, 0.4) inset, 0px 4px 4px 0px rgba(0, 0, 0, 0.25)',
+        }}
+      >
+        {/* Hover overlay effect */}
+        <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-full" />
+        
+        {/* Subtle shine effect */}
+        <div className="absolute top-1 left-1 w-2 h-2 bg-white/30 rounded-full opacity-60" />
+        
+        {/* 16x16 Goose logo in bottom right corner inside the circle */}
+        <div className="absolute bottom-2 w-4 h-4 text-white/90 drop-shadow-md z-10" style={{ right: '11px' }}>
+          <Goose className="w-4 h-4" />
+        </div>
+        
+        {/* Optional overlay for better contrast if needed */}
+        <div className="absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-black/5 rounded-full" />
+      </button>
+
+      {/* Drag Preview */}
+      {dragPreview.visible && (
+        <div
+          className="fixed pointer-events-none z-50"
+          style={{
+            left: dragPreview.x - 40,
+            top: dragPreview.y - 40,
+            transform: 'scale(0.8)',
+            opacity: 0.8
+          }}
+        >
+          <div
+            className={`
+              ${sizeClasses[size]}
+              rounded-full
+              border-2 border-white/50
+              relative overflow-hidden
+              shadow-2xl
+            `}
+            style={{
+              backgroundImage: `url(${circularTileImage})`,
+              backgroundSize: 'contain',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
+              boxShadow: '0px 2px 4px 0px rgba(255, 255, 255, 0.8) inset, 0px 8px 16px 0px rgba(255, 255, 255, 0.3) inset, -2px 2px 8px 0px rgba(255, 255, 255, 0.4) inset, 0px 4px 4px 0px rgba(0, 0, 0, 0.25)',
+            }}
+          >
+            {/* Goose logo in drag preview */}
+            <div className="absolute bottom-2 w-4 h-4 text-white/90 drop-shadow-md z-10" style={{ right: '11px' }}>
+              <Goose className="w-4 h-4" />
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
