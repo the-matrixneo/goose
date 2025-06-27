@@ -575,19 +575,21 @@ export default function GoosIN() {
         
         {/* Start Game Overlay */}
         {!gameState.isPlaying && !gameState.gameOver && !gameState.gameWon && (
-          <div className="absolute inset-4 flex flex-col justify-end items-start bg-background-default bg-opacity-90 rounded">
-            <div className="mb-auto pt-4 w-full text-center">
-              <h2 className="text-text-default font-mono text-2xl font-bold tracking-wider mb-2" style={{ fontFamily: 'monospace', imageRendering: 'pixelated' }}>
-                GOOSIN
-              </h2>
+          <div className="absolute inset-4 flex flex-col justify-between bg-background-default bg-opacity-90 rounded">
+            <div className="flex justify-start pt-2">
+              <svg width="37" height="11" viewBox="0 0 37 11" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-16 h-auto">
+                <path d="M1.25703 10.232V9.188H0.189031V7.7H1.60503V8.744H4.47303V7.1H1.25703V6.044H0.189031V3.512H1.25703V2.468H4.82103V3.512H5.88903V9.188H4.82103V10.232H1.25703ZM1.60503 5.6H4.47303V3.956H1.60503V5.6ZM8.05391 8.132V7.1H6.98591V3.512H8.05391V2.468H11.6059V3.512H12.6859V7.1H11.6059V8.132H8.05391ZM8.40191 6.644H11.2579V3.956H8.40191V6.644ZM15.2141 8.132V7.1H14.1461V3.512H15.2141V2.468H18.7661V3.512H19.8461V7.1H18.7661V8.132H15.2141ZM15.5621 6.644H18.4181V3.956H15.5621V6.644ZM21.3062 8.132V6.644H25.5782V6.044H22.3742V4.988H21.3062V3.512H22.3742V2.468H27.0062V3.956H22.7222V4.544H25.9262V5.6H27.0062V7.1H25.9262V8.132H21.3062ZM28.4664 8.132V2.468H29.8824V8.132H28.4664ZM28.4664 1.868V0.368H29.8824V1.868H28.4664ZM31.1148 8.132V2.468H35.7348V3.512H36.8148V8.132H35.3868V3.956H32.5308V8.132H31.1148Z" fill="currentColor" className="text-text-muted"/>
+              </svg>
             </div>
-            <div className="text-text-muted font-mono text-xs mb-2">COLLECT BREAD • AVOID BUGS</div>
-            <button
-              onClick={toggleGame}
-              className="px-3 py-2 bg-background-accent hover:bg-background-accent/80 text-text-on-accent font-mono text-sm rounded border border-border-subtle transition-colors shadow-sm"
-            >
-              PLAY
-            </button>
+            <div className="flex flex-col items-start">
+              <div className="text-text-muted font-mono text-xs mb-2">COLLECT BREAD • AVOID BUGS</div>
+              <button
+                onClick={toggleGame}
+                className="px-3 py-2 bg-background-accent hover:bg-background-accent/80 text-text-on-accent font-mono text-sm rounded border border-border-subtle transition-colors shadow-sm"
+              >
+                PLAY
+              </button>
+            </div>
           </div>
         )}
         
