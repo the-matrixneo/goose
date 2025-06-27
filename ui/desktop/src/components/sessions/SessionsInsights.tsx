@@ -158,7 +158,7 @@ export function SessionInsights() {
           </Card>
 
           {/* Current Time Card */}
-          <Card className="w-full sm:w-auto animate-in fade-in slide-in-from-right-8 duration-500 rounded-2xl min-w-[200px] max-w-[350px]">
+          <Card className="w-full sm:w-auto animate-in fade-in slide-in-from-right-8 duration-500 rounded-2xl min-w-[200px] max-w-[350px] max-h-[120px]">
             <CardContent className="flex flex-col justify-end items-start h-full pt-4">
               <div className="flex flex-col justify-end items-start">
                 <p className="text-2xl font-mono font-light flex items-end">
@@ -181,7 +181,6 @@ export function SessionInsights() {
                   // Add your click handler here
                 }}
               />
-              <span className="text-xs text-text-muted font-mono">Explore</span>
             </div>
           </div>
         </div>
