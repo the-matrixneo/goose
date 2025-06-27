@@ -13,6 +13,8 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
+use crate::cli_println;
+
 // Re-export theme for use in main
 #[derive(Clone, Copy)]
 pub enum Theme {
@@ -135,44 +137,24 @@ pub fn render_message(message: &Message, debug: bool, porcelain: bool) {
             MessageContent::ToolRequest(req) => render_tool_request(req, theme, debug, porcelain),
             MessageContent::ToolResponse(resp) => render_tool_response(resp, theme, debug, porcelain),
             MessageContent::Image(image) => {
-                if porcelain {
-                    eprintln!("Image: [data: {}, type: {}]", image.data, image.mime_type);
-                } else {
-                    println!("Image: [data: {}, type: {}]", image.data, image.mime_type);
-                }
+                cli_println!(porcelain, "Image: [data: {}, type: {}]", image.data, image.mime_type);
             }
             MessageContent::Thinking(thinking) => {
                 if std::env::var("GOOSE_CLI_SHOW_THINKING").is_ok() {
-                    if porcelain {
-                        eprintln!("\n{}", style("Thinking:").dim().italic());
-                    } else {
-                        println!("\n{}", style("Thinking:").dim().italic());
-                    }
+                    cli_println!(porcelain, "\n{}", style("Thinking:").dim().italic());
                     print_markdown(&thinking.thinking, theme, porcelain);
                 }
             }
             MessageContent::RedactedThinking(_) => {
-                if porcelain {
-                    eprintln!("\n{}", style("Thinking:").dim().italic());
-                } else {
-                    println!("\n{}", style("Thinking:").dim().italic());
-                }
+                cli_println!(porcelain, "\n{}", style("Thinking:").dim().italic());
                 print_markdown("Thinking was redacted", theme, porcelain);
             }
             _ => {
-                if porcelain {
-                    eprintln!("WARNING: Message content type could not be rendered");
-                } else {
-                    println!("WARNING: Message content type could not be rendered");
-                }
+                cli_println!(porcelain, "WARNING: Message content type could not be rendered");
             }
         }
     }
-    if porcelain {
-        eprintln!();
-    } else {
-        println!();
-    }
+    cli_println!(porcelain, "");
 }
 
 pub fn render_text(text: &str, color: Option<Color>, dim: bool, porcelain: bool) {
@@ -198,57 +180,32 @@ pub fn render_text_no_newlines(text: &str, color: Option<Color>, dim: bool, porc
 }
 
 pub fn render_enter_plan_mode(porcelain: bool) {
-    if porcelain {
-        eprintln!(
-            "\n{} {}\n",
-            style("Entering plan mode.").green().bold(),
-            style("You can provide instructions to create a plan and then act on it. To exit early, type /endplan")
-                .green()
-                .dim()
-        );
-    } else {
-        println!(
-            "\n{} {}\n",
-            style("Entering plan mode.").green().bold(),
-            style("You can provide instructions to create a plan and then act on it. To exit early, type /endplan")
-                .green()
-                .dim()
-        );
-    }
+    cli_println!(
+        porcelain,
+        "\n{} {}\n",
+        style("Entering plan mode.").green().bold(),
+        style("You can provide instructions to create a plan and then act on it. To exit early, type /endplan")
+            .green()
+            .dim()
+    );
 }
 
 pub fn render_act_on_plan(porcelain: bool) {
-    if porcelain {
-        eprintln!(
-            "\n{}\n",
-            style("Exiting plan mode and acting on the above plan")
-                .green()
-                .bold(),
-        );
-    } else {
-        println!(
-            "\n{}\n",
-            style("Exiting plan mode and acting on the above plan")
-                .green()
-                .bold(),
-        );
-    }
+    cli_println!(
+        porcelain,
+        "\n{}\n",
+        style("Exiting plan mode and acting on the above plan")
+            .green()
+            .bold(),
+    );
 }
 
 pub fn render_exit_plan_mode(porcelain: bool) {
-    if porcelain {
-        eprintln!("\n{}\n", style("Exiting plan mode.").green().bold());
-    } else {
-        println!("\n{}\n", style("Exiting plan mode.").green().bold());
-    }
+    cli_println!(porcelain, "\n{}\n", style("Exiting plan mode.").green().bold());
 }
 
 pub fn goose_mode_message(text: &str, porcelain: bool) {
-    if porcelain {
-        eprintln!("\n{}", style(text).yellow(),);
-    } else {
-        println!("\n{}", style(text).yellow(),);
-    }
+    cli_println!(porcelain, "\n{}", style(text).yellow());
 }
 
 fn render_tool_request(req: &ToolRequest, theme: Theme, debug: bool, porcelain: bool) {
@@ -288,11 +245,7 @@ fn render_tool_response(resp: &ToolResponse, theme: Theme, debug: bool, porcelai
                 }
 
                 if debug {
-                    if porcelain {
-                        eprintln!("{:#?}", content);
-                    } else {
-                        println!("{:#?}", content);
-                    }
+                    cli_println!(porcelain, "{:#?}", content);
                 } else if let mcp_core::content::Content::Text(text) = content {
                     print_markdown(&text.text, theme, porcelain);
                 }
@@ -303,70 +256,35 @@ fn render_tool_response(resp: &ToolResponse, theme: Theme, debug: bool, porcelai
 }
 
 pub fn render_error(message: &str, porcelain: bool) {
-    if porcelain {
-        eprintln!("\n  {} {}\n", style("error:").red().bold(), message);
-    } else {
-        println!("\n  {} {}\n", style("error:").red().bold(), message);
-    }
+    cli_println!(porcelain, "\n  {} {}\n", style("error:").red().bold(), message);
 }
 
 pub fn render_prompts(prompts: &HashMap<String, Vec<String>>, porcelain: bool) {
-    if porcelain {
-        eprintln!();
-        for (extension, prompts) in prompts {
-            eprintln!(" {}", style(extension).green());
-            for prompt in prompts {
-                eprintln!("  - {}", style(prompt).cyan());
-            }
+    cli_println!(porcelain, "");
+    for (extension, prompts) in prompts {
+        cli_println!(porcelain, " {}", style(extension).green());
+        for prompt in prompts {
+            cli_println!(porcelain, "  - {}", style(prompt).cyan());
         }
-        eprintln!();
-    } else {
-        println!();
-        for (extension, prompts) in prompts {
-            println!(" {}", style(extension).green());
-            for prompt in prompts {
-                println!("  - {}", style(prompt).cyan());
-            }
-        }
-        println!();
     }
+    cli_println!(porcelain, "");
 }
 
 pub fn render_prompt_info(info: &PromptInfo, porcelain: bool) {
-    if porcelain {
-        eprintln!();
-    } else {
-        println!();
-    }
+    cli_println!(porcelain, "");
 
     if let Some(ext) = &info.extension {
-        if porcelain {
-            eprintln!(" {}: {}", style("Extension").green(), ext);
-        } else {
-            println!(" {}: {}", style("Extension").green(), ext);
-        }
+        cli_println!(porcelain, " {}: {}", style("Extension").green(), ext);
     }
 
-    if porcelain {
-        eprintln!(" Prompt: {}", style(&info.name).cyan().bold());
-    } else {
-        println!(" Prompt: {}", style(&info.name).cyan().bold());
-    }
+    cli_println!(porcelain, " Prompt: {}", style(&info.name).cyan().bold());
 
     if let Some(desc) = &info.description {
-        if porcelain {
-            eprintln!("\n {}", desc);
-        } else {
-            println!("\n {}", desc);
-        }
+        cli_println!(porcelain, "\n {}", desc);
     }
 
     if let Some(args) = &info.arguments {
-        if porcelain {
-            eprintln!("\n Arguments:");
-        } else {
-            println!("\n Arguments:");
-        }
+        cli_println!(porcelain, "\n Arguments:");
         
         for arg in args {
             let required = arg.required.unwrap_or(false);
@@ -376,121 +294,67 @@ pub fn render_prompt_info(info: &PromptInfo, porcelain: bool) {
                 style("(optional)").dim()
             };
 
-            if porcelain {
-                eprintln!(
-                    "  {} {} {}",
-                    style(&arg.name).yellow(),
-                    req_str,
-                    arg.description.as_deref().unwrap_or("")
-                );
-            } else {
-                println!(
-                    "  {} {} {}",
-                    style(&arg.name).yellow(),
-                    req_str,
-                    arg.description.as_deref().unwrap_or("")
-                );
-            }
+            cli_println!(
+                porcelain,
+                "  {} {} {}",
+                style(&arg.name).yellow(),
+                req_str,
+                arg.description.as_deref().unwrap_or("")
+            );
         }
     }
     
-    if porcelain {
-        eprintln!();
-    } else {
-        println!();
-    }
+    cli_println!(porcelain, "");
 }
 
 pub fn render_extension_success(name: &str, porcelain: bool) {
-    if porcelain {
-        eprintln!();
-        eprintln!(
-            "  {} extension `{}`",
-            style("added").green(),
-            style(name).cyan(),
-        );
-        eprintln!();
-    } else {
-        println!();
-        println!(
-            "  {} extension `{}`",
-            style("added").green(),
-            style(name).cyan(),
-        );
-        println!();
-    }
+    cli_println!(porcelain, "");
+    cli_println!(
+        porcelain,
+        "  {} extension `{}`",
+        style("added").green(),
+        style(name).cyan(),
+    );
+    cli_println!(porcelain, "");
 }
 
 pub fn render_extension_error(name: &str, error: &str, porcelain: bool) {
-    if porcelain {
-        eprintln!();
-        eprintln!(
-            "  {} to add extension {}",
-            style("failed").red(),
-            style(name).red()
-        );
-        eprintln!();
-        eprintln!("{}", style(error).dim());
-        eprintln!();
-    } else {
-        println!();
-        println!(
-            "  {} to add extension {}",
-            style("failed").red(),
-            style(name).red()
-        );
-        println!();
-        println!("{}", style(error).dim());
-        println!();
-    }
+    cli_println!(porcelain, "");
+    cli_println!(
+        porcelain,
+        "  {} to add extension {}",
+        style("failed").red(),
+        style(name).red()
+    );
+    cli_println!(porcelain, "");
+    cli_println!(porcelain, "{}", style(error).dim());
+    cli_println!(porcelain, "");
 }
 
 pub fn render_builtin_success(names: &str, porcelain: bool) {
-    if porcelain {
-        eprintln!();
-        eprintln!(
-            "  {} builtin{}: {}",
-            style("added").green(),
-            if names.contains(',') { "s" } else { "" },
-            style(names).cyan()
-        );
-        eprintln!();
-    } else {
-        println!();
-        println!(
-            "  {} builtin{}: {}",
-            style("added").green(),
-            if names.contains(',') { "s" } else { "" },
-            style(names).cyan()
-        );
-        println!();
-    }
+    cli_println!(porcelain, "");
+    cli_println!(
+        porcelain,
+        "  {} builtin{}: {}",
+        style("added").green(),
+        if names.contains(',') { "s" } else { "" },
+        style(names).cyan()
+    );
+    cli_println!(porcelain, "");
 }
 
 pub fn render_builtin_error(names: &str, error: &str, porcelain: bool) {
-    if porcelain {
-        eprintln!();
-        eprintln!(
-            "  {} to add builtin{}: {}",
-            style("failed").red(),
-            if names.contains(',') { "s" } else { "" },
-            style(names).red()
-        );
-        eprintln!();
-        eprintln!("{}", style(error).dim());
-        eprintln!();
-    } else {
-        println!();
-        println!(
-            "  {} to add builtin{}: {}",
-            style("failed").red(),
-            if names.contains(',') { "s" } else { "" },
-            style(names).red()
-        );
-        println!();
-        println!("{}", style(error).dim());
-        println!();
-    }
+    cli_println!(porcelain, "");
+    cli_println!(
+        porcelain,
+        "  {} to add builtin{}: {}",
+        style("failed").red(),
+        if names.contains(',') { "s" } else { "" },
+        style(names).red()
+    );
+    cli_println!(porcelain, "");
+    cli_println!(porcelain, "{}", style(error).dim());
+    cli_println!(porcelain, "");
 }
 
 fn render_text_editor_request(call: &ToolCall, debug: bool, porcelain: bool) {
@@ -498,19 +362,12 @@ fn render_text_editor_request(call: &ToolCall, debug: bool, porcelain: bool) {
 
     // Print path first with special formatting
     if let Some(Value::String(path)) = call.arguments.get("path") {
-        if porcelain {
-            eprintln!(
-                "{}: {}",
-                style("path").dim(),
-                style(shorten_path(path, debug)).green()
-            );
-        } else {
-            println!(
-                "{}: {}",
-                style("path").dim(),
-                style(shorten_path(path, debug)).green()
-            );
-        }
+        cli_println!(
+            porcelain,
+            "{}: {}",
+            style("path").dim(),
+            style(shorten_path(path, debug)).green()
+        );
     }
 
     // Print other arguments normally, excluding path
@@ -523,11 +380,7 @@ fn render_text_editor_request(call: &ToolCall, debug: bool, porcelain: bool) {
         }
         print_params(&Value::Object(other_args), 0, debug, porcelain);
     }
-    if porcelain {
-        eprintln!();
-    } else {
-        println!();
-    }
+    cli_println!(porcelain, "");
 }
 
 fn render_shell_request(call: &ToolCall, debug: bool, porcelain: bool) {
@@ -535,11 +388,7 @@ fn render_shell_request(call: &ToolCall, debug: bool, porcelain: bool) {
 
     match call.arguments.get("command") {
         Some(Value::String(s)) => {
-            if porcelain {
-                eprintln!("{}: {}", style("command").dim(), style(s).green());
-            } else {
-                println!("{}: {}", style("command").dim(), style(s).green());
-            }
+            cli_println!(porcelain, "{}: {}", style("command").dim(), style(s).green());
         }
         _ => print_params(&call.arguments, 0, debug, porcelain),
     }
@@ -548,11 +397,7 @@ fn render_shell_request(call: &ToolCall, debug: bool, porcelain: bool) {
 fn render_default_request(call: &ToolCall, debug: bool, porcelain: bool) {
     print_tool_header(call, porcelain);
     print_params(&call.arguments, 0, debug, porcelain);
-    if porcelain {
-        eprintln!();
-    } else {
-        println!();
-    }
+    cli_println!(porcelain, "");
 }
 
 // Helper functions
@@ -571,13 +416,8 @@ fn print_tool_header(call: &ToolCall, porcelain: bool) {
         .magenta()
         .dim(),
     );
-    if porcelain {
-        eprintln!();
-        eprintln!("{}", tool_header);
-    } else {
-        println!();
-        println!("{}", tool_header);
-    }
+    cli_println!(porcelain, "");
+    cli_println!(porcelain, "{}", tool_header);
 }
 
 // Respect NO_COLOR, as https://crates.io/crates/console already does
@@ -628,120 +468,61 @@ fn print_params(value: &Value, depth: usize, debug: bool, porcelain: bool) {
             for (key, val) in map {
                 match val {
                     Value::Object(_) => {
-                        if porcelain {
-                            eprintln!("{}{}:", indent, style(key).dim());
-                        } else {
-                            println!("{}{}:", indent, style(key).dim());
-                        }
+                        cli_println!(porcelain, "{}{}:", indent, style(key).dim());
                         print_params(val, depth + 1, debug, porcelain);
                     }
                     Value::Array(arr) => {
-                        if porcelain {
-                            eprintln!("{}{}:", indent, style(key).dim());
-                        } else {
-                            println!("{}{}:", indent, style(key).dim());
-                        }
+                        cli_println!(porcelain, "{}{}:", indent, style(key).dim());
                         for item in arr.iter() {
-                            if porcelain {
-                                eprintln!("{}{}- ", indent, INDENT);
-                            } else {
-                                println!("{}{}- ", indent, INDENT);
-                            }
+                            cli_println!(porcelain, "{}{}- ", indent, INDENT);
                             print_params(item, depth + 2, debug, porcelain);
                         }
                     }
                     Value::String(s) => {
                         if !debug && s.len() > get_tool_params_max_length() {
-                            if porcelain {
-                                eprintln!("{}{}: {}", indent, style(key).dim(), style("...").dim());
-                            } else {
-                                println!("{}{}: {}", indent, style(key).dim(), style("...").dim());
-                            }
+                            cli_println!(porcelain, "{}{}: {}", indent, style(key).dim(), style("...").dim());
                         } else {
-                            if porcelain {
-                                eprintln!("{}{}: {}", indent, style(key).dim(), style(s).green());
-                            } else {
-                                println!("{}{}: {}", indent, style(key).dim(), style(s).green());
-                            }
+                            cli_println!(porcelain, "{}{}: {}", indent, style(key).dim(), style(s).green());
                         }
                     }
                     Value::Number(n) => {
-                        if porcelain {
-                            eprintln!("{}{}: {}", indent, style(key).dim(), style(n).blue());
-                        } else {
-                            println!("{}{}: {}", indent, style(key).dim(), style(n).blue());
-                        }
+                        cli_println!(porcelain, "{}{}: {}", indent, style(key).dim(), style(n).blue());
                     }
                     Value::Bool(b) => {
-                        if porcelain {
-                            eprintln!("{}{}: {}", indent, style(key).dim(), style(b).blue());
-                        } else {
-                            println!("{}{}: {}", indent, style(key).dim(), style(b).blue());
-                        }
+                        cli_println!(porcelain, "{}{}: {}", indent, style(key).dim(), style(b).blue());
                     }
                     Value::Null => {
-                        if porcelain {
-                            eprintln!("{}{}: {}", indent, style(key).dim(), style("null").dim());
-                        } else {
-                            println!("{}{}: {}", indent, style(key).dim(), style("null").dim());
-                        }
+                        cli_println!(porcelain, "{}{}: {}", indent, style(key).dim(), style("null").dim());
                     }
                 }
             }
         }
         Value::Array(arr) => {
             for (i, item) in arr.iter().enumerate() {
-                if porcelain {
-                    eprintln!("{}{}.", indent, i + 1);
-                } else {
-                    println!("{}{}.", indent, i + 1);
-                }
+                cli_println!(porcelain, "{}{}.", indent, i + 1);
                 print_params(item, depth + 1, debug, porcelain);
             }
         }
         Value::String(s) => {
             if !debug && s.len() > get_tool_params_max_length() {
-                if porcelain {
-                    eprintln!(
-                        "{}{}",
-                        indent,
-                        style(format!("[REDACTED: {} chars]", s.len())).yellow()
-                    );
-                } else {
-                    println!(
-                        "{}{}",
-                        indent,
-                        style(format!("[REDACTED: {} chars]", s.len())).yellow()
-                    );
-                }
+                cli_println!(
+                    porcelain,
+                    "{}{}",
+                    indent,
+                    style(format!("[REDACTED: {} chars]", s.len())).yellow()
+                );
             } else {
-                if porcelain {
-                    eprintln!("{}{}", indent, style(s).green());
-                } else {
-                    println!("{}{}", indent, style(s).green());
-                }
+                cli_println!(porcelain, "{}{}", indent, style(s).green());
             }
         }
         Value::Number(n) => {
-            if porcelain {
-                eprintln!("{}{}", indent, style(n).yellow());
-            } else {
-                println!("{}{}", indent, style(n).yellow());
-            }
+            cli_println!(porcelain, "{}{}", indent, style(n).yellow());
         }
         Value::Bool(b) => {
-            if porcelain {
-                eprintln!("{}{}", indent, style(b).yellow());
-            } else {
-                println!("{}{}", indent, style(b).yellow());
-            }
+            cli_println!(porcelain, "{}{}", indent, style(b).yellow());
         }
         Value::Null => {
-            if porcelain {
-                eprintln!("{}{}", indent, style("null").dim());
-            } else {
-                println!("{}{}", indent, style("null").dim());
-            }
+            cli_println!(porcelain, "{}{}", indent, style("null").dim());
         }
     }
 }
@@ -838,11 +619,7 @@ pub fn display_session_info(
             )
         }
     };
-    if porcelain {
-        eprintln!("{}", session_info);
-    } else {
-        println!("{}", session_info);
-    }
+    cli_println!(porcelain, "{}", session_info);
 
     if session_file.to_str() != Some("/dev/null") && session_file.to_str() != Some("NUL") {
         let logging_info = format!(
@@ -850,11 +627,7 @@ pub fn display_session_info(
             style("logging to").dim(),
             style(session_file.display()).dim().cyan(),
         );
-        if porcelain {
-            eprintln!("{}", logging_info);
-        } else {
-            println!("{}", logging_info);
-        }
+        cli_println!(porcelain, "{}", logging_info);
     }
 
     let working_dir_info = format!(
@@ -864,19 +637,11 @@ pub fn display_session_info(
             .cyan()
             .dim()
     );
-    if porcelain {
-        eprintln!("{}", working_dir_info);
-    } else {
-        println!("{}", working_dir_info);
-    }
+    cli_println!(porcelain, "{}", working_dir_info);
 }
 
 pub fn display_greeting(porcelain: bool) {
-    if porcelain {
-        eprintln!("\nGoose is running! Enter your instructions, or try asking what goose can do.\n");
-    } else {
-        println!("\nGoose is running! Enter your instructions, or try asking what goose can do.\n");
-    }
+    cli_println!(porcelain, "\nGoose is running! Enter your instructions, or try asking what goose can do.\n");
 }
 
 /// Display context window usage with both current and session totals
@@ -884,11 +649,7 @@ pub fn display_context_usage(total_tokens: usize, context_limit: usize, porcelai
     use console::style;
 
     if context_limit == 0 {
-        if porcelain {
-            eprintln!("Context: Error - context limit is zero");
-        } else {
-            println!("Context: Error - context limit is zero");
-        }
+        cli_println!(porcelain, "Context: Error - context limit is zero");
         return;
     }
 
@@ -916,17 +677,11 @@ pub fn display_context_usage(total_tokens: usize, context_limit: usize, porcelai
     };
 
     // Print the status line
-    if porcelain {
-        eprintln!(
-            "Context: {} {}% ({}/{} tokens)",
-            colored_dots, percentage, total_tokens, context_limit
-        );
-    } else {
-        println!(
-            "Context: {} {}% ({}/{} tokens)",
-            colored_dots, percentage, total_tokens, context_limit
-        );
-    }
+    cli_println!(
+        porcelain,
+        "Context: {} {}% ({}/{} tokens)",
+        colored_dots, percentage, total_tokens, context_limit
+    );
 }
 
 pub struct McpSpinners {

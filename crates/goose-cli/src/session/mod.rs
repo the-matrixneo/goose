@@ -38,6 +38,8 @@ use std::sync::Arc;
 use std::time::Instant;
 use tokio;
 
+use crate::cli_println;
+
 pub enum RunMode {
     Normal,
     Plan,
@@ -474,27 +476,15 @@ impl Session {
                     let current = output::get_theme();
                     let new_theme = match current {
                         output::Theme::Light => {
-                            if self.porcelain {
-                                eprintln!("Switching to Dark theme");
-                            } else {
-                                println!("Switching to Dark theme");
-                            }
+                            cli_println!(self.porcelain, "Switching to Dark theme");
                             output::Theme::Dark
                         }
                         output::Theme::Dark => {
-                            if self.porcelain {
-                                eprintln!("Switching to Ansi theme");
-                            } else {
-                                println!("Switching to Ansi theme");
-                            }
+                            cli_println!(self.porcelain, "Switching to Ansi theme");
                             output::Theme::Ansi
                         }
                         output::Theme::Ansi => {
-                            if self.porcelain {
-                                eprintln!("Switching to Light theme");
-                            } else {
-                                println!("Switching to Light theme");
-                            }
+                            cli_println!(self.porcelain, "Switching to Light theme");
                             output::Theme::Light
                         }
                     };
@@ -568,11 +558,7 @@ impl Session {
                     self.handle_prompt_command(opts).await?;
                 }
                 InputResult::Recipe(filepath_opt) => {
-                    if self.porcelain {
-                        eprintln!("{}", console::style("Generating Recipe").green());
-                    } else {
-                        println!("{}", console::style("Generating Recipe").green());
-                    }
+                    cli_println!(self.porcelain, "{}", console::style("Generating Recipe").green());
 
                     output::show_thinking();
                     let recipe = self.agent.create_recipe(self.messages.clone()).await;
@@ -585,19 +571,11 @@ impl Session {
                             match self.save_recipe(&recipe, filepath_str) {
                                 Ok(path) => {
                                     let msg = format!("Saved recipe to {}", path.display());
-                                    if self.porcelain {
-                                        eprintln!("{}", console::style(&msg).green());
-                                    } else {
-                                        println!("{}", console::style(&msg).green());
-                                    }
+                                    cli_println!(self.porcelain, "{}", console::style(&msg).green());
                                 }
                                 Err(e) => {
                                     let msg = format!("Failed to generate recipe: {:?}", e);
-                                    if self.porcelain {
-                                        eprintln!("{}", console::style(&msg).red());
-                                    } else {
-                                        println!("{}", console::style(&msg).red());
-                                    }
+                                    cli_println!(self.porcelain, "{}", console::style(&msg).red());
                                 }
                             }
                         }
@@ -626,11 +604,7 @@ impl Session {
                         };
 
                     if should_summarize {
-                        if self.porcelain {
-                            eprintln!("{}", console::style("Summarizing conversation...").yellow());
-                        } else {
-                            println!("{}", console::style("Summarizing conversation...").yellow());
-                        }
+                        cli_println!(self.porcelain, "{}", console::style("Summarizing conversation...").yellow());
                         output::show_thinking();
 
                         // Get the provider for summarization
@@ -653,19 +627,10 @@ impl Session {
                         .await?;
 
                         output::hide_thinking();
-                        if self.porcelain {
-                            eprintln!("{}", console::style("Conversation has been summarized.").green());
-                            eprintln!("{}", console::style("Key information has been preserved while reducing context length.").green());
-                        } else {
-                            println!("{}", console::style("Conversation has been summarized.").green());
-                            println!("{}", console::style("Key information has been preserved while reducing context length.").green());
-                        }
+                        cli_println!(self.porcelain, "{}", console::style("Conversation has been summarized.").green());
+                        cli_println!(self.porcelain, "{}", console::style("Key information has been preserved while reducing context length.").green());
                     } else {
-                        if self.porcelain {
-                            eprintln!("{}", console::style("Summarization cancelled.").yellow());
-                        } else {
-                            println!("{}", console::style("Summarization cancelled.").yellow());
-                        }
+                        cli_println!(self.porcelain, "{}", console::style("Summarization cancelled.").yellow());
                     }
 
                     continue;
@@ -674,11 +639,7 @@ impl Session {
         }
 
         let message = format!("\nClosing session. Recorded to {}", self.session_file.display());
-        if self.porcelain {
-            eprintln!("{}", message);
-        } else {
-            println!("{}", message);
-        }
+        cli_println!(self.porcelain, "{}", message);
         Ok(())
     }
 
@@ -698,11 +659,7 @@ impl Session {
 
         match planner_response_type {
             PlannerResponseType::Plan => {
-                if self.porcelain {
-                    eprintln!();
-                } else {
-                    println!();
-                }
+                cli_println!(self.porcelain, "");
                 let should_act = match cliclack::confirm(
                     "Do you want to clear message history & act on this plan?",
                 )
@@ -1016,11 +973,7 @@ impl Session {
                                             // Show subagent notifications immediately (no buffering) with compact spacing
                                             if interactive {
                                                 let _ = progress_bars.hide();
-                                                if self.porcelain {
-                                                    eprintln!("{}", &formatted_message);
-                                                } else {
-                                                    println!("{}", console::style(&formatted_message).green().dim());
-                                                }
+                                                cli_println!(self.porcelain, "{}", console::style(&formatted_message).green().dim());
                                             } else {
                                                 progress_bars.log(&formatted_message);
                                             }
@@ -1028,11 +981,7 @@ impl Session {
                                             // Non-subagent notification, display immediately with compact spacing
                                             if interactive {
                                                 let _ = progress_bars.hide();
-                                                if self.porcelain {
-                                                    eprintln!("{}", &formatted_message);
-                                                } else {
-                                                    println!("{}", console::style(&formatted_message).green().dim());
-                                                }
+                                                cli_println!(self.porcelain, "{}", console::style(&formatted_message).green().dim());
                                             } else {
                                                 progress_bars.log(&formatted_message);
                                             }
@@ -1261,19 +1210,12 @@ impl Session {
         }
 
         // Print session restored message
-        if self.porcelain {
-            eprintln!(
-                "\n{} {} messages loaded into context.",
-                console::style("Session restored:").green().bold(),
-                console::style(self.messages.len()).green()
-            );
-        } else {
-            println!(
-                "\n{} {} messages loaded into context.",
-                console::style("Session restored:").green().bold(),
-                console::style(self.messages.len()).green()
-            );
-        }
+        cli_println!(
+            self.porcelain,
+            "\n{} {} messages loaded into context.",
+            console::style("Session restored:").green().bold(),
+            console::style(self.messages.len()).green()
+        );
 
         // Render each message
         for message in &self.messages {
@@ -1281,17 +1223,11 @@ impl Session {
         }
 
         // Add a visual separator after restored messages
-        if self.porcelain {
-            eprintln!(
-                "\n{}\n",
-                console::style("──────── New Messages ────────").dim()
-            );
-        } else {
-            println!(
-                "\n{}\n",
-                console::style("──────── New Messages ────────").dim()
-            );
-        }
+        cli_println!(
+            self.porcelain,
+            "\n{}\n",
+            console::style("──────── New Messages ────────").dim()
+        );
     }
 
     /// Get the session metadata
@@ -1460,11 +1396,7 @@ fn get_reasoner(porcelain: bool) -> Result<Arc<dyn Provider>, anyhow::Error> {
     let provider = if let Ok(provider) = config.get_param::<String>("GOOSE_PLANNER_PROVIDER") {
         provider
     } else {
-        if porcelain {
-            eprintln!("WARNING: GOOSE_PLANNER_PROVIDER not found. Using default provider...");
-        } else {
-            println!("WARNING: GOOSE_PLANNER_PROVIDER not found. Using default provider...");
-        }
+        cli_println!(porcelain, "WARNING: GOOSE_PLANNER_PROVIDER not found. Using default provider...");
         config
             .get_param::<String>("GOOSE_PROVIDER")
             .expect("No provider configured. Run 'goose configure' first")
@@ -1474,11 +1406,7 @@ fn get_reasoner(porcelain: bool) -> Result<Arc<dyn Provider>, anyhow::Error> {
     let model = if let Ok(model) = config.get_param::<String>("GOOSE_PLANNER_MODEL") {
         model
     } else {
-        if porcelain {
-            eprintln!("WARNING: GOOSE_PLANNER_MODEL not found. Using default model...");
-        } else {
-            println!("WARNING: GOOSE_PLANNER_MODEL not found. Using default model...");
-        }
+        cli_println!(porcelain, "WARNING: GOOSE_PLANNER_MODEL not found. Using default model...");
         config
             .get_param::<String>("GOOSE_MODEL")
             .expect("No model configured. Run 'goose configure' first")
