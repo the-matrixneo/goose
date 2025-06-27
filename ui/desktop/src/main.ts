@@ -1327,7 +1327,7 @@ const floatingButtons = new Map<string, BrowserWindow>();
 ipcMain.handle('create-floating-button', async (event, data) => {
   console.log('Main process: create-floating-button called with data:', data);
   try {
-    const { buttonId, x, y, size } = data;
+    const { buttonId, x, y, size, imageData } = data;
     const parentWindow = BrowserWindow.fromWebContents(event.sender);
 
     if (!parentWindow) {
@@ -1400,7 +1400,7 @@ ipcMain.handle('create-floating-button', async (event, data) => {
           JSON.stringify({
             buttonId,
             size,
-            imageData: '', // No image data needed
+            imageData: imageData || '', // Pass the actual image data
             parentWindowId: parentWindow.id,
           }),
         ],
@@ -1409,7 +1409,7 @@ ipcMain.handle('create-floating-button', async (event, data) => {
 
     console.log('Main process: Floating window created with ID:', floatingWindow.id);
 
-    // Create simplified HTML content that should definitely work
+    // Create HTML content that uses the actual image data
     const floatingButtonHTML = `<!DOCTYPE html>
 <html>
 <head>
@@ -1450,6 +1450,7 @@ ipcMain.handle('create-floating-button', async (event, data) => {
       display: flex;
       align-items: center;
       justify-content: center;
+      overflow: hidden;
     }
     .floating-button:hover {
       transform: scale(1.05);
@@ -1458,7 +1459,14 @@ ipcMain.handle('create-floating-button', async (event, data) => {
         0 3px 6px rgba(0, 0, 0, 0.3),
         inset 0 2px 4px rgba(255, 255, 255, 0.4);
     }
-    .goose-logo {
+    .button-image {
+      width: 80%;
+      height: 80%;
+      object-fit: cover;
+      border-radius: 50%;
+      filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.7));
+    }
+    .fallback-icon {
       width: 24px;
       height: 24px;
       color: rgba(255, 255, 255, 0.9);
@@ -1468,12 +1476,51 @@ ipcMain.handle('create-floating-button', async (event, data) => {
 </head>
 <body>
   <div class="floating-button">
-    <svg class="goose-logo" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-    </svg>
+    <div id="button-content">
+      <!-- Content will be set by JavaScript -->
+    </div>
   </div>
   <script>
     console.log('Floating button loaded successfully');
+    
+    // Get the config from the preload script
+    const config = window.electronFloating ? window.electronFloating.getConfig() : {};
+    console.log('Button config:', config);
+    
+    // Set up the button content based on available image data
+    const buttonContent = document.getElementById('button-content');
+    
+    if (config.imageData && config.imageData.trim() !== '') {
+      // Use the actual image data
+      const img = document.createElement('img');
+      img.src = config.imageData;
+      img.className = 'button-image';
+      img.alt = 'Dragged button';
+      
+      // Add error handling for image loading
+      img.onerror = function() {
+        console.log('Failed to load image, using fallback icon');
+        buttonContent.innerHTML = \`
+          <svg class="fallback-icon" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+          </svg>
+        \`;
+      };
+      
+      img.onload = function() {
+        console.log('Image loaded successfully');
+      };
+      
+      buttonContent.appendChild(img);
+    } else {
+      // Use fallback icon if no image data
+      console.log('No image data available, using fallback icon');
+      buttonContent.innerHTML = \`
+        <svg class="fallback-icon" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+        </svg>
+      \`;
+    }
     
     // Handle dragging
     let isDragging = false;
@@ -1506,7 +1553,7 @@ ipcMain.handle('create-floating-button', async (event, data) => {
       }
     });
     
-    console.log('Button ID:', '${buttonId}');
+    console.log('Button ID:', config.buttonId || 'unknown');
     console.log('Window size:', window.innerWidth, 'x', window.innerHeight);
   </script>
 </body>

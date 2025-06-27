@@ -3,6 +3,8 @@ const { contextBridge, ipcRenderer } = require('electron');
 // Parse config from command line arguments
 const config = JSON.parse(process.argv.find(arg => arg.startsWith('{')) || '{}');
 
+console.log('Floating button preload - config:', config);
+
 // Expose floating button API
 contextBridge.exposeInMainWorld('electronFloating', {
   checkDocking: () => {
@@ -13,5 +15,8 @@ contextBridge.exposeInMainWorld('electronFloating', {
     // Focus the parent window when clicked
     ipcRenderer.send('focus-parent-window', config.parentWindowId);
   },
-  getConfig: () => config
+  getConfig: () => {
+    console.log('getConfig called, returning:', config);
+    return config;
+  }
 });
