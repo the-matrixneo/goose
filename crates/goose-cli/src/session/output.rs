@@ -469,15 +469,16 @@ pub fn env_no_color() -> bool {
 
 fn print_markdown(content: &str, theme: Theme, porcelain: bool) {
     if porcelain {
-        // In porcelain mode, use bat for markdown formatting
+        let mut stderr_buffer = String::new();
         bat::PrettyPrinter::new()
             .input(bat::Input::from_bytes(content.as_bytes()))
             .theme(theme.as_str())
             .colored_output(env_no_color())
             .language("Markdown")
             .wrapping_mode(WrappingMode::NoWrapping(true))
-            .print()
+            .print_with_writer(Some(&mut stderr_buffer))
             .unwrap();
+        eprint!("{}", stderr_buffer);
     } else {
         // Normal mode uses bat for markdown formatting
         bat::PrettyPrinter::new()
