@@ -1391,6 +1391,7 @@ ipcMain.handle('create-floating-button', async (event, data) => {
       closable: true,
       focusable: true,
       show: true,
+      movable: true, // Ensure the window can be moved
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
@@ -1435,6 +1436,9 @@ ipcMain.handle('create-floating-button', async (event, data) => {
     body:active {
       cursor: grabbing;
     }
+    body.dragging {
+      cursor: grabbing;
+    }
     .floating-button {
       width: ${windowSize - 4}px;
       height: ${windowSize - 4}px;
@@ -1451,12 +1455,21 @@ ipcMain.handle('create-floating-button', async (event, data) => {
       align-items: center;
       justify-content: center;
       overflow: hidden;
+      -webkit-app-region: drag;
+      pointer-events: auto;
     }
     .floating-button:hover {
       transform: scale(1.05);
       box-shadow: 
         0 6px 12px rgba(0, 0, 0, 0.4),
         0 3px 6px rgba(0, 0, 0, 0.3),
+        inset 0 2px 4px rgba(255, 255, 255, 0.4);
+    }
+    .floating-button.dragging {
+      transform: scale(1.1);
+      box-shadow: 
+        0 8px 16px rgba(0, 0, 0, 0.5),
+        0 4px 8px rgba(0, 0, 0, 0.4),
         inset 0 2px 4px rgba(255, 255, 255, 0.4);
     }
     .button-image {
@@ -1522,33 +1535,67 @@ ipcMain.handle('create-floating-button', async (event, data) => {
       \`;
     }
     
-    // Handle dragging
+    // Handle dragging with better visual feedback
     let isDragging = false;
     let dragStartTime = 0;
+    let dragMoved = false;
     
     document.addEventListener('mousedown', (e) => {
       console.log('Mouse down on floating button');
       isDragging = true;
       dragStartTime = Date.now();
+      dragMoved = false;
+      
+      // Add visual feedback
+      document.body.classList.add('dragging');
+      const floatingButton = document.querySelector('.floating-button');
+      if (floatingButton) {
+        floatingButton.classList.add('dragging');
+      }
+    });
+    
+    document.addEventListener('mousemove', (e) => {
+      if (isDragging) {
+        dragMoved = true;
+      }
     });
     
     document.addEventListener('mouseup', (e) => {
       if (isDragging) {
         const dragDuration = Date.now() - dragStartTime;
-        console.log('Mouse up - drag duration:', dragDuration);
+        console.log('Mouse up - drag duration:', dragDuration, 'moved:', dragMoved);
+        
+        // Remove visual feedback
+        document.body.classList.remove('dragging');
+        const floatingButton = document.querySelector('.floating-button');
+        if (floatingButton) {
+          floatingButton.classList.remove('dragging');
+        }
+        
         isDragging = false;
         
-        // If it was a quick click (less than 200ms), treat as click
-        if (dragDuration < 200) {
+        // If it was a quick click without movement, treat as click
+        if (dragDuration < 200 && !dragMoved) {
           console.log('Quick click detected - focusing parent');
           if (window.electronFloating) {
             window.electronFloating.focusParent();
           }
-        } else {
+        } else if (dragMoved) {
           console.log('Drag detected - checking docking');
           if (window.electronFloating) {
             window.electronFloating.checkDocking();
           }
+        }
+      }
+    });
+    
+    // Handle drag leave to clean up visual state
+    document.addEventListener('mouseleave', (e) => {
+      if (isDragging) {
+        document.body.classList.remove('dragging');
+        const floatingButton = document.querySelector('.floating-button');
+        if (floatingButton) {
+          floatingButton.classList.remove('dragging');
         }
       }
     });
