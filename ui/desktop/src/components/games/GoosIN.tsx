@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Card, CardContent } from '../ui/card';
 
 // Game constants
 const CANVAS_WIDTH = 320;
@@ -233,41 +232,39 @@ export default function GoosIN() {
   }, [gameState.isPlaying, gameLoop, handleKeyDown, handleKeyUp]);
 
   return (
-    <Card className="w-full sm:w-auto animate-in fade-in slide-in-from-right-8 duration-500 rounded-2xl min-w-[340px] max-w-[380px]">
-      <CardContent className="flex flex-col items-center p-4">
-        <div className="relative border border-border-subtle rounded">
-          <canvas
-            ref={canvasRef}
-            width={CANVAS_WIDTH}
-            height={CANVAS_HEIGHT}
-            className="block bg-background-muted"
-            style={{
-              imageRendering: 'pixelated',
-              filter: gameState.isPlaying ? 'none' : 'brightness(0.8)',
-            }}
-          />
-          
-          {!gameState.isPlaying && (
-            <div className="absolute inset-0 flex items-center justify-center bg-background-default bg-opacity-90 rounded">
-              <button
-                onClick={toggleGame}
-                className="px-3 py-2 bg-background-accent hover:bg-background-accent/80 text-text-on-accent font-mono text-sm rounded border border-border-subtle transition-colors shadow-sm"
-              >
-                ▶ Play
-              </button>
-            </div>
-          )}
-        </div>
+    <div className="w-full sm:w-auto animate-in fade-in slide-in-from-right-8 duration-500 rounded-2xl min-w-[340px] max-w-[380px] bg-background-default border border-border-subtle shadow-sm">
+      <div className="relative p-4">
+        <canvas
+          ref={canvasRef}
+          width={CANVAS_WIDTH}
+          height={CANVAS_HEIGHT}
+          className="block bg-background-muted rounded w-full"
+          style={{
+            imageRendering: 'pixelated',
+            filter: gameState.isPlaying ? 'none' : 'brightness(0.8)',
+          }}
+        />
+        
+        {!gameState.isPlaying && (
+          <div className="absolute inset-4 flex items-center justify-center bg-background-default bg-opacity-90 rounded">
+            <button
+              onClick={toggleGame}
+              className="px-3 py-2 bg-background-accent hover:bg-background-accent/80 text-text-on-accent font-mono text-sm rounded border border-border-subtle transition-colors shadow-sm"
+            >
+              ▶ Play
+            </button>
+          </div>
+        )}
         
         {gameState.isPlaying && (
           <button
             onClick={toggleGame}
-            className="mt-2 px-2 py-1 bg-background-subtle hover:bg-background-muted text-text-muted font-mono text-xs rounded transition-colors"
+            className="absolute top-2 right-2 px-2 py-1 bg-background-subtle hover:bg-background-muted text-text-muted font-mono text-xs rounded transition-colors"
           >
-            ⏸ Pause
+            ⏸
           </button>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
