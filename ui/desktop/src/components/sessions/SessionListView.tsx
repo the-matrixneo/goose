@@ -407,18 +407,12 @@ const SessionListView: React.FC<SessionListViewProps> = ({ setView, onSelectSess
   return (
     <>
       <MainPanelLayout>
-        <div className="h-12 flex items-center justify-between">
-          <div className={`flex items-center ${headerPadding}`}>
-            <SidebarTrigger className="no-drag" />
-          </div>
-        </div>
-
         <div className="flex-1 flex flex-col min-h-0">
           {/* Content Area */}
-          <div className="flex flex-col mt-4 mb-6 px-6">
-            <h1 className="text-4xl font-light">Past sessions</h1>
+          <div className="flex flex-col mt-8 mb-6 px-6">
+            <h1 className="text-4xl font-light">Chat history</h1>
             <h3 className="text-sm text-text-muted mt-2">
-              View previous goose sessions and their contents to pick up where you left off.
+              View previous goose cahts and their contents to pick up where you left off.
             </h3>
           </div>
 

@@ -141,7 +141,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
         </SidebarHeader> */}
 
         {/* Menu */}
-        <div className="pt-14">
+        <div className="pt-10">
           <SidebarMenu>
             <motion.div
               initial={{ opacity: 0, x: 20 }}
@@ -158,7 +158,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
                   }}
                   isActive={isActivePath('/')}
                   tooltip="Go back to the main chat screen"
-                  className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200 data-[active=true]:bg-neutral-200"
+                  className="w-full justify-start px-3 rounded-xl h-fit hover:bg-background-medium transition-all duration-200 data-[active=true]:bg-background-medium"
                 >
                   <Home className="w-4 h-4" />
                   <span>Home</span>
@@ -176,10 +176,10 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
                   onClick={() => navigate('/pair')}
                   isActive={isActivePath('/pair')}
                   tooltip="Start pairing with Goose"
-                  className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200 data-[active=true]:bg-neutral-200"
+                  className="w-full justify-start px-3 rounded-xl h-fit hover:bg-background-medium transition-all duration-200 data-[active=true]:bg-background-medium"
                 >
                   <ChatSmart className="w-4 h-4" />
-                  <span>Pair with goose</span>
+                  <span>Chat</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </motion.div>
@@ -198,7 +198,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
                     );
                   }}
                   tooltip="Start a new session in a new window"
-                  className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200"
+                  className="w-full justify-start px-3 rounded-xl h-fit hover:bg-background-medium transition-all duration-200"
                 >
                   {safeIsMacOS ? (
                     <AppWindowMac className="w-4 h-4" />
@@ -222,23 +222,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
               </SidebarMenuButton>
             </SidebarMenuItem> */}
 
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.2 }}
-            >
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  onClick={() => navigate('/sessions')}
-                  isActive={isActivePath('/sessions')}
-                  tooltip="View and share previous sessions"
-                  className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200 data-[active=true]:bg-neutral-200"
-                >
-                  <Time className="w-4 h-4" />
-                  <span>History</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </motion.div>
+            {/* History button moved to AppLayout header */}
 
             {process.env.ALPHA && (
               <motion.div
@@ -251,7 +235,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
                     onClick={() => navigate('/schedules')}
                     isActive={isActivePath('/schedules')}
                     tooltip="Manage scheduled runs"
-                    className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200 data-[active=true]:bg-neutral-200"
+                    className="w-full justify-start px-3 rounded-xl h-fit hover:bg-background-medium transition-all duration-200 data-[active=true]:bg-background-medium"
                   >
                     <Clock className="w-4 h-4" />
                     <span>Scheduler</span>
@@ -270,7 +254,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
                   onClick={() => navigate('/recipes')}
                   isActive={isActivePath('/recipes')}
                   tooltip="Browse your saved recipes"
-                  className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200 data-[active=true]:bg-neutral-200"
+                  className="w-full justify-start px-3 rounded-xl h-fit hover:bg-background-medium transition-all duration-200 data-[active=true]:bg-background-medium"
                 >
                   <FileText className="w-4 h-4" />
                   <span>Recipe library</span>
@@ -278,23 +262,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
               </SidebarMenuItem>
             </motion.div>
 
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.35 }}
-            >
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  onClick={() => navigate('/settings')}
-                  isActive={isActivePath('/settings')}
-                  tooltip="View all settings and options"
-                  className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200 data-[active=true]:bg-neutral-200"
-                >
-                  <Gear className="w-4 h-4" />
-                  <span>Settings</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </motion.div>
+            {/* Settings button moved to AppLayout header */}
           </SidebarMenu>
         </div>
 
@@ -305,25 +273,30 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
       </SidebarContent>
 
       <SidebarFooter>
-        <div className="flex items-center gap-2">
-          <Goose className="w-6 h-6" />
-          <AnimatePresence mode="wait">
-            {state === 'expanded' && (
-              <motion.span
-                key="logo-text"
-                initial={{ opacity: 0, width: 0 }}
-                animate={{ opacity: 1, width: 'auto' }}
-                exit={{ opacity: 0, width: 0 }}
-                transition={{ duration: 0.2, ease: 'easeInOut' }}
-                className="text-base overflow-hidden whitespace-nowrap"
-              >
-                codename goose
-              </motion.span>
-            )}
-          </AnimatePresence>
-        </div>
+        <motion.div
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.4 }}
+          className="flex flex-col gap-2 w-full"
+        >
+          <div className="flex items-center gap-2">
+            <Goose className="w-6 h-6" />
+            <AnimatePresence mode="wait">
+              {state === 'expanded' && (
+                <motion.span
+                  key="logo-text"
+                  initial={{ opacity: 0, width: 0 }}
+                  animate={{ opacity: 1, width: 'auto' }}
+                  exit={{ opacity: 0, width: 0 }}
+                  transition={{ duration: 0.2, ease: 'easeInOut' }}
+                  className="text-base overflow-hidden whitespace-nowrap"
+                >
+                  codename goose
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </div>
 
-        <div className="pb-4">
           <AnimatePresence mode="wait">
             {state === 'expanded' && (
               <motion.div
@@ -340,7 +313,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
                       href="https://discord.gg/pvQ8S2e5"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center justify-center h-8 w-8 p-0 rounded-full hover:bg-neutral-200 transition-all duration-200"
+                      className="inline-flex items-center justify-center h-8 w-8 p-0 rounded-full hover:bg-background-medium transition-all duration-200 text-text-muted"
                     >
                       <MessageCircle className="w-4 h-4" />
                     </a>
@@ -356,7 +329,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
                       href="https://www.linkedin.com/company/block-opensource"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center justify-center h-8 w-8 p-0 rounded-full hover:bg-neutral-200 transition-all duration-200"
+                      className="inline-flex items-center justify-center h-8 w-8 p-0 rounded-full hover:bg-background-medium transition-all duration-200 text-text-muted"
                     >
                       <LinkedIn className="w-4 h-4" />
                     </a>
@@ -372,7 +345,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
                       href="https://www.youtube.com/@blockopensource"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center justify-center h-8 w-8 p-0 rounded-full hover:bg-neutral-200 transition-all duration-200"
+                      className="inline-flex items-center justify-center h-8 w-8 p-0 rounded-full hover:bg-background-medium transition-all duration-200 text-text-muted"
                     >
                       <Youtube className="w-4 h-4" />
                     </a>
@@ -384,7 +357,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
               </motion.div>
             )}
           </AnimatePresence>
-        </div>
+        </motion.div>
       </SidebarFooter>
 
       {/* Save Recipe Dialog */}

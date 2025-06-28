@@ -49,6 +49,7 @@
   --background-app: var(--color-white);
   --background-default: var(--color-white);
   --background-medium: var(--color-neutral-200);
+  --background-strong: var(--color-neutral-300);
   --background-muted: var(--color-neutral-100);
   --background-inverse: var(--color-black);
   --background-danger: var(--color-red-200);
@@ -101,6 +102,7 @@
   --background-app: var(--color-neutral-600);
   --background-default: var(--color-neutral-600);
   --background-medium: var(--color-neutral-500);
+  --background-strong: var(--color-neutral-400);
   --background-muted: var(--color-neutral-400);
   --background-danger: var(--color-red-100);
   --background-success: var(--color-green-100);
@@ -144,6 +146,7 @@
 
   --color-background-default: var(--background-default);
   --color-background-medium: var(--background-medium);
+  --color-background-strong: var(--background-strong);
   --color-background-inverse: var(--background-inverse);
   --color-background-muted: var(--background-muted);
   --color-background-danger: var(--background-danger);
@@ -186,7 +189,7 @@
     @apply border-border-default;
   }
   body {
-    @apply bg-background-default text-text-default;
+    @apply text-text-default;
   }
 }
 

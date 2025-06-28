@@ -444,7 +444,7 @@ export default function ChatInput({
 
   return (
     <div
-      className={`flex flex-col relative h-auto rounded-lg border mx-3 mb-3 transition-colors ${
+      className={`flex flex-col relative h-auto rounded-lg border mx-4 mb-4 transition-colors ${
         disableAnimation ? '' : 'animate-in fade-in slide-in-from-right-8 duration-500'
       } ${
         isFocused
@@ -535,22 +535,35 @@ export default function ChatInput({
         {/* Actions and model/mode/alerts row below input */}
         <div className="flex flex-row items-center gap-1 p-2">
           {/* Send/Attach/Stop actions */}
-          <Button type="button" size="xs" variant="outline" onClick={handleFileSelect}>
+          <Button
+            type="button"
+            size="xs"
+            variant="outline"
+            className="text-text-muted"
+            onClick={handleFileSelect}
+          >
             <Attach />
           </Button>
           {isLoading ? (
-            <Button type="button" onClick={onStop} size="xs" variant="outline">
+            <Button
+              type="button"
+              onClick={onStop}
+              size="xs"
+              variant="outline"
+              className="text-text-muted"
+            >
               <Stop />
             </Button>
           ) : (
-            <Button type="submit" size="xs" variant="outline">
+            <Button type="submit" size="xs" variant="outline" className="text-text-muted">
               <Send />
             </Button>
           )}
 
           {/* Model selector, mode selector, alerts, summarize button */}
-          <div className="flex flex-row items-center gap-2 ml-4">
+          <div className="flex flex-row items-center ml-2">
             <ModelsBottomBar dropdownRef={dropdownRef} setView={setView} />
+            <div className="w-px h-4 bg-border-default mx-2"></div>
             <BottomMenuModeSelection setView={setView} />
             <BottomMenuAlertPopover alerts={alerts} />
             {messages.length > 0 && (

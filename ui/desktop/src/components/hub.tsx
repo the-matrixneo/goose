@@ -42,16 +42,13 @@ import {
   getTextContent,
   TextContent,
 } from '../types/message';
-import SessionsSidebar from './GooseSidebar/AppSidebar';
-import { SidebarTrigger } from './ui/sidebar';
 import BottomMenu from './bottom_menu/BottomMenu';
 import { SessionInsights } from './sessions/SessionsInsights';
 import { useSidebar } from './ui/sidebar';
 import { Button } from './ui/button';
-import { Gear, Idea } from './icons';
+import { Idea } from './icons';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/Tooltip';
-import { Bot, Folder, Save, Send } from 'lucide-react';
-import { ChatSmart } from './icons';
+import { Bot, Save, Send } from 'lucide-react';
 import { MainPanelLayout } from './Layout/MainPanelLayout';
 import ChatInput from './ChatInput';
 
@@ -906,16 +903,6 @@ function HubContentWithSidebar({
           )}
         </div>
       </MainPanelLayout>
-
-      {!isInPairMode && (
-        <BottomMenu
-          setView={setView}
-          numTokens={sessionTokenCount}
-          messages={messages}
-          isLoading={isLoading}
-          setMessages={setMessages}
-        />
-      )}
 
       {showGame && <FlappyGoose onClose={() => setShowGame(false)} />}
 
