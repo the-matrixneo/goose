@@ -30,8 +30,8 @@ function GreetingCard() {
   const greeting = selectedGreeting || { prefix: 'Hello.', message: ' How can I help you today?' };
 
   return (
-    <Card className="col-span-2 border-none animate-in fade-in slide-in-from-right-8 duration-300 bg-background-accent">
-      <CardContent className="flex flex-col justify-end h-full py-4">
+    <Card className="col-span-2 border-none animate-in fade-in slide-in-from-right-8 duration-300 bg-background-accent h-32">
+      <CardContent className="flex flex-col justify-end h-full py-0 px-4">
         <h1 className="text-text-on-accent text-4xl font-light">
           <span>{greeting.prefix}</span>
         </h1>
@@ -92,8 +92,8 @@ export function SessionInsights() {
 
       <div className="grid grid-cols-4 gap-4">
         {/* Total Sessions Card */}
-        <Card className="w-full animate-in fade-in slide-in-from-right-8 duration-500">
-          <CardContent className="flex flex-col justify-end h-full">
+        <Card className="w-full p-3 h-32 animate-in fade-in slide-in-from-right-8 duration-500">
+          <CardContent className="flex flex-col justify-end h-full px-0">
             <div className="flex flex-col justify-end">
               <p className="text-4xl font-mono font-light flex items-end" ref={totalSessionsRef}>
                 {insights?.totalSessions}
@@ -104,25 +104,25 @@ export function SessionInsights() {
         </Card>
 
         {/* Average Duration Card */}
-        <Card className="w-full animate-in fade-in slide-in-from-right-8 duration-500">
-          <CardContent className="flex flex-col justify-end h-full">
+        <Card className="w-full p-3 h-32 animate-in fade-in slide-in-from-right-8 duration-500">
+          <CardContent className="flex flex-col justify-end h-full px-0">
             <div className="flex flex-col justify-end">
               <p className="text-4xl font-mono font-light flex items-end">
                 <span ref={avgDurationRef}>{insights?.avgSessionDuration?.toFixed(1)}m</span>
               </p>
-              <CardDescription>Avg. duration</CardDescription>
+              <CardDescription>Avg. pairing length</CardDescription>
             </div>
           </CardContent>
         </Card>
 
         {/* Total Tokens Card */}
-        <Card className="w-full col-span-2 animate-in fade-in slide-in-from-right-8 duration-500">
-          <CardContent className="flex flex-col justify-end h-full">
+        <Card className="w-full p-3 h-32 col-span-2 animate-in fade-in slide-in-from-right-8 duration-500">
+          <CardContent className="flex flex-col justify-end h-full px-0">
             <div className="flex flex-col justify-end">
               <p className="text-4xl font-mono font-light flex items-end" ref={totalTokensRef}>
                 {insights?.totalTokens ? `${(insights.totalTokens / 1000000).toFixed(2)}M` : ''}
               </p>
-              <CardDescription>Total tokens (millions)</CardDescription>
+              <CardDescription>Total tokens</CardDescription>
             </div>
           </CardContent>
         </Card>
@@ -138,8 +138,8 @@ export function SessionInsights() {
       </Card> */}
 
         {/* Most Active Directories Card */}
-        <Card className="w-full col-span-4 animate-in fade-in slide-in-from-right-8 duration-500">
-          <CardContent>
+        <Card className="w-full p-3 col-span-4 animate-in fade-in slide-in-from-right-8 duration-500">
+          <CardContent className="px-0">
             <CardDescription className="mb-4">
               <span className="text-lg text-text-default">Active directories</span>
             </CardDescription>

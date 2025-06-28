@@ -151,27 +151,14 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
               <SidebarMenuItem>
                 <SidebarMenuButton
                   onClick={() => {
-                    // If we're not on the chat page and have an active session, just navigate back to chat
-                    if (currentPath !== '/' && hasActiveSession) {
-                      navigate('/');
-                    } else if (hasActiveSession) {
-                      // If we're already on the chat page and have an active session, create a new session
-                      resetChat();
-                      navigate('/');
-                    } else {
-                      // Navigate to home if no active session
-                      navigate('/');
-                    }
+                    // Always reset chat and navigate to home when clicking Home button
+                    // This ensures insights are displayed regardless of active session
+                    resetChat();
+                    navigate('/');
                   }}
                   isActive={isActivePath('/')}
-                  tooltip={
-                    currentPath !== '/' && hasActiveSession
-                      ? 'Return to chat'
-                      : hasActiveSession
-                        ? 'Create a new session'
-                        : 'Go back to the main chat screen'
-                  }
-                  className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200"
+                  tooltip="Go back to the main chat screen"
+                  className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200 data-[active=true]:bg-neutral-200"
                 >
                   <Home className="w-4 h-4" />
                   <span>Home</span>
@@ -189,10 +176,10 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
                   onClick={() => navigate('/pair')}
                   isActive={isActivePath('/pair')}
                   tooltip="Start pairing with Goose"
-                  className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200"
+                  className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200 data-[active=true]:bg-neutral-200"
                 >
                   <ChatSmart className="w-4 h-4" />
-                  <span>Pair</span>
+                  <span>Pair with goose</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </motion.div>
@@ -245,7 +232,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
                   onClick={() => navigate('/sessions')}
                   isActive={isActivePath('/sessions')}
                   tooltip="View and share previous sessions"
-                  className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200"
+                  className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200 data-[active=true]:bg-neutral-200"
                 >
                   <Time className="w-4 h-4" />
                   <span>History</span>
@@ -264,7 +251,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
                     onClick={() => navigate('/schedules')}
                     isActive={isActivePath('/schedules')}
                     tooltip="Manage scheduled runs"
-                    className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200"
+                    className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200 data-[active=true]:bg-neutral-200"
                   >
                     <Clock className="w-4 h-4" />
                     <span>Scheduler</span>
@@ -283,7 +270,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
                   onClick={() => navigate('/recipes')}
                   isActive={isActivePath('/recipes')}
                   tooltip="Browse your saved recipes"
-                  className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200"
+                  className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200 data-[active=true]:bg-neutral-200"
                 >
                   <FileText className="w-4 h-4" />
                   <span>Recipe library</span>
@@ -301,7 +288,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
                   onClick={() => navigate('/settings')}
                   isActive={isActivePath('/settings')}
                   tooltip="View all settings and options"
-                  className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200"
+                  className="w-full justify-start px-3 rounded-lg h-fit hover:bg-neutral-200 transition-all duration-200 data-[active=true]:bg-neutral-200"
                 >
                   <Gear className="w-4 h-4" />
                   <span>Settings</span>

@@ -38,6 +38,7 @@ interface ChatInputProps {
   hasMessages?: boolean;
   messages?: Message[];
   setMessages: (messages: Message[]) => void;
+  disableAnimation?: boolean;
 }
 
 export default function ChatInput({
@@ -52,6 +53,7 @@ export default function ChatInput({
   hasMessages,
   messages = [],
   setMessages,
+  disableAnimation = false,
 }: ChatInputProps) {
   const [_value, setValue] = useState(initialValue);
   const [displayValue, setDisplayValue] = useState(initialValue); // For immediate visual feedback
@@ -442,7 +444,9 @@ export default function ChatInput({
 
   return (
     <div
-      className={`flex flex-col relative h-auto rounded-xl border mx-6 mb-6 transition-colors animate-in fade-in slide-in-from-right-8 duration-500 ${
+      className={`flex flex-col relative h-auto rounded-lg border mx-3 mb-3 transition-colors ${
+        disableAnimation ? '' : 'animate-in fade-in slide-in-from-right-8 duration-500'
+      } ${
         isFocused
           ? 'border-borderProminent hover:border-borderProminent'
           : 'border-borderSubtle hover:border-borderStandard'

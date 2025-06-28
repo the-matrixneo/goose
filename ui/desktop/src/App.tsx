@@ -10,6 +10,7 @@ import { ToastContainer } from 'react-toastify';
 import { extractExtensionName } from './components/settings/extensions/utils';
 import { GoosehintsModal } from './components/GoosehintsModal';
 import { type ExtensionConfig } from './extensions';
+import { generateSessionId } from './sessions';
 
 import Hub, { type ChatType } from './components/hub';
 import Pair from './components/pair';
@@ -36,6 +37,7 @@ import { type SessionDetails } from './sessions';
 export type View =
   | 'welcome'
   | 'chat'
+  | 'pair'
   | 'settings'
   | 'moreModels'
   | 'configureProviders'
@@ -101,6 +103,9 @@ const HubRouteWrapper = ({
           case 'chat':
             navigate('/');
             break;
+          case 'pair':
+            navigate('/pair', { state: options });
+            break;
           case 'settings':
             navigate('/settings', { state: options });
             break;
@@ -156,6 +161,9 @@ const PairRouteWrapper = ({
           case 'chat':
             navigate('/');
             break;
+          case 'pair':
+            navigate('/pair', { state: options });
+            break;
           case 'settings':
             navigate('/settings', { state: options });
             break;
@@ -202,6 +210,9 @@ const SettingsRoute = () => {
           case 'chat':
             navigate('/');
             break;
+          case 'pair':
+            navigate('/pair');
+            break;
           case 'settings':
             navigate('/settings', { state: options });
             break;
@@ -245,6 +256,9 @@ const SessionsRoute = () => {
         switch (view) {
           case 'chat':
             navigate('/', { state: options });
+            break;
+          case 'pair':
+            navigate('/pair', { state: options });
             break;
           case 'settings':
             navigate('/settings', { state: options });
@@ -309,6 +323,9 @@ const PermissionRoute = () => {
         switch (parentView) {
           case 'chat':
             navigate('/');
+            break;
+          case 'pair':
+            navigate('/pair');
             break;
           case 'settings':
             navigate('/settings');
@@ -378,6 +395,9 @@ const SharedSessionRouteWrapper = ({
                   case 'chat':
                     navigate('/', { state: _options });
                     break;
+                  case 'pair':
+                    navigate('/pair', { state: _options });
+                    break;
                   case 'settings':
                     navigate('/settings', { state: _options });
                     break;
@@ -431,6 +451,14 @@ export default function App() {
   const [isLoadingSharedSession, setIsLoadingSharedSession] = useState(false);
   const [sharedSessionError, setSharedSessionError] = useState<string | null>(null);
 
+  // Add separate state for pair chat to maintain its own conversation
+  const [pairChat, setPairChat] = useState<ChatType>({
+    id: generateSessionId(),
+    title: 'Pair Chat',
+    messages: [],
+    messageHistoryIndex: 0,
+  });
+
   const { getExtensions, addExtension, read } = useConfig();
   const initAttemptedRef = useRef(false);
 
@@ -441,6 +469,9 @@ export default function App() {
     switch (view) {
       case 'chat':
         window.history.replaceState({}, '', '/');
+        break;
+      case 'pair':
+        window.history.replaceState({}, '', '/pair');
         break;
       case 'settings':
         window.history.replaceState({}, '', '/settings');
@@ -510,6 +541,7 @@ export default function App() {
         // Handle other deep links by redirecting to appropriate route
         const routeMap: Record<string, string> = {
           chat: '/',
+          pair: '/pair',
           settings: '/settings',
           sessions: '/sessions',
           schedules: '/schedules',
@@ -904,11 +936,13 @@ export default function App() {
               <Route
                 path="pair"
                 element={
-                  <PairRouteWrapper
-                    chat={chat}
-                    setChat={setChat}
-                    setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
-                  />
+                  <ChatProvider chat={pairChat} setChat={setPairChat}>
+                    <PairRouteWrapper
+                      chat={pairChat}
+                      setChat={setPairChat}
+                      setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
+                    />
+                  </ChatProvider>
                 }
               />
               <Route path="settings" element={<SettingsRoute />} />

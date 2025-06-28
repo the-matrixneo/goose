@@ -51,6 +51,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from './ui/Tooltip';
 import { Bot, Folder, Save, Send } from 'lucide-react';
 import { ChatSmart } from './icons';
 import { MainPanelLayout } from './Layout/MainPanelLayout';
+import { useLocation } from 'react-router-dom';
 
 // Context for sharing current model info
 const CurrentModelContext = createContext<{ model: string; mode: string } | null>(null);
@@ -133,6 +134,7 @@ function PairContentWithSidebar({
   setView: (view: View, viewOptions?: ViewOptions) => void;
   setIsGoosehintsModalOpen: (isOpen: boolean) => void;
 }) {
+  const location = useLocation();
   const safeIsMacOS = (window?.electron?.platform || 'darwin') === 'darwin';
   const { open: isSidebarOpen } = useSidebar();
 
@@ -147,6 +149,10 @@ function PairContentWithSidebar({
   const [ancestorMessages, setAncestorMessages] = useState<Message[]>([]);
   const [droppedFiles, setDroppedFiles] = useState<string[]>([]);
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
+  const [hasProcessedInitialInput, setHasProcessedInitialInput] = useState(false);
+
+  // Get disableAnimation from location state
+  const disableAnimation = location.state?.disableAnimation || false;
 
   const scrollRef = useRef<ScrollAreaHandle>(null);
 
@@ -582,9 +588,25 @@ function PairContentWithSidebar({
     return map;
   }, new Map());
 
+  // Handle initial input from hub page
+  useEffect(() => {
+    const initialInput = location.state?.initialInput;
+    const fromHub = location.state?.fromHub;
+
+    if (fromHub && initialInput && !hasProcessedInitialInput && messages.length === 0) {
+      // Auto-submit the initial input
+      const userMessage = createUserMessage(initialInput);
+      append(userMessage);
+      setHasProcessedInitialInput(true);
+
+      // Clear the location state to prevent re-processing
+      window.history.replaceState({}, '', '/pair');
+    }
+  }, [location.state, hasProcessedInitialInput, messages.length, append]);
+
   return (
     <div>
-      <MainPanelLayout>
+      <MainPanelLayout disableAnimation={disableAnimation}>
         {/* Loader when generating recipe */}
         {isGeneratingRecipe && <LayingEggLoader />}
 
@@ -796,7 +818,9 @@ function PairContentWithSidebar({
             </>
           )}
         </div>
-        <div className="relative z-10 animate-[fadein_400ms_ease-in_forwards]">
+        <div
+          className={`relative z-10 ${disableAnimation ? '' : 'animate-[fadein_400ms_ease-in_forwards]'}`}
+        >
           <ChatInput
             handleSubmit={handleSubmit}
             isLoading={isLoading}
@@ -809,6 +833,7 @@ function PairContentWithSidebar({
             droppedFiles={droppedFiles}
             messages={messages}
             setMessages={setMessages}
+            disableAnimation={disableAnimation}
           />
         </div>
       </MainPanelLayout>

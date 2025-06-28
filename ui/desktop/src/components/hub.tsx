@@ -7,6 +7,7 @@ import React, {
   useContext,
   createContext,
 } from 'react';
+import { useLocation } from 'react-router-dom';
 import { getApiUrl } from '../config';
 import FlappyGoose from './FlappyGoose';
 import GooseMessage from './GooseMessage';
@@ -29,6 +30,7 @@ import {
 } from './context_management/ChatContextManager';
 import { ContextHandler } from './context_management/ContextHandler';
 import { LocalMessageStorage } from '../utils/localMessageStorage';
+import { useChatContext } from '../contexts/ChatContext';
 import {
   Message,
   createUserMessage,
@@ -51,7 +53,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from './ui/Tooltip';
 import { Bot, Folder, Save, Send } from 'lucide-react';
 import { ChatSmart } from './icons';
 import { MainPanelLayout } from './Layout/MainPanelLayout';
-import { useNavigate } from 'react-router-dom';
+import ChatInput from './ChatInput';
 
 // Context for sharing current model info
 const CurrentModelContext = createContext<{ model: string; mode: string } | null>(null);
@@ -134,9 +136,10 @@ function HubContentWithSidebar({
   setView: (view: View, viewOptions?: ViewOptions) => void;
   setIsGoosehintsModalOpen: (isOpen: boolean) => void;
 }) {
-  const navigate = useNavigate();
-  const safeIsMacOS = (window?.electron?.platform || 'darwin') === 'darwin';
   const { open: isSidebarOpen } = useSidebar();
+  const safeIsMacOS = (window?.electron?.platform || 'darwin') === 'darwin';
+  const location = useLocation();
+  const { resetChat } = useChatContext();
 
   // Calculate padding based on sidebar state and macOS
   const headerPadding = !isSidebarOpen ? (safeIsMacOS ? 'pl-20' : 'pl-12') : 'pl-4';
@@ -149,6 +152,24 @@ function HubContentWithSidebar({
   const [ancestorMessages, setAncestorMessages] = useState<Message[]>([]);
   const [droppedFiles, setDroppedFiles] = useState<string[]>([]);
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
+  const [isInPairMode, setIsInPairMode] = useState(false);
+  // New state to force showing insights when navigating to hub
+  const [forceShowInsights, setForceShowInsights] = useState(true);
+
+  // Effect to detect direct navigation to the hub page
+  useEffect(() => {
+    // Check if we're on the hub page (root route)
+    const isHubPage = location.pathname === '/';
+
+    // If we're on the hub page, force showing insights regardless of message count
+    if (isHubPage) {
+      setForceShowInsights(true);
+      setIsInPairMode(false);
+    }
+  }, [location.pathname]);
+
+  // Get disableAnimation from location state
+  const disableAnimation = location.state?.disableAnimation || false;
 
   const scrollRef = useRef<ScrollAreaHandle>(null);
 
@@ -407,6 +428,28 @@ function HubContentWithSidebar({
     }
   };
 
+  // Handle submit for the initial ChatInput (when no messages)
+  const handleInitialSubmit = (e: React.FormEvent) => {
+    const customEvent = e as unknown as CustomEvent;
+    const combinedTextFromInput = customEvent.detail?.value || '';
+
+    if (combinedTextFromInput.trim()) {
+      // Navigate to pair page with animation disabled
+      setView('pair', { disableAnimation: true });
+
+      // Create and submit the user message
+      const userMessage = createUserMessage(combinedTextFromInput.trim());
+      append(userMessage);
+
+      // Scroll to bottom after a short delay to ensure the message is rendered
+      setTimeout(() => {
+        if (scrollRef.current?.scrollToBottom) {
+          scrollRef.current.scrollToBottom();
+        }
+      }, 100);
+    }
+  };
+
   if (error) {
     console.log('Error:', error);
   }
@@ -586,7 +629,7 @@ function HubContentWithSidebar({
 
   return (
     <div>
-      <MainPanelLayout>
+      <MainPanelLayout disableAnimation={disableAnimation}>
         {/* Loader when generating recipe */}
         {isGeneratingRecipe && <LayingEggLoader />}
 
@@ -695,14 +738,15 @@ function HubContentWithSidebar({
         </div>
 
         <div
-          className="flex flex-col min-w-0 flex-1 overflow-y-scroll relative pl-6 pr-4 pb-16"
+          className={`flex flex-col min-w-0 flex-1 overflow-y-scroll relative p-4 pr-1 ${isInPairMode ? 'pt-2' : ''}`}
           onDrop={handleDrop}
           onDragOver={handleDragOver}
         >
-          {/* Session Insights at the top */}
-          {messages.length === 0 && <SessionInsights />}
+          {/* Session Insights - always show on hub page regardless of message count */}
+          {(messages.length === 0 || forceShowInsights) && !isInPairMode && <SessionInsights />}
 
-          {recipeConfig?.title && messages.length > 0 && (
+          {/* Only show agent header and messages if insights are not forced */}
+          {!forceShowInsights && recipeConfig?.title && messages.length > 0 && (
             <AgentHeader
               title={recipeConfig.title}
               profileInfo={
@@ -716,9 +760,9 @@ function HubContentWithSidebar({
               }}
             />
           )}
-          {messages.length === 0 ? (
+          {(messages.length === 0 || forceShowInsights) && !isInPairMode ? (
             <>
-              <SearchView>{/* Empty search view when no messages */}</SearchView>
+              <SearchView>{/* Empty search view when no messages or insights forced */}</SearchView>
             </>
           ) : (
             <>
@@ -804,29 +848,74 @@ function HubContentWithSidebar({
             </>
           )}
         </div>
-        <div className="relative z-10 animate-[fadein_400ms_ease-in_forwards]">
-          {/* "Let's pair" button when no messages */}
-          {messages.length === 0 && (
-            <div className="flex justify-center mb-6">
-              <Button
-                onClick={() => navigate('/pair')}
-                className="px-8 py-3 text-lg font-medium bg-borderProminent text-text-on-accent rounded-lg hover:bg-opacity-90 transition-all duration-200"
-                size="lg"
-              >
-                Let's pair
-              </Button>
+        <div
+          className={`relative z-10 ${disableAnimation ? '' : 'animate-[fadein_400ms_ease-in_forwards]'}`}
+        >
+          {/* Show session continuation UI when there's an active session but insights are shown */}
+          {forceShowInsights && messages.length > 0 ? (
+            <div className="mx-6 mb-6 p-4 rounded-xl border border-borderSubtle bg-background-default">
+              <div className="flex flex-col items-center gap-4">
+                <div className="text-center">
+                  <h3 className="text-lg font-medium">You have an active session</h3>
+                  <p className="text-sm text-textSubtle mt-1">
+                    Would you like to continue or start fresh?
+                  </p>
+                </div>
+                <div className="flex gap-3">
+                  <Button
+                    onClick={() => {
+                      // Navigate to pair page with the session
+                      setView('pair');
+                    }}
+                    variant="default"
+                  >
+                    Continue Session
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      resetChat();
+                      setForceShowInsights(false);
+                    }}
+                    variant="outline"
+                  >
+                    Start New Session
+                  </Button>
+                </div>
+              </div>
             </div>
+          ) : (
+            /* ChatInput for all conversations */
+            <ChatInput
+              handleSubmit={
+                forceShowInsights || (messages.length === 0 && !isInPairMode)
+                  ? handleInitialSubmit
+                  : handleSubmit
+              }
+              isLoading={isLoading}
+              onStop={onStopGoose}
+              commandHistory={commandHistory}
+              initialValue={_input || initialPrompt}
+              setView={setView}
+              hasMessages={hasMessages}
+              numTokens={sessionTokenCount}
+              droppedFiles={droppedFiles}
+              messages={forceShowInsights ? [] : messages}
+              setMessages={setMessages}
+              disableAnimation={disableAnimation}
+            />
           )}
         </div>
       </MainPanelLayout>
 
-      <BottomMenu
-        setView={setView}
-        numTokens={sessionTokenCount}
-        messages={messages}
-        isLoading={isLoading}
-        setMessages={setMessages}
-      />
+      {!isInPairMode && (
+        <BottomMenu
+          setView={setView}
+          numTokens={sessionTokenCount}
+          messages={messages}
+          isLoading={isLoading}
+          setMessages={setMessages}
+        />
+      )}
 
       {showGame && <FlappyGoose onClose={() => setShowGame(false)} />}
 

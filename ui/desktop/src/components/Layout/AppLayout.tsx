@@ -24,6 +24,9 @@ const AppLayoutContent: React.FC<AppLayoutProps> = ({ setIsGoosehintsModalOpen }
       case 'chat':
         navigate('/');
         break;
+      case 'pair':
+        navigate('/pair');
+        break;
       case 'settings':
         navigate('/settings', { state: viewOptions });
         break;
