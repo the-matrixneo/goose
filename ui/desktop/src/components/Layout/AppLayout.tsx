@@ -18,7 +18,7 @@ const AppLayoutContent: React.FC<AppLayoutProps> = ({ setIsGoosehintsModalOpen }
   const safeIsMacOS = (window?.electron?.platform || 'darwin') === 'darwin';
 
   // Calculate padding based on sidebar state and macOS
-  const headerPadding = !isSidebarOpen ? (safeIsMacOS ? 'pl-[32px]' : 'pl-0') : 'pl-0';
+  const headerPadding = !isSidebarOpen ? (safeIsMacOS ? 'pl-[32px]' : 'pl-4') : 'pl-4';
 
   const setView = (view: View, viewOptions?: ViewOptions) => {
     // Convert view-based navigation to route-based navigation
@@ -73,7 +73,7 @@ const AppLayoutContent: React.FC<AppLayoutProps> = ({ setIsGoosehintsModalOpen }
 
   return (
     <div className="flex flex-1 w-full relative animate-fade-in">
-      <Sidebar variant="inset" collapsible="icon">
+      <Sidebar variant="inset" collapsible="offcanvas">
         <AppSidebar
           onSelectSession={handleSelectSession}
           setView={setView}
@@ -83,7 +83,7 @@ const AppLayoutContent: React.FC<AppLayoutProps> = ({ setIsGoosehintsModalOpen }
       </Sidebar>
       <SidebarInset>
         <div
-          className={`${headerPadding} h-12 z-100 w-full flex items-center justify-between pr-2 py-1`}
+          className={`${headerPadding} absolute top-0 left-0 h-12 z-100 w-full flex items-center justify-between pr-2 py-1`}
         >
           <SidebarTrigger className={`no-drag hover:bg-background-medium`} />
 

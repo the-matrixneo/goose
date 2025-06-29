@@ -63,13 +63,13 @@ export default function SettingsView({
   return (
     <>
       <MainPanelLayout>
-        <div className="flex-1 flex flex-col min-h-0">
+        <div className="flex-1 flex flex-col min-h-0 mt-6">
           {/* Content Area */}
-          <div className="flex flex-col mt-8 mb-6 px-6">
+          <div className="flex flex-col mt-8 mb-6 px-4">
             <h1 className="text-4xl font-light">Settings</h1>
           </div>
 
-          <div className="flex-1 min-h-0 relative px-6">
+          <div className="flex-1 min-h-0 relative">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex">
               <TabsList className="w-48 h-full">
                 <TabsTrigger value="models" className="flex gap-2">

@@ -141,7 +141,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
         </SidebarHeader> */}
 
         {/* Menu */}
-        <div className="pt-10">
+        <div className="pt-12">
           <SidebarMenu>
             <motion.div
               initial={{ opacity: 0, x: 20 }}
@@ -257,7 +257,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
                   className="w-full justify-start px-3 rounded-xl h-fit hover:bg-background-medium transition-all duration-200 data-[active=true]:bg-background-medium"
                 >
                   <FileText className="w-4 h-4" />
-                  <span>Recipe library</span>
+                  <span>Recipes</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </motion.div>
@@ -289,15 +289,16 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
                   animate={{ opacity: 1, width: 'auto' }}
                   exit={{ opacity: 0, width: 0 }}
                   transition={{ duration: 0.2, ease: 'easeInOut' }}
-                  className="text-base overflow-hidden whitespace-nowrap"
+                  className="text-base overflow-hidden whitespace-nowrap leading-tight"
                 >
-                  codename goose
+                  codename
+                  <br /> goose
                 </motion.span>
               )}
             </AnimatePresence>
           </div>
 
-          <AnimatePresence mode="wait">
+          {/* <AnimatePresence mode="wait">
             {state === 'expanded' && (
               <motion.div
                 key="social-icons"
@@ -305,7 +306,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
                 transition={{ duration: 0.2, ease: 'easeInOut' }}
-                className="flex gap-2 overflow-hidden"
+                className="flex gap-1 overflow-hidden"
               >
                 <Tooltip delayDuration={500}>
                   <TooltipTrigger asChild>
@@ -313,7 +314,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
                       href="https://discord.gg/pvQ8S2e5"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center justify-center h-8 w-8 p-0 rounded-full hover:bg-background-medium transition-all duration-200 text-text-muted"
+                      className="inline-flex items-center justify-center h-8 w-8 p-0 rounded-lg hover:bg-background-medium hover:text-text-default transition-all duration-200 text-text-muted"
                     >
                       <MessageCircle className="w-4 h-4" />
                     </a>
@@ -329,7 +330,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
                       href="https://www.linkedin.com/company/block-opensource"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center justify-center h-8 w-8 p-0 rounded-full hover:bg-background-medium transition-all duration-200 text-text-muted"
+                      className="inline-flex items-center justify-center h-8 w-8 p-0 rounded-lg hover:bg-background-medium hover:text-text-default transition-all duration-200 text-text-muted"
                     >
                       <LinkedIn className="w-4 h-4" />
                     </a>
@@ -345,7 +346,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
                       href="https://www.youtube.com/@blockopensource"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center justify-center h-8 w-8 p-0 rounded-full hover:bg-background-medium transition-all duration-200 text-text-muted"
+                      className="inline-flex items-center justify-center h-8 w-8 p-0 rounded-lg hover:bg-background-medium hover:text-text-default transition-all duration-200 text-text-muted"
                     >
                       <Youtube className="w-4 h-4" />
                     </a>
@@ -356,7 +357,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
                 </Tooltip>
               </motion.div>
             )}
-          </AnimatePresence>
+          </AnimatePresence> */}
         </motion.div>
       </SidebarFooter>
 

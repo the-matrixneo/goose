@@ -735,7 +735,7 @@ function HubContentWithSidebar({
         </div>
 
         <div
-          className={`flex flex-col min-w-0 flex-1 overflow-y-scroll relative p-4 pr-1 ${isInPairMode ? 'pt-2' : ''}`}
+          className={`flex flex-col min-w-0 flex-1 overflow-y-scroll relative p-2 pt-6 pr-1`}
           onDrop={handleDrop}
           onDragOver={handleDragOver}
         >

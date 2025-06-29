@@ -73,13 +73,9 @@ export function ActivityHeatmap() {
     const now = new Date();
     const startOfYear = new Date(currentYear, 0, 1); // Jan 1st of current year
 
-    // Calculate days since start of year
-    const daysSinceStartOfYear = Math.floor(
-      (now.getTime() - startOfYear.getTime()) / (1000 * 60 * 60 * 24)
-    );
-
-    // Calculate how many weeks to display (from start of year to now)
-    const weeksToDisplay = Math.ceil((daysSinceStartOfYear + getStartDayOfYear()) / 7);
+    // Calculate weeks to display - now showing full year (52 weeks)
+    // const weeksToDisplay = Math.ceil((daysSinceStartOfYear + getStartDayOfYear()) / 7);
+    const weeksToDisplay = WEEKS_IN_YEAR;
 
     // Create a map to lookup counts easily
     const dataMap = new Map<string, number>();
@@ -99,12 +95,8 @@ export function ActivityHeatmap() {
         const cellDate = new Date(startOfYear);
         cellDate.setDate(cellDate.getDate() + week * 7 + day - getStartDayOfYear());
 
-        // Only include dates up to today
-        if (cellDate > now) {
-          // Empty cell for future dates
-          weekCells.push({ week, day, count: 0, date: '' });
-          continue;
-        }
+        // Only include dates up to today for real data
+        const isFuture = cellDate > now;
 
         // Format the date string
         const dateStr = cellDate.toLocaleDateString(undefined, {
@@ -117,10 +109,12 @@ export function ActivityHeatmap() {
 
         // Try to find a matching date in our data
         // This requires matching the specific week number (from ISO week) and day
-        for (const cell of heatmapData) {
-          if (cell.week === getWeekNumber(cellDate) && cell.day === day) {
-            count = cell.count;
-            break;
+        if (!isFuture) {
+          for (const cell of heatmapData) {
+            if (cell.week === getWeekNumber(cellDate) && cell.day === day) {
+              count = cell.count;
+              break;
+            }
           }
         }
 
@@ -173,11 +167,8 @@ export function ActivityHeatmap() {
     );
   }
 
-  // Get month labels
+  // Get month labels - now showing all months
   const getMonthLabels = () => {
-    // Display month labels from Jan to current month
-    const now = new Date();
-    const currentMonth = now.getMonth();
     const allMonths = [
       'Jan',
       'Feb',
@@ -192,9 +183,8 @@ export function ActivityHeatmap() {
       'Nov',
       'Dec',
     ];
-    const months = allMonths.slice(0, currentMonth + 1);
 
-    return months.map((month, i) => {
+    return allMonths.map((month, i) => {
       // Calculate position based on days in month and start day of year
       const monthIndex = i;
       const daysBeforeMonth = getDaysBeforeMonth(monthIndex);
@@ -205,7 +195,7 @@ export function ActivityHeatmap() {
           key={month}
           className="text-[10px] text-text-muted absolute"
           style={{
-            left: `${(position / grid.length) * 100}%`,
+            left: `${(position / WEEKS_IN_YEAR) * 100}%`,
             transform: 'translateX(-50%)',
           }}
         >
@@ -231,34 +221,37 @@ export function ActivityHeatmap() {
   };
 
   return (
-    <div className="w-full">
+    <div className="w-full px-4">
       {/* Month labels */}
-      <div className="relative h-4 ml-8 mb-2 mr-4">{getMonthLabels()}</div>
+      <div className="relative h-4 ml-12 mb-2 mr-4">{getMonthLabels()}</div>
 
       <div className="flex w-full">
-        {/* Day labels */}
-        <div className="flex flex-col pt-1 pr-2 w-6">
+        {/* Day labels - now right-aligned */}
+        <div className="flex flex-col pt-1 pr-2 w-10">
           {DAYS.map((day, index) => (
-            <div key={day} className="h-3 text-[10px] text-text-muted flex items-center">
+            <div
+              key={day}
+              className="h-3 text-[10px] text-text-muted flex items-center justify-end"
+            >
               {index % 2 === 0 ? day : ''}
             </div>
           ))}
         </div>
 
-        {/* Grid */}
-        <div className="flex gap-[2px] flex-1 mr-4">
+        {/* Grid - with smaller squares */}
+        <div className="flex gap-[1px] flex-1 mr-4">
           {grid.map((week, weekIndex) => (
             <div
               key={weekIndex}
-              className="flex flex-col gap-[2px] flex-1"
-              style={{ maxWidth: `calc(100% / ${grid.length})` }}
+              className="flex flex-col gap-[1px] flex-1"
+              style={{ maxWidth: `calc(100% / ${WEEKS_IN_YEAR})` }}
             >
               {week.map((cell) => (
                 <TooltipProvider key={`${cell.week}-${cell.day}`}>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <div
-                        className={`aspect-square w-full rounded-[2px] ${getColorIntensity(cell.count, maxCount)}`}
+                        className={`aspect-square w-full h-2 rounded-[1px] ${getColorIntensity(cell.count, maxCount)}`}
                         role="gridcell"
                       />
                     </TooltipTrigger>

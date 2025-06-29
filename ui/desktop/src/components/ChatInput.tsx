@@ -444,12 +444,8 @@ export default function ChatInput({
 
   return (
     <div
-      className={`flex flex-col relative h-auto rounded-lg border mx-4 mb-4 transition-colors ${
+      className={`flex flex-col relative h-auto rounded-lg border ml-2 mr-4 mb-4 transition-colors ${
         disableAnimation ? '' : 'animate-in fade-in slide-in-from-right-8 duration-500'
-      } ${
-        isFocused
-          ? 'border-borderProminent hover:border-borderProminent'
-          : 'border-borderSubtle hover:border-borderStandard'
       } z-10`}
     >
       {/* DirSwitcher at the top */}

@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, ViewOptions } from '../../App';
 import { fetchSessionDetails, type SessionDetails } from '../../sessions';
 import SessionListView from './SessionListView';
 import SessionHistoryView from './SessionHistoryView';
 import { toastError } from '../../toasts';
+import { useLocation } from 'react-router-dom';
 
 interface SessionsViewProps {
   setView: (view: View, viewOptions?: ViewOptions) => void;
@@ -13,6 +14,17 @@ const SessionsView: React.FC<SessionsViewProps> = ({ setView }) => {
   const [selectedSession, setSelectedSession] = useState<SessionDetails | null>(null);
   const [isLoadingSession, setIsLoadingSession] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const location = useLocation();
+
+  // Check if a session ID was passed in the location state (from SessionsInsights)
+  useEffect(() => {
+    const state = location.state as { selectedSessionId?: string } | null;
+    if (state?.selectedSessionId) {
+      handleSelectSession(state.selectedSessionId);
+      // Clear the state to prevent reloading on navigation
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
 
   const handleSelectSession = async (sessionId: string) => {
     await loadSessionDetails(sessionId);
