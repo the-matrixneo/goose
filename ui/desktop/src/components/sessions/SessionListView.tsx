@@ -221,7 +221,7 @@ const SessionListView: React.FC<SessionListViewProps> = ({ setView, onSelectSess
     return (
       <Card
         onClick={() => onSelectSession(session.id)}
-        className="h-full py-3 px-4 hover:scale-102 cursor-pointer transition-all duration-150 flex flex-col justify-between"
+        className="h-full py-3 px-4 hover:shadow-default cursor-pointer transition-all duration-150 flex flex-col justify-between"
       >
         <div className="flex-1">
           <h3 className="text-base truncate mb-1">{session.metadata.description || session.id}</h3>
@@ -345,13 +345,13 @@ const SessionListView: React.FC<SessionListViewProps> = ({ setView, onSelectSess
       <MainPanelLayout>
         <div className="flex-1 flex flex-col min-h-0">
           {/* Content Area */}
-          <div className="flex flex-col mt-8 mb-6 px-6">
+          <div className="flex flex-col mt-13 mb-6 px-2">
             <h1 className="text-4xl font-light">Chat history</h1>
           </div>
 
-          <div className="flex-1 min-h-0 relative px-6">
-            <ScrollArea className="h-full" data-search-scroll-area>
-              <div ref={containerRef} className="h-full relative">
+          <div className="flex-1 min-h-0 relative px-2">
+            <ScrollArea className="h-full pr-2" data-search-scroll-area>
+              <div ref={containerRef} className="h-full relative px-1">
                 <SearchView
                   onSearch={handleSearch}
                   onNavigate={handleSearchNavigation}

@@ -18,7 +18,7 @@ const AppLayoutContent: React.FC<AppLayoutProps> = ({ setIsGoosehintsModalOpen }
   const safeIsMacOS = (window?.electron?.platform || 'darwin') === 'darwin';
 
   // Calculate padding based on sidebar state and macOS
-  const headerPadding = !isSidebarOpen ? (safeIsMacOS ? 'pl-[32px]' : 'pl-4') : 'pl-4';
+  const headerPadding = isSidebarOpen ? 'pl-4' : safeIsMacOS ? 'pl-20' : 'pl-4';
 
   const setView = (view: View, viewOptions?: ViewOptions) => {
     // Convert view-based navigation to route-based navigation
@@ -31,6 +31,9 @@ const AppLayoutContent: React.FC<AppLayoutProps> = ({ setIsGoosehintsModalOpen }
         break;
       case 'settings':
         navigate('/settings', { state: viewOptions });
+        break;
+      case 'extensions':
+        navigate('/extensions', { state: viewOptions });
         break;
       case 'sessions':
         navigate('/sessions');
@@ -83,9 +86,11 @@ const AppLayoutContent: React.FC<AppLayoutProps> = ({ setIsGoosehintsModalOpen }
       </Sidebar>
       <SidebarInset>
         <div
-          className={`${headerPadding} absolute top-0 left-0 h-12 z-100 w-full flex items-center justify-between pr-2 py-1`}
+          className={`${headerPadding} absolute top-0 left-0 h-12 z-100 w-full flex items-center justify-between pr-4 py-1`}
         >
-          <SidebarTrigger className={`no-drag hover:bg-background-medium`} />
+          <SidebarTrigger
+            className={`no-drag text-text-muted hover:text-text-default hover:bg-background-muted`}
+          />
 
           {/* Header Action Buttons */}
           <div className="flex items-center">
@@ -95,7 +100,7 @@ const AppLayoutContent: React.FC<AppLayoutProps> = ({ setIsGoosehintsModalOpen }
               variant="ghost"
               size="xs"
               aria-label="View History"
-              className="hover:bg-background-medium no-drag"
+              className="hover:bg-background-muted text-text-muted hover:text-text-default no-drag"
             >
               <Time className="w-4 h-4" />
             </Button>
@@ -106,7 +111,7 @@ const AppLayoutContent: React.FC<AppLayoutProps> = ({ setIsGoosehintsModalOpen }
               variant="ghost"
               size="xs"
               aria-label="Settings"
-              className="hover:bg-background-medium no-drag"
+              className="hover:bg-background-muted text-text-muted hover:text-text-default no-drag"
             >
               <Gear className="w-4 h-4" />
             </Button>

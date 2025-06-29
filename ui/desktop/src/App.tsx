@@ -33,12 +33,14 @@ import { backupConfig, initConfig, readAllConfig } from './api/sdk.gen';
 import PermissionSettingsView from './components/settings/permission/PermissionSetting';
 
 import { type SessionDetails } from './sessions';
+import ExtensionsView, { ExtensionsViewOptions } from './components/extensions/ExtensionsView';
 
 export type View =
   | 'welcome'
   | 'chat'
   | 'pair'
   | 'settings'
+  | 'extensions'
   | 'moreModels'
   | 'configureProviders'
   | 'configPage'
@@ -439,6 +441,34 @@ const SharedSessionRouteWrapper = ({
   );
 };
 
+const ExtensionsRoute = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const viewOptions = location.state as ExtensionsViewOptions;
+
+  return (
+    <ExtensionsView
+      onClose={() => navigate(-1)}
+      setView={(view, options) => {
+        switch (view) {
+          case 'chat':
+            navigate('/');
+            break;
+          case 'pair':
+            navigate('/pair', { state: options });
+            break;
+          case 'settings':
+            navigate('/settings', { state: options });
+            break;
+          default:
+            navigate('/');
+        }
+      }}
+      viewOptions={viewOptions || {}}
+    />
+  );
+};
+
 export default function App() {
   const [fatalError, setFatalError] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
@@ -468,40 +498,43 @@ export default function App() {
     // Convert view to route navigation
     switch (view) {
       case 'chat':
-        window.history.replaceState({}, '', '/');
+        navigate('/');
         break;
       case 'pair':
-        window.history.replaceState({}, '', '/pair');
+        navigate('/pair', { state: viewOptions });
         break;
       case 'settings':
-        window.history.replaceState({}, '', '/settings');
+        navigate('/settings', { state: viewOptions });
+        break;
+      case 'extensions':
+        navigate('/extensions', { state: viewOptions });
         break;
       case 'sessions':
-        window.history.replaceState({}, '', '/sessions');
+        navigate('/sessions');
         break;
       case 'schedules':
-        window.history.replaceState({}, '', '/schedules');
+        navigate('/schedules');
         break;
       case 'recipes':
-        window.history.replaceState({}, '', '/recipes');
+        navigate('/recipes');
         break;
       case 'permission':
-        window.history.replaceState({}, '', '/permission');
+        navigate('/permission', { state: viewOptions });
         break;
       case 'ConfigureProviders':
-        window.history.replaceState({}, '', '/configure-providers');
+        navigate('/configure-providers');
         break;
       case 'sharedSession':
-        window.history.replaceState({}, '', '/shared-session');
+        navigate('/shared-session', { state: viewOptions });
         break;
       case 'recipeEditor':
-        window.history.replaceState({}, '', '/recipe-editor');
+        navigate('/recipe-editor', { state: viewOptions });
         break;
       case 'welcome':
-        window.history.replaceState({}, '', '/welcome');
+        navigate('/welcome');
         break;
       default:
-        window.history.replaceState({}, '', '/');
+        navigate('/');
     }
   };
 
@@ -946,6 +979,7 @@ export default function App() {
                 }
               />
               <Route path="settings" element={<SettingsRoute />} />
+              <Route path="extensions" element={<ExtensionsRoute />} />
               <Route path="sessions" element={<SessionsRoute />} />
               <Route path="schedules" element={<SchedulesRoute />} />
               <Route path="recipes" element={<RecipesRoute />} />

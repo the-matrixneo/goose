@@ -29,7 +29,7 @@ export const ResponseStylesSection = () => {
       <div className="flex justify-between items-center mb-2">
         <h2 className="text-xl text-text-default">Response Styles</h2>
       </div>
-      <div className="border-b pb-8">
+      <div className="pb-6">
         <p className="text-sm text-text-muted mb-6">
           Choose how Goose should format and style its responses
         </p>

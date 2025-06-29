@@ -61,7 +61,7 @@ export const ToolSelectionStrategySection = ({
       <div className="flex justify-between items-center mb-2">
         <h2 className="text-xl text-text-default">Tool Selection Strategy (preview)</h2>
       </div>
-      <div className="border-b pb-8">
+      <div className="pb-6">
         <p className="text-sm text-text-muted mb-6">
           Configure how Goose selects tools for your requests. Recommended when many extensions are
           enabled. Available only with Claude models served on Databricks for now.
