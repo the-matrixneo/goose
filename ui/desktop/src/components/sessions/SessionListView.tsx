@@ -221,44 +221,32 @@ const SessionListView: React.FC<SessionListViewProps> = ({ setView, onSelectSess
     return (
       <Card
         onClick={() => onSelectSession(session.id)}
-        className="py-2 px-4 mb-2 bg-background-default border-none hover:bg-background-muted cursor-pointer transition-all duration-150"
+        className="h-full py-3 px-4 hover:scale-102 cursor-pointer transition-all duration-150 flex flex-col justify-between"
       >
-        <div className="flex justify-between items-start gap-4">
-          <div className="min-w-0 flex-1">
-            <h3 className="text-base truncate max-w-[50vw]">
-              {session.metadata.description || session.id}
-            </h3>
-            <div className="flex gap-3 min-w-0">
-              <div className="flex items-center text-text-muted text-sm shrink-0">
-                <Calendar className="w-3 h-3 mr-1 flex-shrink-0" />
-                <span>{formatMessageTimestamp(Date.parse(session.modified) / 1000)}</span>
-              </div>
-              <div className="flex items-center text-text-muted text-sm min-w-0">
-                <Folder className="w-3 h-3 mr-1 flex-shrink-0" />
-                <span className="truncate">{session.metadata.working_dir}</span>
-              </div>
-            </div>
+        <div className="flex-1">
+          <h3 className="text-base truncate mb-1">{session.metadata.description || session.id}</h3>
+          <div className="flex items-center text-text-muted text-xs mb-1">
+            <Calendar className="w-3 h-3 mr-1 flex-shrink-0" />
+            <span>{formatMessageTimestamp(Date.parse(session.modified) / 1000)}</span>
           </div>
+          <div className="flex items-center text-text-muted text-xs mb-1">
+            <Folder className="w-3 h-3 mr-1 flex-shrink-0" />
+            <span className="truncate">{session.metadata.working_dir}</span>
+          </div>
+        </div>
 
-          <div className="flex items-center gap-3 shrink-0">
-            <div className="flex flex-col items-end">
-              <div className="flex items-center text-sm text-text-muted">
-                <span>{session.path.split('/').pop() || session.path}</span>
-              </div>
-              <div className="flex items-center mt-1 space-x-3 text-sm text-text-muted">
-                <div className="flex items-center">
-                  <MessageSquareText className="w-3 h-3 mr-1" />
-                  <span>{session.metadata.message_count}</span>
-                </div>
-                {session.metadata.total_tokens !== null && (
-                  <div className="flex items-center">
-                    <Target className="w-3 h-3 mr-1" />
-                    <span>{session.metadata.total_tokens.toLocaleString()}</span>
-                  </div>
-                )}
-              </div>
+        <div className="flex items-center justify-between mt-1 pt-2 border-t border-border-subtle">
+          <div className="flex items-center space-x-3 text-xs text-text-muted">
+            <div className="flex items-center">
+              <MessageSquareText className="w-3 h-3 mr-1" />
+              <span>{session.metadata.message_count}</span>
             </div>
-            {/* <ChevronRight className="w-8 h-5 text-text-muted" /> */}
+            {session.metadata.total_tokens !== null && (
+              <div className="flex items-center">
+                <Target className="w-3 h-3 mr-1" />
+                <span>{session.metadata.total_tokens.toLocaleString()}</span>
+              </div>
+            )}
           </div>
         </div>
       </Card>
@@ -267,56 +255,20 @@ const SessionListView: React.FC<SessionListViewProps> = ({ setView, onSelectSess
 
   // Render skeleton loader for session items
   const SessionSkeleton = () => (
-    <Card className="p-2 mb-2 bg-background-default">
-      <div className="flex justify-between items-start gap-4">
-        <div className="min-w-0 flex-1">
-          <Skeleton className="h-5 w-3/4 mb-2" />
-          <div className="flex gap-3">
-            <Skeleton className="h-4 w-24" />
-            <Skeleton className="h-4 w-32" />
-          </div>
-        </div>
-        <div className="flex items-center gap-3 shrink-0">
-          <div className="flex flex-col items-end">
-            <Skeleton className="h-4 w-20 mb-1" />
-            <div className="flex items-center space-x-3">
-              <Skeleton className="h-4 w-8" />
-              <Skeleton className="h-4 w-12" />
-            </div>
-          </div>
-          <Skeleton className="w-8 h-5" />
+    <Card className="h-full p-3 bg-background-default flex flex-col justify-between">
+      <div className="flex-1">
+        <Skeleton className="h-5 w-3/4 mb-2" />
+        <Skeleton className="h-4 w-24 mb-2" />
+        <Skeleton className="h-4 w-32 mb-2" />
+        <Skeleton className="h-4 w-20" />
+      </div>
+      <div className="flex items-center justify-between mt-3 pt-2 border-t border-border-subtle">
+        <div className="flex items-center space-x-3">
+          <Skeleton className="h-4 w-8" />
+          <Skeleton className="h-4 w-12" />
         </div>
       </div>
     </Card>
-  );
-
-  // Virtualized row renderer
-  const Row = useCallback(
-    ({ index, style }: { index: number; style: React.CSSProperties }) => {
-      const item = flattenedItems[index];
-
-      if (!item) return null;
-
-      if (item.type === 'header') {
-        const group = item.data as DateGroup;
-        return (
-          <div
-            style={style}
-            className="sticky top-0 z-10 bg-background-default/95 backdrop-blur-sm py-2 pt-3"
-          >
-            <h2 className="text-xs uppercase text-text-muted">{group.label}</h2>
-          </div>
-        );
-      } else {
-        const session = item.data as Session;
-        return (
-          <div style={style}>
-            <SessionItem session={session} />
-          </div>
-        );
-      }
-    },
-    [flattenedItems]
   );
 
   const renderContent = () => {
@@ -325,7 +277,8 @@ const SessionListView: React.FC<SessionListViewProps> = ({ setView, onSelectSess
         <div className="space-y-6">
           <div className="space-y-3">
             <Skeleton className="h-6 w-24" />
-            <div className="space-y-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+              <SessionSkeleton />
               <SessionSkeleton />
               <SessionSkeleton />
               <SessionSkeleton />
@@ -368,32 +321,15 @@ const SessionListView: React.FC<SessionListViewProps> = ({ setView, onSelectSess
       );
     }
 
-    // Use virtualized list for large datasets (more than 50 items)
-    if (flattenedItems.length > 50) {
-      return (
-        <List
-          ref={listRef}
-          height={containerHeight}
-          itemCount={flattenedItems.length}
-          itemSize={getItemSize}
-          width="100%"
-          className="virtualized-list"
-          overscanCount={5}
-        >
-          {Row}
-        </List>
-      );
-    }
-
-    // Fallback to regular rendering for small datasets
+    // For regular rendering in grid layout
     return (
-      <div className="space-y-6">
+      <div className="space-y-8">
         {dateGroups.map((group) => (
-          <div key={group.label} className="space-y-3">
-            <div className="sticky top-0 z-10 bg-background-default/95 backdrop-blur-sm pb-2">
-              <h2 className="text-lg">{group.label}</h2>
+          <div key={group.label} className="space-y-4">
+            <div className="sticky top-0 z-10 bg-background-default/95 backdrop-blur-sm">
+              <h2 className="text-text-muted">{group.label}</h2>
             </div>
-            <div className="space-y-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
               {group.sessions.map((session) => (
                 <SessionItem key={session.id} session={session} />
               ))}
@@ -411,9 +347,6 @@ const SessionListView: React.FC<SessionListViewProps> = ({ setView, onSelectSess
           {/* Content Area */}
           <div className="flex flex-col mt-8 mb-6 px-6">
             <h1 className="text-4xl font-light">Chat history</h1>
-            <h3 className="text-sm text-text-muted mt-2">
-              View previous goose cahts and their contents to pick up where you left off.
-            </h3>
           </div>
 
           <div className="flex-1 min-h-0 relative px-6">

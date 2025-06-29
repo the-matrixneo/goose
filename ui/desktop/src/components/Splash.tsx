@@ -2,6 +2,7 @@ import { useTextAnimator } from '../hooks/use-text-animator';
 import { Card } from './ui/card';
 import { useState, useEffect } from 'react';
 import { gsap } from 'gsap';
+import { Greeting } from './common/Greeting';
 
 // Register GSAP plugins
 gsap.registerPlugin();
@@ -25,54 +26,7 @@ export default function Splash({ append, activities, title }: SplashProps) {
       ? [...pills.slice(0, messagePillIndex), ...pills.slice(messagePillIndex + 1)]
       : pills;
 
-  const [selectedGreeting, setSelectedGreeting] = useState<{
-    prefix: string;
-    message: string;
-  } | null>(null);
-
-  // Select a random greeting on component mount
-  useEffect(() => {
-    const prefixes = ['Hello.', 'Welcome.', 'Greetings.', 'Welcome back.', 'Hello there.'];
-
-    const messages = [
-      ' Ready to get started?',
-      ' What would you like to work on?',
-      ' Ready to build something amazing?',
-      ' What would you like to explore?',
-      " What's on your mind?",
-      ' What shall we create today?',
-      ' What project needs attention?',
-      ' What would you like to tackle?',
-      ' What would you like to explore?',
-      ' What needs to be done?',
-      " What's the plan for today?",
-      ' Ready to create something great?',
-      ' What can be built today?',
-      " What's the next challenge?",
-      ' What progress can be made?',
-      ' What would you like to accomplish?',
-      ' What task awaits?',
-      " What's the mission today?",
-      ' What can be achieved?',
-      ' What project is ready to begin?',
-    ];
-
-    const randomPrefixIndex = Math.floor(Math.random() * prefixes.length);
-    const randomMessageIndex = Math.floor(Math.random() * messages.length);
-
-    setSelectedGreeting({
-      prefix: prefixes[randomPrefixIndex],
-      message: messages[randomMessageIndex],
-    });
-  }, []);
-
-  const getGreeting = () => {
-    return selectedGreeting || { prefix: 'Hello.', message: ' How can I help you today?' };
-  };
-
-  const greeting = getGreeting();
   const [isContentReady, setIsContentReady] = useState(false);
-  const greetingMessageRef = useTextAnimator({ text: greeting.message });
 
   // Set content ready after initial render
   useEffect(() => {
@@ -93,10 +47,7 @@ export default function Splash({ append, activities, title }: SplashProps) {
 
       {/* Compact greeting section */}
       <div className="flex flex-col px-6 mb-0">
-        <h1 className="text-text-prominent text-4xl font-light mb-2">
-          <span>{greeting.prefix}</span>
-          {/* <span className="text-text-muted">{greeting.message}</span> */}
-        </h1>
+        <Greeting className="text-text-prominent text-4xl font-light mb-2" />
       </div>
 
       <div className="flex flex-col">

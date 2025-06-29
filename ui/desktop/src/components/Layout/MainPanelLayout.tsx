@@ -10,7 +10,7 @@ export const MainPanelLayout: React.FC<{
 
   return (
     <div
-      className={`flex flex-col flex-1 min-w-0 h-[calc(100dvh-56px)] shadow-default bg-background-default mr-2 mb-2 rounded-xl ${animationClasses}`}
+      className={`flex flex-col flex-1 min-w-0 h-[calc(100dvh-56px)] shadow-default bg-background-default mr-2 mb-2 rounded-xl ${animationClasses} px-4`}
     >
       {children}
     </div>

@@ -63,19 +63,10 @@ export default function SettingsView({
   return (
     <>
       <MainPanelLayout>
-        <div className="h-12 flex items-center justify-between">
-          <div className={`flex items-center ${headerPadding}`}>
-            <SidebarTrigger className="no-drag" />
-          </div>
-        </div>
-
         <div className="flex-1 flex flex-col min-h-0">
           {/* Content Area */}
-          <div className="flex flex-col mt-4 mb-6 px-6">
+          <div className="flex flex-col mt-8 mb-6 px-6">
             <h1 className="text-4xl font-light">Settings</h1>
-            <h3 className="text-sm text-text-muted mt-2">
-              Configure your Goose experience with models, extensions, and preferences.
-            </h3>
           </div>
 
           <div className="flex-1 min-h-0 relative px-6">
