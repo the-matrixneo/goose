@@ -142,9 +142,7 @@ fn read_recipe_file<P: AsRef<Path>>(recipe_path: P) -> Result<(String, PathBuf)>
 mod tests {
     use super::*;
     use std::fs;
-    use std::net::TcpListener;
     use tempfile::TempDir;
-    use tokio::task;
 
     #[tokio::test]
     async fn test_retrieve_recipe_file_local() {
