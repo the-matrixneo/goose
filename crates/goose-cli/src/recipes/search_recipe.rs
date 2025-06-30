@@ -4,8 +4,8 @@ use std::path::{Path, PathBuf};
 use std::{env, fs};
 use url::Url;
 
-use crate::recipes::recipe::RECIPE_FILE_EXTENSIONS;
 use super::github_recipe::{retrieve_recipe_from_github, GOOSE_RECIPE_GITHUB_REPO_CONFIG_KEY};
+use crate::recipes::recipe::RECIPE_FILE_EXTENSIONS;
 
 const GOOSE_RECIPE_PATH_ENV_VAR: &str = "GOOSE_RECIPE_PATH";
 
@@ -38,15 +38,11 @@ async fn retrieve_recipe_from_url(url: &str) -> Result<(String, PathBuf)> {
         .await
         .map_err(|e| anyhow!("Failed to read response from URL {}: {}", url, e))?;
 
-    // For URL-based recipes, we'll use the current directory as the parent
-    let parent_dir = std::env::current_dir()
-        .map_err(|e| anyhow!("Failed to get current directory: {}", e))?;
-
-    Ok((content, parent_dir))
+    // keep the parent empty so we don't grant access to the local filesystem
+    Ok((content, "".into()))
 }
 
 pub async fn retrieve_recipe_file(recipe_name: &str) -> Result<(String, PathBuf)> {
-    // Handle URLs first
     if is_url(recipe_name) {
         return retrieve_recipe_from_url(recipe_name).await;
     }
