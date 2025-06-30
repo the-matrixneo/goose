@@ -5,6 +5,7 @@ import { Settings } from 'lucide-react';
 import Modal from '../../Modal';
 import UpdateSection from './UpdateSection';
 import { UPDATES_ENABLED } from '../../../updates';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../ui/card';
 
 interface AppSettingsSectionProps {
   scrollToSection?: string;
@@ -100,17 +101,21 @@ export default function AppSettingsSection({ scrollToSection }: AppSettingsSecti
   };
 
   return (
-    <section id="appSettings">
-      <div className="flex justify-between items-center mb-2">
-        <h2 className="text-xl text-text-default">App Settings</h2>
-      </div>
-      <div className="pb-8">
-        <p className="text-sm text-text-muted mb-6">Configure Goose app</p>
-        <div>
-          {/* Task Notifications */}
-          <div className="flex items-center justify-between mb-4">
+    <div className="space-y-4 pr-4 pb-8">
+      <section className="mb-4">
+        <h1 className="text-2xl text-text-default">App</h1>
+        <p className="text-sm text-text-muted">Configure goose app</p>
+      </section>
+
+      <Card className="rounded-lg">
+        <CardHeader className="pb-0">
+          <CardTitle className="">Appearance</CardTitle>
+          <CardDescription>Configure how goose appears on your system</CardDescription>
+        </CardHeader>
+        <CardContent className="pt-4 space-y-4 px-4">
+          <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-text-default">Notifications</h3>
+              <h3 className="text-text-default text-xs">Notifications</h3>
               <p className="text-xs text-text-muted max-w-md mt-[2px]">
                 Notifications are managed by your OS{' - '}
                 <span
@@ -125,6 +130,7 @@ export default function AppSettingsSection({ scrollToSection }: AppSettingsSecti
               <Button
                 className="flex items-center gap-2 justify-center"
                 variant="secondary"
+                size="sm"
                 onClick={async () => {
                   try {
                     await window.electron.openNotificationsSettings();
@@ -139,12 +145,11 @@ export default function AppSettingsSection({ scrollToSection }: AppSettingsSecti
             </div>
           </div>
 
-          {/* Menu Bar */}
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-text-default">Menu Bar Icon</h3>
+              <h3 className="text-text-default text-xs">Menu bar icon</h3>
               <p className="text-xs text-text-muted max-w-md mt-[2px]">
-                Show Goose in the menu bar
+                Show goose in the menu bar
               </p>
             </div>
             <div className="flex items-center">
@@ -156,12 +161,11 @@ export default function AppSettingsSection({ scrollToSection }: AppSettingsSecti
             </div>
           </div>
 
-          {/* Dock Icon */}
           {isMacOS && (
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-text-default">Dock Icon</h3>
-                <p className="text-xs text-text-muted max-w-md mt-[2px]">Show Goose in the dock</p>
+                <h3 className="text-text-default text-xs">Dock icon</h3>
+                <p className="text-xs text-text-muted max-w-md mt-[2px]">Show goose in the dock</p>
               </div>
               <div className="flex items-center">
                 <Switch
@@ -174,9 +178,9 @@ export default function AppSettingsSection({ scrollToSection }: AppSettingsSecti
             </div>
           )}
 
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-text-default">Quit Confirmation</h3>
+              <h3 className="text-text-default text-xs">Quit confirmation</h3>
               <p className="text-xs text-text-muted max-w-md mt-[2px]">
                 Show confirmation dialog when quitting the app
               </p>
@@ -189,41 +193,62 @@ export default function AppSettingsSection({ scrollToSection }: AppSettingsSecti
               />
             </div>
           </div>
-        </div>
+        </CardContent>
+      </Card>
 
-        {/* Help & Feedback Section */}
-        <div className="mt-8 pt-8 border-t border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg text-text-default mb-1">Help & Feedback</h3>
-          <p className="text-sm text-text-muted mb-4">
-            Help us improve Goose by reporting issues or requesting new features.
-          </p>
+      <Card className="rounded-lg">
+        <CardHeader className="pb-0">
+          <CardTitle className="mb-1">Help & feedback</CardTitle>
+          <CardDescription>
+            Help us improve goose by reporting issues or requesting new features
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="pt-4 px-4">
           <div className="flex space-x-4">
-            <a
-              href="https://github.com/block/goose/issues/new?template=bug_report.md"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm underline"
+            <Button
+              onClick={() => {
+                window.open(
+                  'https://github.com/block/goose/issues/new?template=bug_report.md',
+                  '_blank'
+                );
+              }}
+              variant="secondary"
+              size="sm"
             >
               Report a Bug
-            </a>
-            <a
-              href="https://github.com/block/goose/issues/new?template=feature_request.md"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm underline"
+            </Button>
+            <Button
+              onClick={() => {
+                window.open(
+                  'https://github.com/block/goose/issues/new?template=feature_request.md',
+                  '_blank'
+                );
+              }}
+              variant="secondary"
+              size="sm"
             >
               Request a Feature
-            </a>
+            </Button>
           </div>
-        </div>
+        </CardContent>
+      </Card>
 
-        {/* Update Section */}
-        {UPDATES_ENABLED && (
-          <div ref={updateSectionRef} className="mt-8 pt-8 border-t border-border-default">
-            <UpdateSection />
-          </div>
-        )}
-      </div>
+      {/* Update Section */}
+      {UPDATES_ENABLED && (
+        <div ref={updateSectionRef}>
+          <Card className="rounded-lg">
+            <CardHeader className="pb-0">
+              <CardTitle className="mb-1">Updates</CardTitle>
+              <CardDescription>
+                Check for and install updates to keep goose running at its best
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="px-4">
+              <UpdateSection />
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Notification Instructions Modal */}
       {showNotificationModal && (
@@ -251,59 +276,30 @@ export default function AppSettingsSection({ scrollToSection }: AppSettingsSecti
             </div>
           </div>
 
-          {/* Content */}
-          <div>
-            {isMacOS ? (
-              <div className="space-y-4">
-                <p className="text-textStandard">To enable notifications for Goose on macOS:</p>
-                <ol className="list-decimal list-inside space-y-3 text-textStandard ml-4">
-                  <li>Click the "Open Settings" button</li>
-                  <li>Find "Goose" in the list of applications</li>
-                  <li>Click on "Goose" to open its notification settings</li>
-                  <li>Toggle "Allow Notifications" to ON</li>
-                  <li>Choose your preferred notification style</li>
-                </ol>
-              </div>
-            ) : window.electron.platform === 'win32' ? (
-              <div className="space-y-4">
-                <p className="text-textStandard">To enable notifications for Goose on Windows:</p>
-                <ol className="list-decimal list-inside space-y-3 text-textStandard ml-4">
-                  <li>Click the "Open Settings" button</li>
-                  <li>
-                    In the Notifications & actions settings, scroll down to "Get notifications from
-                    these senders"
-                  </li>
-                  <li>Find "Goose" in the list of applications</li>
-                  <li>Click on "Goose" to expand its notification settings</li>
-                  <li>Toggle the main switch to ON to enable notifications</li>
-                  <li>Customize notification banners, sounds, and other preferences as desired</li>
-                </ol>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <p className="text-textStandard">To enable notifications for Goose on Linux:</p>
-                <ol className="list-decimal list-inside space-y-3 text-textStandard ml-4">
-                  <li>Click the "Open Settings" button</li>
-                  <li>
-                    In the notification settings panel, look for application-specific settings
-                  </li>
-                  <li>Find "Goose" or "Electron" in the list of applications</li>
-                  <li>Enable notifications for the application</li>
-                  <li>Configure notification preferences such as sound and display options</li>
-                </ol>
-                <div className="mt-4 p-3 bg-bgSubtle rounded-md">
-                  <p className="text-sm text-textSubtle">
-                    <strong>Note:</strong> The exact steps may vary depending on your desktop
-                    environment (GNOME, KDE, XFCE, etc.). If the "Open Settings" button doesn't
-                    work, you can manually access notification settings through your system's
-                    settings application.
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
+          {/* OS-specific instructions */}
+          {isMacOS ? (
+            <div className="space-y-4">
+              <p>To enable notifications on macOS:</p>
+              <ol className="list-decimal pl-5 space-y-2">
+                <li>Open System Preferences</li>
+                <li>Click on Notifications</li>
+                <li>Find and select goose in the application list</li>
+                <li>Enable notifications and adjust settings as desired</li>
+              </ol>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <p>To enable notifications on Windows:</p>
+              <ol className="list-decimal pl-5 space-y-2">
+                <li>Open Settings</li>
+                <li>Go to System &gt; Notifications</li>
+                <li>Find and select goose in the application list</li>
+                <li>Toggle notifications on and adjust settings as desired</li>
+              </ol>
+            </div>
+          )}
         </Modal>
       )}
-    </section>
+    </div>
   );
 }

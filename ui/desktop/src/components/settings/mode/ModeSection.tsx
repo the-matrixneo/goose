@@ -37,29 +37,19 @@ export const ModeSection = ({ setView }: ModeSectionProps) => {
   }, [fetchCurrentMode]);
 
   return (
-    <section id="mode">
-      <div className="flex justify-between items-center mb-2">
-        <h2 className="text-xl text-text-default">Mode</h2>
-      </div>
-      <div className="pb-6">
-        <p className="text-sm text-text-muted mb-6">
-          Configure how Goose interacts with tools and extensions
-        </p>
-        <div>
-          {all_goose_modes.map((mode) => (
-            <ModeSelectionItem
-              key={mode.key}
-              mode={mode}
-              currentMode={currentMode}
-              showDescription={true}
-              isApproveModeConfigure={false}
-              parentView="settings"
-              setView={setView}
-              handleModeChange={handleModeChange}
-            />
-          ))}
-        </div>
-      </div>
-    </section>
+    <div className="space-y-1">
+      {all_goose_modes.map((mode) => (
+        <ModeSelectionItem
+          key={mode.key}
+          mode={mode}
+          currentMode={currentMode}
+          showDescription={true}
+          isApproveModeConfigure={false}
+          parentView="settings"
+          setView={setView}
+          handleModeChange={handleModeChange}
+        />
+      ))}
+    </div>
   );
 };

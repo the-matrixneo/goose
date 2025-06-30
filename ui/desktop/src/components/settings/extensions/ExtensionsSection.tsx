@@ -184,17 +184,7 @@ export default function ExtensionsSection({
 
   return (
     <section id="extensions">
-      <div className="flex justify-between items-center mb-2">
-        <h2 className="text-xl text-text-default">Extensions</h2>
-      </div>
-      <div>
-        <p className="text-sm text-text-muted mb-6">
-          These extensions use the Model Context Protocol (MCP). They can expand Goose's
-          capabilities using three main components: Prompts, Resources, and Tools.
-        </p>
-      </div>
-
-      <div className="border-b pb-8">
+      <div className="border-b pb-8 pl-2">
         <ExtensionList
           extensions={extensions}
           onToggle={handleExtensionToggle}

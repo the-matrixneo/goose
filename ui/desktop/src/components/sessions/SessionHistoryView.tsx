@@ -17,7 +17,6 @@ import { createSharedSession } from '../../sharedSessions';
 import { Modal, ModalContent } from '../ui/modal';
 import { Button } from '../ui/button';
 import { toast } from 'react-toastify';
-import MoreMenuLayout from '../more_menu/MoreMenuLayout';
 import { MainPanelLayout } from '../Layout/MainPanelLayout';
 
 interface SessionHistoryViewProps {

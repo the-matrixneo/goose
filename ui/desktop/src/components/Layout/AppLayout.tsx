@@ -95,7 +95,7 @@ const AppLayoutContent: React.FC<AppLayoutProps> = ({ setIsGoosehintsModalOpen }
           {/* Header Action Buttons */}
           <div className="flex items-center">
             {/* History Button */}
-            <Button
+            {/* <Button
               onClick={() => navigate('/sessions')}
               variant="ghost"
               size="xs"
@@ -103,7 +103,7 @@ const AppLayoutContent: React.FC<AppLayoutProps> = ({ setIsGoosehintsModalOpen }
               className="hover:bg-background-muted text-text-muted hover:text-text-default no-drag"
             >
               <Time className="w-4 h-4" />
-            </Button>
+            </Button> */}
 
             {/* Settings Button */}
             <Button

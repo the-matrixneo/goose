@@ -25,26 +25,16 @@ export const ResponseStylesSection = () => {
   };
 
   return (
-    <section id="responseStyles">
-      <div className="flex justify-between items-center mb-2">
-        <h2 className="text-xl text-text-default">Response Styles</h2>
-      </div>
-      <div className="pb-6">
-        <p className="text-sm text-text-muted mb-6">
-          Choose how Goose should format and style its responses
-        </p>
-        <div>
-          {all_response_styles.map((style) => (
-            <ResponseStyleSelectionItem
-              key={style.key}
-              style={style}
-              currentStyle={currentStyle}
-              showDescription={true}
-              handleStyleChange={handleStyleChange}
-            />
-          ))}
-        </div>
-      </div>
-    </section>
+    <div className="space-y-1">
+      {all_response_styles.map((style) => (
+        <ResponseStyleSelectionItem
+          key={style.key}
+          style={style}
+          currentStyle={currentStyle}
+          showDescription={true}
+          handleStyleChange={handleStyleChange}
+        />
+      ))}
+    </div>
   );
 };

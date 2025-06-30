@@ -96,119 +96,125 @@ export function SessionInsights() {
     <>
       <Greeting />
 
-      <div className="grid grid-cols-4 gap-4">
-        {/* Total Sessions Card */}
-        <Card className="w-full p-3 px-4 animate-in fade-in slide-in-from-right-8 duration-500">
-          <CardContent className="flex flex-col justify-end h-full px-0">
-            <div className="flex flex-col justify-end">
-              <p className="text-4xl font-mono font-light flex items-end">
-                {insights?.totalSessions}
-              </p>
-              <span className="text-xs text-text-muted">Total sessions</span>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="grid gap-4">
+        {/* Top row with three equal columns */}
+        <div className="grid grid-cols-3 gap-4">
+          {/* Total Sessions Card */}
+          <Card className="w-full p-3 px-4 animate-in fade-in slide-in-from-right-8 duration-500">
+            <CardContent className="flex flex-col justify-end h-full px-0">
+              <div className="flex flex-col justify-end">
+                <p className="text-4xl font-mono font-light flex items-end">
+                  {insights?.totalSessions}
+                </p>
+                <span className="text-xs text-text-muted">Total sessions</span>
+              </div>
+            </CardContent>
+          </Card>
 
-        {/* Average Duration Card */}
-        <Card className="w-full p-3 px-4 animate-in fade-in slide-in-from-right-8 duration-500">
-          <CardContent className="flex flex-col justify-end h-full px-0">
-            <div className="flex flex-col justify-end">
-              <p className="text-4xl font-mono font-light flex items-end">
-                {insights?.avgSessionDuration?.toFixed(1)}m
-              </p>
-              <span className="text-xs text-text-muted">Avg. chat length</span>
-            </div>
-          </CardContent>
-        </Card>
+          {/* Average Duration Card */}
+          <Card className="w-full p-3 px-4 animate-in fade-in slide-in-from-right-8 duration-500">
+            <CardContent className="flex flex-col justify-end h-full px-0">
+              <div className="flex flex-col justify-end">
+                <p className="text-4xl font-mono font-light flex items-end">
+                  {insights?.avgSessionDuration?.toFixed(1)}m
+                </p>
+                <span className="text-xs text-text-muted">Avg. chat length</span>
+              </div>
+            </CardContent>
+          </Card>
 
-        {/* Total Tokens Card */}
-        <Card className="w-full p-3 px-4 col-span-2 animate-in fade-in slide-in-from-right-8 duration-500">
-          <CardContent className="flex flex-col justify-end h-full px-0">
-            <div className="flex flex-col justify-end">
-              <p className="text-4xl font-mono font-light flex items-end">
-                {insights?.totalTokens ? `${(insights.totalTokens / 1000000).toFixed(2)}M` : ''}
-              </p>
-              <span className="text-xs text-text-muted">Total tokens</span>
-            </div>
-          </CardContent>
-        </Card>
+          {/* Total Tokens Card */}
+          <Card className="w-full p-3 px-4 animate-in fade-in slide-in-from-right-8 duration-500">
+            <CardContent className="flex flex-col justify-end h-full px-0">
+              <div className="flex flex-col justify-end">
+                <p className="text-4xl font-mono font-light flex items-end">
+                  {insights?.totalTokens ? `${(insights.totalTokens / 1000000).toFixed(2)}M` : ''}
+                </p>
+                <span className="text-xs text-text-muted">Total tokens</span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
-        {/* Recent Chats Card */}
-        <Card className="w-full p-3 px-4 col-span-2 animate-in fade-in slide-in-from-right-8 duration-500">
-          <CardContent className="px-0">
-            <div className="flex justify-between items-center mb-4">
-              <CardDescription className="mb-0">
-                <span className="text-lg text-text-default">Recent chats</span>
+        {/* Bottom row with two equal columns */}
+        <div className="grid grid-cols-2 gap-4">
+          {/* Recent Chats Card */}
+          <Card className="w-full p-3 px-4 animate-in fade-in slide-in-from-right-8 duration-500">
+            <CardContent className="px-0">
+              <div className="flex justify-between items-center mb-4">
+                <CardDescription className="mb-0">
+                  <span className="text-lg text-text-default">Recent chats</span>
+                </CardDescription>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs text-text-muted flex items-center gap-1 !px-0 hover:bg-transparent hover:underline hover:text-text-default"
+                  onClick={navigateToSessionHistory}
+                >
+                  See all <ChevronRight className="h-3 w-3" />
+                </Button>
+              </div>
+              <div className="space-y-1">
+                {recentSessions.length > 0 ? (
+                  recentSessions.map((session) => (
+                    <div
+                      key={session.id}
+                      className="flex items-center justify-between text-sm py-1 px-2 rounded-md hover:bg-background-muted cursor-pointer transition-colors"
+                      onClick={() => handleSessionClick(session.id)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          handleSessionClick(session.id);
+                        }
+                      }}
+                    >
+                      <span className="truncate max-w-[200px]">
+                        {session.metadata.description || session.id}
+                      </span>
+                      <span className="text-text-muted font-mono font-light">
+                        {formatDateOnly(session.modified)}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-text-muted text-sm py-2">No recent chat sessions found.</div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Most Active Directories Card */}
+          <Card className="w-full p-3 px-4 animate-in fade-in slide-in-from-right-8 duration-500">
+            <CardContent className="px-0">
+              <CardDescription className="mb-4">
+                <span className="text-lg text-text-default">Popular directories</span>
               </CardDescription>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-xs text-text-muted flex items-center gap-1 !px-0 hover:bg-transparent hover:underline hover:text-text-default"
-                onClick={navigateToSessionHistory}
-              >
-                See all <ChevronRight className="h-3 w-3" />
-              </Button>
-            </div>
-            <div className="space-y-1">
-              {recentSessions.length > 0 ? (
-                recentSessions.map((session) => (
+              <div className="space-y-1">
+                {insights.mostActiveDirs.map(([dir, count], index) => (
                   <div
-                    key={session.id}
+                    key={index}
                     className="flex items-center justify-between text-sm py-1 px-2 rounded-md hover:bg-background-muted cursor-pointer transition-colors"
-                    onClick={() => handleSessionClick(session.id)}
+                    onClick={() => handleDirectoryClick(dir)}
                     role="button"
                     tabIndex={0}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
-                        handleSessionClick(session.id);
+                        handleDirectoryClick(dir);
                       }
                     }}
                   >
-                    <span className="truncate max-w-[200px]">
-                      {session.metadata.description || session.id}
-                    </span>
-                    <span className="text-text-muted font-mono font-light">
-                      {formatDateOnly(session.modified)}
-                    </span>
+                    <div className="flex items-center space-x-2">
+                      <FolderOpen className="h-4 w-4 text-text-muted" />
+                      <span className="truncate max-w-[200px] rtl">{dir}</span>
+                    </div>
+                    <span className="text-text-muted font-mono font-light">{count} sessions</span>
                   </div>
-                ))
-              ) : (
-                <div className="text-text-muted text-sm py-2">No recent chat sessions found.</div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Most Active Directories Card */}
-        <Card className="w-full p-3 px-4 col-span-2 animate-in fade-in slide-in-from-right-8 duration-500">
-          <CardContent className="px-0">
-            <CardDescription className="mb-4">
-              <span className="text-lg text-text-default">Popular directories</span>
-            </CardDescription>
-            <div className="space-y-1">
-              {insights.mostActiveDirs.map(([dir, count], index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between text-sm py-1 px-2 rounded-md hover:bg-background-muted cursor-pointer transition-colors"
-                  onClick={() => handleDirectoryClick(dir)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      handleDirectoryClick(dir);
-                    }
-                  }}
-                >
-                  <div className="flex items-center space-x-2">
-                    <FolderOpen className="h-4 w-4 text-text-muted" />
-                    <span className="truncate max-w-[200px] rtl">{dir}</span>
-                  </div>
-                  <span className="text-text-muted font-mono font-light">{count} sessions</span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </>
   );

@@ -5,9 +5,6 @@ import { ScrollArea } from './ui/scroll-area';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { Skeleton } from './ui/skeleton';
-import { SidebarTrigger, useSidebar } from './ui/sidebar';
-import BackButton from './ui/BackButton';
-import MoreMenuLayout from './more_menu/MoreMenuLayout';
 import { MainPanelLayout } from './Layout/MainPanelLayout';
 
 interface RecipesViewProps {
@@ -22,12 +19,6 @@ export default function RecipesView({ onBack }: RecipesViewProps) {
   const [selectedRecipe, setSelectedRecipe] = useState<SavedRecipe | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [showContent, setShowContent] = useState(false);
-  const { open: isSidebarOpen } = useSidebar();
-
-  const safeIsMacOS = (window?.electron?.platform || 'darwin') === 'darwin';
-
-  // Calculate padding based on sidebar state and macOS
-  const headerPadding = !isSidebarOpen ? (safeIsMacOS ? 'pl-20' : 'pl-12') : 'pl-4';
 
   useEffect(() => {
     loadSavedRecipes();
@@ -222,10 +213,9 @@ export default function RecipesView({ onBack }: RecipesViewProps) {
 
     if (savedRecipes.length === 0) {
       return (
-        <div className="flex flex-col justify-center pt-6 h-full text-text-muted">
-          <FileText className="h-8 w-8 mb-4" />
+        <div className="flex flex-col justify-center pt-2 h-full text-text-muted">
           <p className="text-lg mb-2">No saved recipes</p>
-          <p className="text-sm">Save a recipe from an active session to see it here.</p>
+          <p className="text-sm">Recipe saved from chats will show up here.</p>
         </div>
       );
     }
@@ -245,27 +235,21 @@ export default function RecipesView({ onBack }: RecipesViewProps) {
   return (
     <>
       <MainPanelLayout>
-        <div className="h-12 flex items-center justify-between">
-          <div className={`flex items-center ${headerPadding}`}>
-            <SidebarTrigger className="no-drag" />
-          </div>
-        </div>
-
         <div className="flex-1 flex flex-col min-h-0">
           {/* Content Area */}
-          <div className="flex flex-col mt-4 mb-6 px-6">
-            <h1 className="text-4xl font-light">Saved Recipes</h1>
-            <h3 className="text-sm text-text-muted mt-2">
+          <div className="flex flex-col mt-13 mb-6 px-2">
+            <h1 className="text-4xl font-light">Recipes</h1>
+            <p className="text-sm text-text-muted mb-1">
               View and manage your saved recipes to quickly start new sessions with predefined
               configurations.
-            </h3>
+            </p>
           </div>
 
-          <div className="flex-1 min-h-0 relative px-6">
+          <div className="flex-1 min-h-0 relative px-2">
             <ScrollArea className="h-full">
               <div
-                className={`h-full relative transition-opacity duration-300 ${
-                  showContent ? 'opacity-100' : 'opacity-0'
+                className={`h-full relative transition-all duration-300 ${
+                  showContent ? 'opacity-100 animate-in slide-in-from-right-8 ' : 'opacity-0'
                 }`}
               >
                 {renderContent()}

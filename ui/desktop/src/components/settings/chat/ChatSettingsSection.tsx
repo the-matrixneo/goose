@@ -2,6 +2,7 @@ import { View, ViewOptions } from '../../../App';
 import { ModeSection } from '../mode/ModeSection';
 import { ToolSelectionStrategySection } from '../tool_selection_strategy/ToolSelectionStrategySection';
 import { ResponseStylesSection } from '../response_styles/ResponseStylesSection';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../ui/card';
 
 interface ChatSettingsSectionProps {
   setView: (view: View, viewOptions?: ViewOptions) => void;
@@ -9,19 +10,46 @@ interface ChatSettingsSectionProps {
 
 export default function ChatSettingsSection({ setView }: ChatSettingsSectionProps) {
   return (
-    <div className="space-y-8">
-      <section>
-        <h1 className="text-xl text-text-default mb-4">Chat Experience</h1>
-        <p className="text-sm text-text-muted mb-8">
+    <div className="space-y-4 pr-4 pb-8">
+      <section className="mb-6">
+        <h1 className="text-2xl text-text-default">Chat experience</h1>
+        <p className="text-sm text-text-muted">
           Configure how Goose interacts with you and responds to your queries
         </p>
       </section>
 
-      <ModeSection setView={setView} />
+      <Card className="pb-2 rounded-lg">
+        <CardHeader className="pb-0">
+          <CardTitle className="">Mode</CardTitle>
+          <CardDescription>Configure how Goose interacts with tools and extensions</CardDescription>
+        </CardHeader>
+        <CardContent className="px-2">
+          <ModeSection setView={setView} />
+        </CardContent>
+      </Card>
 
-      <ResponseStylesSection />
+      <Card className="pb-2 rounded-lg">
+        <CardHeader className="pb-0">
+          <CardTitle className="">Response Styles</CardTitle>
+          <CardDescription>Choose how Goose should format and style its responses</CardDescription>
+        </CardHeader>
+        <CardContent className="px-2">
+          <ResponseStylesSection />
+        </CardContent>
+      </Card>
 
-      <ToolSelectionStrategySection setView={setView} />
+      <Card className="pb-2 rounded-lg">
+        <CardHeader className="pb-0">
+          <CardTitle className="">Tool Selection Strategy (preview)</CardTitle>
+          <CardDescription>
+            Configure how Goose selects tools for your requests. Recommended when many extensions
+            are enabled. Available only with Claude models served on Databricks for now.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="px-2">
+          <ToolSelectionStrategySection setView={setView} />
+        </CardContent>
+      </Card>
     </div>
   );
 }

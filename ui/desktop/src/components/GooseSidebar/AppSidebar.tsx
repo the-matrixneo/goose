@@ -9,6 +9,8 @@ import {
   AppWindowMac,
   AppWindow,
   Puzzle,
+  History,
+  FolderKanban,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -151,7 +153,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
                 <motion.div
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.1 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.05 }}
                 >
                   <SidebarMenuItem>
                     <SidebarMenuButton
@@ -174,7 +176,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
                 <motion.div
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.15 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.1 }}
                 >
                   <SidebarMenuItem>
                     <SidebarMenuButton
@@ -207,7 +209,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
                 <motion.div
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.125 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.2 }}
                 >
                   <SidebarMenuItem>
                     <SidebarMenuButton
@@ -225,7 +227,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
                 <motion.div
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.35 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.25 }}
                 >
                   <SidebarMenuItem>
                     <SidebarMenuButton
@@ -244,7 +246,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
                   <motion.div
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
-                    transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.25 }}
+                    transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.3 }}
                   >
                     <SidebarMenuItem>
                       <SidebarMenuButton
@@ -270,7 +272,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
                 <motion.div
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.3 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.35 }}
                 >
                   <SidebarMenuItem>
                     <SidebarMenuButton
@@ -281,6 +283,42 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
                     >
                       <FileText className="w-4 h-4" />
                       <span>Recipes</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </motion.div>
+
+                <motion.div
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.4 }}
+                >
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      onClick={() => navigate('/sessions')}
+                      isActive={isActivePath('/sessions')}
+                      tooltip="View your session history"
+                      className="w-full justify-start px-3 rounded-xl h-fit hover:bg-background-medium transition-all duration-200 data-[active=true]:bg-background-medium"
+                    >
+                      <History className="w-4 h-4" />
+                      <span>Sessions</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </motion.div>
+
+                <motion.div
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.45 }}
+                >
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      onClick={() => navigate('/projects')}
+                      isActive={isActivePath('/projects')}
+                      tooltip="Manage your projects"
+                      className="w-full justify-start px-3 rounded-xl h-fit hover:bg-background-medium transition-all duration-200 data-[active=true]:bg-background-medium"
+                    >
+                      <FolderKanban className="w-4 h-4" />
+                      <span>Projects</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 </motion.div>
@@ -301,7 +339,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
         <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
-          transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.4 }}
+          transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.5 }}
           className="flex flex-col gap-2 w-full"
         >
           <div className="flex items-center gap-2">

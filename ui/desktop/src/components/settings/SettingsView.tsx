@@ -35,13 +35,7 @@ export default function SettingsView({
   setView: (view: View, viewOptions?: ViewOptions) => void;
   viewOptions: SettingsViewOptions;
 }) {
-  const { open: isSidebarOpen } = useSidebar();
   const [activeTab, setActiveTab] = useState('models');
-
-  const safeIsMacOS = (window?.electron?.platform || 'darwin') === 'darwin';
-
-  // Calculate padding based on sidebar state and macOS
-  const headerPadding = !isSidebarOpen ? (safeIsMacOS ? 'pl-20' : 'pl-12') : 'pl-4';
 
   // Determine initial tab based on section prop
   useEffect(() => {
@@ -95,7 +89,7 @@ export default function SettingsView({
                 </TabsTrigger>
               </TabsList>
 
-              <div className="flex-1 ml-6 pt-1.5">
+              <div className="flex-1 ml-6">
                 <ScrollArea className="h-full">
                   <TabsContent value="models" className="mt-0">
                     <ModelsSection setView={setView} />

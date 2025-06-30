@@ -5,6 +5,7 @@ import { useConfig } from '../../ConfigContext';
 import { toastError } from '../../../toasts';
 
 import { UNKNOWN_PROVIDER_MSG, UNKNOWN_PROVIDER_TITLE } from './index';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../ui/card';
 
 interface ModelsSectionProps {
   setView: (view: View) => void;
@@ -48,17 +49,19 @@ export default function ModelsSection({ setView }: ModelsSectionProps) {
   }, []);
 
   return (
-    <section id="models" className="">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl text-text-default">Models</h2>
-      </div>
-      <div className="border-b pb-8">
-        <div className="">
+    <section id="models" className="space-y-4 pr-4">
+      <section>
+        <h1 className="text-2xl text-text-default">Models</h1>
+        <p className="text-sm text-text-muted">Configure models</p>
+      </section>
+
+      <Card className="p-2 pb-4 rounded-lg">
+        <CardContent className="px-2">
           <h3 className="text-text-default">{model}</h3>
           <h4 className="text-xs text-text-muted">{provider}</h4>
-        </div>
-        <ModelSettingsButtons setView={setView} />
-      </div>
+          <ModelSettingsButtons setView={setView} />
+        </CardContent>
+      </Card>
     </section>
   );
 }

@@ -6,7 +6,13 @@ interface ToolSelectionStrategySectionProps {
   setView: (view: View, viewOptions?: ViewOptions) => void;
 }
 
-export const all_tool_selection_strategies = [
+interface ToolSelectionStrategy {
+  key: string;
+  label: string;
+  description: string;
+}
+
+export const all_tool_selection_strategies: ToolSelectionStrategy[] = [
   {
     key: 'default',
     label: 'Default',
@@ -57,50 +63,39 @@ export const ToolSelectionStrategySection = ({
   }, [fetchCurrentStrategy]);
 
   return (
-    <section id="tool-selection-strategy">
-      <div className="flex justify-between items-center mb-2">
-        <h2 className="text-xl text-text-default">Tool Selection Strategy (preview)</h2>
-      </div>
-      <div className="pb-6">
-        <p className="text-sm text-text-muted mb-6">
-          Configure how Goose selects tools for your requests. Recommended when many extensions are
-          enabled. Available only with Claude models served on Databricks for now.
-        </p>
-        <div>
-          {all_tool_selection_strategies.map((strategy) => (
-            <div className="group hover:cursor-pointer" key={strategy.key}>
-              <div
-                className="flex items-center justify-between text-text-default rounded-xl py-2 px-3 hover:bg-background-muted"
-                onClick={() => handleStrategyChange(strategy.key)}
-              >
-                <div className="flex">
-                  <div>
-                    <h3 className="text-text-default">{strategy.label}</h3>
-                    <p className="text-xs text-text-muted mt-[2px]">{strategy.description}</p>
-                  </div>
-                </div>
-
-                <div className="relative flex items-center gap-2">
-                  <input
-                    type="radio"
-                    name="tool-selection-strategy"
-                    value={strategy.key}
-                    checked={currentStrategy === strategy.key}
-                    onChange={() => handleStrategyChange(strategy.key)}
-                    className="peer sr-only"
-                  />
-                  <div
-                    className="h-4 w-4 rounded-full border border-border-default 
-                          peer-checked:border-[6px] peer-checked:border-black dark:peer-checked:border-white
-                          peer-checked:bg-white dark:peer-checked:bg-black
-                          transition-all duration-200 ease-in-out group-hover:border-border-default"
-                  ></div>
-                </div>
+    <div className="space-y-1">
+      {all_tool_selection_strategies.map((strategy) => (
+        <div className="group hover:cursor-pointer" key={strategy.key}>
+          <div
+            className={`flex items-center justify-between text-text-default py-2 px-2 ${currentStrategy === strategy.key ? 'bg-background-muted' : 'bg-background-default hover:bg-background-muted'} rounded-lg transition-all`}
+            onClick={() => handleStrategyChange(strategy.key)}
+          >
+            <div className="flex">
+              <div>
+                <h3 className="text-text-default text-xs">{strategy.label}</h3>
+                <p className="text-xs text-text-muted mt-[2px]">{strategy.description}</p>
               </div>
             </div>
-          ))}
+
+            <div className="relative flex items-center gap-2">
+              <input
+                type="radio"
+                name="tool-selection-strategy"
+                value={strategy.key}
+                checked={currentStrategy === strategy.key}
+                onChange={() => handleStrategyChange(strategy.key)}
+                className="peer sr-only"
+              />
+              <div
+                className="h-4 w-4 rounded-full border border-border-default 
+                      peer-checked:border-[6px] peer-checked:border-black dark:peer-checked:border-white
+                      peer-checked:bg-white dark:peer-checked:bg-black
+                      transition-all duration-200 ease-in-out group-hover:border-border-default"
+              ></div>
+            </div>
+          </div>
         </div>
-      </div>
-    </section>
+      ))}
+    </div>
   );
 };

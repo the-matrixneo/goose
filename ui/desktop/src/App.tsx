@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { IpcRendererEvent } from 'electron';
 import { HashRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { openSharedSessionFromDeepLink, type SessionLinksViewOptions } from './sessionLinks';
@@ -34,6 +34,7 @@ import PermissionSettingsView from './components/settings/permission/PermissionS
 
 import { type SessionDetails } from './sessions';
 import ExtensionsView, { ExtensionsViewOptions } from './components/extensions/ExtensionsView';
+import ProjectsContainer from './components/projects/ProjectsContainer';
 
 export type View =
   | 'welcome'
@@ -52,7 +53,8 @@ export type View =
   | 'loading'
   | 'recipeEditor'
   | 'recipes'
-  | 'permission';
+  | 'permission'
+  | 'projects';
 
 export type ViewOptions = {
   // Settings view options
@@ -469,6 +471,14 @@ const ExtensionsRoute = () => {
   );
 };
 
+const ProjectsRoute = () => {
+  return (
+    <React.Suspense fallback={<div>Loading projects...</div>}>
+      <ProjectsContainer />
+    </React.Suspense>
+  );
+};
+
 export default function App() {
   const [fatalError, setFatalError] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
@@ -492,50 +502,52 @@ export default function App() {
   const { getExtensions, addExtension, read } = useConfig();
   const initAttemptedRef = useRef(false);
 
-  // Create a setView function for useChat hook
+  // Create a setView function for useChat hook - we'll use window.history instead of navigate
   const setView = (view: View, viewOptions: ViewOptions = {}) => {
     console.log(`Setting view to: ${view}`, viewOptions);
-    // Convert view to route navigation
+    // Convert view to route navigation using window.history
     switch (view) {
       case 'chat':
-        navigate('/');
+        window.history.pushState({}, '', '/');
         break;
       case 'pair':
-        navigate('/pair', { state: viewOptions });
+        window.history.pushState(viewOptions, '', '/pair');
         break;
       case 'settings':
-        navigate('/settings', { state: viewOptions });
+        window.history.pushState(viewOptions, '', '/settings');
         break;
       case 'extensions':
-        navigate('/extensions', { state: viewOptions });
+        window.history.pushState(viewOptions, '', '/extensions');
         break;
       case 'sessions':
-        navigate('/sessions');
+        window.history.pushState({}, '', '/sessions');
         break;
       case 'schedules':
-        navigate('/schedules');
+        window.history.pushState({}, '', '/schedules');
         break;
       case 'recipes':
-        navigate('/recipes');
+        window.history.pushState({}, '', '/recipes');
         break;
       case 'permission':
-        navigate('/permission', { state: viewOptions });
+        window.history.pushState(viewOptions, '', '/permission');
         break;
       case 'ConfigureProviders':
-        navigate('/configure-providers');
+        window.history.pushState({}, '', '/configure-providers');
         break;
       case 'sharedSession':
-        navigate('/shared-session', { state: viewOptions });
+        window.history.pushState(viewOptions, '', '/shared-session');
         break;
       case 'recipeEditor':
-        navigate('/recipe-editor', { state: viewOptions });
+        window.history.pushState(viewOptions, '', '/recipe-editor');
         break;
       case 'welcome':
-        navigate('/welcome');
+        window.history.pushState({}, '', '/welcome');
         break;
       default:
-        navigate('/');
+        window.history.pushState({}, '', '/');
     }
+    // Force a router update
+    window.dispatchEvent(new Event('popstate'));
   };
 
   const { chat, setChat } = useChat({ setIsLoadingSession, setView });
@@ -997,6 +1009,14 @@ export default function App() {
               <Route path="permission" element={<PermissionRoute />} />
               <Route path="configure-providers" element={<ConfigureProvidersRoute />} />
               <Route path="welcome" element={<WelcomeRoute />} />
+              <Route
+                path="projects"
+                element={
+                  <ChatProvider chat={chat} setChat={setChat}>
+                    <ProjectsRoute />
+                  </ChatProvider>
+                }
+              />
             </Route>
           </Routes>
         </div>

@@ -235,16 +235,16 @@ const SessionListView: React.FC<SessionListViewProps> = ({ setView, onSelectSess
           </div>
         </div>
 
-        <div className="flex items-center justify-between mt-1 pt-2 border-t border-border-subtle">
+        <div className="flex items-center justify-between mt-1 pt-2">
           <div className="flex items-center space-x-3 text-xs text-text-muted">
             <div className="flex items-center">
               <MessageSquareText className="w-3 h-3 mr-1" />
-              <span>{session.metadata.message_count}</span>
+              <span className="font-mono">{session.metadata.message_count}</span>
             </div>
             {session.metadata.total_tokens !== null && (
               <div className="flex items-center">
                 <Target className="w-3 h-3 mr-1" />
-                <span>{session.metadata.total_tokens.toLocaleString()}</span>
+                <span className="font-mono">{session.metadata.total_tokens.toLocaleString()}</span>
               </div>
             )}
           </div>

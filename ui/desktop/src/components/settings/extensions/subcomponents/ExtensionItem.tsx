@@ -71,18 +71,15 @@ export default function ExtensionItem({
 
   return (
     <div
-      className="flex justify-between rounded-lg transition-colors border border-borderSubtle p-4 pt-3 hover:border-borderProminent hover:cursor-pointer"
+      className="flex justify-between rounded-lg transition-all duration-200 border p-4 pt-3 hover:shadow-default hover:cursor-pointer"
       onClick={() => handleToggle(extension)}
     >
-      <div className="flex flex-col w-max-[90%] word-break">
-        <h3 className="text-textStandard">{getFriendlyTitle(extension)}</h3>
-        <p className="text-xs text-textSubtle">{renderSubtitle()}</p>
+      <div className="flex flex-col word-break">
+        <h3 className="">{getFriendlyTitle(extension)}</h3>
+        <p className="text-xs text-text-muted">{renderSubtitle()}</p>
       </div>
 
-      <div
-        className="flex items-center justify-end gap-2 w-max-[10%]"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
         {editable && (
           <button
             className="text-textSubtle hover:text-textStandard"
