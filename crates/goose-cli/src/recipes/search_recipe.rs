@@ -2,12 +2,48 @@ use anyhow::{anyhow, Result};
 use goose::config::Config;
 use std::path::{Path, PathBuf};
 use std::{env, fs};
+use url::Url;
 
 use crate::recipes::recipe::RECIPE_FILE_EXTENSIONS;
 use super::github_recipe::{retrieve_recipe_from_github, GOOSE_RECIPE_GITHUB_REPO_CONFIG_KEY};
-use super::url_recipe::{is_url, retrieve_recipe_from_url};
 
 const GOOSE_RECIPE_PATH_ENV_VAR: &str = "GOOSE_RECIPE_PATH";
+
+fn is_url(s: &str) -> bool {
+    if let Ok(url) = Url::parse(s) {
+        url.scheme() == "http" || url.scheme() == "https"
+    } else {
+        false
+    }
+}
+
+async fn retrieve_recipe_from_url(url: &str) -> Result<(String, PathBuf)> {
+    let client = reqwest::Client::new();
+    let response = client
+        .get(url)
+        .send()
+        .await
+        .map_err(|e| anyhow!("Failed to fetch recipe from URL {}: {}", url, e))?;
+
+    if !response.status().is_success() {
+        return Err(anyhow!(
+            "Failed to fetch recipe from URL {}: HTTP {}",
+            url,
+            response.status()
+        ));
+    }
+
+    let content = response
+        .text()
+        .await
+        .map_err(|e| anyhow!("Failed to read response from URL {}: {}", url, e))?;
+
+    // For URL-based recipes, we'll use the current directory as the parent
+    let parent_dir = std::env::current_dir()
+        .map_err(|e| anyhow!("Failed to get current directory: {}", e))?;
+
+    Ok((content, parent_dir))
+}
 
 pub async fn retrieve_recipe_file(recipe_name: &str) -> Result<(String, PathBuf)> {
     // Handle URLs first
@@ -104,4 +140,37 @@ fn read_recipe_file<P: AsRef<Path>>(recipe_path: P) -> Result<(String, PathBuf)>
         .to_path_buf();
 
     Ok((content, parent_dir))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::net::TcpListener;
+    use tempfile::TempDir;
+    use tokio::task;
+
+    #[tokio::test]
+    async fn test_retrieve_recipe_file_local() {
+        let temp_dir = TempDir::new().unwrap();
+        let recipe_path = temp_dir.path().join("test.yaml");
+        let recipe_content = "title: Test Recipe\ndescription: A test recipe";
+        fs::write(&recipe_path, recipe_content).unwrap();
+
+        let (content, parent_dir) = retrieve_recipe_file(recipe_path.to_str().unwrap())
+            .await
+            .unwrap();
+
+        assert_eq!(content, recipe_content);
+        assert_eq!(parent_dir, temp_dir.path());
+    }
+
+    #[test]
+    fn test_is_url() {
+        assert!(is_url("http://example.com/recipe.yaml"));
+        assert!(is_url("https://example.com/recipe.yaml"));
+        assert!(!is_url("file:///path/to/recipe.yaml"));
+        assert!(!is_url("/path/to/recipe.yaml"));
+        assert!(!is_url("recipe.yaml"));
+    }
 }
