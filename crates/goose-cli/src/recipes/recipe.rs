@@ -49,7 +49,10 @@ fn validate_recipe_parameters(
     Ok(recipe_parameters)
 }
 
-pub async fn load_recipe_as_template(recipe_name: &str, params: Vec<(String, String)>) -> Result<Recipe> {
+pub async fn load_recipe_as_template(
+    recipe_name: &str,
+    params: Vec<(String, String)>,
+) -> Result<Recipe> {
     let rendered_content = load_recipe_content_as_template(recipe_name, params.clone()).await?;
     let recipe = Recipe::from_content(&rendered_content)?;
 

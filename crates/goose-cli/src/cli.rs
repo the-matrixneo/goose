@@ -782,7 +782,8 @@ pub async fn cli() -> Result<()> {
                         return Ok(());
                     }
                     if render_recipe {
-                        let recipe = load_recipe_content_as_template(&recipe_name, params).await
+                        let recipe = load_recipe_content_as_template(&recipe_name, params)
+                            .await
                             .unwrap_or_else(|err| {
                                 eprintln!("{}: {}", console::style("Error").red().bold(), err);
                                 std::process::exit(1);
@@ -790,8 +791,9 @@ pub async fn cli() -> Result<()> {
                         println!("{}", recipe);
                         return Ok(());
                     }
-                    let recipe =
-                        load_recipe_as_template(&recipe_name, params).await.unwrap_or_else(|err| {
+                    let recipe = load_recipe_as_template(&recipe_name, params)
+                        .await
+                        .unwrap_or_else(|err| {
                             eprintln!("{}: {}", console::style("Error").red().bold(), err);
                             std::process::exit(1);
                         });

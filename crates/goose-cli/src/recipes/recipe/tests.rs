@@ -42,7 +42,9 @@ mod tests {
             let (_temp_dir, recipe_path) = setup_recipe_file(instructions_and_parameters);
 
             let params = vec![("my_name".to_string(), "value".to_string())];
-            let recipe = load_recipe_as_template(recipe_path.to_str().unwrap(), params).await.unwrap();
+            let recipe = load_recipe_as_template(recipe_path.to_str().unwrap(), params)
+                .await
+                .unwrap();
 
             assert_eq!(recipe.title, "Test Recipe");
             assert_eq!(recipe.description, "A test recipe");
@@ -76,7 +78,9 @@ mod tests {
             let (_temp_dir, recipe_path) = setup_recipe_file(instructions_and_parameters);
 
             let params = vec![("my_name".to_string(), "value".to_string())];
-            let recipe = load_recipe_as_template(recipe_path.to_str().unwrap(), params).await.unwrap();
+            let recipe = load_recipe_as_template(recipe_path.to_str().unwrap(), params)
+                .await
+                .unwrap();
 
             assert_eq!(recipe.title, "Test Recipe");
             assert_eq!(recipe.description, "A test recipe");
@@ -143,7 +147,9 @@ mod tests {
             let (_temp_dir, recipe_path) = setup_recipe_file(instructions_and_parameters);
             let params = vec![("param_without_default".to_string(), "value1".to_string())];
 
-            let recipe = load_recipe_as_template(recipe_path.to_str().unwrap(), params).await.unwrap();
+            let recipe = load_recipe_as_template(recipe_path.to_str().unwrap(), params)
+                .await
+                .unwrap();
 
             assert_eq!(recipe.title, "Test Recipe");
             assert_eq!(recipe.description, "A test recipe");
@@ -169,16 +175,17 @@ mod tests {
                 ]"#;
             let (_temp_dir, recipe_path) = setup_recipe_file(instructions_and_parameters);
 
-            let recipe =
-                load_recipe_as_template(recipe_path.to_str().unwrap(), Vec::new()).await.unwrap();
+            let recipe = load_recipe_as_template(recipe_path.to_str().unwrap(), Vec::new())
+                .await
+                .unwrap();
             assert_eq!(recipe.title, "Test Recipe");
             assert_eq!(recipe.description, "A test recipe");
             assert_eq!(recipe.instructions.unwrap(), "Test instructions with ");
         }
 
         #[tokio::test]
-        async fn test_load_recipe_as_template_optional_parameters_without_default_values_in_recipe_file()
-        {
+        async fn test_load_recipe_as_template_optional_parameters_without_default_values_in_recipe_file(
+        ) {
             let instructions_and_parameters = r#"
                 "instructions": "Test instructions with {{ optional_param }}",
                 "parameters": [
@@ -214,7 +221,8 @@ mod tests {
             let params = vec![("param".to_string(), "value".to_string())];
             let (_temp_dir, recipe_path) = setup_recipe_file(instructions_and_parameters);
 
-            let load_recipe_result = load_recipe_as_template(recipe_path.to_str().unwrap(), params).await;
+            let load_recipe_result =
+                load_recipe_as_template(recipe_path.to_str().unwrap(), params).await;
             assert!(load_recipe_result.is_err());
             let err = load_recipe_result.unwrap_err();
             let err_msg = err.to_string();
@@ -229,8 +237,9 @@ mod tests {
                 "#;
             let (_temp_dir, recipe_path) = setup_recipe_file(instructions_and_parameters);
 
-            let recipe =
-                load_recipe_as_template(recipe_path.to_str().unwrap(), Vec::new()).await.unwrap();
+            let recipe = load_recipe_as_template(recipe_path.to_str().unwrap(), Vec::new())
+                .await
+                .unwrap();
             assert_eq!(recipe.instructions.unwrap(), "Test instructions");
             assert!(recipe.parameters.is_none());
         }
