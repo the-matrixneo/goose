@@ -4,12 +4,17 @@ use std::path::{Path, PathBuf};
 use std::{env, fs};
 
 use crate::recipes::recipe::RECIPE_FILE_EXTENSIONS;
-
 use super::github_recipe::{retrieve_recipe_from_github, GOOSE_RECIPE_GITHUB_REPO_CONFIG_KEY};
+use super::url_recipe::{is_url, retrieve_recipe_from_url};
 
 const GOOSE_RECIPE_PATH_ENV_VAR: &str = "GOOSE_RECIPE_PATH";
 
-pub fn retrieve_recipe_file(recipe_name: &str) -> Result<(String, PathBuf)> {
+pub async fn retrieve_recipe_file(recipe_name: &str) -> Result<(String, PathBuf)> {
+    // Handle URLs first
+    if is_url(recipe_name) {
+        return retrieve_recipe_from_url(recipe_name).await;
+    }
+
     // If recipe_name ends with yaml or json, treat it as a direct file path
     if RECIPE_FILE_EXTENSIONS
         .iter()
@@ -18,6 +23,7 @@ pub fn retrieve_recipe_file(recipe_name: &str) -> Result<(String, PathBuf)> {
         let path = PathBuf::from(recipe_name);
         return read_recipe_file(path);
     }
+
     retrieve_recipe_from_local_path(recipe_name).or_else(|e| {
         if let Some(recipe_repo_full_name) = configured_github_recipe_repo() {
             retrieve_recipe_from_github(recipe_name, &recipe_repo_full_name)
