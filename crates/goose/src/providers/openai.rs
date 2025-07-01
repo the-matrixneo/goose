@@ -9,7 +9,7 @@ use super::base::{ConfigKey, ModelInfo, Provider, ProviderMetadata, ProviderUsag
 use super::embedding::{EmbeddingCapable, EmbeddingRequest, EmbeddingResponse};
 use super::errors::ProviderError;
 use super::formats::openai::{create_request, get_usage, response_to_message};
-use super::provider_common::{AuthType, HeaderBuilder, ProviderConfigBuilder, get_shared_client, build_endpoint_url, retry_with_backoff, RetryConfig};
+use super::provider_common::{AuthType, HeaderBuilder, ProviderConfigBuilder, get_shared_client, create_provider_client, build_endpoint_url, retry_with_backoff, RetryConfig};
 use super::utils::{emit_debug_trace, get_model, handle_response_openai_compat, ImageFormat};
 use crate::message::Message;
 use crate::model::ModelConfig;
@@ -68,8 +68,16 @@ impl OpenAiProvider {
             .ok()
             .map(parse_custom_headers);
         
-        // Use shared client for better connection pooling
-        let client = get_shared_client();
+        // Check for custom timeout configuration
+        let timeout_secs = config_builder.get_param("TIMEOUT", None)
+            .and_then(|s| s.parse::<u64>().ok());
+        
+        // Use provider-specific client if timeout is configured, otherwise use shared client
+        let client = if timeout_secs.is_some() {
+            create_provider_client(timeout_secs)?
+        } else {
+            get_shared_client()
+        };
         
         // Configure retry settings
         let retry_config = RetryConfig::default();

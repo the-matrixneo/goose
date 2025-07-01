@@ -9,7 +9,7 @@ use super::azureauth::AzureAuth;
 use super::base::{ConfigKey, Provider, ProviderMetadata, ProviderUsage, Usage};
 use super::errors::ProviderError;
 use super::formats::openai::{create_request, get_usage, response_to_message};
-use super::provider_common::{AuthType, HeaderBuilder, ProviderConfigBuilder, get_shared_client, retry_with_backoff, RetryConfig};
+use super::provider_common::{AuthType, HeaderBuilder, ProviderConfigBuilder, get_shared_client, retry_with_backoff_and_custom_delay, RetryConfig};
 use super::utils::{emit_debug_trace, get_model, handle_response_openai_compat, ImageFormat};
 use crate::message::Message;
 use crate::model::ModelConfig;
@@ -119,35 +119,56 @@ impl AzureProvider {
         base_url.set_path(&new_path);
         base_url.set_query(Some(&format!("api-version={}", self.api_version)));
 
-        // Use the new retry logic
-        retry_with_backoff(&self.retry_config, || async {
-            // Get a fresh auth token for each attempt
-            let auth_token = self.auth.get_token().await.map_err(|e| {
-                tracing::error!("Authentication error: {:?}", e);
-                ProviderError::RequestFailed(format!("Failed to get authentication token: {}", e))
-            })?;
+        // Use the enhanced retry logic with custom delay extraction for Azure
+        retry_with_backoff_and_custom_delay(
+            &self.retry_config,
+            || async {
+                // Get a fresh auth token for each attempt
+                let auth_token = self.auth.get_token().await.map_err(|e| {
+                    tracing::error!("Authentication error: {:?}", e);
+                    ProviderError::RequestFailed(format!("Failed to get authentication token: {}", e))
+                })?;
 
-            // Build headers using HeaderBuilder
-            let header_builder = match self.auth.credential_type() {
-                super::azureauth::AzureCredentials::ApiKey(_) => {
-                    HeaderBuilder::new(auth_token.token_value.clone(), AuthType::Custom("api-key".to_string()))
+                // Build headers using HeaderBuilder
+                let header_builder = match self.auth.credential_type() {
+                    super::azureauth::AzureCredentials::ApiKey(_) => {
+                        HeaderBuilder::new(auth_token.token_value.clone(), AuthType::Custom("api-key".to_string()))
+                    }
+                    super::azureauth::AzureCredentials::DefaultCredential => {
+                        HeaderBuilder::new(auth_token.token_value.clone(), AuthType::Bearer)
+                    }
+                };
+
+                let headers = header_builder.build();
+                
+                let response = self.client
+                    .post(base_url.clone())
+                    .headers(headers)
+                    .json(&payload)
+                    .send()
+                    .await?;
+
+                handle_response_openai_compat(response).await
+            },
+            |error| {
+                // Extract retry-after delay from Azure error messages
+                match error {
+                    ProviderError::RateLimitExceeded(msg) => {
+                        // Look for "try again in X seconds" pattern
+                        if let Some(pos) = msg.to_lowercase().find("try again in ") {
+                            let rest = &msg[pos + 13..]; // Skip "try again in "
+                            rest.split_whitespace()
+                                .next()
+                                .and_then(|s| s.parse::<u64>().ok())
+                                .map(|secs| secs * 1000) // Convert to milliseconds
+                        } else {
+                            None
+                        }
+                    }
+                    _ => None,
                 }
-                super::azureauth::AzureCredentials::DefaultCredential => {
-                    HeaderBuilder::new(auth_token.token_value.clone(), AuthType::Bearer)
-                }
-            };
-
-            let headers = header_builder.build();
-            
-            let response = self.client
-                .post(base_url.clone())
-                .headers(headers)
-                .json(&payload)
-                .send()
-                .await?;
-
-            handle_response_openai_compat(response).await
-        }).await
+            }
+        ).await
     }
 }
 
