@@ -321,11 +321,6 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
             </SidebarGroupContent>
           </SidebarGroup>
         </SidebarMenu>
-
-        {/* Theme Selector */}
-        <div className="mt-4 opacity-100">
-          <ThemeSelector />
-        </div>
       </SidebarContent>
 
       <SidebarFooter className="mb-2">

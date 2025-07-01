@@ -17,7 +17,7 @@ const AppLayoutContent: React.FC<AppLayoutProps> = ({ setIsGoosehintsModalOpen }
   const safeIsMacOS = (window?.electron?.platform || 'darwin') === 'darwin';
 
   // Calculate padding based on sidebar state and macOS
-  const headerPadding = safeIsMacOS ? 'pl-20' : 'pl-6';
+  const headerPadding = safeIsMacOS ? 'pl-21' : 'pl-6';
   // const headerPadding = '';
 
   const setView = (view: View, viewOptions?: ViewOptions) => {

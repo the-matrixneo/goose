@@ -4,9 +4,15 @@ import { Button } from '../ui/button';
 
 interface ThemeSelectorProps {
   className?: string;
+  hideTitle?: boolean;
+  horizontal?: boolean;
 }
 
-const ThemeSelector: React.FC<ThemeSelectorProps> = ({ className = '' }) => {
+const ThemeSelector: React.FC<ThemeSelectorProps> = ({
+  className = '',
+  hideTitle = false,
+  horizontal = false,
+}) => {
   const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'system'>(() => {
     const savedUseSystemTheme = localStorage.getItem('use_system_theme') === 'true';
     if (savedUseSystemTheme) {
@@ -62,9 +68,11 @@ const ThemeSelector: React.FC<ThemeSelectorProps> = ({ className = '' }) => {
   };
 
   return (
-    <div className={`px-1 py-2 space-y-2 ${className}`}>
-      <div className="text-xs text-text-default px-3">Theme</div>
-      <div className="grid grid-cols-3 gap-1 px-3">
+    <div className={`${!horizontal ? 'px-1 py-2 space-y-2' : ''} ${className}`}>
+      {!hideTitle && <div className="text-xs text-text-default px-3">Theme</div>}
+      <div
+        className={`${horizontal ? 'flex' : 'grid grid-cols-3'} gap-1 ${!horizontal ? 'px-3' : ''}`}
+      >
         <Button
           data-testid="light-mode-button"
           onClick={() => handleThemeChange('light')}

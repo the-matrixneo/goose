@@ -8,17 +8,26 @@ export default function Dot({
 }) {
   const backgroundColor =
     {
-      loading: '#2693FF',
-      success: 'var(--icon-extra-subtle)',
-      error: '#CC0023',
+      loading: 'var(--primary)',
+      success: 'var(--green-600)',
+      error: 'var(--red-600)',
     }[loadingStatus] ?? 'var(--icon-extra-subtle)';
 
   return (
     <div
-      className={`w-${size} h-${size} rounded-full`}
-      style={{
-        backgroundColor: backgroundColor,
-      }}
-    />
+      className={`${
+        loadingStatus === 'loading' ? 'animate-pulse' : ''
+      } flex items-center justify-center`}
+    >
+      <div
+        className="rounded-full"
+        style={{
+          width: `${size * 2}px`,
+          height: `${size * 2}px`,
+          backgroundColor: backgroundColor,
+          boxShadow: loadingStatus === 'loading' ? '0 0 5px var(--primary-light)' : 'none',
+        }}
+      />
+    </div>
   );
 }

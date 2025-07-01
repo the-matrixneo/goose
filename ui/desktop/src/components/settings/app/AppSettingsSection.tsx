@@ -13,6 +13,7 @@ import {
 import UpdateSection from './UpdateSection';
 import { UPDATES_ENABLED } from '../../../updates';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../ui/card';
+import ThemeSelector from '../../GooseSidebar/ThemeSelector';
 
 interface AppSettingsSectionProps {
   scrollToSection?: string;
@@ -108,12 +109,7 @@ export default function AppSettingsSection({ scrollToSection }: AppSettingsSecti
   };
 
   return (
-    <div className="space-y-4 pr-4 pb-8">
-      <section className="mb-4">
-        <h1 className="text-2xl text-text-default">App</h1>
-        <p className="text-sm text-text-muted">Configure goose app</p>
-      </section>
-
+    <div className="space-y-4 pr-4 pb-8 mt-1">
       <Card className="rounded-lg">
         <CardHeader className="pb-0">
           <CardTitle className="">Appearance</CardTitle>
@@ -200,6 +196,16 @@ export default function AppSettingsSection({ scrollToSection }: AppSettingsSecti
               />
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card className="rounded-lg">
+        <CardHeader className="pb-0">
+          <CardTitle className="mb-1">Theme</CardTitle>
+          <CardDescription>Customize the look and feel of goose</CardDescription>
+        </CardHeader>
+        <CardContent className="pt-4 px-4">
+          <ThemeSelector className="w-auto" hideTitle horizontal />
         </CardContent>
       </Card>
 

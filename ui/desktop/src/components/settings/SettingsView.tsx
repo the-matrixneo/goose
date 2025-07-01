@@ -1,6 +1,6 @@
 import { ScrollArea } from '../ui/scroll-area';
 import { useSidebar } from '../ui/sidebar';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/vertical-tabs';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import type { View, ViewOptions } from '../../App';
 import ModelsSection from './models/ModelsSection';
 import SessionSharingSection from './sessions/SessionSharingSection';
@@ -69,45 +69,57 @@ export default function SettingsView({
           </div>
 
           <div className="flex-1 min-h-0 relative">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex">
-              <TabsList className="w-48 space-y-1 h-full">
-                <TabsTrigger value="models" className="flex gap-2">
-                  <Bot className="h-4 w-4" />
-                  Models
-                </TabsTrigger>
-                <TabsTrigger value="chat" className="flex gap-2">
-                  <MessageSquare className="h-4 w-4" />
-                  Chat
-                </TabsTrigger>
-                <TabsTrigger value="sharing" className="flex gap-2">
-                  <Share2 className="h-4 w-4" />
-                  Session Sharing
-                </TabsTrigger>
-                <TabsTrigger value="app" className="flex gap-2">
-                  <Monitor className="h-4 w-4" />
-                  App Settings
-                </TabsTrigger>
-              </TabsList>
-
-              <div className="flex-1 ml-6">
-                <ScrollArea className="h-full">
-                  <TabsContent value="models" className="mt-0">
-                    <ModelsSection setView={setView} />
-                  </TabsContent>
-
-                  <TabsContent value="chat" className="mt-0">
-                    <ChatSettingsSection setView={setView} />
-                  </TabsContent>
-
-                  <TabsContent value="sharing" className="mt-0">
-                    <SessionSharingSection />
-                  </TabsContent>
-
-                  <TabsContent value="app" className="mt-0">
-                    <AppSettingsSection scrollToSection={viewOptions.section} />
-                  </TabsContent>
-                </ScrollArea>
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
+              <div className="px-1">
+                <TabsList className="w-full mb-2 justify-start">
+                  <TabsTrigger value="models" className="flex gap-2">
+                    <Bot className="h-4 w-4" />
+                    Models
+                  </TabsTrigger>
+                  <TabsTrigger value="chat" className="flex gap-2">
+                    <MessageSquare className="h-4 w-4" />
+                    Chat
+                  </TabsTrigger>
+                  <TabsTrigger value="sharing" className="flex gap-2">
+                    <Share2 className="h-4 w-4" />
+                    Session
+                  </TabsTrigger>
+                  <TabsTrigger value="app" className="flex gap-2">
+                    <Monitor className="h-4 w-4" />
+                    App
+                  </TabsTrigger>
+                </TabsList>
               </div>
+
+              <ScrollArea className="flex-1 px-2">
+                <TabsContent
+                  value="models"
+                  className="mt-0 focus-visible:outline-none focus-visible:ring-0"
+                >
+                  <ModelsSection setView={setView} />
+                </TabsContent>
+
+                <TabsContent
+                  value="chat"
+                  className="mt-0 focus-visible:outline-none focus-visible:ring-0"
+                >
+                  <ChatSettingsSection setView={setView} />
+                </TabsContent>
+
+                <TabsContent
+                  value="sharing"
+                  className="mt-0 focus-visible:outline-none focus-visible:ring-0"
+                >
+                  <SessionSharingSection />
+                </TabsContent>
+
+                <TabsContent
+                  value="app"
+                  className="mt-0 focus-visible:outline-none focus-visible:ring-0"
+                >
+                  <AppSettingsSection scrollToSection={viewOptions.section} />
+                </TabsContent>
+              </ScrollArea>
             </Tabs>
           </div>
         </div>

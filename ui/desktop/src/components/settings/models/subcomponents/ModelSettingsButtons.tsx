@@ -19,7 +19,6 @@ export default function ModelSettingsButtons({ setView }: ConfigureModelButtonsP
         size="sm"
         onClick={() => setIsAddModelModalOpen(true)}
       >
-        <ArrowLeftRight />
         Switch models
       </Button>
       {isAddModelModalOpen ? (
@@ -33,7 +32,6 @@ export default function ModelSettingsButtons({ setView }: ConfigureModelButtonsP
           setView('ConfigureProviders');
         }}
       >
-        <Sliders className="rotate-90" />
         Configure providers
       </Button>
     </div>

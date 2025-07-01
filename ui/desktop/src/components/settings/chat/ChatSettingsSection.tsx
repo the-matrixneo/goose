@@ -10,14 +10,7 @@ interface ChatSettingsSectionProps {
 
 export default function ChatSettingsSection({ setView }: ChatSettingsSectionProps) {
   return (
-    <div className="space-y-4 pr-4 pb-8">
-      <section className="mb-6">
-        <h1 className="text-2xl text-text-default">Chat experience</h1>
-        <p className="text-sm text-text-muted">
-          Configure how Goose interacts with you and responds to your queries
-        </p>
-      </section>
-
+    <div className="space-y-4 pr-4 pb-8 mt-1">
       <Card className="pb-2 rounded-lg">
         <CardHeader className="pb-0">
           <CardTitle className="">Mode</CardTitle>

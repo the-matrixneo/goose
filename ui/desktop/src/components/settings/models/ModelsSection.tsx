@@ -50,12 +50,7 @@ export default function ModelsSection({ setView }: ModelsSectionProps) {
 
   return (
     <section id="models" className="space-y-4 pr-4">
-      <section>
-        <h1 className="text-2xl text-text-default">Models</h1>
-        <p className="text-sm text-text-muted">Configure models</p>
-      </section>
-
-      <Card className="p-2 pb-4 rounded-lg">
+      <Card className="p-2 pb-4">
         <CardContent className="px-2">
           <h3 className="text-text-default">{model}</h3>
           <h4 className="text-xs text-text-muted">{provider}</h4>
