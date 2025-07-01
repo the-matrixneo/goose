@@ -14,12 +14,16 @@ const SessionsView: React.FC<SessionsViewProps> = ({ setView }) => {
   const [selectedSession, setSelectedSession] = useState<SessionDetails | null>(null);
   const [isLoadingSession, setIsLoadingSession] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [initialSessionId, setInitialSessionId] = useState<string | null>(null);
   const location = useLocation();
 
   // Check if a session ID was passed in the location state (from SessionsInsights)
   useEffect(() => {
     const state = location.state as { selectedSessionId?: string } | null;
     if (state?.selectedSessionId) {
+      // Set immediate loading state to prevent flash of session list
+      setIsLoadingSession(true);
+      setInitialSessionId(state.selectedSessionId);
       handleSelectSession(state.selectedSessionId);
       // Clear the state to prevent reloading on navigation
       window.history.replaceState({}, document.title);
@@ -50,6 +54,7 @@ const SessionsView: React.FC<SessionsViewProps> = ({ setView }) => {
       });
     } finally {
       setIsLoadingSession(false);
+      setInitialSessionId(null);
     }
   };
 
@@ -91,11 +96,22 @@ const SessionsView: React.FC<SessionsViewProps> = ({ setView }) => {
     }
   };
 
-  // If a session is selected, show the session history view
+  // If we're loading an initial session or have a selected session, show the session history view
   // Otherwise, show the sessions list view
-  return selectedSession ? (
+  return selectedSession || (isLoadingSession && initialSessionId) ? (
     <SessionHistoryView
-      session={selectedSession}
+      session={
+        selectedSession || {
+          session_id: initialSessionId || '',
+          messages: [],
+          metadata: {
+            description: 'Loading...',
+            working_dir: '',
+            message_count: 0,
+            total_tokens: 0,
+          },
+        }
+      }
       isLoading={isLoadingSession}
       error={error}
       onBack={handleBackToSessions}

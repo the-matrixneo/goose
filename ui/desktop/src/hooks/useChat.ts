@@ -6,8 +6,9 @@ import { View, ViewOptions } from '../App';
 type UseChatArgs = {
   setIsLoadingSession: (isLoading: boolean) => void;
   setView: (view: View, viewOptions?: ViewOptions) => void;
+  setPairChat?: (chat: ChatType) => void;
 };
-export const useChat = ({ setIsLoadingSession, setView }: UseChatArgs) => {
+export const useChat = ({ setIsLoadingSession, setView, setPairChat }: UseChatArgs) => {
   const [chat, setChat] = useState<ChatType>({
     id: generateSessionId(),
     title: 'New Chat',
@@ -31,13 +32,21 @@ export const useChat = ({ setIsLoadingSession, setView }: UseChatArgs) => {
 
         // Only set view if we have valid session details
         if (sessionDetails && sessionDetails.session_id) {
-          setChat({
+          const sessionChat = {
             id: sessionDetails.session_id,
             title: sessionDetails.metadata?.description || `ID: ${sessionDetails.session_id}`,
             messages: sessionDetails.messages,
             messageHistoryIndex: sessionDetails.messages.length,
-          });
-          setView('chat');
+          };
+
+          setChat(sessionChat);
+
+          // If we're setting the view to 'pair', also update the pairChat state
+          if (setPairChat) {
+            setPairChat(sessionChat);
+          }
+
+          setView('pair');
         } else {
           console.error('Invalid session details received');
         }

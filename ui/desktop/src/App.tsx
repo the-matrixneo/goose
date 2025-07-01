@@ -505,52 +505,50 @@ export default function App() {
   // Create a setView function for useChat hook - we'll use window.history instead of navigate
   const setView = (view: View, viewOptions: ViewOptions = {}) => {
     console.log(`Setting view to: ${view}`, viewOptions);
-    // Convert view to route navigation using window.history
+    // Convert view to route navigation using hash routing
     switch (view) {
       case 'chat':
-        window.history.pushState({}, '', '/');
+        window.location.hash = '#/';
         break;
       case 'pair':
-        window.history.pushState(viewOptions, '', '/pair');
+        window.location.hash = '#/pair';
         break;
       case 'settings':
-        window.history.pushState(viewOptions, '', '/settings');
+        window.location.hash = '#/settings';
         break;
       case 'extensions':
-        window.history.pushState(viewOptions, '', '/extensions');
+        window.location.hash = '#/extensions';
         break;
       case 'sessions':
-        window.history.pushState({}, '', '/sessions');
+        window.location.hash = '#/sessions';
         break;
       case 'schedules':
-        window.history.pushState({}, '', '/schedules');
+        window.location.hash = '#/schedules';
         break;
       case 'recipes':
-        window.history.pushState({}, '', '/recipes');
+        window.location.hash = '#/recipes';
         break;
       case 'permission':
-        window.history.pushState(viewOptions, '', '/permission');
+        window.location.hash = '#/permission';
         break;
       case 'ConfigureProviders':
-        window.history.pushState({}, '', '/configure-providers');
+        window.location.hash = '#/configure-providers';
         break;
       case 'sharedSession':
-        window.history.pushState(viewOptions, '', '/shared-session');
+        window.location.hash = '#/shared-session';
         break;
       case 'recipeEditor':
-        window.history.pushState(viewOptions, '', '/recipe-editor');
+        window.location.hash = '#/recipe-editor';
         break;
       case 'welcome':
-        window.history.pushState({}, '', '/welcome');
+        window.location.hash = '#/welcome';
         break;
       default:
-        window.history.pushState({}, '', '/');
+        window.location.hash = '#/';
     }
-    // Force a router update
-    window.dispatchEvent(new Event('popstate'));
   };
 
-  const { chat, setChat } = useChat({ setIsLoadingSession, setView });
+  const { chat, setChat } = useChat({ setIsLoadingSession, setView, setPairChat });
 
   function extractCommand(link: string): string {
     const url = new URL(link);
@@ -937,7 +935,7 @@ export default function App() {
           toastClassName={() =>
             `relative min-h-16 mb-4 p-2 rounded-lg
              flex justify-between overflow-hidden cursor-pointer
-             text-textProminentInverse bg-bgStandardInverse dark:bg-background-defaultInverse
+             text-text-on-accent bg-background-inverse
             `
           }
           style={{ width: '380px' }}

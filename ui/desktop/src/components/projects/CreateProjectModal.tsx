@@ -46,11 +46,6 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, onClose
       return;
     }
 
-    if (!defaultDirectory.trim()) {
-      toastError({ title: 'Error', msg: 'Default directory is required' });
-      return;
-    }
-
     setIsSubmitting(true);
 
     // Pass data to parent component
@@ -79,54 +74,46 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, onClose
       <DialogContent className="sm:max-w-[425px]">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>Create New Project</DialogTitle>
+            <DialogTitle>Create new project</DialogTitle>
             <DialogDescription>
               Create a project to group related sessions together
             </DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-2">
-              <Label htmlFor="name" className="text-right">
-                Name*
-              </Label>
+            <div className="grid gap-2">
+              <Label htmlFor="name">Name*</Label>
               <Input
                 id="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="col-span-3"
                 placeholder="My Project"
                 autoFocus
                 required
               />
             </div>
 
-            <div className="grid grid-cols-4 items-start gap-2">
-              <Label htmlFor="description" className="text-right pt-2">
-                Description
-              </Label>
+            <div className="grid gap-2">
+              <Label htmlFor="description">Description</Label>
               <Textarea
                 id="description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                className="col-span-3 resize-none"
+                className="resize-none"
                 placeholder="Optional description"
                 rows={2}
               />
             </div>
 
-            <div className="grid grid-cols-4 items-center gap-2">
-              <Label htmlFor="directory" className="text-right">
-                Directory*
-              </Label>
-              <div className="col-span-3 flex gap-2">
+            <div className="grid gap-2">
+              <Label htmlFor="directory">Directory</Label>
+              <div className="flex gap-2">
                 <Input
                   id="directory"
                   value={defaultDirectory}
                   onChange={(e) => setDefaultDirectory(e.target.value)}
                   className="flex-grow"
                   placeholder="Default working directory for sessions"
-                  required
                 />
                 <Button type="button" variant="outline" onClick={handlePickDirectory}>
                   <FolderSearch className="h-4 w-4" />
@@ -135,7 +122,7 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, onClose
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="pt-2">
             <Button variant="outline" onClick={handleClose} type="button">
               Cancel
             </Button>

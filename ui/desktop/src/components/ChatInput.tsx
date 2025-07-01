@@ -444,7 +444,7 @@ export default function ChatInput({
 
   return (
     <div
-      className={`flex flex-col relative h-auto rounded-lg border ml-2 mr-4 mb-4 transition-colors ${
+      className={`flex flex-col relative h-auto rounded-lg border ml-4 mr-6 mb-6 transition-colors ${
         disableAnimation ? '' : 'animate-in fade-in slide-in-from-right-8 duration-500'
       } z-10`}
     >

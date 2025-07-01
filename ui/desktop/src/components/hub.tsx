@@ -158,12 +158,13 @@ function HubContentWithSidebar({
     // Check if we're on the hub page (root route)
     const isHubPage = location.pathname === '/';
 
-    // If we're on the hub page, force showing insights regardless of message count
+    // If we're on the hub page, force showing insights only if there are no messages
+    // This allows resumed sessions to display immediately
     if (isHubPage) {
-      setForceShowInsights(true);
+      setForceShowInsights(chat.messages.length === 0);
       setIsInPairMode(false);
     }
-  }, [location.pathname]);
+  }, [location.pathname, chat.messages.length]);
 
   // Get disableAnimation from location state
   const disableAnimation = location.state?.disableAnimation || false;
@@ -631,7 +632,7 @@ function HubContentWithSidebar({
         {isGeneratingRecipe && <LayingEggLoader />}
 
         <div className="h-12 flex items-center justify-between absolute">
-          <div className="flex items-center pr-4">
+          <div className="flex items-center justify-end pr-4">
             {messages.length > 0 && (
               <>
                 {setIsGoosehintsModalOpen && (
@@ -735,7 +736,7 @@ function HubContentWithSidebar({
         </div>
 
         <div
-          className={`flex flex-col min-w-0 flex-1 overflow-y-scroll relative p-2 pt-6 pr-1`}
+          className={`flex flex-col min-w-0 flex-1 overflow-y-scroll relative px-4 pt-6`}
           onDrop={handleDrop}
           onDragOver={handleDragOver}
         >

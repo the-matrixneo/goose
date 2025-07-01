@@ -163,7 +163,7 @@ export default function GooseMessage({
             {/* Only show MessageCopyLink if there's text content and no tool requests/responses */}
             <div className="relative flex justify-start">
               {toolRequests.length === 0 && (
-                <div className="text-xs text-text-muted pt-1 transition-all duration-200 group-hover:-translate-y-4 group-hover:opacity-0">
+                <div className="text-xs font-mono text-text-muted pt-1 transition-all duration-200 group-hover:-translate-y-4 group-hover:opacity-0">
                   {timestamp}
                 </div>
               )}

@@ -2,7 +2,14 @@ import { useState, useEffect, useRef } from 'react';
 import { Switch } from '../../ui/switch';
 import { Button } from '../../ui/button';
 import { Settings } from 'lucide-react';
-import Modal from '../../Modal';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../../ui/dialog';
 import UpdateSection from './UpdateSection';
 import { UPDATES_ENABLED } from '../../../updates';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../ui/card';
@@ -251,55 +258,50 @@ export default function AppSettingsSection({ scrollToSection }: AppSettingsSecti
       )}
 
       {/* Notification Instructions Modal */}
-      {showNotificationModal && (
-        <Modal
-          onClose={() => setShowNotificationModal(false)}
-          footer={
-            <Button
-              onClick={() => setShowNotificationModal(false)}
-              variant="ghost"
-              className="w-full h-[60px] rounded-none hover:bg-bgSubtle text-textSubtle hover:text-textStandard text-md font-regular"
-            >
-              Close
-            </Button>
-          }
-        >
-          {/* Title and Icon */}
-          <div className="flex flex-col mb-6">
-            <div>
+      <Dialog
+        open={showNotificationModal}
+        onOpenChange={(open) => !open && setShowNotificationModal(false)}
+      >
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
               <Settings className="text-iconStandard" size={24} />
-            </div>
-            <div className="mt-2">
-              <h2 className="text-2xl font-regular text-textStandard">
-                How to Enable Notifications
-              </h2>
-            </div>
+              How to Enable Notifications
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="py-4">
+            {/* OS-specific instructions */}
+            {isMacOS ? (
+              <div className="space-y-4">
+                <p>To enable notifications on macOS:</p>
+                <ol className="list-decimal pl-5 space-y-2">
+                  <li>Open System Preferences</li>
+                  <li>Click on Notifications</li>
+                  <li>Find and select goose in the application list</li>
+                  <li>Enable notifications and adjust settings as desired</li>
+                </ol>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <p>To enable notifications on Windows:</p>
+                <ol className="list-decimal pl-5 space-y-2">
+                  <li>Open Settings</li>
+                  <li>Go to System &gt; Notifications</li>
+                  <li>Find and select goose in the application list</li>
+                  <li>Toggle notifications on and adjust settings as desired</li>
+                </ol>
+              </div>
+            )}
           </div>
 
-          {/* OS-specific instructions */}
-          {isMacOS ? (
-            <div className="space-y-4">
-              <p>To enable notifications on macOS:</p>
-              <ol className="list-decimal pl-5 space-y-2">
-                <li>Open System Preferences</li>
-                <li>Click on Notifications</li>
-                <li>Find and select goose in the application list</li>
-                <li>Enable notifications and adjust settings as desired</li>
-              </ol>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <p>To enable notifications on Windows:</p>
-              <ol className="list-decimal pl-5 space-y-2">
-                <li>Open Settings</li>
-                <li>Go to System &gt; Notifications</li>
-                <li>Find and select goose in the application list</li>
-                <li>Toggle notifications on and adjust settings as desired</li>
-              </ol>
-            </div>
-          )}
-        </Modal>
-      )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowNotificationModal(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -325,7 +325,30 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
               </SidebarGroupContent>
             </SidebarGroup>
 
-            {/* Settings button moved to AppLayout header */}
+            <SidebarSeparator className="!w-[calc(100%-32px)]" />
+
+            {/* Settings Group */}
+            <SidebarGroup>
+              <SidebarGroupContent className="space-y-1">
+                <motion.div
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.5 }}
+                >
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      onClick={() => navigate('/settings')}
+                      isActive={isActivePath('/settings')}
+                      tooltip="Configure Goose settings"
+                      className="w-full justify-start px-3 rounded-xl h-fit hover:bg-background-medium transition-all duration-200 data-[active=true]:bg-background-medium"
+                    >
+                      <Gear className="w-4 h-4" />
+                      <span>Settings</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </motion.div>
+              </SidebarGroupContent>
+            </SidebarGroup>
           </SidebarMenu>
         </div>
 

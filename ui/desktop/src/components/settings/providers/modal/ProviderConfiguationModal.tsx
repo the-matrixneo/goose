@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react';
-import Modal from '../../../../components/Modal';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../../../ui/dialog';
 import ProviderSetupHeader from './subcomponents/ProviderSetupHeader';
 import DefaultProviderSetupForm from './subcomponents/forms/DefaultProviderSetupForm';
 import ProviderSetupActions from './subcomponents/ProviderSetupActions';
@@ -192,49 +199,53 @@ export default function ProviderConfigurationModal() {
   };
 
   return (
-    <Modal
-      onClose={closeModal}
-      footer={
-        <ProviderSetupActions
-          onCancel={handleCancel}
-          onSubmit={handleSubmitForm}
-          onDelete={handleDelete}
-          showDeleteConfirmation={showDeleteConfirmation}
-          onConfirmDelete={handleConfirmDelete}
-          onCancelDelete={() => {
-            setShowDeleteConfirmation(false);
-            setIsActiveProvider(false);
-          }}
-          canDelete={isConfigured && !isActiveProvider} // Disable delete button for active provider
-          providerName={currentProvider.metadata.display_name}
-          isActiveProvider={isActiveProvider} // Pass this to actions for button state
-        />
-      }
-    >
-      <div className="space-y-1">
-        {/* Logo area or warning icon */}
-        <div>{getModalIcon()}</div>
-        {/* Title and some information - centered */}
-        <ProviderSetupHeader title={headerText} body={descriptionText} />
-      </div>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && closeModal()}>
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            {getModalIcon()}
+            {headerText}
+          </DialogTitle>
+          <DialogDescription>{descriptionText}</DialogDescription>
+        </DialogHeader>
 
-      {/* Contains information used to set up each provider */}
-      {/* Only show the form when NOT in delete confirmation mode */}
-      {!showDeleteConfirmation ? (
-        <>
+        <div className="py-4">
           {/* Contains information used to set up each provider */}
-          <FormComponent
-            configValues={configValues}
-            setConfigValues={setConfigValues}
-            provider={currentProvider}
-            validationErrors={validationErrors}
-            {...(modalProps.formProps || {})} // Spread any custom form props
-          />
+          {/* Only show the form when NOT in delete confirmation mode */}
+          {!showDeleteConfirmation ? (
+            <>
+              {/* Contains information used to set up each provider */}
+              <FormComponent
+                configValues={configValues}
+                setConfigValues={setConfigValues}
+                provider={currentProvider}
+                validationErrors={validationErrors}
+                {...(modalProps.formProps || {})} // Spread any custom form props
+              />
 
-          {currentProvider.metadata.config_keys &&
-            currentProvider.metadata.config_keys.length > 0 && <SecureStorageNotice />}
-        </>
-      ) : null}
-    </Modal>
+              {currentProvider.metadata.config_keys &&
+                currentProvider.metadata.config_keys.length > 0 && <SecureStorageNotice />}
+            </>
+          ) : null}
+        </div>
+
+        <DialogFooter>
+          <ProviderSetupActions
+            onCancel={handleCancel}
+            onSubmit={handleSubmitForm}
+            onDelete={handleDelete}
+            showDeleteConfirmation={showDeleteConfirmation}
+            onConfirmDelete={handleConfirmDelete}
+            onCancelDelete={() => {
+              setShowDeleteConfirmation(false);
+              setIsActiveProvider(false);
+            }}
+            canDelete={isConfigured && !isActiveProvider} // Disable delete button for active provider
+            providerName={currentProvider.metadata.display_name}
+            isActiveProvider={isActiveProvider} // Pass this to actions for button state
+          />
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

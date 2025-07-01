@@ -69,7 +69,10 @@ export function SessionInsights() {
   }, []);
 
   const handleSessionClick = (sessionId: string) => {
-    navigate('/sessions', { state: { selectedSessionId: sessionId } });
+    navigate('/sessions', {
+      state: { selectedSessionId: sessionId },
+      replace: true,
+    });
   };
 
   const navigateToSessionHistory = () => {
@@ -139,10 +142,10 @@ export function SessionInsights() {
         {/* Bottom row with two equal columns */}
         <div className="grid grid-cols-2 gap-4">
           {/* Recent Chats Card */}
-          <Card className="w-full p-3 px-4 animate-in fade-in slide-in-from-right-8 duration-500">
+          <Card className="w-full p-3 px-2 animate-in fade-in slide-in-from-right-8 duration-500">
             <CardContent className="px-0">
               <div className="flex justify-between items-center mb-4">
-                <CardDescription className="mb-0">
+                <CardDescription className="mb-0 px-2">
                   <span className="text-lg text-text-default">Recent chats</span>
                 </CardDescription>
                 <Button
@@ -185,9 +188,9 @@ export function SessionInsights() {
           </Card>
 
           {/* Most Active Directories Card */}
-          <Card className="w-full p-3 px-4 animate-in fade-in slide-in-from-right-8 duration-500">
+          <Card className="w-full p-3 px-2 animate-in fade-in slide-in-from-right-8 duration-500">
             <CardContent className="px-0">
-              <CardDescription className="mb-4">
+              <CardDescription className="mb-4 px-2">
                 <span className="text-lg text-text-default">Popular directories</span>
               </CardDescription>
               <div className="space-y-1">

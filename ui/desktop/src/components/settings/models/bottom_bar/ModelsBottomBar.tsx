@@ -5,7 +5,14 @@ import { AddModelModal } from '../subcomponents/AddModelModal';
 import { LeadWorkerSettings } from '../subcomponents/LeadWorkerSettings';
 import { View } from '../../../../App';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '../../../ui/Tooltip';
-import Modal from '../../../Modal';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../../../ui/dialog';
 import { useCurrentModelInfo } from '../../../ChatView';
 import { useConfig } from '../../../ConfigContext';
 import { Button } from '../../../ui/button';
@@ -166,9 +173,14 @@ export default function ModelsBottomBar({ dropdownRef, setView }: ModelsBottomBa
       ) : null}
 
       {isLeadWorkerModalOpen ? (
-        <Modal onClose={() => setIsLeadWorkerModalOpen(false)}>
-          <LeadWorkerSettings onClose={() => setIsLeadWorkerModalOpen(false)} />
-        </Modal>
+        <Dialog
+          open={isLeadWorkerModalOpen}
+          onOpenChange={(open) => !open && setIsLeadWorkerModalOpen(false)}
+        >
+          <DialogContent className="sm:max-w-[500px]">
+            <LeadWorkerSettings onClose={() => setIsLeadWorkerModalOpen(false)} />
+          </DialogContent>
+        </Dialog>
       ) : null}
     </div>
   );
