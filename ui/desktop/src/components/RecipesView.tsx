@@ -236,20 +236,23 @@ export default function RecipesView({ onBack }: RecipesViewProps) {
     <>
       <MainPanelLayout>
         <div className="flex-1 flex flex-col min-h-0">
-          {/* Content Area */}
-          <div className="flex flex-col mt-13 mb-6 px-2">
-            <h1 className="text-4xl font-light">Recipes</h1>
-            <p className="text-sm text-text-muted mb-1">
-              View and manage your saved recipes to quickly start new sessions with predefined
-              configurations.
-            </p>
+          <div className="bg-background-default px-8 pb-8 pt-16">
+            <div className="flex flex-col animate-in fade-in duration-500">
+              <div className="flex justify-between items-center mb-1">
+                <h1 className="text-4xl font-light">Recipes</h1>
+              </div>
+              <p className="text-sm text-text-muted mb-1">
+                View and manage your saved recipes to quickly start new sessions with predefined
+                configurations.
+              </p>
+            </div>
           </div>
 
-          <div className="flex-1 min-h-0 relative px-2">
+          <div className="flex-1 min-h-0 relative px-8">
             <ScrollArea className="h-full">
               <div
                 className={`h-full relative transition-all duration-300 ${
-                  showContent ? 'opacity-100 animate-in slide-in-from-right-8 ' : 'opacity-0'
+                  showContent ? 'opacity-100 animate-in fade-in ' : 'opacity-0'
                 }`}
               >
                 {renderContent()}

@@ -85,28 +85,17 @@ const ProjectsView: React.FC<ProjectsViewProps> = ({ onSelectProject, refreshTri
     defaultDirectory?: string
   ) => {
     try {
-      const newProject = await createProject({
+      await createProject({
         name,
         description: description.trim() === '' ? undefined : description,
-        default_directory: defaultDirectory || getDefaultDirectory(),
+        defaultDirectory: defaultDirectory || getDefaultDirectory(),
       });
-      console.log('Create project response:', newProject);
-
-      setProjects((prevProjects) => [
-        ...prevProjects,
-        {
-          id: newProject.id,
-          name: newProject.name,
-          description: newProject.description,
-          default_directory: newProject.default_directory,
-          sessionCount: 0,
-          createdAt: newProject.createdAt,
-          updatedAt: newProject.updatedAt,
-        },
-      ]);
 
       setIsCreateModalOpen(false);
       toastSuccess({ title: 'Success', msg: `Project "${name}" created successfully` });
+
+      // Refresh the projects list to get the updated data from the server
+      await loadProjects();
     } catch (err) {
       console.error('Failed to create project:', err);
       toastError({ title: 'Error', msg: 'Failed to create project' });
@@ -187,23 +176,28 @@ const ProjectsView: React.FC<ProjectsViewProps> = ({ onSelectProject, refreshTri
   return (
     <MainPanelLayout>
       <div className="flex-1 flex flex-col min-h-0">
-        {/* Content Area */}
-        <div className="flex flex-col mt-13 mb-8 px-2">
-          <h1 className="text-4xl font-light">Projects</h1>
-          <p className="text-sm text-text-muted mb-1">
-            Create and manage your projects to organize related sessions together.
-          </p>
-          <Button onClick={() => setIsCreateModalOpen(true)} className="self-start mt-4">
-            <FolderPlus className="h-4 w-4 mr-2" />
-            New project
-          </Button>
+        <div className="bg-background-default px-8 pb-8 pt-16">
+          <div className="flex flex-col animate-in fade-in duration-500">
+            <div className="flex justify-between items-center mb-1">
+              <h1 className="text-4xl font-light">Projects</h1>
+            </div>
+            <p className="text-sm text-text-muted mb-4">
+              Create and manage your projects to organize related sessions together.
+            </p>
+
+            {/* Action Buttons */}
+            <Button onClick={() => setIsCreateModalOpen(true)} className="self-start">
+              <FolderPlus className="h-4 w-4 mr-2" />
+              New project
+            </Button>
+          </div>
         </div>
 
-        <div className="flex-1 min-h-0 relative px-2">
+        <div className="flex-1 min-h-0 relative px-8">
           <ScrollArea className="h-full">
             <div
               className={`h-full relative transition-all duration-300 ${
-                showContent ? 'opacity-100 animate-in slide-in-from-right-8 ' : 'opacity-0'
+                showContent ? 'opacity-100 animate-in fade-in' : 'opacity-0'
               }`}
             >
               {renderContent()}

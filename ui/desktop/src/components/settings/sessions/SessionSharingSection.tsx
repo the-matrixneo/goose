@@ -94,10 +94,16 @@ export default function SessionSharingSection() {
               : 'You can enable session sharing to share your sessions with others.'}
           </CardDescription>
         </CardHeader>
-        <CardContent className="px-6">
+        <CardContent className="px-4 py-2">
           <div className="space-y-4">
             {/* Toggle for enabling session sharing */}
             <div className="flex items-center gap-3">
+              <label className="text-sm cursor-pointer">
+                {envBaseUrlShare
+                  ? 'Session sharing has already been configured'
+                  : 'Enable session sharing'}
+              </label>
+
               {envBaseUrlShare ? (
                 <Lock className="w-5 h-5 text-text-muted" />
               ) : (
@@ -108,11 +114,6 @@ export default function SessionSharingSection() {
                   variant="mono"
                 />
               )}
-              <label className="text-text-default cursor-pointer">
-                {envBaseUrlShare
-                  ? 'Session sharing has already been configured'
-                  : 'Enable session sharing'}
-              </label>
             </div>
 
             {/* Base URL field (only visible if enabled) */}

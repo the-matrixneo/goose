@@ -627,7 +627,7 @@ function HubContentWithSidebar({
 
   return (
     <div>
-      <MainPanelLayout disableAnimation={disableAnimation}>
+      <MainPanelLayout>
         {/* Loader when generating recipe */}
         {isGeneratingRecipe && <LayingEggLoader />}
 
@@ -736,7 +736,7 @@ function HubContentWithSidebar({
         </div>
 
         <div
-          className={`flex flex-col min-w-0 flex-1 overflow-y-scroll relative px-4 pt-6`}
+          className={`flex flex-col min-w-0 flex-1 overflow-y-scroll relative`}
           onDrop={handleDrop}
           onDragOver={handleDragOver}
         >

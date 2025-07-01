@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Button } from './ui/button';
 import { ToolCallArguments, ToolCallArgumentValue } from './ToolCallArguments';
 import MarkdownContent from './MarkdownContent';
@@ -27,7 +27,7 @@ export default function ToolCallWithResponse({
   }
 
   return (
-    <div className={'w-full text-textSubtle text-sm'}>
+    <div className={'w-full text-sm'}>
       <ToolCallView {...{ isCancelledMessage, toolCall, toolResponse, notifications }} />
     </div>
   );
@@ -59,11 +59,11 @@ function ToolCallExpandable({
     <div className={className}>
       <Button
         onClick={toggleExpand}
-        className="w-full flex justify-between items-center pr-2 rounded-md hover:bg-background-subtle transition-colors"
+        className="w-full flex justify-between items-center pr-2 rounded-lg hover:bg-background-muted transition-colors"
         variant="ghost"
       >
-        <span className="flex items-center">{label}</span>
-        <Expand size={5} isExpanded={isExpanded} />
+        <span className="flex items-center font-mono">{label}</span>
+        {/* <Expand size={5} isExpanded={isExpanded} /> */}
       </Button>
       {isExpanded && <div>{children}</div>}
     </div>
@@ -129,6 +129,44 @@ function ToolCallView({
     ? 'loading'
     : toolResponse?.toolResult.status;
 
+  // Tool call timing tracking
+  const [startTime, setStartTime] = useState<number | null>(null);
+  const [elapsedTime, setElapsedTime] = useState<number | null>(null);
+
+  // Track when tool call starts (when there's no response yet)
+  useEffect(() => {
+    if (!toolResponse?.toolResult.status && startTime === null) {
+      setStartTime(Date.now());
+    }
+  }, [toolResponse?.toolResult.status, startTime]);
+
+  // Calculate elapsed time while tool call is running
+  useEffect(() => {
+    if (startTime && loadingStatus === 'loading') {
+      const interval = setInterval(() => {
+        setElapsedTime(Date.now() - startTime);
+      }, 100); // Update every 100ms for smooth display
+
+      return () => clearInterval(interval);
+    } else if (startTime && loadingStatus !== 'loading') {
+      // Tool call finished, calculate final elapsed time
+      setElapsedTime(Date.now() - startTime);
+    }
+  }, [startTime, loadingStatus]);
+
+  // Format elapsed time for display
+  const formatElapsedTime = (ms: number): string => {
+    if (ms < 1000) {
+      return `${ms}ms`;
+    } else if (ms < 60000) {
+      return `${(ms / 1000).toFixed(1)}s`;
+    } else {
+      const minutes = Math.floor(ms / 60000);
+      const seconds = ((ms % 60000) / 1000).toFixed(0);
+      return `${minutes}m ${seconds}s`;
+    }
+  };
+
   const toolResults: { result: Content; isExpandToolResults: boolean }[] =
     loadingStatus === 'success' && Array.isArray(toolResponse?.toolResult.value)
       ? toolResponse!.toolResult.value
@@ -165,7 +203,7 @@ function ToolCallView({
   const isRenderingProgress =
     loadingStatus === 'loading' && (progressEntries.length > 0 || (logs || []).length > 0);
 
-  const isShouldExpand = isExpandToolDetails || toolResults.some((v) => v.isExpandToolResults);
+  const isShouldExpand = false; // Always start minimized
 
   // Function to create a compact representation of arguments
   const getCompactArguments = () => {
@@ -199,8 +237,8 @@ function ToolCallView({
   return (
     <div className="border border-borderSubtle rounded-lg overflow-hidden shadow-sm">
       <ToolCallExpandable
-        isStartExpanded={isShouldExpand || isRenderingProgress}
-        isForceExpand={isShouldExpand}
+        isStartExpanded={false}
+        isForceExpand={false}
         className="bg-background-subtle bg-opacity-50"
         label={
           <div className="flex items-center py-2">
@@ -210,6 +248,12 @@ function ToolCallView({
             </span>
             {/* Display compact arguments inline */}
             {isToolDetails && getCompactArguments()}
+            {/* Display elapsed time */}
+            {elapsedTime !== null && (
+              <span className="ml-auto text-xs text-text-muted opacity-70">
+                {formatElapsedTime(elapsedTime)}
+              </span>
+            )}
           </div>
         }
       >

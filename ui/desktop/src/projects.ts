@@ -8,7 +8,7 @@ export interface Project {
   id: string;
   name: string;
   description: string | null;
-  default_directory: string;
+  defaultDirectory: string;
   sessionIds: string[];
   createdAt: string;
   updatedAt: string;
@@ -21,7 +21,7 @@ export interface ProjectMetadata {
   id: string;
   name: string;
   description: string | null;
-  default_directory: string;
+  defaultDirectory: string;
   sessionCount: number;
   createdAt: string;
   updatedAt: string;
@@ -40,7 +40,7 @@ export interface ProjectWithSessions extends Project {
 export interface CreateProjectRequest {
   name: string;
   description?: string;
-  default_directory: string;
+  defaultDirectory: string;
 }
 
 /**
@@ -49,7 +49,7 @@ export interface CreateProjectRequest {
 export interface UpdateProjectRequest {
   name?: string;
   description?: string | null;
-  default_directory?: string;
+  defaultDirectory?: string;
 }
 
 /**
@@ -60,7 +60,7 @@ function ensureDefaultDirectory(project: Partial<Project>): Project {
     id: project.id || '',
     name: project.name || '',
     description: project.description || null,
-    default_directory: project.default_directory || process.env.HOME || '',
+    defaultDirectory: project.defaultDirectory || process.env.HOME || '',
     sessionIds: project.sessionIds || [],
     createdAt: project.createdAt || new Date().toISOString(),
     updatedAt: project.updatedAt || new Date().toISOString(),

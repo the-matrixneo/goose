@@ -49,8 +49,8 @@ export const ManualSummarizeButton: React.FC<ManualSummarizeButtonProps> = ({
     <>
       <div className="relative flex items-center">
         <button
-          className={`flex items-center justify-center text-text-default/70 hover:text-text-default ${
-            isLoadingSummary || isLoading ? 'opacity-50 cursor-not-allowed' : ''
+          className={`flex items-center justify-center text-text-default/70 hover:text-text-default text-xs ${
+            isLoadingSummary || isLoading ? 'cursor-not-allowed' : ''
           }`}
           onClick={handleClick}
           disabled={isLoadingSummary || isLoading}

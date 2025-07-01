@@ -54,48 +54,52 @@ export default function ExtensionsView({
 
   return (
     <MainPanelLayout>
-      <div className="flex-1 flex flex-col min-h-0 mt-6">
-        {/* Content Area */}
-        <div className="flex flex-col mt-7 mb-4 px-2">
-          <div className="flex justify-between items-center mb-1">
-            <h1 className="text-4xl font-light">Extensions</h1>
+      <div className="flex flex-col min-w-0 flex-1 overflow-y-scroll relative">
+        <div className="bg-background-default px-8 pb-4 pt-16">
+          <div className="flex flex-col animate-in fade-in duration-500">
+            <div className="flex justify-between items-center mb-1">
+              <h1 className="text-4xl font-light">Extensions</h1>
+            </div>
+            <p className="text-sm text-text-muted mb-6">
+              These extensions use the Model Context Protocol (MCP). They can expand Goose's
+              capabilities using three main components: Prompts, Resources, and Tools.
+            </p>
+
+            {/* Action Buttons */}
+            <div className="flex gap-4 mb-8">
+              <Button
+                className="flex items-center gap-2 justify-center"
+                variant="default"
+                onClick={() => setIsAddModalOpen(true)}
+              >
+                <Plus className="h-4 w-4" />
+                Add custom extension
+              </Button>
+              <Button
+                className="flex items-center gap-2 justify-center"
+                variant="secondary"
+                onClick={() =>
+                  window.open('https://block.github.io/goose/v1/extensions/', '_blank')
+                }
+              >
+                <GPSIcon size={12} />
+                Browse extensions
+              </Button>
+            </div>
           </div>
-          <p className="text-sm text-text-muted">
-            These extensions use the Model Context Protocol (MCP). They can expand Goose's
-            capabilities using three main components: Prompts, Resources, and Tools.
-          </p>
         </div>
 
-        {/* Buttons between header and extensions list */}
-        <div className="flex gap-4 mb-8 px-2">
-          <Button
-            className="flex items-center gap-2 justify-center"
-            variant="default"
-            onClick={() => setIsAddModalOpen(true)}
-          >
-            <Plus className="h-4 w-4" />
-            Add custom extension
-          </Button>
-          <Button
-            className="flex items-center gap-2 justify-center"
-            variant="secondary"
-            onClick={() => window.open('https://block.github.io/goose/v1/extensions/', '_blank')}
-          >
-            <GPSIcon size={12} />
-            Browse extensions
-          </Button>
+        <div className="px-8 pb-16">
+          <ExtensionsSection
+            key={refreshKey}
+            deepLinkConfig={viewOptions.deepLinkConfig}
+            showEnvVars={viewOptions.showEnvVars}
+            hideButtons={true}
+          />
         </div>
 
-        <div className="flex-1 min-h-0 relative">
-          <ScrollArea className="h-full pr-4">
-            <ExtensionsSection
-              key={refreshKey}
-              deepLinkConfig={viewOptions.deepLinkConfig}
-              showEnvVars={viewOptions.showEnvVars}
-              hideButtons={true}
-            />
-          </ScrollArea>
-        </div>
+        {/* Bottom padding space - same as in hub.tsx */}
+        <div className="block h-8" />
       </div>
 
       {/* Modal for adding a new extension */}

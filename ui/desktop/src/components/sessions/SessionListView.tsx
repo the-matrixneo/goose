@@ -43,6 +43,7 @@ const SessionListView: React.FC<SessionListViewProps> = ({ setView, onSelectSess
   const [dateGroups, setDateGroups] = useState<DateGroup[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showSkeleton, setShowSkeleton] = useState(true);
+  const [showContent, setShowContent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchResults, setSearchResults] = useState<{
     count: number;
@@ -119,6 +120,10 @@ const SessionListView: React.FC<SessionListViewProps> = ({ setView, onSelectSess
     if (!isLoading && showSkeleton) {
       const timer = setTimeout(() => {
         setShowSkeleton(false);
+        // Add a small delay before showing content for fade-in effect
+        setTimeout(() => {
+          setShowContent(true);
+        }, 50);
       }, 300); // Show skeleton for at least 300ms
 
       return () => clearTimeout(timer);
@@ -178,6 +183,7 @@ const SessionListView: React.FC<SessionListViewProps> = ({ setView, onSelectSess
   const loadSessions = async () => {
     setIsLoading(true);
     setShowSkeleton(true);
+    setShowContent(false);
     setError(null);
     try {
       const sessions = await fetchSessions();
@@ -341,31 +347,39 @@ const SessionListView: React.FC<SessionListViewProps> = ({ setView, onSelectSess
   };
 
   return (
-    <>
-      <MainPanelLayout>
-        <div className="flex-1 flex flex-col min-h-0">
-          {/* Content Area */}
-          <div className="flex flex-col mt-13 mb-6 px-2">
-            <h1 className="text-4xl font-light">Chat history</h1>
-          </div>
-
-          <div className="flex-1 min-h-0 relative px-2">
-            <ScrollArea className="h-full pr-2" data-search-scroll-area>
-              <div ref={containerRef} className="h-full relative px-1">
-                <SearchView
-                  onSearch={handleSearch}
-                  onNavigate={handleSearchNavigation}
-                  searchResults={searchResults}
-                  className="relative"
-                >
-                  {renderContent()}
-                </SearchView>
-              </div>
-            </ScrollArea>
+    <MainPanelLayout>
+      <div className="flex-1 flex flex-col min-h-0">
+        <div className="bg-background-default px-8 pb-8 pt-16">
+          <div className="flex flex-col animate-in fade-in duration-500">
+            <div className="flex justify-between items-center mb-1">
+              <h1 className="text-4xl font-light">Chat history</h1>
+            </div>
+            <p className="text-sm text-text-muted mb-4">
+              View and search your past conversations with Goose.
+            </p>
           </div>
         </div>
-      </MainPanelLayout>
-    </>
+
+        <div className="flex-1 min-h-0 relative px-8">
+          <ScrollArea className="h-full">
+            <div
+              className={`h-full relative transition-all duration-300 ${
+                showContent ? 'opacity-100 animate-in fade-in' : 'opacity-0'
+              }`}
+            >
+              <SearchView
+                onSearch={handleSearch}
+                onNavigate={handleSearchNavigation}
+                searchResults={searchResults}
+                className="relative"
+              >
+                {renderContent()}
+              </SearchView>
+            </div>
+          </ScrollArea>
+        </div>
+      </div>
+    </MainPanelLayout>
   );
 };
 

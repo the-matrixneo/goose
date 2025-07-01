@@ -179,7 +179,7 @@ export default function GooseMessage({
         {toolRequests.length > 0 && (
           <div className="relative flex flex-col w-full">
             {toolRequests.map((toolRequest) => (
-              <div className={`goose-message-tool px-2 py-2`} key={toolRequest.id}>
+              <div className={`goose-message-tool pb-2`} key={toolRequest.id}>
                 <ToolCallWithResponse
                   // If the message is resumed and not matched tool response, it means the tool is broken or cancelled.
                   isCancelledMessage={

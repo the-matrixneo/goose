@@ -72,7 +72,7 @@ export default function ExtensionItem({
 
   return (
     <Card
-      className="transition-all duration-200 hover:shadow-default hover:cursor-pointer"
+      className="transition-all duration-200 hover:shadow-default hover:cursor-pointer min-h-[120px]"
       onClick={() => handleToggle(extension)}
     >
       <CardHeader>
@@ -97,7 +97,7 @@ export default function ExtensionItem({
           </div>
         </CardAction>
       </CardHeader>
-      <CardContent className="px-4 text-sm">{renderSubtitle()}</CardContent>
+      <CardContent className="px-4 text-sm text-text-muted">{renderSubtitle()}</CardContent>
     </Card>
   );
 }

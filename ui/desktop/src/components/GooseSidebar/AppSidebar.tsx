@@ -162,7 +162,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
                     }}
                     isActive={isActivePath('/')}
                     tooltip="Go back to the main chat screen"
-                    className="w-full justify-start px-3 rounded-lg h-fit hover:bg-background-medium transition-all duration-200 data-[active=true]:bg-background-medium"
+                    className="w-full justify-start px-3 rounded-lg h-fit hover:bg-background-medium/50 transition-all duration-200 data-[active=true]:bg-background-medium"
                   >
                     <Home className="w-4 h-4" />
                     <span>Home</span>
@@ -187,7 +187,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
                     onClick={() => navigate('/pair')}
                     isActive={isActivePath('/pair')}
                     tooltip="Start pairing with Goose"
-                    className="w-full justify-start px-3 rounded-lg h-fit hover:bg-background-medium transition-all duration-200 data-[active=true]:bg-background-medium"
+                    className="w-full justify-start px-3 rounded-lg h-fit hover:bg-background-medium/50 transition-all duration-200 data-[active=true]:bg-background-medium"
                   >
                     <ChatSmart className="w-4 h-4" />
                     <span>Chat</span>
@@ -205,7 +205,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
                     onClick={() => navigate('/extensions')}
                     isActive={isActivePath('/extensions')}
                     tooltip="Manage your extensions"
-                    className="w-full justify-start px-3 rounded-lg h-fit hover:bg-background-medium transition-all duration-200 data-[active=true]:bg-background-medium"
+                    className="w-full justify-start px-3 rounded-lg h-fit hover:bg-background-medium/50 transition-all duration-200 data-[active=true]:bg-background-medium"
                   >
                     <Puzzle className="w-4 h-4" />
                     <span>Extensions</span>
@@ -224,7 +224,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
                       onClick={() => navigate('/schedules')}
                       isActive={isActivePath('/schedules')}
                       tooltip="Manage scheduled runs"
-                      className="w-full justify-start px-3 rounded-lg h-fit hover:bg-background-medium transition-all duration-200 data-[active=true]:bg-background-medium"
+                      className="w-full justify-start px-3 rounded-lg h-fit hover:bg-background-medium/50 transition-all duration-200 data-[active=true]:bg-background-medium"
                     >
                       <Clock className="w-4 h-4" />
                       <span>Scheduler</span>
@@ -250,7 +250,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
                     onClick={() => navigate('/projects')}
                     isActive={isActivePath('/projects')}
                     tooltip="Manage your projects"
-                    className="w-full justify-start px-3 rounded-lg h-fit hover:bg-background-medium transition-all duration-200 data-[active=true]:bg-background-medium"
+                    className="w-full justify-start px-3 rounded-lg h-fit hover:bg-background-medium/50 transition-all duration-200 data-[active=true]:bg-background-medium"
                   >
                     <FolderKanban className="w-4 h-4" />
                     <span>Projects</span>
@@ -268,7 +268,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
                     onClick={() => navigate('/sessions')}
                     isActive={isActivePath('/sessions')}
                     tooltip="View your session history"
-                    className="w-full justify-start px-3 rounded-lg h-fit hover:bg-background-medium transition-all duration-200 data-[active=true]:bg-background-medium"
+                    className="w-full justify-start px-3 rounded-lg h-fit hover:bg-background-medium/50 transition-all duration-200 data-[active=true]:bg-background-medium"
                   >
                     <History className="w-4 h-4" />
                     <span>Sessions</span>
@@ -286,7 +286,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
                     onClick={() => navigate('/recipes')}
                     isActive={isActivePath('/recipes')}
                     tooltip="Browse your saved recipes"
-                    className="w-full justify-start px-3 rounded-lg h-fit hover:bg-background-medium transition-all duration-200 data-[active=true]:bg-background-medium"
+                    className="w-full justify-start px-3 rounded-lg h-fit hover:bg-background-medium/50 transition-all duration-200 data-[active=true]:bg-background-medium"
                   >
                     <FileText className="w-4 h-4" />
                     <span>Recipes</span>
@@ -311,7 +311,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
                     onClick={() => navigate('/settings')}
                     isActive={isActivePath('/settings')}
                     tooltip="Configure Goose settings"
-                    className="w-full justify-start px-3 rounded-lg h-fit hover:bg-background-medium transition-all duration-200 data-[active=true]:bg-background-medium"
+                    className="w-full justify-start px-3 rounded-lg h-fit hover:bg-background-medium/50 transition-all duration-200 data-[active=true]:bg-background-medium"
                   >
                     <Gear className="w-4 h-4" />
                     <span>Settings</span>

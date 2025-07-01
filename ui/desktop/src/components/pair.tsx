@@ -606,11 +606,11 @@ function PairContentWithSidebar({
 
   return (
     <div>
-      <MainPanelLayout disableAnimation={disableAnimation}>
+      <MainPanelLayout>
         {/* Loader when generating recipe */}
         {isGeneratingRecipe && <LayingEggLoader />}
 
-        <div className="h-12 flex items-center justify-between">
+        {/* <div className="h-12 flex items-center justify-between">
           <div className="flex items-center pr-4">
             {messages.length > 0 && (
               <>
@@ -626,7 +626,6 @@ function PairContentWithSidebar({
                       >
                         <div className="flex gap-2 items-center text-text-default">
                           <Idea className="w-4 h-4" />
-                          {/* Configure .goosehints */}
                         </div>
                       </Button>
                     </TooltipTrigger>
@@ -668,7 +667,6 @@ function PairContentWithSidebar({
                     <Tooltip delayDuration={500}>
                       <TooltipTrigger className="w-full">
                         <Button
-                          // onClick={handleSaveRecipeClick}
                           className="px-3"
                           variant="ghost"
                           size="sm"
@@ -700,7 +698,6 @@ function PairContentWithSidebar({
                       >
                         <div className="flex gap-2 items-center text-text-default">
                           <Bot className="w-4 h-4" />
-                          {/* Make Agent from this session */}
                         </div>
                       </Button>
                     </TooltipTrigger>
@@ -712,10 +709,10 @@ function PairContentWithSidebar({
               </>
             )}
           </div>
-        </div>
+        </div> */}
 
         <div
-          className="flex flex-col min-w-0 flex-1 overflow-y-scroll relative pl-6 pr-4 pb-16 pt-2"
+          className="flex flex-col min-w-0 flex-1 overflow-y-scroll relative pl-6 px-4 pb-16 pt-2"
           onDrop={handleDrop}
           onDragOver={handleDragOver}
         >
@@ -744,7 +741,7 @@ function PairContentWithSidebar({
                   return (
                     <div
                       key={message.id || index}
-                      className={`relative ${index === 0 ? 'mt-0' : 'mt-4'} ${isUser ? 'user' : 'assistant'}`}
+                      className={`relative px-2 ${index === 0 ? 'mt-0' : 'mt-2'} ${isUser ? 'user' : 'assistant'}`}
                       data-testid="message-container"
                     >
                       {isUser ? (
@@ -821,6 +818,7 @@ function PairContentWithSidebar({
         <div
           className={`relative z-10 ${disableAnimation ? '' : 'animate-[fadein_400ms_ease-in_forwards]'}`}
         >
+          <div className="px-6">{isLoading && <LoadingGoose />}</div>
           <ChatInput
             handleSubmit={handleSubmit}
             isLoading={isLoading}

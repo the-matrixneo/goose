@@ -7,7 +7,7 @@ interface GreetingProps {
 }
 
 export function Greeting({
-  className = 'mb-6 mt-7 text-4xl font-light animate-in fade-in slide-in-from-right-8 duration-300',
+  className = 'mt-1 text-4xl font-light animate-in fade-in duration-300',
   forceRefresh = false,
 }: GreetingProps) {
   const prefixes = ['Hello!'];
@@ -48,9 +48,11 @@ export function Greeting({
   const messageRef = useTextAnimator({ text: greeting.message });
 
   return (
-    <h1 className={className} key={forceRefresh ? Date.now() : undefined}>
-      {/* <span>{greeting.prefix}</span> */}
-      <span ref={messageRef}>{greeting.message}</span>
-    </h1>
+    <div className="px-8 pb-12 pt-16 bg-background-default">
+      <h1 className={className} key={forceRefresh ? Date.now() : undefined}>
+        {/* <span>{greeting.prefix}</span> */}
+        <span ref={messageRef}>{greeting.message}</span>
+      </h1>
+    </div>
   );
 }

@@ -1,23 +1,15 @@
 import { useEffect, useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
-import {
-  FolderOpen,
-  Calendar,
-  MessageSquareText,
-  Target,
-  ChevronRight,
-  Folder,
-} from 'lucide-react';
+import { Card, CardContent, CardDescription } from '../ui/card';
+import { Folder } from 'lucide-react';
 import { getApiUrl, getSecretKey } from '../../config';
 import { useTextAnimator } from '../../hooks/use-text-animator';
 import { Greeting } from '../common/Greeting';
-import { ActivityHeatmap } from '../common/ActivityHeatmap';
 import { fetchSessions, type Session } from '../../sessions';
 import { fetchProjects, type ProjectMetadata } from '../../projects';
 import { useNavigate } from 'react-router-dom';
-import { formatMessageTimestamp } from '../../utils/timeUtils';
 import { Button } from '../ui/button';
 import { ChatSmart } from '../icons/';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface SessionInsights {
   totalSessions: number;
@@ -123,15 +115,15 @@ export function SessionInsights() {
   }
 
   return (
-    <>
+    <div className="bg-background-muted">
       <Greeting />
 
-      <div className="grid gap-4">
+      <div className="grid gap-[2px] mt-0.5">
         {/* Top row with three equal columns */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-3 gap-[2px]">
           {/* Total Sessions Card */}
-          <Card className="w-full p-3 px-4 animate-in fade-in slide-in-from-right-8 duration-500">
-            <CardContent className="flex flex-col justify-end h-full px-0">
+          <Card className="w-full py-6 px-4 border-none rounded-tl-none rounded-bl-none">
+            <CardContent className="animate-in fade-in duration-500 flex flex-col justify-end h-full px-4">
               <div className="flex flex-col justify-end">
                 <p className="text-4xl font-mono font-light flex items-end">
                   {insights?.totalSessions}
@@ -142,8 +134,8 @@ export function SessionInsights() {
           </Card>
 
           {/* Average Duration Card */}
-          <Card className="w-full p-3 px-4 animate-in fade-in slide-in-from-right-8 duration-500">
-            <CardContent className="flex flex-col justify-end h-full px-0">
+          <Card className="w-full py-6 px-4 border-none">
+            <CardContent className="animate-in fade-in duration-500 flex flex-col justify-end h-full px-4">
               <div className="flex flex-col justify-end">
                 <p className="text-4xl font-mono font-light flex items-end">
                   {insights?.avgSessionDuration?.toFixed(1)}m
@@ -154,8 +146,8 @@ export function SessionInsights() {
           </Card>
 
           {/* Total Tokens Card */}
-          <Card className="w-full p-3 px-4 animate-in fade-in slide-in-from-right-8 duration-500">
-            <CardContent className="flex flex-col justify-end h-full px-0">
+          <Card className="w-full py-6 px-4 border-none rounded-tr-none rounded-br-none">
+            <CardContent className="animate-in fade-in duration-500 flex flex-col justify-end h-full px-4">
               <div className="flex flex-col justify-end">
                 <p className="text-4xl font-mono font-light flex items-end">
                   {insights?.totalTokens ? `${(insights.totalTokens / 1000000).toFixed(2)}M` : ''}
@@ -167,12 +159,12 @@ export function SessionInsights() {
         </div>
 
         {/* Bottom row with two equal columns */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-[2px]">
           {/* Recent Projects Card */}
-          <Card className="w-full p-3 px-2 animate-in fade-in slide-in-from-right-8 duration-500">
-            <CardContent className="px-0">
-              <div className="flex justify-between items-center mb-4">
-                <CardDescription className="mb-0 px-2">
+          <Card className="w-full py-6 px-4 border-none rounded-tl-none rounded-bl-none">
+            <CardContent className="animate-in fade-in duration-500 px-4">
+              <div className="flex justify-between items-center mb-2 px-2">
+                <CardDescription className="mb-0">
                   <span className="text-lg text-text-default">Recent projects</span>
                 </CardDescription>
                 <Button
@@ -184,42 +176,49 @@ export function SessionInsights() {
                   See all
                 </Button>
               </div>
-              <div className="space-y-1">
-                {recentProjects.length > 0 ? (
-                  recentProjects.map((project) => (
-                    <div
-                      key={project.id}
-                      className="flex items-center justify-between text-sm py-1 px-2 rounded-md hover:bg-background-muted cursor-pointer transition-colors"
-                      onClick={() => handleProjectClick(project.id)}
-                      role="button"
-                      tabIndex={0}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          handleProjectClick(project.id);
-                        }
-                      }}
-                    >
-                      <div className="flex items-center space-x-2">
-                        <Folder className="h-4 w-4 text-text-muted" />
-                        <span className="truncate max-w-[200px]">{project.name}</span>
-                      </div>
-                      <span className="text-text-muted font-mono font-light">
-                        {formatDateOnly(project.updatedAt)}
-                      </span>
+              <div className="space-y-1 min-h-[96px] transition-all duration-300 ease-in-out">
+                <AnimatePresence>
+                  {recentProjects.length > 0 ? (
+                    recentProjects.map((project, index) => (
+                      <motion.div
+                        key={project.id}
+                        className="flex items-center justify-between text-sm py-1 px-2 rounded-md hover:bg-background-muted cursor-pointer transition-colors"
+                        onClick={() => handleProjectClick(project.id)}
+                        role="button"
+                        tabIndex={0}
+                        initial={{ opacity: 0, y: 5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.3, delay: index * 0.1 }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            handleProjectClick(project.id);
+                          }
+                        }}
+                      >
+                        <div className="flex items-center space-x-2">
+                          <Folder className="h-4 w-4 text-text-muted" />
+                          <span className="truncate max-w-[200px]">{project.name}</span>
+                        </div>
+                        <span className="text-text-muted font-mono font-light">
+                          {formatDateOnly(project.updatedAt)}
+                        </span>
+                      </motion.div>
+                    ))
+                  ) : (
+                    <div className="text-text-muted text-sm py-2 px-2">
+                      No recent projects found.
                     </div>
-                  ))
-                ) : (
-                  <div className="text-text-muted text-sm py-2 px-2">No recent projects found.</div>
-                )}
+                  )}
+                </AnimatePresence>
               </div>
             </CardContent>
           </Card>
 
           {/* Recent Chats Card */}
-          <Card className="w-full p-3 px-2 animate-in fade-in slide-in-from-right-8 duration-500">
-            <CardContent className="px-0">
-              <div className="flex justify-between items-center mb-4">
-                <CardDescription className="mb-0 px-2">
+          <Card className="w-full py-6 px-4 border-none rounded-tr-none rounded-br-none">
+            <CardContent className="animate-in fade-in duration-500 px-4">
+              <div className="flex justify-between items-center mb-2 px-2">
+                <CardDescription className="mb-0">
                   <span className="text-lg text-text-default">Recent chats</span>
                 </CardDescription>
                 <Button
@@ -231,40 +230,48 @@ export function SessionInsights() {
                   See all
                 </Button>
               </div>
-              <div className="space-y-1">
-                {recentSessions.length > 0 ? (
-                  recentSessions.map((session) => (
-                    <div
-                      key={session.id}
-                      className="flex items-center justify-between text-sm py-1 px-2 rounded-md hover:bg-background-muted cursor-pointer transition-colors"
-                      onClick={() => handleSessionClick(session.id)}
-                      role="button"
-                      tabIndex={0}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          handleSessionClick(session.id);
-                        }
-                      }}
-                    >
-                      <div className="flex items-center space-x-2">
-                        <ChatSmart className="h-4 w-4 text-text-muted" />
-                        <span className="truncate max-w-[200px]">
-                          {session.metadata.description || session.id}
+              <div className="space-y-1 min-h-[96px] transition-all duration-300 ease-in-out">
+                <AnimatePresence>
+                  {recentSessions.length > 0 ? (
+                    recentSessions.map((session, index) => (
+                      <motion.div
+                        key={session.id}
+                        className="flex items-center justify-between text-sm py-1 px-2 rounded-md hover:bg-background-muted cursor-pointer transition-colors"
+                        onClick={() => handleSessionClick(session.id)}
+                        role="button"
+                        tabIndex={0}
+                        initial={{ opacity: 0, y: 5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.3, delay: index * 0.1 }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            handleSessionClick(session.id);
+                          }
+                        }}
+                      >
+                        <div className="flex items-center space-x-2">
+                          <ChatSmart className="h-4 w-4 text-text-muted" />
+                          <span className="truncate max-w-[200px]">
+                            {session.metadata.description || session.id}
+                          </span>
+                        </div>
+                        <span className="text-text-muted font-mono font-light">
+                          {formatDateOnly(session.modified)}
                         </span>
-                      </div>
-                      <span className="text-text-muted font-mono font-light">
-                        {formatDateOnly(session.modified)}
-                      </span>
+                      </motion.div>
+                    ))
+                  ) : (
+                    <div className="text-text-muted text-sm py-2">
+                      No recent chat sessions found.
                     </div>
-                  ))
-                ) : (
-                  <div className="text-text-muted text-sm py-2">No recent chat sessions found.</div>
-                )}
+                  )}
+                </AnimatePresence>
               </div>
             </CardContent>
           </Card>
         </div>
+        <div className="h-full bg-background-default"></div>
       </div>
-    </>
+    </div>
   );
 }

@@ -1,8 +1,13 @@
 import React, { useState, useCallback } from 'react';
 import ProjectsView from './ProjectsView';
 import ProjectDetailsView from './ProjectDetailsView';
+import { View, ViewOptions } from '../../App';
 
-const ProjectsContainer: React.FC = () => {
+interface ProjectsContainerProps {
+  setView: (view: View, viewOptions?: ViewOptions) => void;
+}
+
+const ProjectsContainer: React.FC<ProjectsContainerProps> = ({ setView }) => {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
@@ -21,7 +26,9 @@ const ProjectsContainer: React.FC = () => {
   }, []);
 
   if (selectedProjectId) {
-    return <ProjectDetailsView projectId={selectedProjectId} onBack={handleBack} />;
+    return (
+      <ProjectDetailsView projectId={selectedProjectId} onBack={handleBack} setView={setView} />
+    );
   }
 
   return <ProjectsView onSelectProject={handleSelectProject} refreshTrigger={refreshTrigger} />;

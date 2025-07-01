@@ -472,9 +472,52 @@ const ExtensionsRoute = () => {
 };
 
 const ProjectsRoute = () => {
+  const navigate = useNavigate();
+
+  const setView = (view: View, viewOptions?: ViewOptions) => {
+    // Convert view to route navigation
+    switch (view) {
+      case 'chat':
+        navigate('/');
+        break;
+      case 'pair':
+        navigate('/pair', { state: viewOptions });
+        break;
+      case 'settings':
+        navigate('/settings', { state: viewOptions });
+        break;
+      case 'sessions':
+        navigate('/sessions');
+        break;
+      case 'schedules':
+        navigate('/schedules');
+        break;
+      case 'recipes':
+        navigate('/recipes');
+        break;
+      case 'permission':
+        navigate('/permission', { state: viewOptions });
+        break;
+      case 'ConfigureProviders':
+        navigate('/configure-providers');
+        break;
+      case 'sharedSession':
+        navigate('/shared-session', { state: viewOptions });
+        break;
+      case 'recipeEditor':
+        navigate('/recipe-editor', { state: viewOptions });
+        break;
+      case 'welcome':
+        navigate('/welcome');
+        break;
+      default:
+        navigate('/');
+    }
+  };
+
   return (
     <React.Suspense fallback={<div>Loading projects...</div>}>
-      <ProjectsContainer />
+      <ProjectsContainer setView={setView} />
     </React.Suspense>
   );
 };
