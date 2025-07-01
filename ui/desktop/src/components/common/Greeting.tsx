@@ -49,10 +49,8 @@ export function Greeting({
 
   return (
     <h1 className={className} key={forceRefresh ? Date.now() : undefined}>
-      <span>{greeting.prefix}</span>
-      <span className="text-text-muted" ref={messageRef}>
-        {greeting.message}
-      </span>
+      {/* <span>{greeting.prefix}</span> */}
+      <span ref={messageRef}>{greeting.message}</span>
     </h1>
   );
 }

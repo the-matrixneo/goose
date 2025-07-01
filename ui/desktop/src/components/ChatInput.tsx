@@ -457,7 +457,7 @@ export default function ChatInput({
           data-testid="chat-input"
           autoFocus
           id="dynamic-textarea"
-          placeholder="What would you like to pair on? ⌘↑/⌘↓"
+          placeholder="⌘↑/⌘↓ to navigate messages"
           value={displayValue}
           onChange={handleChange}
           onCompositionStart={handleCompositionStart}

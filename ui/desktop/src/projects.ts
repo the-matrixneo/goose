@@ -1,6 +1,5 @@
 import { Session } from './sessions';
 import { client } from './api/client.gen';
-import { ProjectMetadata } from './api/types.gen';
 
 /**
  * Interface for a project with all details
@@ -9,7 +8,7 @@ export interface Project {
   id: string;
   name: string;
   description: string | null;
-  defaultDirectory: string;
+  default_directory: string;
   sessionIds: string[];
   createdAt: string;
   updatedAt: string;
@@ -22,7 +21,7 @@ export interface ProjectMetadata {
   id: string;
   name: string;
   description: string | null;
-  defaultDirectory: string;
+  default_directory: string;
   sessionCount: number;
   createdAt: string;
   updatedAt: string;
@@ -41,7 +40,7 @@ export interface ProjectWithSessions extends Project {
 export interface CreateProjectRequest {
   name: string;
   description?: string;
-  defaultDirectory: string;
+  default_directory: string;
 }
 
 /**
@@ -50,7 +49,7 @@ export interface CreateProjectRequest {
 export interface UpdateProjectRequest {
   name?: string;
   description?: string | null;
-  defaultDirectory?: string;
+  default_directory?: string;
 }
 
 /**
@@ -61,7 +60,7 @@ function ensureDefaultDirectory(project: Partial<Project>): Project {
     id: project.id || '',
     name: project.name || '',
     description: project.description || null,
-    defaultDirectory: project.defaultDirectory || process.env.HOME || '',
+    default_directory: project.default_directory || process.env.HOME || '',
     sessionIds: project.sessionIds || [],
     createdAt: project.createdAt || new Date().toISOString(),
     updatedAt: project.updatedAt || new Date().toISOString(),
@@ -95,24 +94,15 @@ export async function fetchProjects(): Promise<ProjectMetadata[]> {
  * @returns Promise with the created project
  */
 export async function createProject(request: CreateProjectRequest): Promise<Project> {
-  try {
-    const response = await client.post<{ project: Project }>({
-      url: '/projects',
-      body: request,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response?.data?.project) {
-      throw new Error('Unexpected response format from create_project');
-    }
-
-    return ensureDefaultDirectory(response.data.project);
-  } catch (error) {
-    console.error('Error creating project:', error);
-    throw error;
-  }
+  const response = await client.post<{ project: Project }>({
+    url: '/projects',
+    body: request,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+  console.log('Raw createProject response:', response);
+  return ensureDefaultDirectory((response as any).project ?? response);
 }
 
 /**

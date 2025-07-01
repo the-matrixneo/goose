@@ -1,14 +1,23 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
-import { FolderOpen, Calendar, MessageSquareText, Target, ChevronRight } from 'lucide-react';
+import {
+  FolderOpen,
+  Calendar,
+  MessageSquareText,
+  Target,
+  ChevronRight,
+  Folder,
+} from 'lucide-react';
 import { getApiUrl, getSecretKey } from '../../config';
 import { useTextAnimator } from '../../hooks/use-text-animator';
 import { Greeting } from '../common/Greeting';
 import { ActivityHeatmap } from '../common/ActivityHeatmap';
 import { fetchSessions, type Session } from '../../sessions';
+import { fetchProjects, type ProjectMetadata } from '../../projects';
 import { useNavigate } from 'react-router-dom';
 import { formatMessageTimestamp } from '../../utils/timeUtils';
 import { Button } from '../ui/button';
+import { ChatSmart } from '../icons/';
 
 interface SessionInsights {
   totalSessions: number;
@@ -21,6 +30,7 @@ export function SessionInsights() {
   const [insights, setInsights] = useState<SessionInsights | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [recentSessions, setRecentSessions] = useState<Session[]>([]);
+  const [recentProjects, setRecentProjects] = useState<ProjectMetadata[]>([]);
   const navigate = useNavigate();
 
   // Add text animator effects for each number
@@ -64,8 +74,18 @@ export function SessionInsights() {
       }
     };
 
+    const loadRecentProjects = async () => {
+      try {
+        const projects = await fetchProjects();
+        setRecentProjects(projects.slice(0, 3));
+      } catch (error) {
+        console.error('Failed to load recent projects:', error);
+      }
+    };
+
     loadInsights();
     loadRecentSessions();
+    loadRecentProjects();
   }, []);
 
   const handleSessionClick = (sessionId: string) => {
@@ -79,8 +99,15 @@ export function SessionInsights() {
     navigate('/sessions');
   };
 
-  const handleDirectoryClick = (dir: string) => {
-    navigate('/pair', { state: { workingDirectory: dir } });
+  const navigateToProjects = () => {
+    navigate('/projects');
+  };
+
+  const handleProjectClick = (projectId: string) => {
+    navigate('/projects', {
+      state: { selectedProjectId: projectId },
+      replace: true,
+    });
   };
 
   // Format date to show only the date part (without time)
@@ -141,6 +168,53 @@ export function SessionInsights() {
 
         {/* Bottom row with two equal columns */}
         <div className="grid grid-cols-2 gap-4">
+          {/* Recent Projects Card */}
+          <Card className="w-full p-3 px-2 animate-in fade-in slide-in-from-right-8 duration-500">
+            <CardContent className="px-0">
+              <div className="flex justify-between items-center mb-4">
+                <CardDescription className="mb-0 px-2">
+                  <span className="text-lg text-text-default">Recent projects</span>
+                </CardDescription>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs text-text-muted flex items-center gap-1 !px-0 hover:bg-transparent hover:underline hover:text-text-default"
+                  onClick={navigateToProjects}
+                >
+                  See all
+                </Button>
+              </div>
+              <div className="space-y-1">
+                {recentProjects.length > 0 ? (
+                  recentProjects.map((project) => (
+                    <div
+                      key={project.id}
+                      className="flex items-center justify-between text-sm py-1 px-2 rounded-md hover:bg-background-muted cursor-pointer transition-colors"
+                      onClick={() => handleProjectClick(project.id)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          handleProjectClick(project.id);
+                        }
+                      }}
+                    >
+                      <div className="flex items-center space-x-2">
+                        <Folder className="h-4 w-4 text-text-muted" />
+                        <span className="truncate max-w-[200px]">{project.name}</span>
+                      </div>
+                      <span className="text-text-muted font-mono font-light">
+                        {formatDateOnly(project.updatedAt)}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-text-muted text-sm py-2 px-2">No recent projects found.</div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Recent Chats Card */}
           <Card className="w-full p-3 px-2 animate-in fade-in slide-in-from-right-8 duration-500">
             <CardContent className="px-0">
@@ -154,7 +228,7 @@ export function SessionInsights() {
                   className="text-xs text-text-muted flex items-center gap-1 !px-0 hover:bg-transparent hover:underline hover:text-text-default"
                   onClick={navigateToSessionHistory}
                 >
-                  See all <ChevronRight className="h-3 w-3" />
+                  See all
                 </Button>
               </div>
               <div className="space-y-1">
@@ -172,9 +246,12 @@ export function SessionInsights() {
                         }
                       }}
                     >
-                      <span className="truncate max-w-[200px]">
-                        {session.metadata.description || session.id}
-                      </span>
+                      <div className="flex items-center space-x-2">
+                        <ChatSmart className="h-4 w-4 text-text-muted" />
+                        <span className="truncate max-w-[200px]">
+                          {session.metadata.description || session.id}
+                        </span>
+                      </div>
                       <span className="text-text-muted font-mono font-light">
                         {formatDateOnly(session.modified)}
                       </span>
@@ -183,37 +260,6 @@ export function SessionInsights() {
                 ) : (
                   <div className="text-text-muted text-sm py-2">No recent chat sessions found.</div>
                 )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Most Active Directories Card */}
-          <Card className="w-full p-3 px-2 animate-in fade-in slide-in-from-right-8 duration-500">
-            <CardContent className="px-0">
-              <CardDescription className="mb-4 px-2">
-                <span className="text-lg text-text-default">Popular directories</span>
-              </CardDescription>
-              <div className="space-y-1">
-                {insights.mostActiveDirs.map(([dir, count], index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between text-sm py-1 px-2 rounded-md hover:bg-background-muted cursor-pointer transition-colors"
-                    onClick={() => handleDirectoryClick(dir)}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        handleDirectoryClick(dir);
-                      }
-                    }}
-                  >
-                    <div className="flex items-center space-x-2">
-                      <FolderOpen className="h-4 w-4 text-text-muted" />
-                      <span className="truncate max-w-[200px] rtl">{dir}</span>
-                    </div>
-                    <span className="text-text-muted font-mono font-light">{count} sessions</span>
-                  </div>
-                ))}
               </div>
             </CardContent>
           </Card>

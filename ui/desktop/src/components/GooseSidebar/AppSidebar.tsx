@@ -6,8 +6,6 @@ import {
   MessageCircle,
   Home,
   Loader2,
-  AppWindowMac,
-  AppWindow,
   Puzzle,
   History,
   FolderKanban,
@@ -136,7 +134,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
 
   return (
     <>
-      <SidebarContent>
+      <SidebarContent className="pt-16">
         {/* <SidebarHeader>
           <div className="flex items-center gap-2 pt-12 pb-4">
             <GooseLogo size="small" />
@@ -145,220 +143,192 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
         </SidebarHeader> */}
 
         {/* Menu */}
-        <div className="pt-12">
-          <SidebarMenu>
-            {/* Navigation Group */}
-            <SidebarGroup>
-              <SidebarGroupContent className="space-y-1">
-                <motion.div
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.05 }}
-                >
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      onClick={() => {
-                        // Always reset chat and navigate to home when clicking Home button
-                        // This ensures insights are displayed regardless of active session
-                        resetChat();
-                        navigate('/');
-                      }}
-                      isActive={isActivePath('/')}
-                      tooltip="Go back to the main chat screen"
-                      className="w-full justify-start px-3 rounded-xl h-fit hover:bg-background-medium transition-all duration-200 data-[active=true]:bg-background-medium"
-                    >
-                      <Home className="w-4 h-4" />
-                      <span>Home</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                </motion.div>
-
-                <motion.div
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.1 }}
-                >
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      onClick={() => {
-                        window.electron.createChatWindow(
-                          undefined,
-                          window.appConfig.get('GOOSE_WORKING_DIR') as string | undefined
-                        );
-                      }}
-                      tooltip="Start a new session in a new window"
-                      className="w-full justify-start px-3 rounded-xl h-fit hover:bg-background-medium transition-all duration-200"
-                    >
-                      {safeIsMacOS ? (
-                        <AppWindowMac className="w-4 h-4" />
-                      ) : (
-                        <AppWindow className="w-4 h-4" />
-                      )}
-                      <span>New window</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                </motion.div>
-              </SidebarGroupContent>
-            </SidebarGroup>
-
-            <SidebarSeparator className="!w-[calc(100%-32px)]" />
-
-            {/* Chat & Configuration Group */}
-            <SidebarGroup>
-              <SidebarGroupContent className="space-y-1">
-                <motion.div
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.2 }}
-                >
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      onClick={() => navigate('/pair')}
-                      isActive={isActivePath('/pair')}
-                      tooltip="Start pairing with Goose"
-                      className="w-full justify-start px-3 rounded-xl h-fit hover:bg-background-medium transition-all duration-200 data-[active=true]:bg-background-medium"
-                    >
-                      <ChatSmart className="w-4 h-4" />
-                      <span>Chat</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                </motion.div>
-
-                <motion.div
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.25 }}
-                >
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      onClick={() => navigate('/extensions')}
-                      isActive={isActivePath('/extensions')}
-                      tooltip="Manage your extensions"
-                      className="w-full justify-start px-3 rounded-xl h-fit hover:bg-background-medium transition-all duration-200 data-[active=true]:bg-background-medium"
-                    >
-                      <Puzzle className="w-4 h-4" />
-                      <span>Extensions</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                </motion.div>
-
-                {process.env.ALPHA && (
-                  <motion.div
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.3 }}
+        <SidebarMenu>
+          {/* Navigation Group */}
+          <SidebarGroup>
+            <SidebarGroupContent className="space-y-1">
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.05 }}
+              >
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    onClick={() => {
+                      // Always reset chat and navigate to home when clicking Home button
+                      // This ensures insights are displayed regardless of active session
+                      resetChat();
+                      navigate('/');
+                    }}
+                    isActive={isActivePath('/')}
+                    tooltip="Go back to the main chat screen"
+                    className="w-full justify-start px-3 rounded-lg h-fit hover:bg-background-medium transition-all duration-200 data-[active=true]:bg-background-medium"
                   >
-                    <SidebarMenuItem>
-                      <SidebarMenuButton
-                        onClick={() => navigate('/schedules')}
-                        isActive={isActivePath('/schedules')}
-                        tooltip="Manage scheduled runs"
-                        className="w-full justify-start px-3 rounded-xl h-fit hover:bg-background-medium transition-all duration-200 data-[active=true]:bg-background-medium"
-                      >
-                        <Clock className="w-4 h-4" />
-                        <span>Scheduler</span>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  </motion.div>
-                )}
-              </SidebarGroupContent>
-            </SidebarGroup>
+                    <Home className="w-4 h-4" />
+                    <span>Home</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </motion.div>
+            </SidebarGroupContent>
+          </SidebarGroup>
 
-            <SidebarSeparator className="!w-[calc(100%-32px)]" />
+          <SidebarSeparator />
 
-            {/* Content Group */}
-            <SidebarGroup>
-              <SidebarGroupContent className="space-y-1">
+          {/* Chat & Configuration Group */}
+          <SidebarGroup>
+            <SidebarGroupContent className="space-y-1">
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.2 }}
+              >
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    onClick={() => navigate('/pair')}
+                    isActive={isActivePath('/pair')}
+                    tooltip="Start pairing with Goose"
+                    className="w-full justify-start px-3 rounded-lg h-fit hover:bg-background-medium transition-all duration-200 data-[active=true]:bg-background-medium"
+                  >
+                    <ChatSmart className="w-4 h-4" />
+                    <span>Chat</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.25 }}
+              >
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    onClick={() => navigate('/extensions')}
+                    isActive={isActivePath('/extensions')}
+                    tooltip="Manage your extensions"
+                    className="w-full justify-start px-3 rounded-lg h-fit hover:bg-background-medium transition-all duration-200 data-[active=true]:bg-background-medium"
+                  >
+                    <Puzzle className="w-4 h-4" />
+                    <span>Extensions</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </motion.div>
+
+              {process.env.ALPHA && (
                 <motion.div
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.35 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.3 }}
                 >
                   <SidebarMenuItem>
                     <SidebarMenuButton
-                      onClick={() => navigate('/recipes')}
-                      isActive={isActivePath('/recipes')}
-                      tooltip="Browse your saved recipes"
-                      className="w-full justify-start px-3 rounded-xl h-fit hover:bg-background-medium transition-all duration-200 data-[active=true]:bg-background-medium"
+                      onClick={() => navigate('/schedules')}
+                      isActive={isActivePath('/schedules')}
+                      tooltip="Manage scheduled runs"
+                      className="w-full justify-start px-3 rounded-lg h-fit hover:bg-background-medium transition-all duration-200 data-[active=true]:bg-background-medium"
                     >
-                      <FileText className="w-4 h-4" />
-                      <span>Recipes</span>
+                      <Clock className="w-4 h-4" />
+                      <span>Scheduler</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 </motion.div>
+              )}
+            </SidebarGroupContent>
+          </SidebarGroup>
 
-                <motion.div
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.4 }}
-                >
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      onClick={() => navigate('/sessions')}
-                      isActive={isActivePath('/sessions')}
-                      tooltip="View your session history"
-                      className="w-full justify-start px-3 rounded-xl h-fit hover:bg-background-medium transition-all duration-200 data-[active=true]:bg-background-medium"
-                    >
-                      <History className="w-4 h-4" />
-                      <span>Sessions</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                </motion.div>
+          <SidebarSeparator />
 
-                <motion.div
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.45 }}
-                >
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      onClick={() => navigate('/projects')}
-                      isActive={isActivePath('/projects')}
-                      tooltip="Manage your projects"
-                      className="w-full justify-start px-3 rounded-xl h-fit hover:bg-background-medium transition-all duration-200 data-[active=true]:bg-background-medium"
-                    >
-                      <FolderKanban className="w-4 h-4" />
-                      <span>Projects</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                </motion.div>
-              </SidebarGroupContent>
-            </SidebarGroup>
+          {/* Content Group */}
+          <SidebarGroup>
+            <SidebarGroupContent className="space-y-1">
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.35 }}
+              >
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    onClick={() => navigate('/projects')}
+                    isActive={isActivePath('/projects')}
+                    tooltip="Manage your projects"
+                    className="w-full justify-start px-3 rounded-lg h-fit hover:bg-background-medium transition-all duration-200 data-[active=true]:bg-background-medium"
+                  >
+                    <FolderKanban className="w-4 h-4" />
+                    <span>Projects</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </motion.div>
 
-            <SidebarSeparator className="!w-[calc(100%-32px)]" />
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.4 }}
+              >
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    onClick={() => navigate('/sessions')}
+                    isActive={isActivePath('/sessions')}
+                    tooltip="View your session history"
+                    className="w-full justify-start px-3 rounded-lg h-fit hover:bg-background-medium transition-all duration-200 data-[active=true]:bg-background-medium"
+                  >
+                    <History className="w-4 h-4" />
+                    <span>Sessions</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </motion.div>
 
-            {/* Settings Group */}
-            <SidebarGroup>
-              <SidebarGroupContent className="space-y-1">
-                <motion.div
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.5 }}
-                >
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      onClick={() => navigate('/settings')}
-                      isActive={isActivePath('/settings')}
-                      tooltip="Configure Goose settings"
-                      className="w-full justify-start px-3 rounded-xl h-fit hover:bg-background-medium transition-all duration-200 data-[active=true]:bg-background-medium"
-                    >
-                      <Gear className="w-4 h-4" />
-                      <span>Settings</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                </motion.div>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          </SidebarMenu>
-        </div>
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.45 }}
+              >
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    onClick={() => navigate('/recipes')}
+                    isActive={isActivePath('/recipes')}
+                    tooltip="Browse your saved recipes"
+                    className="w-full justify-start px-3 rounded-lg h-fit hover:bg-background-medium transition-all duration-200 data-[active=true]:bg-background-medium"
+                  >
+                    <FileText className="w-4 h-4" />
+                    <span>Recipes</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </motion.div>
+            </SidebarGroupContent>
+          </SidebarGroup>
+
+          <SidebarSeparator />
+
+          {/* Settings Group */}
+          <SidebarGroup>
+            <SidebarGroupContent className="space-y-1">
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.5 }}
+              >
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    onClick={() => navigate('/settings')}
+                    isActive={isActivePath('/settings')}
+                    tooltip="Configure Goose settings"
+                    className="w-full justify-start px-3 rounded-lg h-fit hover:bg-background-medium transition-all duration-200 data-[active=true]:bg-background-medium"
+                  >
+                    <Gear className="w-4 h-4" />
+                    <span>Settings</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </motion.div>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        </SidebarMenu>
 
         {/* Theme Selector */}
-        <div className="mt-4 opacity-0">
+        <div className="mt-4 opacity-100">
           <ThemeSelector />
         </div>
       </SidebarContent>
 
-      <SidebarFooter>
+      <SidebarFooter className="mb-2">
         <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
@@ -383,67 +353,6 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
               )}
             </AnimatePresence>
           </div>
-
-          {/* <AnimatePresence mode="wait">
-            {state === 'expanded' && (
-              <motion.div
-                key="social-icons"
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.2, ease: 'easeInOut' }}
-                className="flex gap-1 overflow-hidden"
-              >
-                <Tooltip delayDuration={500}>
-                  <TooltipTrigger asChild>
-                    <a
-                      href="https://discord.gg/pvQ8S2e5"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center justify-center h-8 w-8 p-0 rounded-lg hover:bg-background-medium hover:text-text-default transition-all duration-200 text-text-muted"
-                    >
-                      <MessageCircle className="w-4 h-4" />
-                    </a>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">
-                    <p>Join our Discord</p>
-                  </TooltipContent>
-                </Tooltip>
-
-                <Tooltip delayDuration={500}>
-                  <TooltipTrigger asChild>
-                    <a
-                      href="https://www.linkedin.com/company/block-opensource"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center justify-center h-8 w-8 p-0 rounded-lg hover:bg-background-medium hover:text-text-default transition-all duration-200 text-text-muted"
-                    >
-                      <LinkedIn className="w-4 h-4" />
-                    </a>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">
-                    <p>Follow us on LinkedIn</p>
-                  </TooltipContent>
-                </Tooltip>
-
-                <Tooltip delayDuration={500}>
-                  <TooltipTrigger asChild>
-                    <a
-                      href="https://www.youtube.com/@blockopensource"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center justify-center h-8 w-8 p-0 rounded-lg hover:bg-background-medium hover:text-text-default transition-all duration-200 text-text-muted"
-                    >
-                      <Youtube className="w-4 h-4" />
-                    </a>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">
-                    <p>Watch on YouTube</p>
-                  </TooltipContent>
-                </Tooltip>
-              </motion.div>
-            )}
-          </AnimatePresence> */}
         </motion.div>
       </SidebarFooter>
 

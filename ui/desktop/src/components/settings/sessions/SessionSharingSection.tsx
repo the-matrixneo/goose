@@ -89,7 +89,7 @@ export default function SessionSharingSection() {
         <h2 className="text-xl text-text-default">Session sharing</h2>
       </div>
 
-      <div className="border-b pb-8 pr-4">
+      <div className="pb-8 pr-4">
         {envBaseUrlShare ? (
           <p className="text-sm text-text-muted mb-4">
             Session sharing is configured but fully opt-in — your sessions are only shared when you

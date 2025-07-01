@@ -213,9 +213,9 @@ export default function RecipesView({ onBack }: RecipesViewProps) {
 
     if (savedRecipes.length === 0) {
       return (
-        <div className="flex flex-col justify-center pt-2 h-full text-text-muted">
-          <p className="text-lg mb-2">No saved recipes</p>
-          <p className="text-sm">Recipe saved from chats will show up here.</p>
+        <div className="flex flex-col justify-center pt-2 h-full">
+          <p className="text-lg">No saved recipes</p>
+          <p className="text-sm text-text-muted">Recipe saved from chats will show up here.</p>
         </div>
       );
     }

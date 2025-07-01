@@ -12,24 +12,17 @@
   --color-white: #ffffff;
   --color-black: #000000;
 
-  --color-neutral-100: #e8eaf2;
-  --color-neutral-200: #d4dae2;
-  --color-neutral-300: #a1a7b0;
-  --color-neutral-400: #6e747e;
-  --color-neutral-500: #32353b;
-  --color-neutral-600: #19191b;
-
-  --color-mine-shaft-50: #f4f6f7;
-  --color-mine-shaft-100: #e3e6ea;
-  --color-mine-shaft-200: #cbd1d6;
-  --color-mine-shaft-300: #a7b0b9;
-  --color-mine-shaft-400: #7b8895;
-  --color-mine-shaft-500: #606c7a;
-  --color-mine-shaft-600: #525b68;
-  --color-mine-shaft-700: #474e57;
-  --color-mine-shaft-800: #3f434b;
-  --color-mine-shaft-900: #32353b;
-  --color-mine-shaft-950: #22252a;
+  --color-neutral-50: #f4f6f7;
+  --color-neutral-100: #e3e6ea;
+  --color-neutral-200: #cbd1d6;
+  --color-neutral-300: #a7b0b9;
+  --color-neutral-400: #7b8895;
+  --color-neutral-500: #606c7a;
+  --color-neutral-600: #525b68;
+  --color-neutral-700: #474e57;
+  --color-neutral-800: #3f434b;
+  --color-neutral-900: #32353b;
+  --color-neutral-950: #22252a;
 
   --color-red-100: #ff6b6b;
   --color-red-200: #f94b4b;
@@ -43,7 +36,7 @@
   --color-yellow-100: #ffd966;
   --color-yellow-200: #fbcd44;
 
-  --color-accent: var(--color-neutral-500);
+  --color-accent: var(--color-neutral-900);
 }
 
 :root {
@@ -60,25 +53,26 @@
   /* Semantic */
   --background-app: var(--color-white);
   --background-default: var(--color-white);
-  --background-medium: var(--color-neutral-200);
+  --background-card: var(--color-white);
+  --background-muted: var(--color-neutral-50);
+  --background-medium: var(--color-neutral-100);
   --background-strong: var(--color-neutral-300);
-  --background-muted: var(--color-neutral-100);
   --background-inverse: var(--color-black);
   --background-danger: var(--color-red-200);
   --background-success: var(--color-green-200);
   --background-info: var(--color-blue-200);
   --background-warning: var(--color-yellow-200);
 
-  --border-default: var(--color-neutral-200);
-  --border-input: var(--color-neutral-200);
-  --border-strong: var(--color-neutral-300);
+  --border-default: var(--color-neutral-100);
+  --border-input: var(--color-neutral-100);
+  --border-strong: var(--color-neutral-100);
   --border-danger: var(--color-red-200);
   --border-success: var(--color-green-200);
   --border-warning: var(--color-yellow-200);
   --border-info: var(--color-blue-200);
 
-  --text-default: var(--color-neutral-600);
-  --text-muted: var(--color-neutral-500);
+  --text-default: var(--color-neutral-800);
+  --text-muted: var(--color-neutral-400);
   --text-inverse: var(--color-white);
   --text-danger: var(--color-red-200);
   --text-success: var(--color-green-200);
@@ -111,19 +105,20 @@
   --text-on-accent: var(--color-black);
 
   /* semantic */
-  --background-app: var(--color-neutral-600);
-  --background-default: var(--color-neutral-600);
-  --background-medium: var(--color-neutral-500);
-  --background-strong: var(--color-neutral-300);
-  --background-muted: var(--color-neutral-400);
+  --background-app: var(--color-neutral-950);
+  --background-default: var(--color-neutral-950);
+  --background-card: var(--color-neutral-900);
+  --background-muted: var(--color-neutral-800);
+  --background-medium: var(--color-neutral-700);
+  --background-strong: var(--color-neutral-600);
   --background-danger: var(--color-red-100);
   --background-success: var(--color-green-100);
   --background-info: var(--color-blue-100);
   --background-warning: var(--color-yellow-100);
 
-  --border-default: var(--color-neutral-500);
-  --border-input: var(--color-neutral-500);
-  --border-strong: var(--color-neutral-200);
+  --border-default: var(--color-neutral-800);
+  --border-input: var(--color-neutral-800);
+  --border-strong: var(--color-neutral-700);
   --border-danger: var(--color-red-100);
   --border-success: var(--color-green-100);
   --border-warning: var(--color-yellow-100);
@@ -157,14 +152,15 @@
   --ease-g2: cubic-bezier(0.55, 0, 1, 0.45);
 
   --color-background-default: var(--background-default);
+  --color-background-muted: var(--background-muted);
   --color-background-medium: var(--background-medium);
   --color-background-strong: var(--background-strong);
   --color-background-inverse: var(--background-inverse);
-  --color-background-muted: var(--background-muted);
   --color-background-danger: var(--background-danger);
   --color-background-success: var(--background-success);
   --color-background-info: var(--background-info);
   --color-background-warning: var(--background-warning);
+  --color-background-card: var(--background-card);
 
   --color-background-accent: var(--background-accent);
   --color-border-accent: var(--border-accent);
@@ -448,11 +444,11 @@
 /* Native scrollbar styling */
 * {
   scrollbar-width: auto;
-  scrollbar-color: var(--grey-80) transparent;
+  scrollbar-color: var(--color-neutral-200) transparent;
 }
 
 .dark * {
-  scrollbar-color: var(--dark-grey-45) transparent;
+  scrollbar-color: var(--color-neutral-400) transparent;
 }
 
 /* Webkit scrollbar styles */
@@ -469,7 +465,7 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background-color: var(--grey-80);
+  background-color: var(--color-neutral-200);
   border: 3px solid transparent; /* Creates padding effect */
   border-radius: 8px;
   background-clip: padding-box;
@@ -477,26 +473,26 @@
 }
 
 .dark ::-webkit-scrollbar-thumb {
-  background-color: var(--dark-grey-45);
+  background-color: var(--color-neutral-400);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background-color: var(--grey-60);
+  background-color: var(--color-neutral-300);
   border: 2px solid transparent; /* Slightly less padding on hover */
 }
 
 .dark ::-webkit-scrollbar-thumb:hover {
-  background-color: var(--dark-grey-60);
+  background-color: var(--color-neutral-500);
 }
 
 /* Ensure the thumb is more prominent when active */
 ::-webkit-scrollbar-thumb:active {
-  background-color: var(--grey-50);
+  background-color: var(--color-neutral-400);
   border: 2px solid transparent;
 }
 
 .dark ::-webkit-scrollbar-thumb:active {
-  background-color: var(--dark-grey-60);
+  background-color: var(--color-neutral-500);
 }
 
 ::-webkit-scrollbar-track {
@@ -505,20 +501,20 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--grey-80);
+  background: var(--color-neutral-200);
   border-radius: 4px;
 }
 
 .dark ::-webkit-scrollbar-thumb {
-  background: var(--dark-grey-45);
+  background: var(--color-neutral-400);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--grey-60);
+  background: var(--color-neutral-300);
 }
 
 .dark ::-webkit-scrollbar-thumb:hover {
-  background: var(--dark-grey-60);
+  background: var(--color-neutral-500);
 }
 
 body {
@@ -547,7 +543,7 @@ body {
 
 .bg-inline-code {
   border-radius: 4px;
-  color: var(--grey-80);
+  color: var(--color-neutral-200);
   font-family: 'Cash Sans Mono', monospace;
   font-size: 12px;
   font-style: normal;

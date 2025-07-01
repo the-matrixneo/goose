@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -18,18 +18,30 @@ interface CreateProjectModalProps {
   isOpen: boolean;
   onClose: () => void;
   onCreate: (name: string, description: string, defaultDirectory: string) => void;
+  defaultDirectory?: string;
 }
 
-const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, onClose, onCreate }) => {
+const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
+  isOpen,
+  onClose,
+  onCreate,
+  defaultDirectory: defaultDirectoryProp,
+}) => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [defaultDirectory, setDefaultDirectory] = useState('');
+  const [defaultDirectory, setDefaultDirectory] = useState(defaultDirectoryProp || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setDefaultDirectory(defaultDirectoryProp || '');
+    }
+  }, [defaultDirectoryProp, isOpen]);
 
   const resetForm = () => {
     setName('');
     setDescription('');
-    setDefaultDirectory('');
+    setDefaultDirectory(defaultDirectoryProp || '');
     setIsSubmitting(false);
   };
 

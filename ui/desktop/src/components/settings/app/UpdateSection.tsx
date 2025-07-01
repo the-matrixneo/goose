@@ -195,7 +195,7 @@ export default function UpdateSection() {
           <div className="text-text-default text-2xl font-mono">
             {updateInfo.currentVersion || 'Loading...'}
           </div>
-          <div className="text-sm text-text-muted">Current version</div>
+          <div className="text-xs text-text-muted">Current version</div>
         </div>
         {updateInfo.latestVersion && updateInfo.isUpdateAvailable && (
           <span className="text-textSubtle"> → {updateInfo.latestVersion} available</span>

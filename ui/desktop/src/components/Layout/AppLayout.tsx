@@ -3,6 +3,8 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { SidebarProvider, SidebarInset, Sidebar, SidebarTrigger, useSidebar } from '../ui/sidebar';
 import AppSidebar from '../GooseSidebar/AppSidebar';
 import { View, ViewOptions } from '../../App';
+import { AppWindowMac, AppWindow } from 'lucide-react';
+import { Button } from '../ui/button';
 
 interface AppLayoutProps {
   setIsGoosehintsModalOpen?: (isOpen: boolean) => void;
@@ -12,12 +14,11 @@ interface AppLayoutProps {
 const AppLayoutContent: React.FC<AppLayoutProps> = ({ setIsGoosehintsModalOpen }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { open: isSidebarOpen } = useSidebar();
   const safeIsMacOS = (window?.electron?.platform || 'darwin') === 'darwin';
 
   // Calculate padding based on sidebar state and macOS
-  // const headerPadding = isSidebarOpen ? 'pl-6' : safeIsMacOS ? 'pl-20' : 'pl-6';
-  const headerPadding = '';
+  const headerPadding = safeIsMacOS ? 'pl-20' : 'pl-6';
+  // const headerPadding = '';
 
   const setView = (view: View, viewOptions?: ViewOptions) => {
     // Convert view-based navigation to route-based navigation
@@ -68,8 +69,29 @@ const AppLayoutContent: React.FC<AppLayoutProps> = ({ setIsGoosehintsModalOpen }
     navigate('/', { state: { sessionId } });
   };
 
+  const handleNewWindow = () => {
+    window.electron.createChatWindow(
+      undefined,
+      window.appConfig.get('GOOSE_WORKING_DIR') as string | undefined
+    );
+  };
+
   return (
     <div className="flex flex-1 w-full relative animate-fade-in">
+      <div className={`${headerPadding} absolute top-3 z-100 flex items-center`}>
+        <SidebarTrigger
+          className={`no-drag hover:border-border-strong hover:text-text-default hover:!bg-background-medium hover:scale-105`}
+        />
+        <Button
+          onClick={handleNewWindow}
+          className="no-drag hover:!bg-background-medium"
+          variant="ghost"
+          size="xs"
+          title="Start a new session in a new window"
+        >
+          {safeIsMacOS ? <AppWindowMac className="w-4 h-4" /> : <AppWindow className="w-4 h-4" />}
+        </Button>
+      </div>
       <Sidebar variant="inset" collapsible="offcanvas">
         <AppSidebar
           onSelectSession={handleSelectSession}
@@ -79,13 +101,6 @@ const AppLayoutContent: React.FC<AppLayoutProps> = ({ setIsGoosehintsModalOpen }
         />
       </Sidebar>
       <SidebarInset>
-        <div
-          className={`${headerPadding} absolute top-0 left-0 h-12 z-100 w-full flex items-center justify-between pr-6 py-1`}
-        >
-          <SidebarTrigger
-            className={`no-drag text-text-muted hover:text-text-default hover:bg-background-muted`}
-          />
-        </div>
         <Outlet />
       </SidebarInset>
     </div>

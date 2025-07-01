@@ -1,16 +1,20 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { all_goose_modes, ModeSelectionItem } from '../settings/mode/ModeSelectionItem';
 import { useConfig } from '../ConfigContext';
 import { View, ViewOptions } from '../../App';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '../ui/dropdown-menu';
 
 interface BottomMenuModeSelectionProps {
   setView: (view: View, viewOptions?: ViewOptions) => void;
 }
 
 export const BottomMenuModeSelection = ({ setView }: BottomMenuModeSelectionProps) => {
-  const [isGooseModeMenuOpen, setIsGooseModeMenuOpen] = useState(false);
   const [gooseMode, setGooseMode] = useState('auto');
-  const gooseModeDropdownRef = useRef<HTMLDivElement>(null);
   const { read, upsert } = useConfig();
 
   const fetchCurrentMode = useCallback(async () => {
@@ -27,41 +31,6 @@ export const BottomMenuModeSelection = ({ setView }: BottomMenuModeSelectionProp
   useEffect(() => {
     fetchCurrentMode();
   }, [fetchCurrentMode]);
-
-  useEffect(() => {
-    const handleEsc = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setIsGooseModeMenuOpen(false);
-      }
-    };
-
-    if (isGooseModeMenuOpen) {
-      window.addEventListener('keydown', handleEsc);
-    }
-
-    return () => {
-      window.removeEventListener('keydown', handleEsc);
-    };
-  }, [isGooseModeMenuOpen]);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        gooseModeDropdownRef.current &&
-        !gooseModeDropdownRef.current.contains(event.target as Node)
-      ) {
-        setIsGooseModeMenuOpen(false);
-      }
-    };
-
-    if (isGooseModeMenuOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isGooseModeMenuOpen]);
 
   const handleModeChange = async (newMode: string) => {
     if (gooseMode === newMode) {
@@ -83,33 +52,27 @@ export const BottomMenuModeSelection = ({ setView }: BottomMenuModeSelectionProp
   }
 
   return (
-    <div className="relative flex items-center" ref={gooseModeDropdownRef}>
-      <span
-        className="flex items-center cursor-pointer [&_svg]:size-4 text-text-default/70 hover:text-text-default hover:scale-100 hover:bg-transparent text-xs"
-        onClick={() => setIsGooseModeMenuOpen(!isGooseModeMenuOpen)}
-      >
-        {getValueByKey(gooseMode).toLowerCase()}
-      </span>
-
-      {/* Dropdown Menu */}
-      {isGooseModeMenuOpen && (
-        <div className="absolute bottom-[24px] right-0 w-[240px] z-50 py-2 bg-background-default rounded-lg border border-border-default">
-          <div>
-            {all_goose_modes.map((mode) => (
-              <ModeSelectionItem
-                key={mode.key}
-                mode={mode}
-                currentMode={gooseMode}
-                showDescription={false}
-                isApproveModeConfigure={false}
-                parentView="chat"
-                setView={setView}
-                handleModeChange={handleModeChange}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <span className="flex items-center cursor-pointer [&_svg]:size-4 text-text-default/70 hover:text-text-default hover:scale-100 hover:bg-transparent text-xs">
+          {getValueByKey(gooseMode).toLowerCase()}
+        </span>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-[240px] px-2" side="top" align="end">
+        {all_goose_modes.map((mode) => (
+          <DropdownMenuItem key={mode.key} className="p-0">
+            <ModeSelectionItem
+              mode={mode}
+              currentMode={gooseMode}
+              showDescription={false}
+              isApproveModeConfigure={false}
+              parentView="chat"
+              setView={setView}
+              handleModeChange={handleModeChange}
+            />
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 };

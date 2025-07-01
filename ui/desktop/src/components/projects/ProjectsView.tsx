@@ -13,9 +13,10 @@ import { Skeleton } from '../ui/skeleton';
 
 interface ProjectsViewProps {
   onSelectProject: (projectId: string) => void;
+  refreshTrigger?: number;
 }
 
-const ProjectsView: React.FC<ProjectsViewProps> = ({ onSelectProject }) => {
+const ProjectsView: React.FC<ProjectsViewProps> = ({ onSelectProject, refreshTrigger = 0 }) => {
   const [projects, setProjects] = useState<ProjectMetadata[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -29,10 +30,10 @@ const ProjectsView: React.FC<ProjectsViewProps> = ({ onSelectProject }) => {
   // Calculate padding based on sidebar state and macOS
   const headerPadding = !isSidebarOpen ? (safeIsMacOS ? 'pl-20' : 'pl-12') : 'pl-4';
 
-  // Load projects on component mount
+  // Load projects on component mount and when refreshTrigger changes
   useEffect(() => {
     loadProjects();
-  }, []);
+  }, [refreshTrigger]);
 
   // Minimum loading time to prevent skeleton flash
   useEffect(() => {
@@ -67,17 +68,29 @@ const ProjectsView: React.FC<ProjectsViewProps> = ({ onSelectProject }) => {
     }
   };
 
+  // Get the current working directory or fallback to home
+  const getDefaultDirectory = () => {
+    if (window.appConfig && typeof window.appConfig.get === 'function') {
+      const dir = window.appConfig.get('GOOSE_WORKING_DIR');
+      return typeof dir === 'string' ? dir : '';
+    }
+    return typeof process !== 'undefined' && process.env && typeof process.env.HOME === 'string'
+      ? process.env.HOME
+      : '';
+  };
+
   const handleCreateProject = async (
     name: string,
     description: string,
-    defaultDirectory: string
+    defaultDirectory?: string
   ) => {
     try {
       const newProject = await createProject({
         name,
         description: description.trim() === '' ? undefined : description,
-        defaultDirectory,
+        default_directory: defaultDirectory || getDefaultDirectory(),
       });
+      console.log('Create project response:', newProject);
 
       setProjects((prevProjects) => [
         ...prevProjects,
@@ -85,7 +98,7 @@ const ProjectsView: React.FC<ProjectsViewProps> = ({ onSelectProject }) => {
           id: newProject.id,
           name: newProject.name,
           description: newProject.description,
-          defaultDirectory: newProject.defaultDirectory,
+          default_directory: newProject.default_directory,
           sessionCount: 0,
           createdAt: newProject.createdAt,
           updatedAt: newProject.updatedAt,
@@ -148,9 +161,9 @@ const ProjectsView: React.FC<ProjectsViewProps> = ({ onSelectProject }) => {
 
     if (projects.length === 0) {
       return (
-        <div className="flex flex-col justify-center h-full text-text-muted">
+        <div className="flex flex-col justify-center h-full">
           <p className="text-lg">No projects yet</p>
-          <p className="text-sm mb-4">
+          <p className="text-sm mb-4 text-text-muted">
             Create your first project to organize related sessions together
           </p>
         </div>
@@ -203,6 +216,7 @@ const ProjectsView: React.FC<ProjectsViewProps> = ({ onSelectProject }) => {
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
         onCreate={handleCreateProject}
+        defaultDirectory={getDefaultDirectory()}
       />
     </MainPanelLayout>
   );
