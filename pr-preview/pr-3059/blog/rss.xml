@@ -90,16 +90,16 @@ The whole point was to offload the tedious stuff so we could focus on the work t
 <ul>
 <li><strong>Constant data reloading</strong>: Each interaction requires re-loading or describing your dataset</li>
 <li><strong>Expensive iterations</strong>: Large datasets are slow and costly to process repeatedly</li>
-<li><strong>Context size</strong>: The raw data is also too large to be fit in context</li>
-<li><strong>Not designed for adhoc work</strong>: It is harder to have the model do some steps for you, and then let you take over and then later pass control back to the model</li>
+<li><strong>Context size</strong>: The raw data may be too large to be fit in context</li>
+<li><strong>Not designed for interactive work</strong>: It is harder to have the assistant do some steps and then transfer control back to the human or vice versa</li>
 </ul>
 <p>This has made it difficult to use AI to help with data science workflows, which led to the creation of the MCP Jupyter Server.</p>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="a-better-approach-persistent-state">A Better Approach: Persistent State<a href="https://block.github.io/goose/pr-preview/pr-3059/blog/2025/06/24/mcp-jupyter-server#a-better-approach-persistent-state" class="hash-link" aria-label="Direct link to A Better Approach: Persistent State" title="Direct link to A Better Approach: Persistent State">​</a></h2>
-<p>The MCP Jupyter Server takes a different approach. Instead of losing context between interactions, it maintains persistent memory and lets the AI interact with your data through code execution. This creates a powerful paradigm:</p>
+<p>The MCP Jupyter Server takes a different approach. Instead of losing context between interactions, it maintains persistent memory and lets the AI interact with your data through Jupyter code cell execution. This creates a powerful paradigm:</p>
 <ul>
 <li><strong>Persistent memory</strong>: Variables and state are maintained across all interactions</li>
 <li><strong>Efficient iterations</strong>: No need to reload data or re-establish context</li>
-<li><strong>Code-based data interaction</strong>: AI explores data through execution, not given the raw data</li>
+<li><strong>Code-based data interaction</strong>: AI explores data through execution, not given the raw data in context</li>
 <li><strong>True pair programming</strong>: Seamless collaboration within the same notebook context</li>
 </ul>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="transforming-ml-workflows">Transforming ML Workflows<a href="https://block.github.io/goose/pr-preview/pr-3059/blog/2025/06/24/mcp-jupyter-server#transforming-ml-workflows" class="hash-link" aria-label="Direct link to Transforming ML Workflows" title="Direct link to Transforming ML Workflows">​</a></h2>
@@ -128,7 +128,7 @@ The whole point was to offload the tedious stuff so we could focus on the work t
 <p><span style="color:#059669;font-weight:bold">AI:</span> "Great! With alpha=0.1, accuracy improved to 78% and the validation curve looks much better. Should I tune it further or try ensemble methods?"</p>
 </blockquote>
 <h3 class="anchor anchorWithStickyNavbar_LWe7" id="real-time-debugging">Real-time Debugging<a href="https://block.github.io/goose/pr-preview/pr-3059/blog/2025/06/24/mcp-jupyter-server#real-time-debugging" class="hash-link" aria-label="Direct link to Real-time Debugging" title="Direct link to Real-time Debugging">​</a></h3>
-<p>When errors occur, the AI has full context:</p>
+<p>When errors occur, the assistant has full context:</p>
 <blockquote>
 <p><span style="color:#2563eb;font-weight:bold">User:</span> "I'm getting a KeyError in cell 5"</p>
 <p><span style="color:#059669;font-weight:bold">AI:</span> "Let me check what columns are available in your dataframe"</p>
@@ -155,9 +155,9 @@ The whole point was to offload the tedious stuff so we could focus on the work t
 <p><em><span style="color:#6b7280;font-style:italic">[AI accesses the existing model variable and generates evaluation metrics]</span></em></p>
 <p><span style="color:#059669;font-weight:bold">AI:</span> "Your Random Forest achieved 0.84 precision and 0.81 recall. The confusion matrix shows some false positives in the high-value sales category. Would you like me to adjust the decision threshold or try feature engineering?"</p>
 </blockquote>
-<p>This fluid back-and-forth, where the AI understands and builds upon the existing notebook state, allows for seamless collaboration without the need for constant context re-establishment or data reloading.</p>
+<p>This fluid back-and-forth, where the assistant understands and builds upon the existing notebook state, allows for seamless collaboration without the need for constant context re-establishment or data reloading.</p>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="example-notebook">Example notebook<a href="https://block.github.io/goose/pr-preview/pr-3059/blog/2025/06/24/mcp-jupyter-server#example-notebook" class="hash-link" aria-label="Direct link to Example notebook" title="Direct link to Example notebook">​</a></h2>
-<p>Can see an example notebook that was handled by the MCP Jupyter Server.  The server</p>
+<p>Here you can see an example notebook that was handled by the MCP Jupyter Server.  The server</p>
 <p><strong><a href="https://github.com/block/mcp-jupyter/blob/main/demos/demo.ipynb" target="_blank" rel="noopener noreferrer">📓 View the Complete Demo Notebook</a></strong></p>
 <p>The demo walks through a typical data science workflow:</p>
 <ul>
