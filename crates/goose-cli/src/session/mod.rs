@@ -1,6 +1,7 @@
 mod builder;
 mod commands;
 mod completion;
+mod completion_cache;
 mod export;
 mod input;
 mod output;
@@ -19,6 +20,7 @@ pub use goose::session::Identifier;
 
 use anyhow::Result;
 use completion::GooseCompleter;
+use completion_cache::CompletionCacheManager;
 use etcetera::{choose_app_strategy, AppStrategy};
 use goose::agents::{Agent, SessionConfig};
 use goose::config::Config;
@@ -30,10 +32,7 @@ use mcp_core::protocol::JsonRpcMessage;
 use mcp_core::protocol::JsonRpcNotification;
 
 use serde_json::Value;
-use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::Arc;
-use std::time::Instant;
 use tokio;
 
 pub enum RunMode {
@@ -45,29 +44,12 @@ pub struct Session {
     agent: Agent,
     messages: Vec<Message>,
     session_file: Option<PathBuf>,
-    // Cache for completion data - using std::sync for thread safety without async
-    completion_cache: Arc<std::sync::RwLock<CompletionCache>>,
+    // Cache manager for completion data
+    completion_cache_manager: CompletionCacheManager,
     debug: bool, // New field for debug mode
     run_mode: RunMode,
     scheduled_job_id: Option<String>, // ID of the scheduled job that triggered this session
     max_turns: Option<u32>,
-}
-
-// Cache structure for completion data
-struct CompletionCache {
-    prompts: HashMap<String, Vec<String>>,
-    prompt_info: HashMap<String, output::PromptInfo>,
-    last_updated: Instant,
-}
-
-impl CompletionCache {
-    fn new() -> Self {
-        Self {
-            prompts: HashMap::new(),
-            prompt_info: HashMap::new(),
-            last_updated: Instant::now(),
-        }
-    }
 }
 
 pub use utils::{classify_planner_response, get_reasoner, PlannerResponseType};
@@ -97,7 +79,7 @@ impl Session {
             agent,
             messages,
             session_file,
-            completion_cache: Arc::new(std::sync::RwLock::new(CompletionCache::new())),
+            completion_cache_manager: CompletionCacheManager::new(),
             debug,
             run_mode: RunMode::Normal,
             scheduled_job_id,
@@ -172,7 +154,7 @@ impl Session {
             )?;
 
         // Set up the completer with a reference to the completion cache
-        let completer = GooseCompleter::new(self.completion_cache.clone());
+        let completer = GooseCompleter::new(self.completion_cache_manager.get_cache_ref());
         editor.set_helper(Some(completer));
 
         Ok(editor)
@@ -777,42 +759,13 @@ impl Session {
     /// Update the completion cache with fresh data
     /// This should be called before the interactive session starts
     pub async fn update_completion_cache(&mut self) -> Result<()> {
-        // Get fresh data
-        let prompts = self.agent.list_extension_prompts().await;
-
-        // Update the cache with write lock
-        let mut cache = self.completion_cache.write().unwrap();
-        cache.prompts.clear();
-        cache.prompt_info.clear();
-
-        for (extension, prompt_list) in prompts {
-            let names: Vec<String> = prompt_list.iter().map(|p| p.name.clone()).collect();
-            cache.prompts.insert(extension.clone(), names);
-
-            for prompt in prompt_list {
-                cache.prompt_info.insert(
-                    prompt.name.clone(),
-                    output::PromptInfo {
-                        name: prompt.name.clone(),
-                        description: prompt.description.clone(),
-                        arguments: prompt.arguments.clone(),
-                        extension: Some(extension.clone()),
-                    },
-                );
-            }
-        }
-
-        cache.last_updated = Instant::now();
-        Ok(())
+        self.completion_cache_manager.update_cache(&self.agent).await
     }
 
     /// Invalidate the completion cache
     /// This should be called when extensions are added or removed
-    async fn invalidate_completion_cache(&self) {
-        let mut cache = self.completion_cache.write().unwrap();
-        cache.prompts.clear();
-        cache.prompt_info.clear();
-        cache.last_updated = Instant::now();
+    pub async fn invalidate_completion_cache(&self) {
+        self.completion_cache_manager.invalidate_cache();
     }
 
     pub fn message_history(&self) -> Vec<Message> {
