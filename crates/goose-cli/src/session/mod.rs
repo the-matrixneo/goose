@@ -759,7 +759,9 @@ impl Session {
     /// Update the completion cache with fresh data
     /// This should be called before the interactive session starts
     pub async fn update_completion_cache(&mut self) -> Result<()> {
-        self.completion_cache_manager.update_cache(&self.agent).await
+        self.completion_cache_manager
+            .update_cache(&self.agent)
+            .await
     }
 
     /// Invalidate the completion cache

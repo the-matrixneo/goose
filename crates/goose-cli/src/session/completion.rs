@@ -407,7 +407,10 @@ mod tests {
         let mut cache = CompletionCache::new();
 
         // Add some test prompts
-        cache.update_prompts("extension1".to_string(), vec!["test_prompt1".to_string(), "test_prompt2".to_string()]);
+        cache.update_prompts(
+            "extension1".to_string(),
+            vec!["test_prompt1".to_string(), "test_prompt2".to_string()],
+        );
         cache.update_prompts("extension2".to_string(), vec!["other_prompt".to_string()]);
 
         // Add prompt info with arguments

@@ -146,9 +146,9 @@ mod tests {
         let mut cache = CompletionCache::new();
         let extension = "test_ext".to_string();
         let prompts = vec!["prompt1".to_string(), "prompt2".to_string()];
-        
+
         cache.update_prompts(extension.clone(), prompts.clone());
-        
+
         assert_eq!(cache.get_prompts(&extension), Some(&prompts));
     }
 
@@ -156,24 +156,24 @@ mod tests {
     fn test_completion_cache_clear() {
         let mut cache = CompletionCache::new();
         cache.update_prompts("test".to_string(), vec!["prompt".to_string()]);
-        
+
         assert!(!cache.get_all_prompts().is_empty());
-        
+
         cache.clear();
-        
+
         assert!(cache.get_all_prompts().is_empty());
     }
 
     #[test]
     fn test_completion_cache_manager() {
         let manager = CompletionCacheManager::new();
-        
+
         manager.with_cache(|cache| {
             assert!(cache.get_all_prompts().is_empty());
         });
-        
+
         manager.invalidate_cache();
-        
+
         manager.with_cache(|cache| {
             assert!(cache.get_all_prompts().is_empty());
         });
