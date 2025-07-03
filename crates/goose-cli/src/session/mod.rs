@@ -3,6 +3,7 @@ mod builder;
 mod commands;
 mod completion;
 mod completion_cache;
+mod context_manager;
 mod export;
 mod input;
 mod interactive;
@@ -78,12 +79,6 @@ impl Session {
         }
     }
 
-    /// Update the project tracker with the current message
-    fn update_project_tracker(&self, message: &str) -> Result<()> {
-        let session_id = extract_session_id(&self.session_file);
-        update_project_tracker(message, session_id.as_deref())
-    }
-
     /// Process a single message and exit
     pub async fn headless(&mut self, message: String) -> Result<()> {
         self.process_message(message).await
@@ -93,47 +88,8 @@ impl Session {
         self.session_file.clone()
     }
 
-    /// Update the completion cache with fresh data
-    /// This should be called before the interactive session starts
-    pub async fn update_completion_cache(&mut self) -> Result<()> {
-        self.completion_cache_manager
-            .update_cache(&self.agent)
-            .await
-    }
-
-    /// Invalidate the completion cache
-    /// This should be called when extensions are added or removed
-    pub async fn invalidate_completion_cache(&self) {
-        self.completion_cache_manager.invalidate_cache();
-    }
-
     pub fn message_history(&self) -> Vec<Message> {
         self.messages.clone()
-    }
-
-    /// Render all past messages from the session history
-    pub fn render_message_history(&self) {
-        if self.messages.is_empty() {
-            return;
-        }
-
-        // Print session restored message
-        println!(
-            "\n{} {} messages loaded into context.",
-            console::style("Session restored:").green().bold(),
-            console::style(self.messages.len()).green()
-        );
-
-        // Render each message
-        for message in &self.messages {
-            output::render_message(message, self.debug);
-        }
-
-        // Add a visual separator after restored messages
-        println!(
-            "\n{}\n",
-            console::style("──────── New Messages ────────").dim()
-        );
     }
 
     pub fn get_metadata(&self) -> Result<session::SessionMetadata> {

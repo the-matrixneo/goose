@@ -128,7 +128,7 @@ impl Session {
     }
 
     /// Set up the interactive editor with completer and configuration
-    pub(crate) async fn setup_interactive_editor(
+    async fn setup_interactive_editor(
         &self,
     ) -> Result<rustyline::Editor<GooseCompleter, rustyline::history::DefaultHistory>> {
         let config = rustyline::Config::builder()
@@ -147,7 +147,7 @@ impl Session {
     }
 
     /// Get the path to the global history file
-    pub(crate) fn get_history_file_path(&self) -> Result<PathBuf> {
+    fn get_history_file_path(&self) -> Result<PathBuf> {
         let strategy =
             choose_app_strategy(crate::APP_STRATEGY.clone()).expect("goose requires a home dir");
         let config_dir = strategy.config_dir();
@@ -164,7 +164,7 @@ impl Session {
     }
 
     /// Load command history from the global history file
-    pub(crate) fn load_command_history(
+    fn load_command_history(
         &self,
         editor: &mut rustyline::Editor<GooseCompleter, rustyline::history::DefaultHistory>,
         history_file: &PathBuf,
