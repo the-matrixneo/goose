@@ -4,11 +4,33 @@ use goose::message::Message;
 use goose::model::ModelConfig;
 use goose::providers::base::Provider;
 use goose::providers::create;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 pub enum PlannerResponseType {
     Plan,
     ClarifyingQuestions,
+}
+
+/// Update the project tracker with the current message
+pub fn update_project_tracker(message: &str, session_id: Option<&str>) -> Result<()> {
+    if let Err(e) = crate::project_tracker::update_project_tracker(Some(message), session_id) {
+        eprintln!(
+            "Warning: Failed to update project tracker with instruction: {}",
+            e
+        );
+    }
+
+    Ok(())
+}
+
+/// Extract session ID from the session file path
+pub fn extract_session_id(session_file: &Option<PathBuf>) -> Option<String> {
+    session_file
+        .as_ref()
+        .and_then(|p| p.file_stem())
+        .and_then(|s| s.to_str())
+        .map(|s| s.to_string())
 }
 
 /// Decide if the planner's response is a plan or a clarifying question

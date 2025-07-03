@@ -1,11 +1,15 @@
+mod agent_response;
 mod builder;
 mod commands;
 mod completion;
 mod completion_cache;
 mod export;
 mod input;
+mod interactive;
+mod messages;
 mod output;
 mod prompt;
+mod state;
 mod thinking;
 mod utils;
 
@@ -52,7 +56,10 @@ pub struct Session {
     max_turns: Option<u32>,
 }
 
-pub use utils::{classify_planner_response, get_reasoner, PlannerResponseType};
+pub use utils::{
+    classify_planner_response, extract_session_id, get_reasoner, update_project_tracker,
+    PlannerResponseType,
+};
 
 impl Session {
     pub fn new(
@@ -118,27 +125,8 @@ impl Session {
 
     /// Update the project tracker with the current message
     fn update_project_tracker(&self, message: &str) -> Result<()> {
-        let session_id = self.extract_session_id();
-
-        if let Err(e) =
-            crate::project_tracker::update_project_tracker(Some(message), session_id.as_deref())
-        {
-            eprintln!(
-                "Warning: Failed to update project tracker with instruction: {}",
-                e
-            );
-        }
-
-        Ok(())
-    }
-
-    /// Extract session ID from the session file path
-    fn extract_session_id(&self) -> Option<String> {
-        self.session_file
-            .as_ref()
-            .and_then(|p| p.file_stem())
-            .and_then(|s| s.to_str())
-            .map(|s| s.to_string())
+        let session_id = extract_session_id(&self.session_file);
+        update_project_tracker(message, session_id.as_deref())
     }
 
     /// Set up the interactive editor with completer and configuration
