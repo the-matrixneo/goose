@@ -40,11 +40,6 @@ impl CompletionCache {
         self.prompt_info.insert(name, info);
     }
 
-    /// Get cached prompts for an extension
-    pub fn get_prompts(&self, extension: &str) -> Option<&Vec<String>> {
-        self.prompts.get(extension)
-    }
-
     /// Get all cached prompts
     pub fn get_all_prompts(&self) -> &HashMap<String, Vec<String>> {
         &self.prompts
@@ -53,11 +48,6 @@ impl CompletionCache {
     /// Get cached prompt info
     pub fn get_prompt_info(&self, name: &str) -> Option<&output::PromptInfo> {
         self.prompt_info.get(name)
-    }
-
-    /// Get the last update time
-    pub fn last_updated(&self) -> Instant {
-        self.last_updated
     }
 }
 
@@ -113,15 +103,6 @@ impl CompletionCacheManager {
         let mut cache = self.cache.write().unwrap();
         cache.clear();
     }
-
-    /// Get a read lock on the cache for safe access
-    pub fn with_cache<F, R>(&self, f: F) -> R
-    where
-        F: FnOnce(&CompletionCache) -> R,
-    {
-        let cache = self.cache.read().unwrap();
-        f(&*cache)
-    }
 }
 
 impl Default for CompletionCacheManager {
@@ -149,7 +130,9 @@ mod tests {
 
         cache.update_prompts(extension.clone(), prompts.clone());
 
-        assert_eq!(cache.get_prompts(&extension), Some(&prompts));
+        // Test using get_all_prompts instead of get_prompts
+        let all_prompts = cache.get_all_prompts();
+        assert_eq!(all_prompts.get(&extension), Some(&prompts));
     }
 
     #[test]
@@ -168,14 +151,19 @@ mod tests {
     fn test_completion_cache_manager() {
         let manager = CompletionCacheManager::new();
 
-        manager.with_cache(|cache| {
+        // Test using get_cache_ref instead of with_cache
+        {
+            let cache_ref = manager.get_cache_ref();
+            let cache = cache_ref.read().unwrap();
             assert!(cache.get_all_prompts().is_empty());
-        });
+        }
 
         manager.invalidate_cache();
 
-        manager.with_cache(|cache| {
+        {
+            let cache_ref = manager.get_cache_ref();
+            let cache = cache_ref.read().unwrap();
             assert!(cache.get_all_prompts().is_empty());
-        });
+        }
     }
 }
