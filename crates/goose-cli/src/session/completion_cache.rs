@@ -5,8 +5,6 @@ use std::time::Instant;
 
 use crate::session::output;
 
-/// Cache structure for completion data
-/// Uses std::sync::RwLock for thread safety without async
 pub struct CompletionCache {
     prompts: HashMap<String, Vec<String>>,
     prompt_info: HashMap<String, output::PromptInfo>,
@@ -22,36 +20,30 @@ impl CompletionCache {
         }
     }
 
-    /// Clear all cached data
     pub fn clear(&mut self) {
         self.prompts.clear();
         self.prompt_info.clear();
         self.last_updated = Instant::now();
     }
 
-    /// Update the cache with fresh prompt data
     pub fn update_prompts(&mut self, extension: String, prompt_names: Vec<String>) {
         self.prompts.insert(extension, prompt_names);
         self.last_updated = Instant::now();
     }
 
-    /// Update the cache with prompt info
     pub fn update_prompt_info(&mut self, name: String, info: output::PromptInfo) {
         self.prompt_info.insert(name, info);
     }
 
-    /// Get all cached prompts
     pub fn get_all_prompts(&self) -> &HashMap<String, Vec<String>> {
         &self.prompts
     }
 
-    /// Get cached prompt info
     pub fn get_prompt_info(&self, name: &str) -> Option<&output::PromptInfo> {
         self.prompt_info.get(name)
     }
 }
 
-/// Thread-safe completion cache manager
 pub struct CompletionCacheManager {
     cache: Arc<std::sync::RwLock<CompletionCache>>,
 }
@@ -151,7 +143,6 @@ mod tests {
     fn test_completion_cache_manager() {
         let manager = CompletionCacheManager::new();
 
-        // Test using get_cache_ref instead of with_cache
         {
             let cache_ref = manager.get_cache_ref();
             let cache = cache_ref.read().unwrap();

@@ -6,7 +6,6 @@ use crate::session::{output, Session};
 use goose::session;
 
 impl Session {
-    /// Handle clear command
     pub fn handle_clear_command(&mut self) {
         self.messages.clear();
         tracing::info!("Chat context cleared by user.");
@@ -16,7 +15,6 @@ impl Session {
         );
     }
 
-    /// Handle summarize command
     pub async fn handle_summarize_command(&mut self) -> Result<()> {
         let prompt = "Are you sure you want to summarize this conversation? This will condense the message history.";
         let should_summarize = match cliclack::confirm(prompt).initial_value(true).interact() {
@@ -34,16 +32,12 @@ impl Session {
             println!("{}", console::style("Summarizing conversation...").yellow());
             output::show_thinking();
 
-            // Get the provider for summarization
             let provider = self.agent.provider().await?;
 
-            // Call the summarize_context method which uses the summarize_messages function
             let (summarized_messages, _) = self.agent.summarize_context(&self.messages).await?;
 
-            // Update the session messages with the summarized ones
             self.messages = summarized_messages;
 
-            // Persist the summarized messages
             if let Some(session_file) = &self.session_file {
                 session::persist_messages_with_schedule_id(
                     session_file,
@@ -71,7 +65,6 @@ impl Session {
         Ok(())
     }
 
-    /// Display enhanced context usage with session totals
     pub async fn display_context_usage(&self) -> Result<()> {
         let provider = self.agent.provider().await?;
         let model_config = provider.get_model_config();
@@ -92,13 +85,11 @@ impl Session {
     }
 }
 
-/// Helper function to summarize context messages
 pub async fn summarize_context_messages(
     messages: &mut Vec<Message>,
     agent: &goose::agents::Agent,
     message_suffix: &str,
 ) -> Result<()> {
-    // Summarize messages to fit within context length
     let (summarized_messages, _) = agent.summarize_context(messages).await?;
     let msg = format!("Context maxed out\n{}\n{}", "-".repeat(50), message_suffix);
     output::render_text(&msg, Some(Color::Yellow), true);

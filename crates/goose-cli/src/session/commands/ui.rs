@@ -1,7 +1,6 @@
 use crate::session::{output, Session};
 
 impl Session {
-    /// Handle theme toggle command
     pub fn handle_theme_toggle(&self) {
         let current = output::get_theme();
         let new_theme = match current {

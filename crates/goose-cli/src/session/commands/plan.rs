@@ -4,7 +4,6 @@ use goose::message::Message;
 use crate::session::{input, output, utils, RunMode, Session};
 
 impl Session {
-    /// Handle plan command
     pub async fn handle_plan_command(&mut self, options: input::PlanCommandOptions) -> Result<()> {
         self.run_mode = RunMode::Plan;
         output::render_enter_plan_mode();

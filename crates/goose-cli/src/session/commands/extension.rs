@@ -6,11 +6,6 @@ use std::collections::HashMap;
 use crate::session::Session;
 
 impl Session {
-    /// Add a stdio extension to the session
-    ///
-    /// # Arguments
-    /// * `extension_command` - Full command string including environment variables
-    ///   Format: "ENV1=val1 ENV2=val2 command args..."
     pub async fn add_extension(&mut self, extension_command: String) -> Result<()> {
         let mut parts: Vec<&str> = extension_command.split_whitespace().collect();
         let mut envs = std::collections::HashMap::new();
@@ -60,10 +55,6 @@ impl Session {
         Ok(())
     }
 
-    /// Add a remote extension to the session
-    ///
-    /// # Arguments
-    /// * `extension_url` - URL of the server
     pub async fn add_remote_extension(&mut self, extension_url: String) -> Result<()> {
         let name: String = rand::thread_rng()
             .sample_iter(&Alphanumeric)

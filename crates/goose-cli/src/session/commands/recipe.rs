@@ -4,7 +4,6 @@ use std::path::PathBuf;
 use crate::session::{output, Session};
 
 impl Session {
-    /// Handle recipe generation command
     pub async fn handle_recipe_command(&mut self, filepath_opt: Option<String>) -> Result<()> {
         println!("{}", console::style("Generating Recipe").green());
 
@@ -38,14 +37,6 @@ impl Session {
         Ok(())
     }
 
-    /// Save a recipe to a file
-    ///
-    /// # Arguments
-    /// * `recipe` - The recipe to save
-    /// * `filepath_str` - The path to save the recipe to
-    ///
-    /// # Returns
-    /// * `Result<PathBuf, String>` - The path the recipe was saved to or an error message
     pub fn save_recipe(
         &self,
         recipe: &goose::recipe::Recipe,

@@ -8,7 +8,6 @@ use std::sync::Arc;
 use crate::session::{output, utils, RunMode, Session};
 
 impl Session {
-    /// Handle goose mode setting command
     pub fn handle_goose_mode_setting(&self, mode: &str) -> Result<bool> {
         let config = Config::global();
         let mode = mode.to_lowercase();
@@ -30,7 +29,6 @@ impl Session {
         Ok(true)
     }
 
-    /// Handle normal mode message processing in interactive session
     pub async fn handle_normal_mode_message(&mut self, content: &str) -> Result<()> {
         self.add_user_message_to_history(content).await?;
         self.update_project_tracker(content)?;
@@ -42,7 +40,6 @@ impl Session {
         Ok(())
     }
 
-    /// Handle plan mode message processing in interactive session
     pub async fn handle_plan_mode_message(&mut self, content: &str) -> Result<()> {
         let mut plan_messages = self.messages.clone();
         plan_messages.push(Message::user().with_text(content));

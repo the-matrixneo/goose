@@ -54,7 +54,6 @@ impl Session {
         Ok(result.messages)
     }
 
-    /// Handle prompt command execution
     pub async fn handle_prompt_command(&mut self, opts: input::PromptCommandOptions) -> Result<()> {
         // name is required
         if opts.name.is_empty() {
