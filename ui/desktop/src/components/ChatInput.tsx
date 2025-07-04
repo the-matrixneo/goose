@@ -573,7 +573,7 @@ export default function ChatInput({
         {isLoading ? (
           <Button
             type="button"
-            size="icon"
+            size="sm"
             variant="ghost"
             onClick={(e) => {
               e.preventDefault();
@@ -591,7 +591,7 @@ export default function ChatInput({
               <>
                 <Button
                   type="button"
-                  size="icon"
+                  size="sm"
                   variant="ghost"
                   onClick={() => {
                     if (isRecording) {
@@ -641,7 +641,7 @@ export default function ChatInput({
             )}
             <Button
               type="submit"
-              size="icon"
+              size="sm"
               variant="ghost"
               disabled={
                 !hasSubmittableContent || isAnyImageLoading || isRecording || isTranscribing
@@ -671,7 +671,7 @@ export default function ChatInput({
         <div className="gap-1 flex items-center justify-between w-full">
           <Button
             type="button"
-            size="icon"
+            size="sm"
             variant="ghost"
             onClick={handleFileSelect}
             className="text-textSubtle hover:text-textStandard w-7 h-7 [&_svg]:size-4"

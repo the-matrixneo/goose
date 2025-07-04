@@ -130,7 +130,7 @@ const ScheduleCard = React.memo<{
               <PopoverTrigger asChild>
                 <Button
                   variant="ghost"
-                  size="icon"
+                  size="sm"
                   onClick={(e) => {
                     e.stopPropagation();
                   }}

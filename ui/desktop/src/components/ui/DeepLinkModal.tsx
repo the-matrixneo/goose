@@ -17,8 +17,7 @@ interface DeepLinkModalProps {
 // Function to generate a deep link from a bot config
 export function generateDeepLink(recipeConfig: RecipeConfig): string {
   const configBase64 = Buffer.from(JSON.stringify(recipeConfig)).toString('base64');
-  const urlSafe = encodeURIComponent(configBase64);
-  return `goose://bot?config=${urlSafe}`;
+  return `goose://bot?config=${configBase64}`;
 }
 
 export function DeepLinkModal({ recipeConfig: initialRecipeConfig, onClose }: DeepLinkModalProps) {
@@ -97,7 +96,7 @@ export function DeepLinkModal({ recipeConfig: initialRecipeConfig, onClose }: De
     >
       <Card
         ref={modalRef}
-        className="relative w-[700px] max-w-full bg-bgApp rounded-xl my-10 max-h-[90vh] flex flex-col shadow-lg"
+        className="relative w-[700px] max-w-full bg-background-default rounded-xl my-10 max-h-[90vh] flex flex-col shadow-lg"
       >
         <div className="p-8 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 32px)' }}>
           <div className="flex flex-col">
