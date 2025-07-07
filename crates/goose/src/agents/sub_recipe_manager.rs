@@ -5,7 +5,8 @@ use std::collections::HashMap;
 use crate::{
     agents::{
         recipe_tools::sub_recipe_tools::{
-            create_sub_recipe_task, create_sub_recipe_task_tool, SUB_RECIPE_TASK_TOOL_NAME_PREFIX,
+            create_multiple_sub_recipe_task_tool, create_multiple_sub_recipe_tasks,
+            SUB_RECIPE_TASK_TOOL_NAME_PREFIX,
         },
         tool_execution::ToolCallResult,
     },
@@ -34,18 +35,12 @@ impl SubRecipeManager {
 
     pub fn add_sub_recipe_tools(&mut self, sub_recipes_to_add: Vec<SubRecipe>) {
         for sub_recipe in sub_recipes_to_add {
-            // let sub_recipe_key = format!(
-            //     "{}_{}",
-            //     SUB_RECIPE_TOOL_NAME_PREFIX,
-            //     sub_recipe.name.clone()
-            // );
-            // let tool = create_sub_recipe_tool(&sub_recipe);
             let sub_recipe_key = format!(
                 "{}_{}",
                 SUB_RECIPE_TASK_TOOL_NAME_PREFIX,
                 sub_recipe.name.clone()
             );
-            let tool = create_sub_recipe_task_tool(&sub_recipe);
+            let tool = create_multiple_sub_recipe_task_tool(&sub_recipe);
             self.sub_recipe_tools.insert(sub_recipe_key.clone(), tool);
             self.sub_recipes.insert(sub_recipe_key.clone(), sub_recipe);
         }
@@ -111,8 +106,7 @@ impl SubRecipeManager {
 
             ToolError::InvalidParameters(format!("Sub-recipe '{}' not found", sub_recipe_name))
         })?;
-
-        let output = create_sub_recipe_task(sub_recipe, params)
+        let output = create_multiple_sub_recipe_tasks(sub_recipe, params)
             .await
             .map_err(|e| {
                 ToolError::ExecutionError(format!("Sub-recipe execution failed: {}", e))

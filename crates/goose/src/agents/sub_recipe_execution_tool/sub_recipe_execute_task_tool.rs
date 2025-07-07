@@ -10,19 +10,31 @@ pub fn create_sub_recipe_execute_task_tool() -> Tool {
     Tool::new(
         SUB_RECIPE_EXECUTE_TASK_TOOL_NAME,
         "Only use this tool when you execute sub recipe task.
-EXECUTION STRATEGY:
-- DEFAULT: Execute tasks sequentially (one at a time) unless user explicitly requests parallel execution
-- PARALLEL: Only when user explicitly uses keywords like 'parallel', 'simultaneously', 'at the same time', 'concurrently'
+
+EXECUTION STRATEGY DECISION:
+1. PRE-CREATED TASKS: If tasks were created by subrecipe__create_task_* tools, check the execution_mode in the response:
+   - If execution_mode is 'parallel', use parallel execution
+   - If execution_mode is 'sequential', use sequential execution
+   - Always respect the execution_mode from task creation to maintain consistency
+
+2. USER INTENT: If creating tasks inline or user explicitly specifies:
+   - DEFAULT: Execute tasks sequentially unless user explicitly requests parallel execution
+   - PARALLEL: When user uses keywords like 'parallel', 'simultaneously', 'at the same time', 'concurrently'
 
 IMPLEMENTATION:
 - Sequential execution: Call this tool multiple times, passing exactly ONE task per call
 - Parallel execution: Call this tool once, passing an ARRAY of all tasks
 
 EXAMPLES:
+User Intent Based:
 - User: 'get weather and tell me a joke' → Sequential (2 separate tool calls, 1 task each)
 - User: 'get weather and joke in parallel' → Parallel (1 tool call with array of 2 tasks)
 - User: 'run these simultaneously' → Parallel (1 tool call with task array)
-- User: 'do task A then task B' → Sequential (2 separate tool calls)",
+- User: 'do task A then task B' → Sequential (2 separate tool calls)
+
+Pre-created Task Based:
+- subrecipe__create_task_weather returns execution_mode: 'parallel' → Use parallel execution
+- subrecipe__create_task_weather returns execution_mode: 'sequential' → Use sequential execution",
         serde_json::json!({
             "type": "object",
             "properties": {
@@ -30,7 +42,7 @@ EXAMPLES:
                     "type": "string",
                     "enum": ["sequential", "parallel"],
                     "default": "sequential",
-                    "description": "Execution strategy for multiple tasks. Use 'sequential' (default) unless user explicitly requests parallel execution with words like 'parallel', 'simultaneously', 'at the same time', or 'concurrently'."
+                    "description": "Execution strategy for multiple tasks. For pre-created tasks, respect the execution_mode from task creation. For user intent, use 'sequential' (default) unless user explicitly requests parallel execution with words like 'parallel', 'simultaneously', 'at the same time', or 'concurrently'."
                 },
                 "tasks": {
                     "type": "array",

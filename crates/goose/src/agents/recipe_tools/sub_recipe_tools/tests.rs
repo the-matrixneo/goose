@@ -9,6 +9,7 @@ mod tests {
             name: "test_sub_recipe".to_string(),
             path: "test_sub_recipe.yaml".to_string(),
             values: Some(HashMap::from([("key1".to_string(), "value1".to_string())])),
+            executions: None,
         };
         sub_recipe
     }
@@ -42,6 +43,7 @@ mod tests {
                 name: "test_sub_recipe".to_string(),
                 path: "test_sub_recipe.yaml".to_string(),
                 values: None,
+                executions: None,
             };
             let params: HashMap<String, String> = HashMap::new();
             let params_value = serde_json::to_value(params).unwrap();
@@ -113,6 +115,7 @@ mod tests {
                 name: "test_sub_recipe".to_string(),
                 path: "test_sub_recipe.yaml".to_string(),
                 values: None,
+                executions: None,
             };
 
             let sub_recipe_file_content = r#"{
@@ -150,6 +153,77 @@ mod tests {
             assert_eq!(key1_prop["description"], "A test parameter");
             assert_eq!(result["required"].as_array().unwrap().len(), 1);
             assert_eq!(result["required"][0], "key1");
+        }
+    }
+
+    mod get_input_schema_for_multiple_sub_recipe_task_tests {
+        use crate::{
+            agents::recipe_tools::sub_recipe_tools::get_input_schema_for_multiple_sub_recipe_task,
+            recipe::SubRecipe,
+        };
+
+        #[test]
+        fn test_get_input_schema_for_multiple_tasks() {
+            let sub_recipe_file_content = r#"{
+                "version": "1.0.0",
+                "title": "Test Recipe",
+                "description": "A test recipe",
+                "prompt": "Test prompt",
+                "parameters": [
+                    {
+                        "key": "param1",
+                        "input_type": "string",
+                        "requirement": "required",
+                        "description": "A required parameter"
+                    },
+                    {
+                        "key": "param2",
+                        "input_type": "number",
+                        "requirement": "optional",
+                        "description": "An optional parameter"
+                    }
+                ]
+            }"#;
+
+            let temp_dir = tempfile::tempdir().unwrap();
+            let temp_file = temp_dir.path().join("test_sub_recipe.yaml");
+            std::fs::write(&temp_file, sub_recipe_file_content).unwrap();
+
+            let sub_recipe = SubRecipe {
+                name: "test_sub_recipe".to_string(),
+                path: temp_file.to_string_lossy().to_string(),
+                values: None,
+                executions: None,
+            };
+
+            let result = get_input_schema_for_multiple_sub_recipe_task(&sub_recipe).unwrap();
+
+            // Verify the schema structure
+            assert_eq!(result["type"], "object");
+            assert!(result["properties"].is_object());
+
+            let properties = result["properties"].as_object().unwrap();
+            assert_eq!(properties.len(), 1);
+            assert!(properties.contains_key("task_parameters"));
+
+            let task_params = &properties["task_parameters"];
+            assert_eq!(task_params["type"], "array");
+            assert_eq!(task_params["minItems"], 1);
+
+            let items = &task_params["items"];
+            assert_eq!(items["type"], "object");
+
+            let item_properties = items["properties"].as_object().unwrap();
+            assert_eq!(item_properties.len(), 2);
+            assert!(item_properties.contains_key("param1"));
+            assert!(item_properties.contains_key("param2"));
+
+            assert_eq!(item_properties["param1"]["type"], "string");
+            assert_eq!(item_properties["param2"]["type"], "number");
+
+            let required = items["required"].as_array().unwrap();
+            assert_eq!(required.len(), 1);
+            assert_eq!(required[0], "param1");
         }
     }
 }

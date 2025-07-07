@@ -137,6 +137,21 @@ pub struct SubRecipe {
     pub path: String,
     #[serde(default, deserialize_with = "deserialize_value_map_as_string")]
     pub values: Option<HashMap<String, String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub executions: Option<Execution>,
+}
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Execution {
+    #[serde(default)]
+    pub parallel: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub runs: Option<Vec<ExecutionRun>>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ExecutionRun {
+    #[serde(default, deserialize_with = "deserialize_value_map_as_string")]
+    pub values: Option<HashMap<String, String>>,
 }
 
 fn deserialize_value_map_as_string<'de, D>(
