@@ -116,7 +116,6 @@ impl SecretDiscovery {
             Err(_) => (false, SecretSource::Missing),
         }
     }
-
 }
 
 impl Default for SecretDiscovery {

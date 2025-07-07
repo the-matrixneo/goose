@@ -147,7 +147,6 @@ impl SecretCollector {
             .with_context(|| format!("Failed to store secret '{}'", key))?;
         Ok(())
     }
-
 }
 
 impl Default for SecretCollector {
