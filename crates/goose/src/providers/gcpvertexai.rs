@@ -18,7 +18,9 @@ use crate::providers::formats::gcpvertexai::{
 
 use crate::providers::formats::gcpvertexai::GcpLocation::Iowa;
 use crate::providers::gcpauth::GcpAuth;
-use crate::providers::provider_common::{ProviderConfigBuilder, get_shared_client, retry_with_backoff, RetryConfig};
+use crate::providers::provider_common::{
+    get_shared_client, retry_with_backoff, ProviderConfigBuilder, RetryConfig,
+};
 use crate::providers::utils::emit_debug_trace;
 use mcp_core::tool::Tool;
 
@@ -40,7 +42,6 @@ enum GcpVertexAIError {
     #[error("Authentication error: {0}")]
     AuthError(String),
 }
-
 
 /// Provider implementation for Google Cloud Platform's Vertex AI service.
 ///
@@ -94,10 +95,10 @@ impl GcpVertexAIProvider {
     /// * `model` - Configuration for the model to be used
     async fn new_async(model: ModelConfig) -> Result<Self> {
         let config = crate::config::Config::global();
-        let config_builder = ProviderConfigBuilder::new(&config, "GCP");
-        
+        let config_builder = ProviderConfigBuilder::new(config, "GCP");
+
         let project_id = config.get_param("GCP_PROJECT_ID")?;
-        let location = Self::determine_location(&config)?;
+        let location = Self::determine_location(config)?;
         let host = format!("https://{}-aiplatform.googleapis.com", location);
 
         // Use shared client for better connection pooling
@@ -107,13 +108,16 @@ impl GcpVertexAIProvider {
 
         // Configure retry settings with GCP's specific requirements
         let retry_config = RetryConfig {
-            max_retries: config_builder.get_param("MAX_RETRIES", None)
+            max_retries: config_builder
+                .get_param("MAX_RETRIES", None)
                 .and_then(|v| v.parse::<u32>().ok())
                 .unwrap_or(GCP_MAX_RETRIES),
-            initial_delay_ms: config_builder.get_param("INITIAL_RETRY_INTERVAL_MS", None)
+            initial_delay_ms: config_builder
+                .get_param("INITIAL_RETRY_INTERVAL_MS", None)
                 .and_then(|v| v.parse::<u64>().ok())
                 .unwrap_or(GCP_INITIAL_RETRY_INTERVAL_MS),
-            max_delay_ms: config_builder.get_param("MAX_RETRY_INTERVAL_MS", None)
+            max_delay_ms: config_builder
+                .get_param("MAX_RETRY_INTERVAL_MS", None)
                 .and_then(|v| v.parse::<u64>().ok())
                 .unwrap_or(GCP_MAX_RETRY_INTERVAL_MS),
             backoff_multiplier: 2.0,
@@ -241,7 +245,7 @@ impl GcpVertexAIProvider {
                 } else {
                     format!("Pay-as-you-go resource exhausted: {cite_gcp_vertex_429}.")
                 };
-                
+
                 return Err(ProviderError::RateLimitExceeded(quota_error));
             }
 

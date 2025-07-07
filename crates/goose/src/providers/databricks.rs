@@ -3,8 +3,10 @@ use super::embedding::EmbeddingCapable;
 use super::errors::ProviderError;
 use super::formats::databricks::{create_request, get_usage, response_to_message};
 use super::oauth;
-use super::provider_common::{ProviderConfigBuilder, get_shared_client, build_endpoint_url, retry_with_backoff, RetryConfig};
-use super::utils::{get_model, emit_debug_trace, ImageFormat};
+use super::provider_common::{
+    build_endpoint_url, get_shared_client, retry_with_backoff, ProviderConfigBuilder, RetryConfig,
+};
+use super::utils::{emit_debug_trace, get_model, ImageFormat};
 use crate::config::ConfigError;
 use crate::message::Message;
 use crate::model::ModelConfig;
@@ -40,7 +42,6 @@ pub const DATABRICKS_KNOWN_MODELS: &[&str] = &[
 
 pub const DATABRICKS_DOC_URL: &str =
     "https://docs.databricks.com/en/generative-ai/external-models/index.html";
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum DatabricksAuth {
@@ -90,7 +91,7 @@ impl Default for DatabricksProvider {
 impl DatabricksProvider {
     pub fn from_env(model: ModelConfig) -> Result<Self> {
         let config = crate::config::Config::global();
-        let config_builder = ProviderConfigBuilder::new(&config, "DATABRICKS");
+        let config_builder = ProviderConfigBuilder::new(config, "DATABRICKS");
 
         // For compatibility for now we check both config and secret for databricks host
         // but it is not actually a secret value
@@ -113,13 +114,16 @@ impl DatabricksProvider {
 
         // Configure retry settings with Databricks' specific requirements
         let retry_config = RetryConfig {
-            max_retries: config_builder.get_param("MAX_RETRIES", None)
+            max_retries: config_builder
+                .get_param("MAX_RETRIES", None)
                 .and_then(|v| v.parse::<u32>().ok())
                 .unwrap_or(DATABRICKS_MAX_RETRIES),
-            initial_delay_ms: config_builder.get_param("INITIAL_RETRY_INTERVAL_MS", None)
+            initial_delay_ms: config_builder
+                .get_param("INITIAL_RETRY_INTERVAL_MS", None)
                 .and_then(|v| v.parse::<u64>().ok())
                 .unwrap_or(DATABRICKS_INITIAL_RETRY_INTERVAL_MS),
-            max_delay_ms: config_builder.get_param("MAX_RETRY_INTERVAL_MS", None)
+            max_delay_ms: config_builder
+                .get_param("MAX_RETRY_INTERVAL_MS", None)
                 .and_then(|v| v.parse::<u64>().ok())
                 .unwrap_or(DATABRICKS_MAX_RETRY_INTERVAL_MS),
             backoff_multiplier: 2.0,
@@ -147,7 +151,6 @@ impl DatabricksProvider {
             retry_config,
         })
     }
-
 
     /// Create a new DatabricksProvider with the specified host and token
     ///
@@ -201,7 +204,7 @@ impl DatabricksProvider {
         };
 
         let url = build_endpoint_url(&self.host, &path)?;
-        
+
         // Use retry logic for resilience
         retry_with_backoff(&self.retry_config, || async {
             // Get a fresh auth token for each attempt

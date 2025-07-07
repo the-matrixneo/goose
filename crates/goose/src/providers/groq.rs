@@ -3,7 +3,10 @@ use crate::message::Message;
 use crate::model::ModelConfig;
 use crate::providers::base::{ConfigKey, Provider, ProviderMetadata, ProviderUsage, Usage};
 use crate::providers::formats::openai::{create_request, get_usage, response_to_message};
-use crate::providers::provider_common::{AuthType, HeaderBuilder, ProviderConfigBuilder, get_shared_client, build_endpoint_url, retry_with_backoff, RetryConfig};
+use crate::providers::provider_common::{
+    build_endpoint_url, get_shared_client, retry_with_backoff, AuthType, HeaderBuilder,
+    ProviderConfigBuilder, RetryConfig,
+};
 use crate::providers::utils::{get_model, handle_response_openai_compat};
 use anyhow::Result;
 use async_trait::async_trait;
@@ -39,14 +42,14 @@ impl Default for GroqProvider {
 impl GroqProvider {
     pub fn from_env(model: ModelConfig) -> Result<Self> {
         let config = crate::config::Config::global();
-        let config_builder = ProviderConfigBuilder::new(&config, "GROQ");
-        
+        let config_builder = ProviderConfigBuilder::new(config, "GROQ");
+
         let api_key = config_builder.get_api_key()?;
         let host = config_builder.get_host(GROQ_API_HOST);
-        
+
         // Use shared client for better connection pooling
         let client = get_shared_client();
-        
+
         // Configure retry settings
         let retry_config = RetryConfig::default();
 
@@ -61,13 +64,14 @@ impl GroqProvider {
 
     async fn post(&self, payload: Value) -> Result<Value, ProviderError> {
         let url = build_endpoint_url(&self.host, "openai/v1/chat/completions")?;
-        
+
         // Build headers using the new HeaderBuilder
         let headers = HeaderBuilder::new(self.api_key.clone(), AuthType::Bearer).build();
-        
+
         // Use retry logic for resilience
         retry_with_backoff(&self.retry_config, || async {
-            let response = self.client
+            let response = self
+                .client
                 .post(url.clone())
                 .headers(headers.clone())
                 .json(&payload)
@@ -76,7 +80,8 @@ impl GroqProvider {
 
             // Use the common response handler
             handle_response_openai_compat(response).await
-        }).await
+        })
+        .await
     }
 }
 
@@ -146,11 +151,7 @@ impl Provider for GroqProvider {
             .build();
 
         // Send request
-        let response = self.client
-            .get(url)
-            .headers(headers)
-            .send()
-            .await?;
+        let response = self.client.get(url).headers(headers).send().await?;
         let status = response.status();
         let payload: serde_json::Value = response.json().await.map_err(|_| {
             ProviderError::RequestFailed("Response body is not valid JSON".to_string())

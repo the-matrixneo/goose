@@ -389,8 +389,15 @@ pub async fn get_pricing(
                 });
             }
             // Check if the model has embedded pricing data from provider metadata
-            else if let Some(metadata) = get_providers().iter().find(|p| p.name == model_req.provider) {
-                if let Some(model_info) = metadata.known_models.iter().find(|m| m.name == model_req.model) {
+            else if let Some(metadata) = get_providers()
+                .iter()
+                .find(|p| p.name == model_req.provider)
+            {
+                if let Some(model_info) = metadata
+                    .known_models
+                    .iter()
+                    .find(|m| m.name == model_req.model)
+                {
                     if let (Some(input_cost), Some(output_cost)) =
                         (model_info.input_token_cost, model_info.output_token_cost)
                     {

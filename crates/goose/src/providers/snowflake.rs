@@ -8,8 +8,10 @@ use std::sync::Arc;
 use super::base::{ConfigKey, Provider, ProviderMetadata, ProviderUsage};
 use super::errors::ProviderError;
 use super::formats::snowflake::{create_request, get_usage, response_to_message};
-use super::provider_common::{ProviderConfigBuilder, get_shared_client, build_endpoint_url, retry_with_backoff, RetryConfig};
-use super::utils::{get_model, emit_debug_trace, ImageFormat};
+use super::provider_common::{
+    build_endpoint_url, get_shared_client, retry_with_backoff, ProviderConfigBuilder, RetryConfig,
+};
+use super::utils::{emit_debug_trace, get_model, ImageFormat};
 use crate::config::ConfigError;
 use crate::message::Message;
 use crate::model::ModelConfig;
@@ -54,8 +56,8 @@ impl Default for SnowflakeProvider {
 impl SnowflakeProvider {
     pub fn from_env(model: ModelConfig) -> Result<Self> {
         let config = crate::config::Config::global();
-        let _config_builder = ProviderConfigBuilder::new(&config, "SNOWFLAKE");
-        
+        let _config_builder = ProviderConfigBuilder::new(config, "SNOWFLAKE");
+
         // Try to get host from params or secrets
         let mut host: Result<String, ConfigError> = config.get_param("SNOWFLAKE_HOST");
         if host.is_err() {
@@ -92,7 +94,7 @@ impl SnowflakeProvider {
 
         // Use shared client for better connection pooling
         let client = get_shared_client();
-        
+
         // Configure retry settings
         let retry_config = RetryConfig::default();
 
@@ -121,9 +123,9 @@ impl SnowflakeProvider {
         } else {
             self.host.clone()
         };
-        
+
         let url = build_endpoint_url(&host, "api/v2/cortex/inference:complete")?;
-        
+
         // Use retry logic for resilience
         retry_with_backoff(&self.retry_config, || async {
             let auth_header = self.ensure_auth_header().await?;

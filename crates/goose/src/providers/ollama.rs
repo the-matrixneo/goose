@@ -1,6 +1,8 @@
 use super::base::{ConfigKey, Provider, ProviderMetadata, ProviderUsage, Usage};
 use super::errors::ProviderError;
-use super::provider_common::{ProviderConfigBuilder, get_shared_client, retry_with_backoff, RetryConfig};
+use super::provider_common::{
+    get_shared_client, retry_with_backoff, ProviderConfigBuilder, RetryConfig,
+};
 use super::utils::{get_model, handle_response_openai_compat};
 use crate::message::Message;
 use crate::model::ModelConfig;
@@ -40,13 +42,13 @@ impl Default for OllamaProvider {
 impl OllamaProvider {
     pub fn from_env(model: ModelConfig) -> Result<Self> {
         let config = crate::config::Config::global();
-        let config_builder = ProviderConfigBuilder::new(&config, "OLLAMA");
-        
+        let config_builder = ProviderConfigBuilder::new(config, "OLLAMA");
+
         let host = config_builder.get_host(OLLAMA_HOST);
-        
+
         // Use shared client for better connection pooling
         let client = get_shared_client();
-        
+
         // Configure retry settings
         let retry_config = RetryConfig::default();
 
@@ -98,7 +100,8 @@ impl OllamaProvider {
         retry_with_backoff(&self.retry_config, || async {
             let response = self.client.post(url.clone()).json(&payload).send().await?;
             handle_response_openai_compat(response).await
-        }).await
+        })
+        .await
     }
 }
 

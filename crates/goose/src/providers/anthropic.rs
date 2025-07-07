@@ -8,7 +8,10 @@ use std::sync::Arc;
 use super::base::{ConfigKey, ModelInfo, Provider, ProviderMetadata, ProviderUsage};
 use super::errors::ProviderError;
 use super::formats::anthropic::{create_request, get_usage, response_to_message};
-use super::provider_common::{AuthType, HeaderBuilder, ProviderConfigBuilder, get_shared_client, build_endpoint_url, retry_with_backoff, RetryConfig};
+use super::provider_common::{
+    build_endpoint_url, get_shared_client, retry_with_backoff, AuthType, HeaderBuilder,
+    ProviderConfigBuilder, RetryConfig,
+};
 use super::utils::{emit_debug_trace, get_model};
 use crate::message::Message;
 use crate::model::ModelConfig;
@@ -51,14 +54,14 @@ impl Default for AnthropicProvider {
 impl AnthropicProvider {
     pub fn from_env(model: ModelConfig) -> Result<Self> {
         let config = crate::config::Config::global();
-        let config_builder = ProviderConfigBuilder::new(&config, "ANTHROPIC");
-        
+        let config_builder = ProviderConfigBuilder::new(config, "ANTHROPIC");
+
         let api_key = config_builder.get_api_key()?;
         let host = config_builder.get_host("https://api.anthropic.com");
-        
+
         // Use shared client for better connection pooling
         let client = get_shared_client();
-        
+
         // Configure retry settings
         let retry_config = RetryConfig {
             max_retries: 3,
@@ -78,7 +81,7 @@ impl AnthropicProvider {
 
     async fn post(&self, headers: HeaderMap, payload: Value) -> Result<Value, ProviderError> {
         let url = build_endpoint_url(&self.host, "v1/messages")?;
-        
+
         retry_with_backoff(&self.retry_config, || async {
             let response = self
                 .client
@@ -181,20 +184,32 @@ impl Provider for AnthropicProvider {
         let payload = create_request(&self.model, system, messages, tools)?;
 
         // Build headers using the new HeaderBuilder
-        let mut header_builder = HeaderBuilder::new(self.api_key.clone(), AuthType::Custom("x-api-key".to_string()));
-        header_builder = header_builder.add_custom_header("anthropic-version".to_string(), ANTHROPIC_API_VERSION.to_string());
+        let mut header_builder = HeaderBuilder::new(
+            self.api_key.clone(),
+            AuthType::Custom("x-api-key".to_string()),
+        );
+        header_builder = header_builder.add_custom_header(
+            "anthropic-version".to_string(),
+            ANTHROPIC_API_VERSION.to_string(),
+        );
 
         let is_thinking_enabled = std::env::var("CLAUDE_THINKING_ENABLED").is_ok();
         if self.model.model_name.starts_with("claude-3-7-sonnet-") {
             if is_thinking_enabled {
                 // https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking#extended-output-capabilities-beta
-                header_builder = header_builder.add_custom_header("anthropic-beta".to_string(), "output-128k-2025-02-19".to_string());
+                header_builder = header_builder.add_custom_header(
+                    "anthropic-beta".to_string(),
+                    "output-128k-2025-02-19".to_string(),
+                );
             } else {
                 // https://docs.anthropic.com/en/docs/build-with-claude/tool-use/token-efficient-tool-use
-                header_builder = header_builder.add_custom_header("anthropic-beta".to_string(), "token-efficient-tools-2025-02-19".to_string());
+                header_builder = header_builder.add_custom_header(
+                    "anthropic-beta".to_string(),
+                    "token-efficient-tools-2025-02-19".to_string(),
+                );
             }
         }
-        
+
         let headers = header_builder.build();
 
         // Make request

@@ -3,8 +3,11 @@ use crate::message::Message;
 use crate::model::ModelConfig;
 use crate::providers::base::{ConfigKey, Provider, ProviderMetadata, ProviderUsage, Usage};
 use crate::providers::formats::openai::{create_request, get_usage, response_to_message};
-use crate::providers::provider_common::{AuthType, HeaderBuilder, ProviderConfigBuilder, get_shared_client, build_endpoint_url, retry_with_backoff, RetryConfig};
-use crate::providers::utils::{get_model, handle_response_openai_compat, emit_debug_trace};
+use crate::providers::provider_common::{
+    build_endpoint_url, get_shared_client, retry_with_backoff, AuthType, HeaderBuilder,
+    ProviderConfigBuilder, RetryConfig,
+};
+use crate::providers::utils::{emit_debug_trace, get_model, handle_response_openai_compat};
 use anyhow::Result;
 use async_trait::async_trait;
 use mcp_core::Tool;
@@ -57,14 +60,14 @@ impl Default for XaiProvider {
 impl XaiProvider {
     pub fn from_env(model: ModelConfig) -> Result<Self> {
         let config = crate::config::Config::global();
-        let config_builder = ProviderConfigBuilder::new(&config, "XAI");
-        
+        let config_builder = ProviderConfigBuilder::new(config, "XAI");
+
         let api_key = config_builder.get_api_key()?;
         let host = config_builder.get_host(XAI_API_HOST);
-        
+
         // Use shared client for better connection pooling
         let client = get_shared_client();
-        
+
         // Configure retry settings
         let retry_config = RetryConfig::default();
 
@@ -79,16 +82,17 @@ impl XaiProvider {
 
     async fn post(&self, payload: Value) -> anyhow::Result<Value, ProviderError> {
         let url = build_endpoint_url(&self.host, "chat/completions")?;
-        
+
         // Build headers using HeaderBuilder
         let headers = HeaderBuilder::new(self.api_key.clone(), AuthType::Bearer).build();
-        
+
         tracing::debug!("xAI API URL: {}", url);
         tracing::debug!("xAI request model: {:?}", self.model.model_name);
-        
+
         // Use retry logic for resilience
         retry_with_backoff(&self.retry_config, || async {
-            let response = self.client
+            let response = self
+                .client
                 .post(url.clone())
                 .headers(headers.clone())
                 .json(&payload)
@@ -96,7 +100,8 @@ impl XaiProvider {
                 .await?;
 
             handle_response_openai_compat(response).await
-        }).await
+        })
+        .await
     }
 }
 
@@ -154,17 +159,17 @@ impl Provider for XaiProvider {
         emit_debug_trace(&self.model, &payload, &response, &usage);
         Ok((message, ProviderUsage::new(model, usage)))
     }
-    
+
     /// Fetch supported models from xAI API; returns Err on failure, Ok(None) if no models found
     async fn fetch_supported_models_async(&self) -> Result<Option<Vec<String>>, ProviderError> {
         let url = build_endpoint_url(&self.host, "models")?;
-        
+
         // Build headers using HeaderBuilder
         let headers = HeaderBuilder::new(self.api_key.clone(), AuthType::Bearer).build();
-        
+
         let response = self.client.get(url).headers(headers).send().await?;
         let json: serde_json::Value = response.json().await?;
-        
+
         if let Some(err_obj) = json.get("error") {
             let msg = err_obj
                 .get("message")
@@ -172,11 +177,11 @@ impl Provider for XaiProvider {
                 .unwrap_or("unknown error");
             return Err(ProviderError::Authentication(msg.to_string()));
         }
-        
+
         let data = json.get("data").and_then(|v| v.as_array()).ok_or_else(|| {
             ProviderError::UsageError("Missing data field in JSON response".into())
         })?;
-        
+
         let mut models: Vec<String> = data
             .iter()
             .filter_map(|m| m.get("id").and_then(|v| v.as_str()).map(str::to_string))

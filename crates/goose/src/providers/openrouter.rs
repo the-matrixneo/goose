@@ -6,7 +6,10 @@ use std::sync::Arc;
 
 use super::base::{ConfigKey, Provider, ProviderMetadata, ProviderUsage, Usage};
 use super::errors::ProviderError;
-use super::provider_common::{AuthType, HeaderBuilder, ProviderConfigBuilder, get_shared_client, build_endpoint_url, retry_with_backoff, RetryConfig};
+use super::provider_common::{
+    build_endpoint_url, get_shared_client, retry_with_backoff, AuthType, HeaderBuilder,
+    ProviderConfigBuilder, RetryConfig,
+};
 use super::utils::{
     emit_debug_trace, get_model, handle_response_google_compat, handle_response_openai_compat,
     is_google_model,
@@ -50,14 +53,14 @@ impl Default for OpenRouterProvider {
 impl OpenRouterProvider {
     pub fn from_env(model: ModelConfig) -> Result<Self> {
         let config = crate::config::Config::global();
-        let config_builder = ProviderConfigBuilder::new(&config, "OPENROUTER");
-        
+        let config_builder = ProviderConfigBuilder::new(config, "OPENROUTER");
+
         let api_key = config_builder.get_api_key()?;
         let host = config_builder.get_host("https://openrouter.ai");
-        
+
         // Use shared client for better connection pooling
         let client = get_shared_client();
-        
+
         // Configure retry settings
         let retry_config = RetryConfig::default();
 
@@ -72,16 +75,20 @@ impl OpenRouterProvider {
 
     async fn post(&self, payload: Value) -> Result<Value, ProviderError> {
         let url = build_endpoint_url(&self.host, "api/v1/chat/completions")?;
-        
+
         // Build headers using HeaderBuilder
         let headers = HeaderBuilder::new(self.api_key.clone(), AuthType::Bearer)
-            .add_custom_header("HTTP-Referer".to_string(), "https://block.github.io/goose".to_string())
+            .add_custom_header(
+                "HTTP-Referer".to_string(),
+                "https://block.github.io/goose".to_string(),
+            )
             .add_custom_header("X-Title".to_string(), "Goose".to_string())
             .build();
-        
+
         // Use retry logic for resilience
         retry_with_backoff(&self.retry_config, || async {
-            let response = self.client
+            let response = self
+                .client
                 .post(url.clone())
                 .headers(headers.clone())
                 .json(&payload)
@@ -94,9 +101,9 @@ impl OpenRouterProvider {
             }
 
             // For OpenAI-compatible models, parse the response body to JSON
-            let response_body = handle_response_openai_compat(response)
-                .await
-                .map_err(|e| ProviderError::RequestFailed(format!("Failed to parse response: {e}")))?;
+            let response_body = handle_response_openai_compat(response).await.map_err(|e| {
+                ProviderError::RequestFailed(format!("Failed to parse response: {e}"))
+            })?;
 
             // OpenRouter can return errors in 200 OK responses, so we have to check for errors explicitly
             // https://openrouter.ai/docs/api-reference/errors
@@ -118,7 +125,9 @@ impl OpenRouterProvider {
 
                 // Return appropriate error based on the OpenRouter error code
                 match error_code {
-                    401 | 403 => return Err(ProviderError::Authentication(error_message.to_string())),
+                    401 | 403 => {
+                        return Err(ProviderError::Authentication(error_message.to_string()))
+                    }
                     429 => return Err(ProviderError::RateLimitExceeded(error_message.to_string())),
                     500 | 503 => return Err(ProviderError::ServerError(error_message.to_string())),
                     _ => return Err(ProviderError::RequestFailed(error_message.to_string())),
@@ -127,7 +136,8 @@ impl OpenRouterProvider {
 
             // No error detected, return the response body
             Ok(response_body)
-        }).await
+        })
+        .await
     }
 }
 

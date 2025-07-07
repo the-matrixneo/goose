@@ -204,18 +204,14 @@ impl std::fmt::Display for OpenAIError {
 /// Trait for parsing provider-specific error responses
 pub trait ProviderErrorParser {
     /// Parse an error response into a ProviderError
-    fn parse_error_response(
-        &self,
-        status: StatusCode,
-        response_text: &str,
-    ) -> ProviderError;
-    
+    fn parse_error_response(&self, status: StatusCode, response_text: &str) -> ProviderError;
+
     /// Check if an error indicates context length exceeded
     fn is_context_length_error(&self, response_text: &str) -> bool {
-        response_text.to_lowercase().contains("context") || 
-        response_text.to_lowercase().contains("too long") ||
-        response_text.to_lowercase().contains("too many tokens") ||
-        response_text.to_lowercase().contains("exceeds")
+        response_text.to_lowercase().contains("context")
+            || response_text.to_lowercase().contains("too long")
+            || response_text.to_lowercase().contains("too many tokens")
+            || response_text.to_lowercase().contains("exceeds")
     }
 }
 
@@ -223,20 +219,14 @@ pub trait ProviderErrorParser {
 pub struct DefaultErrorParser;
 
 impl ProviderErrorParser for DefaultErrorParser {
-    fn parse_error_response(
-        &self,
-        status: StatusCode,
-        response_text: &str,
-    ) -> ProviderError {
+    fn parse_error_response(&self, status: StatusCode, response_text: &str) -> ProviderError {
         let error_msg = format!("API error ({}): {}", status, response_text);
-        
+
         match status {
             StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN => {
                 ProviderError::Authentication(error_msg)
             }
-            StatusCode::TOO_MANY_REQUESTS => {
-                ProviderError::RateLimitExceeded(error_msg)
-            }
+            StatusCode::TOO_MANY_REQUESTS => ProviderError::RateLimitExceeded(error_msg),
             StatusCode::BAD_REQUEST => {
                 if self.is_context_length_error(response_text) {
                     ProviderError::ContextLengthExceeded(error_msg)
@@ -244,15 +234,9 @@ impl ProviderErrorParser for DefaultErrorParser {
                     ProviderError::RequestFailed(error_msg)
                 }
             }
-            s if s.is_server_error() => {
-                ProviderError::ServerError(error_msg)
-            }
-            StatusCode::REQUEST_TIMEOUT => {
-                ProviderError::Timeout(408)
-            }
-            _ => {
-                ProviderError::RequestFailed(error_msg)
-            }
+            s if s.is_server_error() => ProviderError::ServerError(error_msg),
+            StatusCode::REQUEST_TIMEOUT => ProviderError::Timeout(408),
+            _ => ProviderError::RequestFailed(error_msg),
         }
     }
 }

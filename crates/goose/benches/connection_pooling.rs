@@ -1,12 +1,12 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
-use goose::providers::provider_common::{get_shared_client, create_provider_client};
-use tokio::runtime::Runtime;
-use std::sync::Arc;
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use goose::providers::provider_common::{create_provider_client, get_shared_client};
 use reqwest::Client;
+use std::sync::Arc;
+use tokio::runtime::Runtime;
 
 fn create_new_clients(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
-    
+
     c.bench_function("create_new_client", |b| {
         b.iter(|| {
             rt.block_on(async {
@@ -18,7 +18,7 @@ fn create_new_clients(c: &mut Criterion) {
 
 fn reuse_shared_client(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
-    
+
     c.bench_function("get_shared_client", |b| {
         b.iter(|| {
             rt.block_on(async {
@@ -30,7 +30,7 @@ fn reuse_shared_client(c: &mut Criterion) {
 
 fn concurrent_requests_new_clients(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
-    
+
     let mut group = c.benchmark_group("concurrent_requests_new");
     for num_requests in [10, 50, 100].iter() {
         group.bench_with_input(
@@ -48,7 +48,7 @@ fn concurrent_requests_new_clients(c: &mut Criterion) {
                                 })
                             })
                             .collect();
-                        
+
                         for task in tasks {
                             task.await.unwrap();
                         }
@@ -62,7 +62,7 @@ fn concurrent_requests_new_clients(c: &mut Criterion) {
 
 fn concurrent_requests_shared_client(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
-    
+
     let mut group = c.benchmark_group("concurrent_requests_shared");
     for num_requests in [10, 50, 100].iter() {
         group.bench_with_input(
@@ -80,7 +80,7 @@ fn concurrent_requests_shared_client(c: &mut Criterion) {
                                 })
                             })
                             .collect();
-                        
+
                         for task in tasks {
                             task.await.unwrap();
                         }

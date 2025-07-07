@@ -3,7 +3,9 @@ use crate::message::Message;
 use crate::model::ModelConfig;
 use crate::providers::base::{ConfigKey, Provider, ProviderMetadata, ProviderUsage};
 use crate::providers::formats::google::{create_request, get_usage, response_to_message};
-use crate::providers::provider_common::{ProviderConfigBuilder, get_shared_client, build_endpoint_url, retry_with_backoff, RetryConfig};
+use crate::providers::provider_common::{
+    build_endpoint_url, get_shared_client, retry_with_backoff, ProviderConfigBuilder, RetryConfig,
+};
 use crate::providers::utils::{
     emit_debug_trace, handle_response_google_compat, unescape_json_values,
 };
@@ -68,14 +70,14 @@ impl Default for GoogleProvider {
 impl GoogleProvider {
     pub fn from_env(model: ModelConfig) -> Result<Self> {
         let config = crate::config::Config::global();
-        let config_builder = ProviderConfigBuilder::new(&config, "GOOGLE");
-        
+        let config_builder = ProviderConfigBuilder::new(config, "GOOGLE");
+
         let api_key = config_builder.get_api_key()?;
         let host = config_builder.get_host(GOOGLE_API_HOST);
-        
+
         // Use shared client for better connection pooling
         let client = get_shared_client();
-        
+
         // Configure retry settings
         let retry_config = RetryConfig::default();
 
@@ -94,10 +96,11 @@ impl GoogleProvider {
             self.model.model_name, self.api_key
         );
         let url = build_endpoint_url(&self.host, &path)?;
-        
+
         // Use retry logic for resilience
         retry_with_backoff(&self.retry_config, || async {
-            let response = self.client
+            let response = self
+                .client
                 .post(url.clone())
                 .header("Content-Type", "application/json")
                 .json(&payload)
@@ -105,7 +108,8 @@ impl GoogleProvider {
                 .await?;
 
             handle_response_google_compat(response).await
-        }).await
+        })
+        .await
     }
 }
 
@@ -162,16 +166,16 @@ impl Provider for GoogleProvider {
         // List models via the v1beta/models endpoint
         let path = format!("v1beta/models?key={}", self.api_key);
         let url = build_endpoint_url(&self.host, &path)?;
-        
+
         let response = self.client.get(url).send().await?;
         let json: serde_json::Value = response.json().await?;
-        
+
         // If 'models' field missing, return None
         let arr = match json.get("models").and_then(|v| v.as_array()) {
             Some(arr) => arr,
             None => return Ok(None),
         };
-        
+
         let mut models: Vec<String> = arr
             .iter()
             .filter_map(|m| m.get("name").and_then(|v| v.as_str()))

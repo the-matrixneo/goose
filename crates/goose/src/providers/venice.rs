@@ -8,7 +8,10 @@ use std::sync::Arc;
 
 use super::base::{ConfigKey, Provider, ProviderMetadata, ProviderUsage, Usage};
 use super::errors::ProviderError;
-use super::provider_common::{AuthType, HeaderBuilder, ProviderConfigBuilder, get_shared_client, build_endpoint_url, retry_with_backoff, RetryConfig};
+use super::provider_common::{
+    build_endpoint_url, get_shared_client, retry_with_backoff, AuthType, HeaderBuilder,
+    ProviderConfigBuilder, RetryConfig,
+};
 use crate::message::{Message, MessageContent};
 use crate::model::ModelConfig;
 use mcp_core::{tool::Tool, Role, ToolCall, ToolResult};
@@ -92,13 +95,15 @@ impl Default for VeniceProvider {
 impl VeniceProvider {
     pub fn from_env(mut model: ModelConfig) -> Result<Self> {
         let config = crate::config::Config::global();
-        let config_builder = ProviderConfigBuilder::new(&config, "VENICE");
-        
+        let config_builder = ProviderConfigBuilder::new(config, "VENICE");
+
         let api_key = config_builder.get_api_key()?;
         let host = config_builder.get_host(VENICE_DEFAULT_HOST);
-        let base_path = config_builder.get_param("BASE_PATH", Some(VENICE_DEFAULT_BASE_PATH))
+        let base_path = config_builder
+            .get_param("BASE_PATH", Some(VENICE_DEFAULT_BASE_PATH))
             .unwrap_or_else(|| VENICE_DEFAULT_BASE_PATH.to_string());
-        let models_path = config_builder.get_param("MODELS_PATH", Some(VENICE_DEFAULT_MODELS_PATH))
+        let models_path = config_builder
+            .get_param("MODELS_PATH", Some(VENICE_DEFAULT_MODELS_PATH))
             .unwrap_or_else(|| VENICE_DEFAULT_MODELS_PATH.to_string());
 
         // Ensure we only keep the bare model id internally
@@ -106,7 +111,7 @@ impl VeniceProvider {
 
         // Use shared client for better connection pooling
         let client = get_shared_client();
-        
+
         // Configure retry settings
         let retry_config = RetryConfig::default();
 
@@ -125,19 +130,19 @@ impl VeniceProvider {
 
     async fn post(&self, path: &str, body: &str) -> Result<Response, ProviderError> {
         let url = build_endpoint_url(&self.host, path)?;
-        
+
         // Build headers using HeaderBuilder
         let headers = HeaderBuilder::new(self.api_key.clone(), AuthType::Bearer).build();
-        
+
         // Choose GET for models endpoint, POST otherwise
         let is_models_endpoint = path.contains("models");
-        
+
         // Use retry logic for resilience
         retry_with_backoff(&self.retry_config, || async {
             // Log the request details
             tracing::debug!("Venice request URL: {}", url);
             tracing::debug!("Venice request body: {}", body);
-            
+
             let response = if is_models_endpoint {
                 tracing::debug!("Using GET method for models endpoint");
                 self.client.get(url.clone())

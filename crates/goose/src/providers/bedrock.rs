@@ -66,7 +66,7 @@ impl BedrockProvider {
                 .provide_credentials(),
         )?;
         let client = Client::new(&sdk_config);
-        
+
         // Configure retry settings for Bedrock's specific requirements
         let retry_config = RetryConfig {
             max_retries: 10,
@@ -75,7 +75,11 @@ impl BedrockProvider {
             backoff_multiplier: 1.5,  // Slower backoff for Bedrock
         };
 
-        Ok(Self { client, model, retry_config })
+        Ok(Self {
+            client,
+            model,
+            retry_config,
+        })
     }
 }
 
@@ -135,7 +139,7 @@ impl Provider for BedrockProvider {
         // Use retry logic for resilience
         retry_with_backoff(&self.retry_config, || async {
             let result = request.clone().send().await;
-            
+
             match result {
                 Ok(response) => {
                     // Successful response, process it and return
@@ -170,47 +174,38 @@ impl Provider for BedrockProvider {
                         )),
                     }
                 }
-                Err(err) => {
-                    match err.into_service_error() {
-                        ConverseError::ThrottlingException(throttle_err) => {
-                            tracing::warn!("Bedrock throttling error: {:?}", throttle_err);
-                            Err(ProviderError::RateLimitExceeded(format!(
-                                "Failed to call Bedrock: {:?}",
-                                throttle_err
-                            )))
-                        }
-                        ConverseError::AccessDeniedException(err) => {
-                            Err(ProviderError::Authentication(format!(
-                                "Failed to call Bedrock: {:?}",
-                                err
-                            )))
-                        }
-                        ConverseError::ValidationException(err)
-                            if err
-                                .message()
-                                .unwrap_or_default()
-                                .contains("Input is too long for requested model.") =>
-                        {
-                            Err(ProviderError::ContextLengthExceeded(format!(
-                                "Failed to call Bedrock: {:?}",
-                                err
-                            )))
-                        }
-                        ConverseError::ModelErrorException(err) => {
-                            Err(ProviderError::ExecutionError(format!(
-                                "Failed to call Bedrock: {:?}",
-                                err
-                            )))
-                        }
-                        err => {
-                            Err(ProviderError::ServerError(format!(
-                                "Failed to call Bedrock: {:?}",
-                                err
-                            )))
-                        }
+                Err(err) => match err.into_service_error() {
+                    ConverseError::ThrottlingException(throttle_err) => {
+                        tracing::warn!("Bedrock throttling error: {:?}", throttle_err);
+                        Err(ProviderError::RateLimitExceeded(format!(
+                            "Failed to call Bedrock: {:?}",
+                            throttle_err
+                        )))
                     }
-                }
+                    ConverseError::AccessDeniedException(err) => Err(
+                        ProviderError::Authentication(format!("Failed to call Bedrock: {:?}", err)),
+                    ),
+                    ConverseError::ValidationException(err)
+                        if err
+                            .message()
+                            .unwrap_or_default()
+                            .contains("Input is too long for requested model.") =>
+                    {
+                        Err(ProviderError::ContextLengthExceeded(format!(
+                            "Failed to call Bedrock: {:?}",
+                            err
+                        )))
+                    }
+                    ConverseError::ModelErrorException(err) => Err(ProviderError::ExecutionError(
+                        format!("Failed to call Bedrock: {:?}", err),
+                    )),
+                    err => Err(ProviderError::ServerError(format!(
+                        "Failed to call Bedrock: {:?}",
+                        err
+                    ))),
+                },
             }
-        }).await
+        })
+        .await
     }
 }

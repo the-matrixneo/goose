@@ -9,7 +9,10 @@ use super::azureauth::AzureAuth;
 use super::base::{ConfigKey, Provider, ProviderMetadata, ProviderUsage, Usage};
 use super::errors::ProviderError;
 use super::formats::openai::{create_request, get_usage, response_to_message};
-use super::provider_common::{AuthType, HeaderBuilder, ProviderConfigBuilder, get_shared_client, retry_with_backoff_and_custom_delay, RetryConfig};
+use super::provider_common::{
+    get_shared_client, retry_with_backoff_and_custom_delay, AuthType, HeaderBuilder,
+    ProviderConfigBuilder, RetryConfig,
+};
 use super::utils::{emit_debug_trace, get_model, handle_response_openai_compat, ImageFormat};
 use crate::message::Message;
 use crate::model::ModelConfig;
@@ -63,13 +66,16 @@ impl Default for AzureProvider {
 impl AzureProvider {
     pub fn from_env(model: ModelConfig) -> Result<Self> {
         let config = crate::config::Config::global();
-        let config_builder = ProviderConfigBuilder::new(&config, "AZURE_OPENAI");
-        
-        let endpoint = config_builder.get_param("ENDPOINT", None)
+        let config_builder = ProviderConfigBuilder::new(config, "AZURE_OPENAI");
+
+        let endpoint = config_builder
+            .get_param("ENDPOINT", None)
             .ok_or_else(|| anyhow::anyhow!("AZURE_OPENAI_ENDPOINT is required"))?;
-        let deployment_name = config_builder.get_param("DEPLOYMENT_NAME", None)
+        let deployment_name = config_builder
+            .get_param("DEPLOYMENT_NAME", None)
             .ok_or_else(|| anyhow::anyhow!("AZURE_OPENAI_DEPLOYMENT_NAME is required"))?;
-        let api_version = config_builder.get_param("API_VERSION", Some(AZURE_DEFAULT_API_VERSION))
+        let api_version = config_builder
+            .get_param("API_VERSION", Some(AZURE_DEFAULT_API_VERSION))
             .unwrap_or_else(|| AZURE_DEFAULT_API_VERSION.to_string());
 
         // Try to get API key first, if not found use Azure credential chain
@@ -78,7 +84,7 @@ impl AzureProvider {
 
         // Use shared client for better connection pooling
         let client = get_shared_client();
-        
+
         // Configure retry settings with Azure's specific requirements
         let retry_config = RetryConfig {
             max_retries: DEFAULT_MAX_RETRIES as u32,
@@ -126,22 +132,27 @@ impl AzureProvider {
                 // Get a fresh auth token for each attempt
                 let auth_token = self.auth.get_token().await.map_err(|e| {
                     tracing::error!("Authentication error: {:?}", e);
-                    ProviderError::RequestFailed(format!("Failed to get authentication token: {}", e))
+                    ProviderError::RequestFailed(format!(
+                        "Failed to get authentication token: {}",
+                        e
+                    ))
                 })?;
 
                 // Build headers using HeaderBuilder
                 let header_builder = match self.auth.credential_type() {
-                    super::azureauth::AzureCredentials::ApiKey(_) => {
-                        HeaderBuilder::new(auth_token.token_value.clone(), AuthType::Custom("api-key".to_string()))
-                    }
+                    super::azureauth::AzureCredentials::ApiKey(_) => HeaderBuilder::new(
+                        auth_token.token_value.clone(),
+                        AuthType::Custom("api-key".to_string()),
+                    ),
                     super::azureauth::AzureCredentials::DefaultCredential => {
                         HeaderBuilder::new(auth_token.token_value.clone(), AuthType::Bearer)
                     }
                 };
 
                 let headers = header_builder.build();
-                
-                let response = self.client
+
+                let response = self
+                    .client
                     .post(base_url.clone())
                     .headers(headers)
                     .json(&payload)
@@ -167,8 +178,9 @@ impl AzureProvider {
                     }
                     _ => None,
                 }
-            }
-        ).await
+            },
+        )
+        .await
     }
 }
 

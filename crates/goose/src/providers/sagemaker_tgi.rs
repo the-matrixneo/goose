@@ -77,7 +77,7 @@ impl SageMakerTgiProvider {
             .build();
 
         let sagemaker_client = SageMakerClient::new(&config_with_timeout);
-        
+
         // Configure retry settings
         let retry_config = RetryConfig::default();
 
@@ -178,7 +178,9 @@ impl SageMakerTgiProvider {
                     let error_msg = format!("SageMaker invoke failed: {}", e);
                     if error_msg.contains("ThrottlingException") {
                         ProviderError::RateLimitExceeded(error_msg)
-                    } else if error_msg.contains("ValidationException") && error_msg.contains("payload size") {
+                    } else if error_msg.contains("ValidationException")
+                        && error_msg.contains("payload size")
+                    {
                         ProviderError::ContextLengthExceeded(error_msg)
                     } else if error_msg.contains("ModelError") {
                         ProviderError::ExecutionError(error_msg)
@@ -198,7 +200,8 @@ impl SageMakerTgiProvider {
             serde_json::from_str(response_text).map_err(|e| {
                 ProviderError::RequestFailed(format!("Failed to parse response JSON: {}", e))
             })
-        }).await
+        })
+        .await
     }
 
     fn parse_tgi_response(&self, response: Value) -> Result<Message, ProviderError> {

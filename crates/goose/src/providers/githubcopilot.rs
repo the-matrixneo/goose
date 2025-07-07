@@ -14,8 +14,8 @@ use std::sync::Arc;
 use super::base::{Provider, ProviderMetadata, ProviderUsage, Usage};
 use super::errors::ProviderError;
 use super::formats::openai::{create_request, get_usage, response_to_message};
-use super::utils::{emit_debug_trace, get_model, handle_response_openai_compat, ImageFormat};
 use super::provider_common::{get_shared_client, retry_with_backoff, RetryConfig};
+use super::utils::{emit_debug_trace, get_model, handle_response_openai_compat, ImageFormat};
 
 use crate::config::{Config, ConfigError};
 use crate::message::Message;
@@ -157,7 +157,7 @@ impl GithubCopilotProvider {
         let (endpoint, token) = self.get_api_info().await?;
         let url = url::Url::parse(&format!("{}/chat/completions", endpoint))
             .map_err(|e| ProviderError::RequestFailed(format!("Invalid base URL: {e}")))?;
-        
+
         // Use retry logic for resilience
         let response = retry_with_backoff(&self.retry_config, || async {
             self.client
@@ -168,7 +168,8 @@ impl GithubCopilotProvider {
                 .send()
                 .await
                 .map_err(|e| ProviderError::RequestFailed(e.to_string()))
-        }).await?;
+        })
+        .await?;
         if stream_only_model {
             let mut collector = OAIStreamCollector::new();
             let mut stream = response.bytes_stream();

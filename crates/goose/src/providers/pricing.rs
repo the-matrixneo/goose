@@ -110,7 +110,11 @@ impl PricingCache {
     }
 
     /// Get pricing for a specific model with active model caching
-    pub async fn get_active_model_pricing(&self, provider: &str, model: &str) -> Option<PricingInfo> {
+    pub async fn get_active_model_pricing(
+        &self,
+        provider: &str,
+        model: &str,
+    ) -> Option<PricingInfo> {
         // Check active model cache first
         {
             let cache = self.active_model_cache.read().await;
@@ -120,7 +124,7 @@ impl PricingCache {
                 }
             }
         }
-        
+
         // Fetch and cache
         if let Some(info) = self.get_model_pricing(provider, model).await {
             let mut cache = self.active_model_cache.write().await;
@@ -330,7 +334,9 @@ pub async fn get_model_pricing(provider: &str, model: &str) -> Option<PricingInf
 
 /// Get pricing for the active model with optimized caching
 pub async fn get_active_model_pricing(provider: &str, model: &str) -> Option<PricingInfo> {
-    PRICING_CACHE.get_active_model_pricing(provider, model).await
+    PRICING_CACHE
+        .get_active_model_pricing(provider, model)
+        .await
 }
 
 /// Force refresh pricing data
