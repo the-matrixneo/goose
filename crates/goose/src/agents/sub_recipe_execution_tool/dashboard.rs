@@ -13,6 +13,7 @@ pub struct TaskDashboard {
     tasks: Arc<RwLock<HashMap<String, TaskInfo>>>,
     last_display: Arc<RwLock<String>>,
     last_refresh: Arc<RwLock<Instant>>,
+    initial_display_shown: Arc<RwLock<bool>>,
 }
 
 impl TaskDashboard {
@@ -39,6 +40,7 @@ impl TaskDashboard {
             tasks: Arc::new(RwLock::new(task_map)),
             last_display: Arc::new(RwLock::new(String::new())),
             last_refresh: Arc::new(RwLock::new(Instant::now())),
+            initial_display_shown: Arc::new(RwLock::new(false)),
         }
     }
 
@@ -94,20 +96,28 @@ impl TaskDashboard {
         let tasks = self.tasks.read().await;
         let mut display = String::new();
 
-        // Clear screen and move to top
-        display.push_str("\x1b[2J\x1b[H");
+        let mut initial_shown = self.initial_display_shown.write().await;
+        if !*initial_shown {
+            // Clear screen and show header only on first display
+            display.push_str("\x1b[2J\x1b[H");
+            display.push_str("🎯 Task Execution Dashboard\n");
+            display.push_str("═══════════════════════════\n\n");
+            *initial_shown = true;
+        } else {
+            // Move cursor to beginning of progress line (line 4)
+            display.push_str("\x1b[4;1H");
+        }
+        drop(initial_shown);
 
-        // Title
-        display.push_str("🎯 Task Execution Dashboard\n");
-        display.push_str("═══════════════════════════\n\n");
-
-        // Summary stats
+        // Summary stats (this line gets updated in-place)
         let (total, pending, running, completed, failed) = count_by_status(&tasks);
-
-        display.push_str(&format!("📊 Progress: {} total | ⏳ {} pending | 🏃 {} running | ✅ {} completed | ❌ {} failed\n\n", 
+        display.push_str(&format!("📊 Progress: {} total | ⏳ {} pending | 🏃 {} running | ✅ {} completed | ❌ {} failed", 
             total, pending, running, completed, failed));
 
-        // Task list
+        // Clear to end of line and add newlines
+        display.push_str("\x1b[K\n\n");
+
+        // Task list (update in-place)
         let mut task_list: Vec<_> = tasks.values().collect();
         task_list.sort_by_key(|t| &t.task.id);
 
@@ -122,9 +132,10 @@ impl TaskDashboard {
             let task_name = get_task_name(task_info);
 
             display.push_str(&format!(
-                "{} {} ({})\n",
+                "{} {} ({})",
                 status_icon, task_name, task_info.task.task_type
             ));
+            display.push_str("\x1b[K\n"); // Clear to end of line
 
             if let Some(start_time) = task_info.start_time {
                 let duration = if let Some(end_time) = task_info.end_time {
@@ -132,23 +143,29 @@ impl TaskDashboard {
                 } else {
                     Instant::now().duration_since(start_time)
                 };
-                display.push_str(&format!("   ⏱️  {:.1}s\n", duration.as_secs_f64()));
+                display.push_str(&format!("   ⏱️  {:.1}s", duration.as_secs_f64()));
+                display.push_str("\x1b[K\n"); // Clear to end of line
             }
 
             if matches!(task_info.status, TaskStatus::Running)
                 && !task_info.current_output.is_empty()
             {
                 let output_preview = truncate_with_ellipsis(&task_info.current_output, 100);
-                display.push_str(&format!("   💬 {}\n", output_preview.replace('\n', " | ")));
+                display.push_str(&format!("   💬 {}", output_preview.replace('\n', " | ")));
+                display.push_str("\x1b[K\n"); // Clear to end of line
             }
 
             if let Some(error) = task_info.error() {
                 let error_preview = truncate_with_ellipsis(error, 80);
-                display.push_str(&format!("   ⚠️  {}\n", error_preview.replace('\n', " ")));
+                display.push_str(&format!("   ⚠️  {}", error_preview.replace('\n', " ")));
+                display.push_str("\x1b[K\n"); // Clear to end of line
             }
 
-            display.push('\n');
+            display.push_str("\x1b[K\n"); // Clear to end of line and add blank line
         }
+
+        // Clear any remaining lines below
+        display.push_str("\x1b[J");
 
         // Only update display if it changed
         let mut last_display = self.last_display.write().await;
