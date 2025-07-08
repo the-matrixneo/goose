@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { IpcRendererEvent } from 'electron';
 import { HashRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { openSharedSessionFromDeepLink, type SessionLinksViewOptions } from './sessionLinks';
@@ -40,7 +40,7 @@ import PermissionSettingsView from './components/settings/permission/PermissionS
 
 import { type SessionDetails } from './sessions';
 import ExtensionsView, { ExtensionsViewOptions } from './components/extensions/ExtensionsView';
-import ProjectsContainer from './components/projects/ProjectsContainer';
+// import ProjectsContainer from './components/projects/ProjectsContainer';
 import RecipesView from './components/RecipesView';
 import RecipeEditor from './components/RecipeEditor';
 
@@ -61,8 +61,8 @@ export type View =
   | 'loading'
   | 'recipeEditor'
   | 'recipes'
-  | 'permission'
-  | 'projects';
+  | 'permission';
+// | 'projects';
 
 export type ViewOptions = {
   // Settings view options
@@ -477,56 +477,56 @@ const ExtensionsRoute = () => {
   );
 };
 
-const ProjectsRoute = () => {
-  const navigate = useNavigate();
-
-  const setView = (view: View, viewOptions?: ViewOptions) => {
-    // Convert view to route navigation
-    switch (view) {
-      case 'chat':
-        navigate('/');
-        break;
-      case 'pair':
-        navigate('/pair', { state: viewOptions });
-        break;
-      case 'settings':
-        navigate('/settings', { state: viewOptions });
-        break;
-      case 'sessions':
-        navigate('/sessions');
-        break;
-      case 'schedules':
-        navigate('/schedules');
-        break;
-      case 'recipes':
-        navigate('/recipes');
-        break;
-      case 'permission':
-        navigate('/permission', { state: viewOptions });
-        break;
-      case 'ConfigureProviders':
-        navigate('/configure-providers');
-        break;
-      case 'sharedSession':
-        navigate('/shared-session', { state: viewOptions });
-        break;
-      case 'recipeEditor':
-        navigate('/recipe-editor', { state: viewOptions });
-        break;
-      case 'welcome':
-        navigate('/welcome');
-        break;
-      default:
-        navigate('/');
-    }
-  };
-
-  return (
-    <React.Suspense fallback={<div>Loading projects...</div>}>
-      <ProjectsContainer setView={setView} />
-    </React.Suspense>
-  );
-};
+// const ProjectsRoute = () => {
+//   const navigate = useNavigate();
+//
+//   const setView = (view: View, viewOptions?: ViewOptions) => {
+//     // Convert view to route navigation
+//     switch (view) {
+//       case 'chat':
+//         navigate('/');
+//         break;
+//       case 'pair':
+//         navigate('/pair', { state: viewOptions });
+//         break;
+//       case 'settings':
+//         navigate('/settings', { state: viewOptions });
+//         break;
+//       case 'sessions':
+//         navigate('/sessions');
+//         break;
+//       case 'schedules':
+//         navigate('/schedules');
+//         break;
+//       case 'recipes':
+//         navigate('/recipes');
+//         break;
+//       case 'permission':
+//         navigate('/permission', { state: viewOptions });
+//         break;
+//       case 'ConfigureProviders':
+//         navigate('/configure-providers');
+//         break;
+//       case 'sharedSession':
+//         navigate('/shared-session', { state: viewOptions });
+//         break;
+//       case 'recipeEditor':
+//         navigate('/recipe-editor', { state: viewOptions });
+//         break;
+//       case 'welcome':
+//         navigate('/welcome');
+//         break;
+//       default:
+//         navigate('/');
+//     }
+//   };
+//
+//   return (
+//     <React.Suspense fallback={<div>Loading projects...</div>}>
+//       <ProjectsContainer setView={setView} />
+//     </React.Suspense>
+//   );
+// };
 
 export default function App() {
   const [fatalError, setFatalError] = useState<string | null>(null);
@@ -1093,14 +1093,14 @@ export default function App() {
               <Route path="permission" element={<PermissionRoute />} />
               <Route path="configure-providers" element={<ConfigureProvidersRoute />} />
               <Route path="welcome" element={<WelcomeRoute />} />
-              <Route
-                path="projects"
-                element={
-                  <ChatProvider chat={chat} setChat={setChat}>
-                    <ProjectsRoute />
-                  </ChatProvider>
-                }
-              />
+              {/*<Route*/}
+              {/*  path="projects"*/}
+              {/*  element={*/}
+              {/*    <ChatProvider chat={chat} setChat={setChat}>*/}
+              {/*      <ProjectsRoute />*/}
+              {/*    </ChatProvider>*/}
+              {/*  }*/}
+              {/*/>*/}
             </Route>
           </Routes>
         </div>

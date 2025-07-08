@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { FileText, Clock, Home, Puzzle, History, FolderKanban } from 'lucide-react';
+import { FileText, Clock, Home, Puzzle, History } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -196,23 +196,23 @@ const AppSidebar: React.FC<SidebarProps> = ({ currentPath }) => {
           {/* Content Group */}
           <SidebarGroup>
             <SidebarGroupContent className="space-y-1">
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.35 }}
-              >
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    onClick={() => navigate('/projects')}
-                    isActive={isActivePath('/projects')}
-                    tooltip="Manage your projects"
-                    className="w-full justify-start px-3 rounded-lg h-fit hover:bg-background-medium/50 transition-all duration-200 data-[active=true]:bg-background-medium"
-                  >
-                    <FolderKanban className="w-4 h-4" />
-                    <span>Projects</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </motion.div>
+              {/*<motion.div*/}
+              {/*  initial={{ opacity: 0, x: 20 }}*/}
+              {/*  animate={{ opacity: 1, x: 0 }}*/}
+              {/*  transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.35 }}*/}
+              {/*>*/}
+              {/*  <SidebarMenuItem>*/}
+              {/*    <SidebarMenuButton*/}
+              {/*      onClick={() => navigate('/projects')}*/}
+              {/*      isActive={isActivePath('/projects')}*/}
+              {/*      tooltip="Manage your projects"*/}
+              {/*      className="w-full justify-start px-3 rounded-lg h-fit hover:bg-background-medium/50 transition-all duration-200 data-[active=true]:bg-background-medium"*/}
+              {/*    >*/}
+              {/*      <FolderKanban className="w-4 h-4" />*/}
+              {/*      <span>Projects</span>*/}
+              {/*    </SidebarMenuButton>*/}
+              {/*  </SidebarMenuItem>*/}
+              {/*</motion.div>*/}
 
               <motion.div
                 initial={{ opacity: 0, x: 20 }}
