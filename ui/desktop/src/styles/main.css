@@ -413,6 +413,18 @@
   }
 }
 
+@keyframes wind {
+  0% {
+    transform: translate(0, 0);
+  }
+  99.99% {
+    transform: translate(-100%, 100%);
+  }
+  100% {
+    transform: translate(0, 0);
+  }
+}
+
 /* Toast close button styling */
 .Toastify__close-button {
   color: var(--text-prominent-inverse) !important;
