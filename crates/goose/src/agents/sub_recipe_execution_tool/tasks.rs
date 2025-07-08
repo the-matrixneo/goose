@@ -7,12 +7,10 @@ use tokio::time::timeout;
 
 use crate::agents::sub_recipe_execution_tool::types::{Task, TaskResult};
 
-// Process a single task based on its type
 pub async fn process_task(task: &Task, timeout_seconds: u64) -> TaskResult {
     let task_clone = task.clone();
     let timeout_duration = Duration::from_secs(timeout_seconds);
 
-    // Execute with timeout
     match timeout(timeout_duration, execute_task(task_clone)).await {
         Ok(Ok(data)) => TaskResult {
             task_id: task.id.clone(),
@@ -36,6 +34,17 @@ pub async fn process_task(task: &Task, timeout_seconds: u64) -> TaskResult {
 }
 
 async fn execute_task(task: Task) -> Result<Value, String> {
+    let (command, output_identifier) = build_command(&task)?;
+    let (stdout_output, stderr_output, success) = run_command(command, &output_identifier).await?;
+    
+    if success {
+        process_output(stdout_output)
+    } else {
+        Err(format!("Command failed:\n{}", stderr_output))
+    }
+}
+
+fn build_command(task: &Task) -> Result<(Command, String), String> {
     let mut output_identifier = task.id.clone();
     let mut command = if task.task_type == "sub_recipe" {
         let sub_recipe = task.payload.get("sub_recipe").unwrap();
@@ -66,11 +75,12 @@ async fn execute_task(task: Task) -> Result<Value, String> {
         cmd
     };
 
-    // Configure to capture stdout
     command.stdout(Stdio::piped());
     command.stderr(Stdio::piped());
+    Ok((command, output_identifier))
+}
 
-    // Spawn the child process
+async fn run_command(mut command: Command, output_identifier: &str) -> Result<(String, String, bool), String> {
     let mut child = command
         .spawn()
         .map_err(|e| format!("Failed to spawn goose: {}", e))?;
@@ -78,30 +88,8 @@ async fn execute_task(task: Task) -> Result<Value, String> {
     let stdout = child.stdout.take().expect("Failed to capture stdout");
     let stderr = child.stderr.take().expect("Failed to capture stderr");
 
-    let mut stdout_reader = BufReader::new(stdout).lines();
-    let mut stderr_reader = BufReader::new(stderr).lines();
-
-    // Spawn background tasks to read from stdout and stderr
-    let output_identifier_clone = output_identifier.clone();
-    let stdout_task = tokio::spawn(async move {
-        let mut buffer = String::new();
-        while let Ok(Some(line)) = stdout_reader.next_line().await {
-            println!("[{}] {}", output_identifier_clone, line);
-            buffer.push_str(&line);
-            buffer.push('\n');
-        }
-        buffer
-    });
-
-    let stderr_task = tokio::spawn(async move {
-        let mut buffer = String::new();
-        while let Ok(Some(line)) = stderr_reader.next_line().await {
-            eprintln!("[stderr for {}] {}", output_identifier, line);
-            buffer.push_str(&line);
-            buffer.push('\n');
-        }
-        buffer
-    });
+    let stdout_task = spawn_output_reader(stdout, output_identifier, false);
+    let stderr_task = spawn_output_reader(stderr, output_identifier, true);
 
     let status = child
         .wait()
@@ -111,9 +99,46 @@ async fn execute_task(task: Task) -> Result<Value, String> {
     let stdout_output = stdout_task.await.unwrap();
     let stderr_output = stderr_task.await.unwrap();
 
-    if status.success() {
-        Ok(Value::String(stdout_output))
-    } else {
-        Err(format!("Command failed:\n{}", stderr_output))
+    Ok((stdout_output, stderr_output, status.success()))
+}
+
+fn spawn_output_reader(
+    reader: impl tokio::io::AsyncRead + Unpin + Send + 'static,
+    output_identifier: &str,
+    is_stderr: bool,
+) -> tokio::task::JoinHandle<String> {
+    let output_identifier = output_identifier.to_string();
+    tokio::spawn(async move {
+        let mut buffer = String::new();
+        let mut lines = BufReader::new(reader).lines();
+        while let Ok(Some(line)) = lines.next_line().await {
+            if is_stderr {
+                eprintln!("[stderr for {}] {}", output_identifier, line);
+            } else {
+                println!("[{}] {}", output_identifier, line);
+            }
+            buffer.push_str(&line);
+            buffer.push('\n');
+        }
+        buffer
+    })
+}
+
+fn process_output(stdout_output: String) -> Result<Value, String> {
+    let last_line = stdout_output
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .last()
+        .unwrap_or("");
+    
+    if let (Some(start), Some(end)) = (last_line.find('{'), last_line.rfind('}')) {
+        if start < end {
+            let potential_json = &last_line[start..=end];
+            
+            if serde_json::from_str::<Value>(potential_json).is_ok() {
+                return Ok(Value::String(potential_json.to_string()));
+            }
+        }
     }
+    Ok(Value::String(stdout_output))
 }
