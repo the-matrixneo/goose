@@ -38,6 +38,7 @@ interface ModeSelectionItemProps {
   showDescription: boolean;
   isApproveModeConfigure: boolean;
   parentView: View;
+  parentViewOptions?: ViewOptions;
   setView: (view: View, viewOptions?: ViewOptions) => void;
   handleModeChange: (newMode: string) => void;
 }
@@ -48,11 +49,12 @@ export function ModeSelectionItem({
   showDescription,
   isApproveModeConfigure,
   parentView,
+  parentViewOptions,
   setView,
   handleModeChange,
 }: ModeSelectionItemProps) {
   const [checked, setChecked] = useState(currentMode == mode.key);
-  const [isDislogOpen, setIsDislogOpen] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   useEffect(() => {
     setChecked(currentMode === mode.key);
@@ -79,6 +81,7 @@ export function ModeSelectionItem({
               onClick={() => {
                 setView('permission', {
                   parentView,
+                  parentViewOptions,
                 });
               }}
             >
@@ -103,10 +106,10 @@ export function ModeSelectionItem({
       </div>
       <div>
         <div>
-          {isDislogOpen ? (
+          {isDialogOpen ? (
             <ConfigureApproveMode
               onClose={() => {
-                setIsDislogOpen(false);
+                setIsDialogOpen(false);
               }}
               handleModeChange={handleModeChange}
               currentMode={currentMode}

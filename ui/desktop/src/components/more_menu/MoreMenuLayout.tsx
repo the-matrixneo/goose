@@ -21,10 +21,7 @@ export default function MoreMenuLayout({
   const safeIsMacOS = (window?.electron?.platform || 'darwin') === 'darwin';
 
   return (
-    <div
-      className="relative flex items-center h-14 border-b border-borderSubtle w-full"
-      style={{ WebkitAppRegion: 'drag' }}
-    >
+    <div className="relative flex items-center h-14 w-full" style={{ WebkitAppRegion: 'drag' }}>
       {showMenu && (
         <div
           className={`flex items-center justify-between w-full h-full ${safeIsMacOS ? 'pl-[86px]' : 'pl-[8px]'} pr-4`}

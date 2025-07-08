@@ -324,11 +324,12 @@ const PermissionRoute = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const parentView = location.state?.parentView as View;
+  const parentViewOptions = location.state?.parentViewOptions as ViewOptions;
 
   return (
     <PermissionSettingsView
       onClose={() => {
-        // Navigate back to parent view
+        // Navigate back to parent view with options
         switch (parentView) {
           case 'chat':
             navigate('/');
@@ -337,7 +338,7 @@ const PermissionRoute = () => {
             navigate('/pair');
             break;
           case 'settings':
-            navigate('/settings');
+            navigate('/settings', { state: parentViewOptions });
             break;
           case 'sessions':
             navigate('/sessions');

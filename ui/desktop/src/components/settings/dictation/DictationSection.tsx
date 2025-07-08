@@ -179,7 +179,7 @@ export default function DictationSection() {
               </button>
 
               {showProviderDropdown && (
-                <div className="absolute right-0 mt-1 w-48 bg-bgApp border border-borderStandard rounded-md shadow-lg z-10">
+                <div className="absolute right-0 mt-1 w-48 bg-background-default border border-borderStandard rounded-md shadow-lg z-10">
                   <button
                     onClick={() => handleProviderChange('openai')}
                     disabled={!hasOpenAIKey}

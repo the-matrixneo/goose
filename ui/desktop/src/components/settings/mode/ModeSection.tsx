@@ -69,6 +69,7 @@ export const ModeSection = ({ setView }: ModeSectionProps) => {
           showDescription={true}
           isApproveModeConfigure={false}
           parentView="settings"
+          parentViewOptions={{ section: 'chat' }}
           setView={setView}
           handleModeChange={handleModeChange}
         />

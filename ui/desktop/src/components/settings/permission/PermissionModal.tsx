@@ -138,7 +138,7 @@ export default function PermissionModal({ extensionName, onClose }: PermissionMo
                       <ChevronDownIcon className="ml-2 h-4 w-4" />
                     </DropdownMenu.Trigger>
                     <DropdownMenu.Portal>
-                      <DropdownMenu.Content className="bg-white dark:bg-bgProminent rounded-lg shadow-md">
+                      <DropdownMenu.Content className="bg-white dark:bg-bgProminent z-50 rounded-lg shadow-md">
                         {permissionOptions.map((option) => (
                           <DropdownMenu.Item
                             key={option.value}

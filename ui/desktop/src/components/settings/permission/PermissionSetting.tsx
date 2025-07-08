@@ -77,7 +77,7 @@ export default function PermissionSettingsView({ onClose }: { onClose: () => voi
   }, []);
 
   return (
-    <div className="h-screen w-full animate-[fadein_200ms_ease-in_forwards]">
+    <div className="bg-background-default h-screen w-full animate-[fadein_200ms_ease-in_forwards]">
       <MoreMenuLayout showMenu={false} />
 
       <ScrollArea className="h-full w-full">

@@ -67,6 +67,7 @@ export const BottomMenuModeSelection = ({ setView }: BottomMenuModeSelectionProp
               showDescription={false}
               isApproveModeConfigure={false}
               parentView="chat"
+              parentViewOptions={undefined}
               setView={setView}
               handleModeChange={handleModeChange}
             />
