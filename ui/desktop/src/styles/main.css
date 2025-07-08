@@ -84,7 +84,7 @@
 
   --ring: var(--border-strong);
 
-  --sidebar: var(--background-default);
+  --sidebar: var(--background-muted);
   --sidebar-foreground: var(--text-default);
   --sidebar-primary: var(--background-accent);
   --sidebar-primary-foreground: var(--text-inverse);
@@ -138,7 +138,7 @@
 
   --ring: var(--border-strong);
 
-  --sidebar: var(--background-default);
+  --sidebar: var(--background-muted);
   --sidebar-foreground: var(--text-default);
   --sidebar-primary: var(--background-accent);
   --sidebar-primary-foreground: var(--text-inverse);
