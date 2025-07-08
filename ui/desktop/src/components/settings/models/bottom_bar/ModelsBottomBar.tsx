@@ -63,9 +63,7 @@ export default function ModelsBottomBar({ dropdownRef, setView, alerts }: Models
 
   return (
     <div className="relative flex items-center" ref={dropdownRef}>
-      <div>
-        <BottomMenuAlertPopover alerts={alerts} />
-      </div>
+      <BottomMenuAlertPopover alerts={alerts} />
       <DropdownMenu>
         <DropdownMenuTrigger className="flex items-center hover:cursor-pointer max-w-[180px] md:max-w-[200px] lg:max-w-[380px] min-w-0 group hover:text-textStandard transition-colors">
           <span className="truncate text-text-default/70 hover:text-text-default hover:scale-100 hover:bg-transparent text-xs max-w-[130px] md:max-w-[200px] lg:max-w-[360px] min-w-0 block">
