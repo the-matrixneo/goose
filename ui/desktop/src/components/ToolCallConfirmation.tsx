@@ -59,12 +59,12 @@ export default function ToolConfirmation({
   }
 
   return isCancelledMessage ? (
-    <div className="goose-message-content bg-bgSubtle rounded-2xl px-4 py-2 text-textStandard">
+    <div className="goose-message-content bg-background-muted rounded-2xl px-4 py-2 text-textStandard">
       Tool call confirmation is cancelled.
     </div>
   ) : (
     <>
-      <div className="goose-message-content bg-bgSubtle rounded-2xl px-4 py-2 rounded-b-none text-textStandard">
+      <div className="goose-message-content bg-background-muted rounded-2xl px-4 py-2 rounded-b-none text-textStandard">
         Goose would like to call the above tool. Allow?
       </div>
       {clicked ? (
@@ -120,20 +120,19 @@ export default function ToolConfirmation({
         </div>
       ) : (
         <div className="goose-message-tool bg-background-default border border-borderSubtle dark:border-gray-700 rounded-b-2xl px-4 pt-2 pb-2 flex gap-2 items-center">
-          <Button
-            className="bg-black text-white dark:bg-white dark:text-black rounded-full px-6 py-2 transition"
-            onClick={() => handleButtonClick(ALWAYS_ALLOW)}
-          >
+          <Button className="rounded-full" onClick={() => handleButtonClick(ALWAYS_ALLOW)}>
             Always Allow
           </Button>
           <Button
-            className="bg-bgProminent text-white dark:text-white rounded-full px-6 py-2 transition"
+            className="rounded-full"
+            variant="secondary"
             onClick={() => handleButtonClick(ALLOW_ONCE)}
           >
             Allow Once
           </Button>
           <Button
-            className="bg-white text-black dark:bg-black dark:text-white border border-gray-300 dark:border-gray-700 rounded-full px-6 py-2 transition"
+            className="rounded-full"
+            variant="outline"
             onClick={() => handleButtonClick(DENY)}
           >
             Deny
