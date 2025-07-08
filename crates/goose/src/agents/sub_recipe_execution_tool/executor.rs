@@ -4,9 +4,11 @@ use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio::time::Instant;
 
-use crate::agents::sub_recipe_execution_tool::dashboard::{DisplayMode, TaskDashboard};
 use crate::agents::sub_recipe_execution_tool::lib::{
     Config, ExecutionResponse, ExecutionStats, SharedState, Task, TaskResult, TaskStatus,
+};
+use crate::agents::sub_recipe_execution_tool::task_execution_tracker::{
+    DisplayMode, TaskExecutionTracker,
 };
 use crate::agents::sub_recipe_execution_tool::tasks::process_task;
 use crate::agents::sub_recipe_execution_tool::workers::spawn_worker;
@@ -19,12 +21,12 @@ pub async fn execute_single_task(
     notifier: mpsc::Sender<JsonRpcMessage>,
 ) -> ExecutionResponse {
     let start_time = Instant::now();
-    let dashboard = Arc::new(TaskDashboard::new(
+    let task_execution_tracker = Arc::new(TaskExecutionTracker::new(
         vec![task.clone()],
         DisplayMode::SingleTaskOutput,
         notifier,
     ));
-    let result = process_task(task, config.timeout_seconds, dashboard).await;
+    let result = process_task(task, config.timeout_seconds, task_execution_tracker).await;
     let execution_time = start_time.elapsed().as_millis();
     let stats = calculate_stats(&[result.clone()], execution_time);
 
@@ -40,9 +42,9 @@ pub async fn execute_tasks_in_parallel(
     config: Config,
     notifier: mpsc::Sender<JsonRpcMessage>,
 ) -> ExecutionResponse {
-    let dashboard = Arc::new(TaskDashboard::new(
+    let task_execution_tracker = Arc::new(TaskExecutionTracker::new(
         tasks.clone(),
-        DisplayMode::Dashboard,
+        DisplayMode::MultipleTasksOutput,
         notifier,
     ));
     let start_time = Instant::now();
@@ -52,7 +54,7 @@ pub async fn execute_tasks_in_parallel(
         return create_empty_response();
     }
 
-    dashboard.refresh_display().await;
+    task_execution_tracker.refresh_display().await;
 
     let (task_tx, task_rx, result_tx, mut result_rx) = create_channels(task_count);
 
@@ -61,7 +63,7 @@ pub async fn execute_tasks_in_parallel(
         return create_error_response(e);
     }
 
-    let shared_state = create_shared_state(task_rx, result_tx, dashboard.clone());
+    let shared_state = create_shared_state(task_rx, result_tx, task_execution_tracker.clone());
 
     // Simple static worker allocation - no dynamic scaling needed
     let worker_count = std::cmp::min(task_count, config.max_workers);
@@ -71,7 +73,7 @@ pub async fn execute_tasks_in_parallel(
         worker_handles.push(handle);
     }
 
-    let results = collect_results(&mut result_rx, dashboard.clone(), task_count).await;
+    let results = collect_results(&mut result_rx, task_execution_tracker.clone(), task_count).await;
 
     for handle in worker_handles {
         if let Err(e) = handle.await {
@@ -79,7 +81,7 @@ pub async fn execute_tasks_in_parallel(
         }
     }
 
-    dashboard.show_final_summary().await;
+    task_execution_tracker.send_tasks_complete().await;
 
     let execution_time = start_time.elapsed().as_millis();
     let stats = calculate_stats(&results, execution_time);
@@ -125,13 +127,13 @@ fn create_channels(
 fn create_shared_state(
     task_rx: mpsc::Receiver<Task>,
     result_tx: mpsc::Sender<TaskResult>,
-    dashboard: Arc<TaskDashboard>,
+    task_execution_tracker: Arc<TaskExecutionTracker>,
 ) -> Arc<SharedState> {
     Arc::new(SharedState {
         task_receiver: Arc::new(tokio::sync::Mutex::new(task_rx)),
         result_sender: result_tx,
         active_workers: Arc::new(AtomicUsize::new(0)),
-        dashboard,
+        task_execution_tracker,
     })
 }
 
@@ -163,12 +165,12 @@ fn create_empty_response() -> ExecutionResponse {
 
 async fn collect_results(
     result_rx: &mut mpsc::Receiver<TaskResult>,
-    dashboard: Arc<TaskDashboard>,
+    task_execution_tracker: Arc<TaskExecutionTracker>,
     expected_count: usize,
 ) -> Vec<TaskResult> {
     let mut results = Vec::new();
     while let Some(result) = result_rx.recv().await {
-        dashboard
+        task_execution_tracker
             .complete_task(&result.task_id, result.clone())
             .await;
         results.push(result);

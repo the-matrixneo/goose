@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use tokio::sync::mpsc;
 
-use crate::agents::sub_recipe_execution_tool::dashboard::TaskDashboard;
+use crate::agents::sub_recipe_execution_tool::task_execution_tracker::TaskExecutionTracker;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Task {
@@ -93,7 +93,7 @@ pub struct SharedState {
     pub task_receiver: Arc<tokio::sync::Mutex<mpsc::Receiver<Task>>>,
     pub result_sender: mpsc::Sender<TaskResult>,
     pub active_workers: Arc<AtomicUsize>,
-    pub dashboard: Arc<TaskDashboard>,
+    pub task_execution_tracker: Arc<TaskExecutionTracker>,
 }
 
 impl SharedState {

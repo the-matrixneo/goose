@@ -21,8 +21,9 @@ pub fn spawn_worker(
 
 async fn worker_loop(state: Arc<SharedState>, _worker_id: usize, timeout_seconds: u64) {
     while let Some(task) = receive_task(&state).await {
-        state.dashboard.start_task(&task.id).await;
-        let result = process_task(&task, timeout_seconds, state.dashboard.clone()).await;
+        state.task_execution_tracker.start_task(&task.id).await;
+        let result =
+            process_task(&task, timeout_seconds, state.task_execution_tracker.clone()).await;
 
         if let Err(e) = state.result_sender.send(result).await {
             eprintln!("Worker failed to send result: {}", e);

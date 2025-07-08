@@ -6,18 +6,23 @@ use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 use tokio::time::timeout;
 
-use crate::agents::sub_recipe_execution_tool::dashboard::TaskDashboard;
+use crate::agents::sub_recipe_execution_tool::task_execution_tracker::TaskExecutionTracker;
 use crate::agents::sub_recipe_execution_tool::types::{Task, TaskResult, TaskStatus};
 
 pub async fn process_task(
     task: &Task,
     timeout_seconds: u64,
-    dashboard: Arc<TaskDashboard>,
+    task_execution_tracker: Arc<TaskExecutionTracker>,
 ) -> TaskResult {
     let task_clone = task.clone();
     let timeout_duration = Duration::from_secs(timeout_seconds);
 
-    match timeout(timeout_duration, get_task_result(task_clone, dashboard)).await {
+    match timeout(
+        timeout_duration,
+        get_task_result(task_clone, task_execution_tracker),
+    )
+    .await
+    {
         Ok(Ok(data)) => TaskResult {
             task_id: task.id.clone(),
             status: TaskStatus::Completed,
@@ -39,10 +44,18 @@ pub async fn process_task(
     }
 }
 
-async fn get_task_result(task: Task, dashboard: Arc<TaskDashboard>) -> Result<Value, String> {
+async fn get_task_result(
+    task: Task,
+    task_execution_tracker: Arc<TaskExecutionTracker>,
+) -> Result<Value, String> {
     let (command, output_identifier) = build_command(&task)?;
-    let (stdout_output, stderr_output, success) =
-        run_command(command, &output_identifier, &task.id, dashboard).await?;
+    let (stdout_output, stderr_output, success) = run_command(
+        command,
+        &output_identifier,
+        &task.id,
+        task_execution_tracker,
+    )
+    .await?;
 
     if success {
         process_output(stdout_output)
@@ -93,7 +106,7 @@ async fn run_command(
     mut command: Command,
     output_identifier: &str,
     task_id: &str,
-    dashboard: Arc<TaskDashboard>,
+    task_execution_tracker: Arc<TaskExecutionTracker>,
 ) -> Result<(String, String, bool), String> {
     let mut child = command
         .spawn()
@@ -102,10 +115,20 @@ async fn run_command(
     let stdout = child.stdout.take().expect("Failed to capture stdout");
     let stderr = child.stderr.take().expect("Failed to capture stderr");
 
-    let stdout_task =
-        spawn_output_reader(stdout, output_identifier, false, task_id, dashboard.clone());
-    let stderr_task =
-        spawn_output_reader(stderr, output_identifier, true, task_id, dashboard.clone());
+    let stdout_task = spawn_output_reader(
+        stdout,
+        output_identifier,
+        false,
+        task_id,
+        task_execution_tracker.clone(),
+    );
+    let stderr_task = spawn_output_reader(
+        stderr,
+        output_identifier,
+        true,
+        task_id,
+        task_execution_tracker.clone(),
+    );
 
     let status = child
         .wait()
@@ -123,7 +146,7 @@ fn spawn_output_reader(
     output_identifier: &str,
     is_stderr: bool,
     task_id: &str,
-    dashboard: Arc<TaskDashboard>,
+    task_execution_tracker: Arc<TaskExecutionTracker>,
 ) -> tokio::task::JoinHandle<String> {
     let output_identifier = output_identifier.to_string();
     let task_id = task_id.to_string();
@@ -136,7 +159,9 @@ fn spawn_output_reader(
 
             if !is_stderr {
                 // Use dashboard's smart output handling based on display mode
-                dashboard.send_live_output(&task_id, &line).await;
+                task_execution_tracker
+                    .send_live_output(&task_id, &line)
+                    .await;
             } else {
                 eprintln!("[stderr for {}] {}", output_identifier, line);
             }
