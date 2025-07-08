@@ -1,3 +1,4 @@
+use serde_json::{Map, Value};
 use std::collections::HashMap;
 use tokio::time::Instant;
 
@@ -10,17 +11,14 @@ const ERROR_PREVIEW_LENGTH: usize = 80;
 const CLEAR_TO_EOL: &str = "\x1b[K";
 
 pub fn get_task_name(task_info: &TaskInfo) -> &str {
-    if task_info.task.task_type == "sub_recipe" {
-        task_info
-            .task
-            .payload
-            .get("sub_recipe")
-            .and_then(|sr| sr.get("name"))
-            .and_then(|n| n.as_str())
-            .unwrap_or(&task_info.task.id)
-    } else {
-        &task_info.task.id
-    }
+    task_info
+        .task
+        .get_sub_recipe_name()
+        .unwrap_or(&task_info.task.id)
+}
+
+pub fn get_command_parameters(task_info: &TaskInfo) -> Option<&Map<String, Value>> {
+    task_info.task.get_command_parameters()
 }
 
 pub fn truncate_with_ellipsis(text: &str, max_len: usize) -> String {
@@ -68,9 +66,7 @@ pub fn strip_ansi_codes(text: &str) -> String {
     result
 }
 
-// Pure utility functions for dashboard rendering
 
-/// Get status icon for a given task status
 pub fn get_status_icon(status: &TaskStatus) -> &'static str {
     match status {
         TaskStatus::Pending => "⏳",
@@ -80,7 +76,6 @@ pub fn get_status_icon(status: &TaskStatus) -> &'static str {
     }
 }
 
-/// Process output lines, keeping only recent lines and stripping ANSI codes
 pub fn process_output_lines(output: &str) -> String {
     let lines: Vec<&str> = output.lines().collect();
     let recent_lines = if lines.len() > MAX_OUTPUT_LINES {
@@ -139,7 +134,29 @@ pub fn format_task_error(task_info: &TaskInfo) -> Option<String> {
     })
 }
 
-/// Format complete task display
+pub fn format_command_parameters(task_info: &TaskInfo) -> Option<String> {
+    get_command_parameters(task_info).map(|params| {
+        if params.is_empty() {
+            return format!("   📋 Parameters: (none){}\n", CLEAR_TO_EOL);
+        }
+
+        let params_str = params
+            .iter()
+            .map(|(key, value)| {
+                let value_str = match value {
+                    Value::String(s) => s.clone(),
+                    _ => value.to_string(),
+                };
+                format!("{}={}", key, value_str)
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        let params_preview = truncate_with_ellipsis(&params_str, OUTPUT_PREVIEW_LENGTH);
+        format!("   📋 Parameters: {}{}\n", params_preview, CLEAR_TO_EOL)
+    })
+}
+
 pub fn format_task_display(task_info: &TaskInfo, current_time: Instant) -> String {
     let mut display = String::new();
 
@@ -153,12 +170,14 @@ pub fn format_task_display(task_info: &TaskInfo, current_time: Instant) -> Strin
         status_icon, task_name, task_info.task.task_type, CLEAR_TO_EOL
     ));
 
-    // Task timing
+    if let Some(params) = format_command_parameters(task_info) {
+        display.push_str(&params);
+    }
+
     if let Some(timing) = format_task_timing(task_info, current_time) {
         display.push_str(&timing);
     }
 
-    // Task output (if running)
     if let Some(output) = format_task_output(task_info) {
         display.push_str(&output);
     }
@@ -168,7 +187,6 @@ pub fn format_task_display(task_info: &TaskInfo, current_time: Instant) -> Strin
         display.push_str(&error);
     }
 
-    // Empty line
     display.push_str(&format!(
         "{}
 ",

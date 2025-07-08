@@ -58,29 +58,31 @@ async fn execute_task(task: Task, dashboard: Option<Arc<TaskDashboard>>) -> Resu
 fn build_command(task: &Task) -> Result<(Command, String), String> {
     let mut output_identifier = task.id.clone();
     let mut command = if task.task_type == "sub_recipe" {
-        let sub_recipe = task.payload.get("sub_recipe").unwrap();
-        let sub_recipe_name = sub_recipe.get("name").unwrap().as_str().unwrap();
-        let path = sub_recipe.get("recipe_path").unwrap().as_str().unwrap();
-        let command_parameters = sub_recipe.get("command_parameters").unwrap();
+        let sub_recipe_name = task
+            .get_sub_recipe_name()
+            .ok_or("Missing sub_recipe name")?;
+        let path = task
+            .get_sub_recipe_path()
+            .ok_or("Missing sub_recipe path")?;
+        let command_parameters = task
+            .get_command_parameters()
+            .ok_or("Missing command_parameters")?;
+
         output_identifier = format!("sub-recipe {}", sub_recipe_name);
         let mut cmd = Command::new("goose");
         cmd.arg("run").arg("--recipe").arg(path);
-        if let Some(params_map) = command_parameters.as_object() {
-            for (key, value) in params_map {
-                let key_str = key.to_string();
-                let value_str = value.as_str().unwrap_or(&value.to_string()).to_string();
-                cmd.arg("--params")
-                    .arg(format!("{}={}", key_str, value_str));
-            }
+
+        for (key, value) in command_parameters {
+            let key_str = key.to_string();
+            let value_str = value.as_str().unwrap_or(&value.to_string()).to_string();
+            cmd.arg("--params")
+                .arg(format!("{}={}", key_str, value_str));
         }
         cmd
     } else {
         let text = task
-            .payload
-            .get("text_instruction")
-            .unwrap()
-            .as_str()
-            .unwrap();
+            .get_text_instruction()
+            .ok_or("Missing text_instruction")?;
         let mut cmd = Command::new("goose");
         cmd.arg("run").arg("--text").arg(text);
         cmd

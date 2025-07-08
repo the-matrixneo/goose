@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{Map, Value};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use tokio::sync::mpsc;
@@ -11,6 +11,44 @@ pub struct Task {
     pub id: String,
     pub task_type: String,
     pub payload: Value,
+}
+
+impl Task {
+    pub fn get_sub_recipe(&self) -> Option<&Map<String, Value>> {
+        if self.task_type == "sub_recipe" {
+            self.payload.get("sub_recipe").and_then(|sr| sr.as_object())
+        } else {
+            None
+        }
+    }
+
+    pub fn get_command_parameters(&self) -> Option<&Map<String, Value>> {
+        self.get_sub_recipe()
+            .and_then(|sr| sr.get("command_parameters"))
+            .and_then(|cp| cp.as_object())
+    }
+
+    pub fn get_sub_recipe_name(&self) -> Option<&str> {
+        self.get_sub_recipe()
+            .and_then(|sr| sr.get("name"))
+            .and_then(|name| name.as_str())
+    }
+
+    pub fn get_sub_recipe_path(&self) -> Option<&str> {
+        self.get_sub_recipe()
+            .and_then(|sr| sr.get("recipe_path"))
+            .and_then(|path| path.as_str())
+    }
+
+    pub fn get_text_instruction(&self) -> Option<&str> {
+        if self.task_type != "sub_recipe" {
+            self.payload
+                .get("text_instruction")
+                .and_then(|text| text.as_str())
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
