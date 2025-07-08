@@ -2,17 +2,21 @@ import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { Button } from './ui/button';
 import type { View } from '../App';
 import Stop from './ui/Stop';
-import { Attach, Send, Close } from './icons';
+import { Attach, Send, Close, Microphone } from './icons';
 import { debounce } from 'lodash';
 import { LocalMessageStorage } from '../utils/localMessageStorage';
 import { Message } from '../types/message';
 import { DirSwitcher } from './bottom_menu/DirSwitcher';
-import BottomMenuAlertPopover from './bottom_menu/BottomMenuAlertPopover';
+// import BottomMenuAlertPopover from './bottom_menu/BottomMenuAlertPopover';
 import ModelsBottomBar from './settings/models/bottom_bar/ModelsBottomBar';
 import { BottomMenuModeSelection } from './bottom_menu/BottomMenuModeSelection';
 import { ManualSummarizeButton } from './context_management/ManualSummaryButton';
-import { useAlerts } from './alerts';
-import { useToolCount } from './alerts/useToolCount';
+// import { useAlerts } from './alerts';
+// import { useToolCount } from './alerts/useToolCount';
+import { useWhisper } from '../hooks/useWhisper';
+import { WaveformVisualizer } from './WaveformVisualizer';
+import { toastError } from '../toasts';
+import MentionPopover, { FileItemWithMatch } from './MentionPopover';
 
 interface PastedImage {
   id: string;
@@ -35,9 +39,18 @@ interface ChatInputProps {
   droppedFiles?: string[];
   setView: (view: View) => void;
   numTokens?: number;
+  // inputTokens?: number;
+  // outputTokens?: number;
   hasMessages?: boolean;
   messages?: Message[];
   setMessages: (messages: Message[]) => void;
+  // sessionCosts?: {
+  //   [key: string]: {
+  //     inputTokens: number;
+  //     outputTokens: number;
+  //     totalCost: number;
+  //   };
+  // };
   disableAnimation?: boolean;
 }
 
@@ -49,19 +62,72 @@ export default function ChatInput({
   initialValue = '',
   droppedFiles = [],
   setView,
-  numTokens,
-  hasMessages,
+  // numTokens,
+  // inputTokens,
+  // outputTokens,
+  // hasMessages,
   messages = [],
   setMessages,
   disableAnimation = false,
+  // sessionCosts,
 }: ChatInputProps) {
   const [_value, setValue] = useState(initialValue);
   const [displayValue, setDisplayValue] = useState(initialValue); // For immediate visual feedback
   const [isFocused, setIsFocused] = useState(false);
   const [pastedImages, setPastedImages] = useState<PastedImage[]>([]);
-  const { alerts, addAlert, clearAlerts } = useAlerts();
+  // const { alerts, addAlert, clearAlerts } = useAlerts();
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const toolCount = useToolCount();
+  // const toolCount = useToolCount();
+  const [mentionPopover, setMentionPopover] = useState<{
+    isOpen: boolean;
+    position: { x: number; y: number };
+    query: string;
+    mentionStart: number;
+    selectedIndex: number;
+  }>({
+    isOpen: false,
+    position: { x: 0, y: 0 },
+    query: '',
+    mentionStart: -1,
+    selectedIndex: 0,
+  });
+  const mentionPopoverRef = useRef<{
+    getDisplayFiles: () => FileItemWithMatch[];
+    selectFile: (index: number) => void;
+  }>(null);
+
+  // Whisper hook for voice dictation
+  const {
+    isRecording,
+    isTranscribing,
+    canUseDictation,
+    audioContext,
+    analyser,
+    startRecording,
+    stopRecording,
+    recordingDuration,
+    estimatedSize,
+  } = useWhisper({
+    onTranscription: (text) => {
+      // Append transcribed text to the current input
+      const newValue = displayValue.trim() ? `${displayValue.trim()} ${text}` : text;
+      setDisplayValue(newValue);
+      setValue(newValue);
+      textAreaRef.current?.focus();
+    },
+    onError: (error) => {
+      toastError({
+        title: 'Dictation Error',
+        msg: error.message,
+      });
+    },
+    onSizeWarning: (sizeMB) => {
+      toastError({
+        title: 'Recording Size Warning',
+        msg: `Recording is ${sizeMB.toFixed(1)}MB. Maximum size is 25MB.`,
+      });
+    },
+  });
 
   // Update internal value when initialValue changes
   useEffect(() => {
@@ -183,8 +249,48 @@ export default function ChatInput({
 
   const handleChange = (evt: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = evt.target.value;
+    const cursorPosition = evt.target.selectionStart;
+
     setDisplayValue(val); // Update display immediately
     debouncedSetValue(val); // Debounce the actual state update
+
+    // Check for @ mention
+    checkForMention(val, cursorPosition, evt.target);
+  };
+
+  const checkForMention = (text: string, cursorPosition: number, textArea: HTMLTextAreaElement) => {
+    // Find the last @ before the cursor
+    const beforeCursor = text.slice(0, cursorPosition);
+    const lastAtIndex = beforeCursor.lastIndexOf('@');
+
+    if (lastAtIndex === -1) {
+      // No @ found, close mention popover
+      setMentionPopover((prev) => ({ ...prev, isOpen: false }));
+      return;
+    }
+
+    // Check if there's a space between @ and cursor (which would end the mention)
+    const afterAt = beforeCursor.slice(lastAtIndex + 1);
+    if (afterAt.includes(' ') || afterAt.includes('\n')) {
+      setMentionPopover((prev) => ({ ...prev, isOpen: false }));
+      return;
+    }
+
+    // Calculate position for the popover - position it above the chat input
+    const textAreaRect = textArea.getBoundingClientRect();
+
+    setMentionPopover((prev) => ({
+      ...prev,
+      isOpen: true,
+      position: {
+        x: textAreaRect.left,
+        y: textAreaRect.top, // Position at the top of the textarea
+      },
+      query: afterAt,
+      mentionStart: lastAtIndex,
+      selectedIndex: 0, // Reset selection when query changes
+      // filteredFiles will be populated by the MentionPopover component
+    }));
   };
 
   const handlePaste = async (evt: React.ClipboardEvent<HTMLTextAreaElement>) => {
@@ -389,6 +495,38 @@ export default function ChatInput({
   };
 
   const handleKeyDown = (evt: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // If mention popover is open, handle arrow keys and enter
+    if (mentionPopover.isOpen && mentionPopoverRef.current) {
+      if (evt.key === 'ArrowDown') {
+        evt.preventDefault();
+        const displayFiles = mentionPopoverRef.current.getDisplayFiles();
+        const maxIndex = Math.max(0, displayFiles.length - 1);
+        setMentionPopover((prev) => ({
+          ...prev,
+          selectedIndex: Math.min(prev.selectedIndex + 1, maxIndex),
+        }));
+        return;
+      }
+      if (evt.key === 'ArrowUp') {
+        evt.preventDefault();
+        setMentionPopover((prev) => ({
+          ...prev,
+          selectedIndex: Math.max(prev.selectedIndex - 1, 0),
+        }));
+        return;
+      }
+      if (evt.key === 'Enter') {
+        evt.preventDefault();
+        mentionPopoverRef.current.selectFile(mentionPopover.selectedIndex);
+        return;
+      }
+      if (evt.key === 'Escape') {
+        evt.preventDefault();
+        setMentionPopover((prev) => ({ ...prev, isOpen: false }));
+        return;
+      }
+    }
+
     // Handle history navigation first
     handleHistoryNavigation(evt);
 
@@ -438,6 +576,28 @@ export default function ChatInput({
     }
   };
 
+  const handleMentionFileSelect = (filePath: string) => {
+    // Replace the @ mention with the file path
+    const beforeMention = displayValue.slice(0, mentionPopover.mentionStart);
+    const afterMention = displayValue.slice(
+      mentionPopover.mentionStart + 1 + mentionPopover.query.length
+    );
+    const newValue = `${beforeMention}${filePath}${afterMention}`;
+
+    setDisplayValue(newValue);
+    setValue(newValue);
+    setMentionPopover((prev) => ({ ...prev, isOpen: false }));
+    textAreaRef.current?.focus();
+
+    // Set cursor position after the inserted file path
+    setTimeout(() => {
+      if (textAreaRef.current) {
+        const newCursorPosition = beforeMention.length + filePath.length;
+        textAreaRef.current.setSelectionRange(newCursorPosition, newCursorPosition);
+      }
+    }, 0);
+  };
+
   const hasSubmittableContent =
     displayValue.trim() || pastedImages.some((img) => img.filePath && !img.error && !img.isLoading);
   const isAnyImageLoading = pastedImages.some((img) => img.isLoading);
@@ -446,35 +606,50 @@ export default function ChatInput({
     <div
       className={`flex flex-col relative h-auto border-t-2 border-background-muted p-4 transition-colors ${
         disableAnimation ? '' : 'animate-in fade-in duration-500'
-      } z-10`}
+      } ${
+        isFocused
+          ? 'border-borderProminent hover:border-borderProminent'
+          : 'border-borderSubtle hover:border-borderStandard'
+      } bg-bgApp z-10`}
     >
-      {/* DirSwitcher at the top */}
       <div className="p-2 pb-0">
         <DirSwitcher hasMessages={messages.length > 0} />
       </div>
       <form onSubmit={onFormSubmit} className="flex flex-col">
-        <textarea
-          data-testid="chat-input"
-          autoFocus
-          id="dynamic-textarea"
-          placeholder="⌘↑/⌘↓ to navigate messages"
-          value={displayValue}
-          onChange={handleChange}
-          onCompositionStart={handleCompositionStart}
-          onCompositionEnd={handleCompositionEnd}
-          onKeyDown={handleKeyDown}
-          onPaste={handlePaste}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
-          ref={textAreaRef}
-          rows={1}
-          style={{
-            minHeight: `${minHeight}px`,
-            maxHeight: `${maxHeight}px`,
-            overflowY: 'auto',
-          }}
-          className="w-full outline-none border-none focus:ring-0 bg-transparent px-3 pt-3 pb-1.5 text-sm resize-none text-textStandard placeholder:text-textPlaceholder"
-        />
+        <div className="relative">
+          <textarea
+            data-testid="chat-input"
+            autoFocus
+            id="dynamic-textarea"
+            placeholder={isRecording ? '' : '⌘↑/⌘↓ to navigate messages'}
+            value={displayValue}
+            onChange={handleChange}
+            onCompositionStart={handleCompositionStart}
+            onCompositionEnd={handleCompositionEnd}
+            onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
+            ref={textAreaRef}
+            rows={1}
+            style={{
+              minHeight: `${minHeight}px`,
+              maxHeight: `${maxHeight}px`,
+              overflowY: 'auto',
+              opacity: isRecording ? 0 : 1,
+            }}
+            className="w-full outline-none border-none focus:ring-0 bg-transparent px-3 pt-3 pb-1.5 text-sm resize-none text-textStandard placeholder:text-textPlaceholder"
+          />
+          {isRecording && (
+            <div className="absolute inset-0 flex items-center pl-4 pr-[108px] pt-3 pb-1.5">
+              <WaveformVisualizer
+                audioContext={audioContext}
+                analyser={analyser}
+                isRecording={isRecording}
+              />
+            </div>
+          )}
+        </div>
 
         {pastedImages.length > 0 && (
           <div className="flex flex-wrap gap-2 p-2 border-t border-borderSubtle">
@@ -540,6 +715,7 @@ export default function ChatInput({
           >
             <Attach />
           </Button>
+
           {isLoading ? (
             <Button
               type="button"
@@ -551,9 +727,85 @@ export default function ChatInput({
               <Stop />
             </Button>
           ) : (
-            <Button type="submit" size="xs" variant="outline" className="text-text-muted">
-              <Send />
-            </Button>
+            <>
+              {/* Microphone button - only show if dictation is enabled and configured */}
+              {canUseDictation && (
+                <>
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant="ghost"
+                    onClick={() => {
+                      if (isRecording) {
+                        stopRecording();
+                      } else {
+                        startRecording();
+                      }
+                    }}
+                    disabled={isTranscribing}
+                    className={`absolute right-12 top-2 transition-colors rounded-full w-7 h-7 [&_svg]:size-4 ${
+                      isRecording
+                        ? 'bg-red-500 text-white hover:bg-red-600'
+                        : isTranscribing
+                          ? 'text-textSubtle cursor-not-allowed animate-pulse'
+                          : 'text-textSubtle hover:text-textStandard'
+                    }`}
+                    title={
+                      isRecording
+                        ? `Stop recording (${Math.floor(recordingDuration)}s, ~${estimatedSize.toFixed(1)}MB)`
+                        : isTranscribing
+                          ? 'Transcribing...'
+                          : 'Start dictation'
+                    }
+                  >
+                    <Microphone />
+                  </Button>
+                  {/* Recording/transcribing status indicator - positioned above the input */}
+                  {(isRecording || isTranscribing) && (
+                    <div className="absolute right-0 -top-8 bg-bgApp px-2 py-1 rounded text-xs whitespace-nowrap shadow-md border border-borderSubtle">
+                      {isTranscribing ? (
+                        <span className="text-blue-500 flex items-center gap-1">
+                          <span className="inline-block w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+                          Transcribing...
+                        </span>
+                      ) : (
+                        <span
+                          className={`flex items-center gap-2 ${estimatedSize > 20 ? 'text-orange-500' : 'text-textSubtle'}`}
+                        >
+                          <span className="inline-block w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                          {Math.floor(recordingDuration)}s • ~{estimatedSize.toFixed(1)}MB
+                          {estimatedSize > 20 && <span className="text-xs">(near 25MB limit)</span>}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+              <Button
+                type="submit"
+                size="xs"
+                variant="outline"
+                disabled={
+                  !hasSubmittableContent || isAnyImageLoading || isRecording || isTranscribing
+                }
+                className={`text-text-muted ${
+                  !hasSubmittableContent || isAnyImageLoading || isRecording || isTranscribing
+                    ? 'text-textSubtle cursor-not-allowed'
+                    : 'bg-bgAppInverse text-textProminentInverse hover:cursor-pointer'
+                }`}
+                title={
+                  isAnyImageLoading
+                    ? 'Waiting for images to save...'
+                    : isRecording
+                      ? 'Recording...'
+                      : isTranscribing
+                        ? 'Transcribing...'
+                        : 'Send'
+                }
+              >
+                <Send />
+              </Button>
+            </>
           )}
 
           {/* Model selector, mode selector, alerts, summarize button */}
@@ -561,7 +813,7 @@ export default function ChatInput({
             <ModelsBottomBar dropdownRef={dropdownRef} setView={setView} />
             <div className="w-px h-4 bg-border-default mx-2"></div>
             <BottomMenuModeSelection setView={setView} />
-            <BottomMenuAlertPopover alerts={alerts} />
+            {/*<BottomMenuAlertPopover alerts={alerts} />*/}
             {messages.length > 0 && (
               <ManualSummarizeButton
                 messages={messages}
@@ -570,6 +822,19 @@ export default function ChatInput({
               />
             )}
           </div>
+
+          <MentionPopover
+            ref={mentionPopoverRef}
+            isOpen={mentionPopover.isOpen}
+            onClose={() => setMentionPopover((prev) => ({ ...prev, isOpen: false }))}
+            onSelect={handleMentionFileSelect}
+            position={mentionPopover.position}
+            query={mentionPopover.query}
+            selectedIndex={mentionPopover.selectedIndex}
+            onSelectedIndexChange={(index) =>
+              setMentionPopover((prev) => ({ ...prev, selectedIndex: index }))
+            }
+          />
         </div>
       </form>
     </div>

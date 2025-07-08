@@ -10,6 +10,8 @@ import { useModelAndProvider } from '../ModelAndProviderContext';
 import { Message } from '../../types/message';
 import { ManualSummarizeButton } from '../context_management/ManualSummaryButton';
 import { DirSwitcher } from './DirSwitcher';
+import { CostTracker } from './CostTracker';
+import { COST_TRACKING_ENABLED } from '../../updates';
 
 const TOKEN_LIMIT_DEFAULT = 128000; // fallback for custom models that the backend doesn't know about
 const TOKEN_WARNING_THRESHOLD = 0.8; // warning shows at 80% of the token limit
@@ -23,15 +25,27 @@ interface ModelLimit {
 export default function BottomMenu({
   setView,
   numTokens = 0,
+  inputTokens = 0,
+  outputTokens = 0,
   messages = [],
   isLoading = false,
   setMessages,
+  sessionCosts,
 }: {
   setView: (view: View, viewOptions?: ViewOptions) => void;
   numTokens?: number;
+  inputTokens?: number;
+  outputTokens?: number;
   messages?: Message[];
   isLoading?: boolean;
   setMessages: (messages: Message[]) => void;
+  sessionCosts?: {
+    [key: string]: {
+      inputTokens: number;
+      outputTokens: number;
+      totalCost: number;
+    };
+  };
 }) {
   const [isModelMenuOpen, setIsModelMenuOpen] = useState(false);
   const { alerts, addAlert, clearAlerts } = useAlerts();
@@ -210,26 +224,48 @@ export default function BottomMenu({
 
       <div className="flex items-center">
         {/* Tool and Token count */}
-        {<BottomMenuAlertPopover alerts={alerts} />}
+        <div className="flex items-center h-full pl-2">
+          {<BottomMenuAlertPopover alerts={alerts} />}
+        </div>
+
+        {/* Cost Tracker - no separator before it */}
+        {COST_TRACKING_ENABLED && (
+          <>
+            <div className="flex items-center h-full ml-1">
+              <CostTracker
+                inputTokens={inputTokens}
+                outputTokens={outputTokens}
+                sessionCosts={sessionCosts}
+              />
+            </div>
+            <div className="w-[1px] h-4 bg-borderSubtle mx-1.5" />
+          </>
+        )}
 
         {/* Model Selector Dropdown */}
-        <ModelsBottomBar dropdownRef={dropdownRef} setView={setView} />
+        <div className="flex items-center h-full">
+          <ModelsBottomBar dropdownRef={dropdownRef} setView={setView} />
+        </div>
 
         {/* Separator */}
-        <div className="w-1 h-1 rounded-full bg-background-accent/50 mx-2" />
+        <div className="w-1 h-1 rounded-full bg-background-accent/50 mx-1.5" />
 
         {/* Goose Mode Selector Dropdown */}
-        <BottomMenuModeSelection setView={setView} />
+        <div className="flex items-center h-full">
+          <BottomMenuModeSelection setView={setView} />
+        </div>
 
-        {/* Summarize Context Button - ADD THIS */}
+        {/* Summarize Context Button */}
         {messages.length > 0 && (
           <>
-            <div className="w-1 h-1 rounded-full bg-background-accent/50 mx-2" />
-            <ManualSummarizeButton
-              messages={messages}
-              isLoading={isLoading}
-              setMessages={setMessages}
-            />
+            <div className="w-1 h-1 rounded-full bg-background-accent/50 mx-1.5" />
+            <div className="flex items-center h-full">
+              <ManualSummarizeButton
+                messages={messages}
+                isLoading={isLoading}
+                setMessages={setMessages}
+              />
+            </div>
           </>
         )}
       </div>

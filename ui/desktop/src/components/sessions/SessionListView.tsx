@@ -1,12 +1,5 @@
-import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
-import {
-  MessageSquareText,
-  Target,
-  AlertCircle,
-  Calendar,
-  ChevronRight,
-  Folder,
-} from 'lucide-react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
+import { MessageSquareText, Target, AlertCircle, Calendar, Folder } from 'lucide-react';
 import { VariableSizeList as List } from 'react-window';
 import { fetchSessions, type Session } from '../../sessions';
 import { Card } from '../ui/card';
@@ -17,7 +10,6 @@ import { formatMessageTimestamp } from '../../utils/timeUtils';
 import { SearchView } from '../conversation/SearchView';
 import { SearchHighlighter } from '../../utils/searchHighlighter';
 import { MainPanelLayout } from '../Layout/MainPanelLayout';
-import { SidebarTrigger, useSidebar } from '../ui/sidebar';
 import { groupSessionsByDate, type DateGroup } from '../../utils/dateUtils';
 import { Skeleton } from '../ui/skeleton';
 
@@ -37,7 +29,7 @@ interface FlattenedItem {
   index: number;
 }
 
-const SessionListView: React.FC<SessionListViewProps> = ({ setView, onSelectSession }) => {
+const SessionListView: React.FC<SessionListViewProps> = ({ onSelectSession }) => {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [filteredSessions, setFilteredSessions] = useState<Session[]>([]);
   const [dateGroups, setDateGroups] = useState<DateGroup[]>([]);
@@ -49,15 +41,8 @@ const SessionListView: React.FC<SessionListViewProps> = ({ setView, onSelectSess
     count: number;
     currentIndex: number;
   } | null>(null);
-  const [containerHeight, setContainerHeight] = useState(600);
   const containerRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<List>(null);
-  const { open: isSidebarOpen } = useSidebar();
-
-  const safeIsMacOS = (window?.electron?.platform || 'darwin') === 'darwin';
-
-  // Calculate padding based on sidebar state and macOS
-  const headerPadding = !isSidebarOpen ? (safeIsMacOS ? 'pl-20' : 'pl-12') : 'pl-4';
 
   // Flatten date groups into a single array for virtualization
   const flattenedItems = useMemo((): FlattenedItem[] => {
@@ -85,32 +70,6 @@ const SessionListView: React.FC<SessionListViewProps> = ({ setView, onSelectSess
     return items;
   }, [dateGroups]);
 
-  // Calculate item sizes for variable height list
-  const getItemSize = useCallback(
-    (index: number) => {
-      const item = flattenedItems[index];
-      if (!item) return 80; // Default fallback height
-
-      return item.type === 'header' ? 48 : 68; // Header: 48px, Session: 68px
-    },
-    [flattenedItems]
-  );
-
-  // Update container height on mount and resize
-  useEffect(() => {
-    const updateHeight = () => {
-      if (containerRef.current) {
-        const rect = containerRef.current.getBoundingClientRect();
-        const availableHeight = window.innerHeight - rect.top - 20; // 40px for padding
-        setContainerHeight(Math.max(availableHeight, 400)); // Minimum height of 400px
-      }
-    };
-
-    updateHeight();
-    window.addEventListener('resize', updateHeight);
-    return () => window.removeEventListener('resize', updateHeight);
-  }, []);
-
   useEffect(() => {
     loadSessions();
   }, []);
@@ -126,8 +85,10 @@ const SessionListView: React.FC<SessionListViewProps> = ({ setView, onSelectSess
         }, 50);
       }, 300); // Show skeleton for at least 300ms
 
+      // eslint-disable-next-line no-undef
       return () => clearTimeout(timer);
     }
+    return () => void 0;
   }, [isLoading, showSkeleton]);
 
   // Update date groups when filtered sessions change

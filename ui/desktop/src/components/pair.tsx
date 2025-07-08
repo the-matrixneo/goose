@@ -8,7 +8,6 @@ import React, {
   createContext,
 } from 'react';
 import { getApiUrl } from '../config';
-import FlappyGoose from './FlappyGoose';
 import GooseMessage from './GooseMessage';
 import ChatInput from './ChatInput';
 import { type View, ViewOptions } from '../App';
@@ -41,15 +40,6 @@ import {
   getTextContent,
   TextContent,
 } from '../types/message';
-import SessionsSidebar from './GooseSidebar/AppSidebar';
-import { SidebarTrigger } from './ui/sidebar';
-import BottomMenu from './bottom_menu/BottomMenu';
-import { useSidebar } from './ui/sidebar';
-import { Button } from './ui/button';
-import { Gear, Idea } from './icons';
-import { Tooltip, TooltipContent, TooltipTrigger } from './ui/Tooltip';
-import { Bot, Folder, Save, Send } from 'lucide-react';
-import { ChatSmart } from './icons';
 import { MainPanelLayout } from './Layout/MainPanelLayout';
 import { useLocation } from 'react-router-dom';
 
@@ -105,7 +95,6 @@ function PairContent({
   chat,
   setChat,
   setView,
-  setIsGoosehintsModalOpen,
 }: {
   readyForAutoUserPrompt: boolean;
   chat: ChatType;
@@ -113,42 +102,25 @@ function PairContent({
   setView: (view: View, viewOptions?: ViewOptions) => void;
   setIsGoosehintsModalOpen: (isOpen: boolean) => void;
 }) {
-  return (
-    <PairContentWithSidebar
-      chat={chat}
-      setChat={setChat}
-      setView={setView}
-      setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
-    />
-  );
+  return <PairContentWithSidebar chat={chat} setChat={setChat} setView={setView} />;
 }
 
 function PairContentWithSidebar({
   chat,
   setChat,
   setView,
-  setIsGoosehintsModalOpen,
 }: {
   chat: ChatType;
   setChat: (chat: ChatType) => void;
   setView: (view: View, viewOptions?: ViewOptions) => void;
-  setIsGoosehintsModalOpen: (isOpen: boolean) => void;
 }) {
   const location = useLocation();
-  const safeIsMacOS = (window?.electron?.platform || 'darwin') === 'darwin';
-  const { open: isSidebarOpen } = useSidebar();
-
-  // Calculate padding based on sidebar state and macOS
-  const headerPadding = !isSidebarOpen ? (safeIsMacOS ? 'pl-20' : 'pl-12') : 'pl-4';
-
   const [hasMessages, setHasMessages] = useState(false);
   const [lastInteractionTime, setLastInteractionTime] = useState<number>(Date.now());
-  const [showGame, setShowGame] = useState(false);
   const [isGeneratingRecipe, setIsGeneratingRecipe] = useState(false);
   const [sessionTokenCount, setSessionTokenCount] = useState<number>(0);
   const [ancestorMessages, setAncestorMessages] = useState<Message[]>([]);
   const [droppedFiles, setDroppedFiles] = useState<string[]>([]);
-  const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
   const [hasProcessedInitialInput, setHasProcessedInitialInput] = useState(false);
 
   // Get disableAnimation from location state
@@ -251,8 +223,6 @@ function PairContentWithSidebar({
         console.log('Pair: New session detected, emitting session-created event');
         // Emit event to indicate a new session is being created
         window.dispatchEvent(new CustomEvent('session-created'));
-        // Also update the refresh trigger
-        setRefreshTrigger((prev) => prev + 1);
       }
 
       return originalAppend(message);
@@ -610,107 +580,6 @@ function PairContentWithSidebar({
         {/* Loader when generating recipe */}
         {isGeneratingRecipe && <LayingEggLoader />}
 
-        {/* <div className="h-12 flex items-center justify-between">
-          <div className="flex items-center pr-4">
-            {messages.length > 0 && (
-              <>
-                {setIsGoosehintsModalOpen && (
-                  <Tooltip delayDuration={500}>
-                    <TooltipTrigger className="w-full">
-                      <Button
-                        onClick={() => setIsGoosehintsModalOpen(true)}
-                        className="px-3"
-                        variant="ghost"
-                        size="sm"
-                        shape="round"
-                      >
-                        <div className="flex gap-2 items-center text-text-default">
-                          <Idea className="w-4 h-4" />
-                        </div>
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="right">
-                      <p>Customize instructions</p>
-                    </TooltipContent>
-                  </Tooltip>
-                )}
-
-                {recipeConfig ? (
-                  <>
-                    <Tooltip delayDuration={500}>
-                      <TooltipTrigger className="w-full">
-                        <Button
-                          onClick={() => {
-                            window.electron.createChatWindow(
-                              undefined,
-                              undefined,
-                              undefined,
-                              undefined,
-                              recipeConfig as Recipe,
-                              'recipeEditor'
-                            );
-                          }}
-                          className="px-3"
-                          variant="ghost"
-                        >
-                          <div className="flex gap-2 items-center text-text-default">
-                            <Send className="w-4 h-4" />
-                            View recipe
-                          </div>
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="right">
-                        <p>View the recipe you're using</p>
-                      </TooltipContent>
-                    </Tooltip>
-
-                    <Tooltip delayDuration={500}>
-                      <TooltipTrigger className="w-full">
-                        <Button
-                          className="px-3"
-                          variant="ghost"
-                          size="sm"
-                          shape="round"
-                        >
-                          <div className="flex gap-2 items-center text-text-default">
-                            <Save className="w-4 h-4" />
-                            Save recipe
-                          </div>
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="right">
-                        <p>Save this recipe for reuse</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </>
-                ) : (
-                  <Tooltip delayDuration={500}>
-                    <TooltipTrigger className="w-full">
-                      <Button
-                        onClick={() => {
-                          window.electron.logInfo('Make Agent button clicked');
-                          window.dispatchEvent(new CustomEvent('make-agent-from-chat'));
-                        }}
-                        className="px-3"
-                        variant="ghost"
-                        size="sm"
-                        shape="round"
-                      >
-                        <div className="flex gap-2 items-center text-text-default">
-                          <Bot className="w-4 h-4" />
-                        </div>
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="right">
-                      <p>Make a custom agent you can share or reuse</p>
-                    </TooltipContent>
-                  </Tooltip>
-                )}
-              </>
-            )}
-          </div>
-        </div> */}
-
         <div
           className="flex flex-col min-w-0 flex-1 overflow-y-scroll relative pl-6 px-4 pb-16 pt-2"
           onDrop={handleDrop}
@@ -736,7 +605,7 @@ function PairContentWithSidebar({
               <SearchView>
                 {filteredMessages.map((message, index) => {
                   const isUser = isUserMessage(message);
-                  const nextMessage = filteredMessages[index + 1];
+                  // const nextMessage = filteredMessages[index + 1];
 
                   return (
                     <div

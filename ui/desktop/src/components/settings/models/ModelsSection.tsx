@@ -5,7 +5,7 @@ import { useConfig } from '../../ConfigContext';
 import { toastError } from '../../../toasts';
 
 import { UNKNOWN_PROVIDER_MSG, UNKNOWN_PROVIDER_TITLE } from './index';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../ui/card';
+import { Card, CardContent } from '../../ui/card';
 
 interface ModelsSectionProps {
   setView: (view: View) => void;

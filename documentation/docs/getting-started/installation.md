@@ -90,9 +90,12 @@ import LinuxDesktopInstallButtons from '@site/src/components/LinuxDesktopInstall
         <LinuxDesktopInstallButtons/>
 
         <div style={{ marginTop: '1rem' }}>
-          1. Extract the downloaded tar.bz2 file.
-          2. Run the executable file to launch the Goose Desktop application.
-
+          **For Debian/Ubuntu-based distributions:**
+          1. Download the DEB file
+          2. Navigate to the directory where it is saved in a terminal
+          3. Run `sudo dpkg -i (filename).deb`
+          4. Launch Goose from the app menu
+          
           :::tip Updating Goose
           It's best to keep Goose updated by periodically running the installation steps again.
           :::
@@ -142,37 +145,63 @@ import LinuxDesktopInstallButtons from '@site/src/components/LinuxDesktopInstall
         </div>
       </TabItem>
       <TabItem value="cli" label="Goose CLI">
-        There isn't native installation support for Windows CLI, however you can run Goose using WSL (Windows Subsystem for Linux).
+        Run the following command in **Git Bash**, **MSYS2**, or **PowerShell** to install the Goose CLI natively on Windows:
 
-        1. Open [PowerShell](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows) as Administrator and install WSL and the default Ubuntu distribution:
-
-        ```bash
-        wsl --install
-        ```
-
-        2. If prompted, restart your computer to complete the WSL installation. Once restarted, or if WSL is already installed, launch your Ubuntu shell by running:
-
-        ```bash
-        wsl -d Ubuntu
-        ```
-
-        3. Run the Goose installation script:
         ```bash
         curl -fsSL https://github.com/block/goose/releases/download/stable/download_cli.sh | bash
         ```
-        :::tip
-          If you encounter any issues on download, you might need to install `bzip2` to extract the downloaded file:
-
-          ```bash
-          sudo apt update && sudo apt install bzip2 -y
-          ```
-        :::
+        This script will fetch the latest version of Goose and set it up on your system.
 
         If you'd like to install without interactive configuration, disable `CONFIGURE`:
 
-        ```sh
+        ```bash
         curl -fsSL https://github.com/block/goose/releases/download/stable/download_cli.sh | CONFIGURE=false bash
-        ```  
+        ```
+
+        :::note Prerequisites
+        - **Git Bash** (recommended): Comes with [Git for Windows](https://git-scm.com/download/win)
+        - **MSYS2**: Available from [msys2.org](https://www.msys2.org/)
+        - **PowerShell**: Available on Windows 10/11 by default
+        
+        The script requires `curl` and `unzip` to be available in your environment.
+        :::
+
+        <details>
+        <summary>Install via Windows Subsystem for Linux (WSL)</summary>
+
+          We recommend running the Goose CLI natively on Windows, but you can use WSL if you prefer a Linux-like environment.
+
+          1. Open [PowerShell](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows) as Administrator and install WSL and the default Ubuntu distribution:
+
+          ```bash
+          wsl --install
+          ```
+
+          2. If prompted, restart your computer to complete the WSL installation. Once restarted, or if WSL is already installed, launch your Ubuntu shell by running:
+
+          ```bash
+          wsl -d Ubuntu
+          ```
+
+          3. Run the Goose installation script:
+          ```bash
+          curl -fsSL https://github.com/block/goose/releases/download/stable/download_cli.sh | bash
+          ```
+          :::tip
+            If you encounter any issues on download, you might need to install `bzip2` to extract the downloaded file:
+
+            ```bash
+            sudo apt update && sudo apt install bzip2 -y
+            ```
+          :::
+
+          If you'd like to install without interactive configuration, disable `CONFIGURE`:
+
+          ```sh
+          curl -fsSL https://github.com/block/goose/releases/download/stable/download_cli.sh | CONFIGURE=false bash
+          ```  
+
+        </details>
       </TabItem>
     </Tabs>
   </TabItem>
@@ -193,7 +222,7 @@ Goose works with a set of [supported LLM providers][providers], and you'll need 
     Upon installing, Goose will automatically enter its configuration screen. Here is where you can set up your LLM provider.
 
     :::tip Windows Users
-    Choose to not store to keyring when prompted.
+    When using the native Windows CLI, choose to not store to keyring when prompted during initial configuration.
     :::
 
     Example:
@@ -221,6 +250,12 @@ Goose works with a set of [supported LLM providers][providers], and you'll need 
   :::info Windows Users
   On initial run, you may encounter errors about keyrings when setting your API Keys. Set the needed environment variables manually, e.g.:
 
+  **For Native Windows CLI (Git Bash/MSYS2):**
+  ```bash
+  export OPENAI_API_KEY={your_api_key}
+  ```
+
+  **For WSL:**
   ```bash
   export OPENAI_API_KEY={your_api_key}
   ```
@@ -231,8 +266,17 @@ Goose works with a set of [supported LLM providers][providers], and you'll need 
   ● OPENAI_API_KEY is set via environment variable
   ```
 
-  To make the changes persist in WSL across sessions, add the goose path and export commands to your `.bashrc` or `.bash_profile` file so you can load it later.
+  **To make the changes persist across sessions:**
 
+  **For Native Windows CLI (Git Bash):**
+  Add the goose path and export commands to your `~/.bashrc` or `~/.bash_profile` file:
+  ```bash
+  echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+  echo 'export OPENAI_API_KEY=your_api_key' >> ~/.bashrc
+  source ~/.bashrc
+  ```
+
+  **For WSL:**
   ```bash
   echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
   echo 'export OPENAI_API_KEY=your_api_key' >> ~/.bashrc

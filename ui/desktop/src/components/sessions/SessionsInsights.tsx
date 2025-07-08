@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription } from '../ui/card';
 import { Folder } from 'lucide-react';
 import { getApiUrl, getSecretKey } from '../../config';
-import { useTextAnimator } from '../../hooks/use-text-animator';
 import { Greeting } from '../common/Greeting';
 import { fetchSessions, type Session } from '../../sessions';
 import { fetchProjects, type ProjectMetadata } from '../../projects';
@@ -11,7 +10,7 @@ import { Button } from '../ui/button';
 import { ChatSmart } from '../icons/';
 import { motion, AnimatePresence } from 'framer-motion';
 
-interface SessionInsights {
+interface SessionInsightsType {
   totalSessions: number;
   mostActiveDirs: [string, number][];
   avgSessionDuration: number;
@@ -19,20 +18,11 @@ interface SessionInsights {
 }
 
 export function SessionInsights() {
-  const [insights, setInsights] = useState<SessionInsights | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [insights, setInsights] = useState<SessionInsightsType | null>(null);
+  const [_error, setError] = useState<string | null>(null);
   const [recentSessions, setRecentSessions] = useState<Session[]>([]);
   const [recentProjects, setRecentProjects] = useState<ProjectMetadata[]>([]);
   const navigate = useNavigate();
-
-  // Add text animator effects for each number
-  const totalSessionsRef = useTextAnimator({ text: insights?.totalSessions.toString() ?? '' });
-  const avgDurationRef = useTextAnimator({
-    text: insights?.avgSessionDuration ? insights.avgSessionDuration.toFixed(1) : '',
-  });
-  const totalTokensRef = useTextAnimator({
-    text: insights?.totalTokens ? (insights.totalTokens / 1000000).toFixed(2) : '',
-  });
 
   useEffect(() => {
     const loadInsights = async () => {

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useTextAnimator } from '../../hooks/use-text-animator';
 
 interface GreetingProps {
@@ -33,8 +33,6 @@ export function Greeting({
     ' What can be achieved?',
     ' What project is ready to begin?',
   ];
-
-  const [randomKey] = useState(() => Math.random());
 
   const greeting = useState(() => {
     const randomPrefixIndex = Math.floor(Math.random() * prefixes.length);

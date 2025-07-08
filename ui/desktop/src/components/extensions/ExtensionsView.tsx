@@ -1,4 +1,3 @@
-import { ScrollArea } from '../ui/scroll-area';
 import { View, ViewOptions } from '../../App';
 import ExtensionsSection from '../settings/extensions/ExtensionsSection';
 import { ExtensionConfig } from '../../api';
@@ -6,7 +5,7 @@ import { MainPanelLayout } from '../Layout/MainPanelLayout';
 import { Button } from '../ui/button';
 import { Plus } from 'lucide-react';
 import { GPSIcon } from '../ui/icons';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import ExtensionModal from '../settings/extensions/modal/ExtensionModal';
 import {
   getDefaultFormData,
@@ -23,7 +22,6 @@ export type ExtensionsViewOptions = {
 
 export default function ExtensionsView({
   viewOptions,
-  setView,
 }: {
   onClose: () => void;
   setView: (view: View, viewOptions?: ViewOptions) => void;

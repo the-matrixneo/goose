@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import { useRef, useEffect } from 'react';
 import { Geese } from '../icons/Geese';
 import { Button } from '../ui/button';
 import {

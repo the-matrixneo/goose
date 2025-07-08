@@ -92,7 +92,7 @@ const SessionMessages: React.FC<{
           ) : messages?.length > 0 ? (
             <div className="max-w-4xl mx-auto w-full">
               {messages
-                .map((message, index) => {
+                .map((message) => {
                   // Skip pure tool response messages for cleaner display
                   const isOnlyToolResponse =
                     message.content.length > 0 &&
@@ -136,7 +136,6 @@ const SessionHistoryView: React.FC<SessionHistoryViewProps> = ({
   isLoading,
   error,
   onBack,
-  onResume,
   onRetry,
   showActionButtons = true,
 }) => {

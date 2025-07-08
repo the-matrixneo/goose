@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Button } from '../../../ui/button';
-import { Sliders, ArrowLeftRight } from 'lucide-react';
 import { AddModelModal } from './AddModelModal';
 import type { View } from '../../../../App';
 

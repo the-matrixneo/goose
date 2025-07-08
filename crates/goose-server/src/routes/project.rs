@@ -5,7 +5,7 @@ use crate::state::AppState;
 use axum::{
     extract::{Path, State},
     http::{HeaderMap, StatusCode},
-    routing::{get, post, put, delete},
+    routing::{delete, get, post, put},
     Json, Router,
 };
 use goose::project::{Project, ProjectMetadata};
@@ -70,7 +70,8 @@ async fn list_projects(
 ) -> Result<Json<ProjectListResponse>, StatusCode> {
     verify_secret_key(&headers, &state)?;
 
-    let projects = goose::project::list_projects().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let projects =
+        goose::project::list_projects().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     Ok(Json(ProjectListResponse { projects }))
 }
@@ -140,10 +141,11 @@ async fn create_project(
     }
 
     let project = goose::project::create_project(
-        create_req.name, 
-        create_req.description, 
-        create_req.default_directory
-    ).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        create_req.name,
+        create_req.description,
+        create_req.default_directory,
+    )
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     Ok(Json(ProjectResponse { project }))
 }
@@ -180,7 +182,8 @@ async fn update_project(
         update_req.name,
         update_req.description,
         update_req.default_directory,
-    ).map_err(|e| {
+    )
+    .map_err(|e| {
         if e.to_string().contains("not found") {
             StatusCode::NOT_FOUND
         } else {
@@ -263,10 +266,13 @@ async fn add_session_to_project(
     })?;
 
     // Also update session metadata to include the project_id
-    let session_path = goose::session::get_path(goose::session::Identifier::Name(session_id.clone()));
-    let mut metadata = goose::session::read_metadata(&session_path).map_err(|_| StatusCode::NOT_FOUND)?;
+    let session_path =
+        goose::session::get_path(goose::session::Identifier::Name(session_id.clone()))
+            .map_err(|_| StatusCode::NOT_FOUND)?;
+    let mut metadata =
+        goose::session::read_metadata(&session_path).map_err(|_| StatusCode::NOT_FOUND)?;
     metadata.project_id = Some(project_id);
-    
+
     tokio::task::spawn(async move {
         if let Err(e) = goose::session::update_metadata(&session_path, &metadata).await {
             tracing::error!("Failed to update session metadata: {}", e);
@@ -310,15 +316,18 @@ async fn remove_session_from_project(
             StatusCode::INTERNAL_SERVER_ERROR
         }
     })?;
-    
+
     // Also update session metadata to remove the project_id
-    let session_path = goose::session::get_path(goose::session::Identifier::Name(session_id.clone()));
-    let mut metadata = goose::session::read_metadata(&session_path).map_err(|_| StatusCode::NOT_FOUND)?;
-    
+    let session_path =
+        goose::session::get_path(goose::session::Identifier::Name(session_id.clone()))
+            .map_err(|_| StatusCode::NOT_FOUND)?;
+    let mut metadata =
+        goose::session::read_metadata(&session_path).map_err(|_| StatusCode::NOT_FOUND)?;
+
     // Only update if this session was actually in this project
     if metadata.project_id.as_deref() == Some(&project_id) {
         metadata.project_id = None;
-        
+
         tokio::task::spawn(async move {
             if let Err(e) = goose::session::update_metadata(&session_path, &metadata).await {
                 tracing::error!("Failed to update session metadata: {}", e);
@@ -337,7 +346,13 @@ pub fn routes(state: Arc<AppState>) -> Router {
         .route("/projects/{project_id}", get(get_project_details))
         .route("/projects/{project_id}", put(update_project))
         .route("/projects/{project_id}", delete(delete_project))
-        .route("/projects/{project_id}/sessions/{session_id}", post(add_session_to_project))
-        .route("/projects/{project_id}/sessions/{session_id}", delete(remove_session_from_project))
+        .route(
+            "/projects/{project_id}/sessions/{session_id}",
+            post(add_session_to_project),
+        )
+        .route(
+            "/projects/{project_id}/sessions/{session_id}",
+            delete(remove_session_from_project),
+        )
         .with_state(state)
-} 
+}

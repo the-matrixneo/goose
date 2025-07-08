@@ -2,39 +2,34 @@ import React, { useState, useEffect } from 'react';
 import { CLIChatView } from './CLIChatView';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../ui/button';
-import { Card } from '../ui/card';
 import { Badge } from '../ui/badge';
-import {
-  Terminal,
-  Settings,
-  History,
-  Bot,
-  MessageSquare,
-  ArrowLeft,
-  RefreshCw,
-} from 'lucide-react';
+import { Terminal, Settings, History, MessageSquare, ArrowLeft, RefreshCw } from 'lucide-react';
 import { generateSessionId } from '../../sessions';
 import { type View, ViewOptions } from '../../App';
 import { MainPanelLayout } from '../Layout/MainPanelLayout';
 
-interface CLIHubProps {
-  chat: {
-    id: string;
-    title: string;
-    messageHistoryIndex: number;
-    messages: any[];
-  };
-  setChat: (chat: any) => void;
-  setView: (view: View, viewOptions?: ViewOptions) => void;
-  setIsGoosehintsModalOpen: (isOpen: boolean) => void;
+interface ChatMessage {
+  role: string;
+  content: string;
+  id?: string;
+  timestamp?: number;
+  [key: string]: unknown;
 }
 
-export const CLIHub: React.FC<CLIHubProps> = ({
-  chat,
-  setChat,
-  setView,
-  setIsGoosehintsModalOpen,
-}) => {
+interface ChatState {
+  id: string;
+  title: string;
+  messageHistoryIndex: number;
+  messages: ChatMessage[];
+}
+
+interface CLIHubProps {
+  chat: ChatState;
+  setChat: (chat: ChatState) => void;
+  setView: (view: View, viewOptions?: ViewOptions) => void;
+}
+
+export const CLIHub: React.FC<CLIHubProps> = ({ chat, setChat, setView }) => {
   const navigate = useNavigate();
   const [sessionId, setSessionId] = useState(chat.id || generateSessionId());
 
@@ -47,12 +42,8 @@ export const CLIHub: React.FC<CLIHubProps> = ({
       messageHistoryIndex: 0,
       messages: [],
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, setChat]);
-
-  const handleSessionExit = () => {
-    // Navigate back to main view or show session ended message
-    setView('chat');
-  };
 
   const handleNewSession = () => {
     const newSessionId = generateSessionId();
@@ -107,7 +98,7 @@ export const CLIHub: React.FC<CLIHubProps> = ({
 
       {/* CLI Chat View */}
       <div className="flex flex-col min-w-0 flex-1 overflow-y-scroll relative pl-6 pr-4 pb-16 pt-2">
-        <CLIChatView sessionId={sessionId} onSessionExit={handleSessionExit} />
+        <CLIChatView sessionId={sessionId} />
       </div>
 
       {/* Footer */}

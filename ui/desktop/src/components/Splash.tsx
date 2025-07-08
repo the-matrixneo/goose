@@ -1,6 +1,4 @@
-import { useTextAnimator } from '../hooks/use-text-animator';
 import { Card } from './ui/card';
-import { useState, useEffect } from 'react';
 import { gsap } from 'gsap';
 import { Greeting } from './common/Greeting';
 
@@ -25,13 +23,6 @@ export default function Splash({ append, activities, title }: SplashProps) {
     messagePillIndex >= 0
       ? [...pills.slice(0, messagePillIndex), ...pills.slice(messagePillIndex + 1)]
       : pills;
-
-  const [isContentReady, setIsContentReady] = useState(false);
-
-  // Set content ready after initial render
-  useEffect(() => {
-    setIsContentReady(true);
-  }, []);
 
   return (
     <div className="flex flex-col">

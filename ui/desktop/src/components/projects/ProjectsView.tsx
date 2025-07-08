@@ -4,11 +4,10 @@ import { fetchProjects, createProject } from '../../projects';
 import ProjectCard from './ProjectCard';
 import CreateProjectModal from './CreateProjectModal';
 import { Button } from '../ui/button';
-import { FolderPlus, Loader, AlertCircle, FileText } from 'lucide-react';
+import { FolderPlus, AlertCircle } from 'lucide-react';
 import { toastError, toastSuccess } from '../../toasts';
 import { ScrollArea } from '../ui/scroll-area';
 import { MainPanelLayout } from '../Layout/MainPanelLayout';
-import { useSidebar } from '../ui/sidebar';
 import { Skeleton } from '../ui/skeleton';
 
 interface ProjectsViewProps {
@@ -23,12 +22,6 @@ const ProjectsView: React.FC<ProjectsViewProps> = ({ onSelectProject, refreshTri
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [showSkeleton, setShowSkeleton] = useState(true);
   const [showContent, setShowContent] = useState(false);
-  const { open: isSidebarOpen } = useSidebar();
-
-  const safeIsMacOS = (window?.electron?.platform || 'darwin') === 'darwin';
-
-  // Calculate padding based on sidebar state and macOS
-  const headerPadding = !isSidebarOpen ? (safeIsMacOS ? 'pl-20' : 'pl-12') : 'pl-4';
 
   // Load projects on component mount and when refreshTrigger changes
   useEffect(() => {
@@ -46,8 +39,10 @@ const ProjectsView: React.FC<ProjectsViewProps> = ({ onSelectProject, refreshTri
         }, 50);
       }, 300); // Show skeleton for at least 300ms
 
+      // eslint-disable-next-line no-undef
       return () => clearTimeout(timer);
     }
+    return () => void 0;
   }, [loading, showSkeleton]);
 
   const loadProjects = async () => {

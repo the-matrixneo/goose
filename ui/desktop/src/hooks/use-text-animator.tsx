@@ -1,12 +1,12 @@
 import { gsap } from 'gsap';
 import SplitType from 'split-type';
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef } from 'react';
 
 // Utility debounce function
-export const debounce = <T extends (...args: any[]) => void>(func: T, delay: number): T => {
-  let timerId: NodeJS.Timeout;
-  return ((...args: any[]) => {
-    clearTimeout(timerId);
+export const debounce = <T extends (...args: unknown[]) => void>(func: T, delay: number): T => {
+  let timerId: ReturnType<typeof setTimeout>;
+  return ((...args: unknown[]) => {
+    window.clearTimeout(timerId);
     timerId = setTimeout(() => {
       func(...args);
     }, delay);
@@ -43,22 +43,22 @@ export class TextSplitter {
   }
 
   initResizeObserver() {
-    const resizeObserver = new ResizeObserver(
-      debounce((entries: ResizeObserverEntry[]) => this.handleResize(entries), 100)
-    );
+    // Use a simpler approach to avoid type issues
+    const resizeObserver = new ResizeObserver(() => {
+      // Just check the current width directly from the element
+      if (this.textElement) {
+        const currentWidth = Math.floor(this.textElement.getBoundingClientRect().width);
+
+        if (this.previousContainerWidth && this.previousContainerWidth !== currentWidth) {
+          this.splitText.split({ types: ['chars'] });
+          this.onResize?.();
+        }
+
+        this.previousContainerWidth = currentWidth;
+      }
+    });
+
     resizeObserver.observe(this.textElement);
-  }
-
-  handleResize(entries: ResizeObserverEntry[]) {
-    const [{ contentRect }] = entries;
-    const width = Math.floor(contentRect.width);
-
-    if (this.previousContainerWidth && this.previousContainerWidth !== width) {
-      this.splitText.split({ types: ['chars'] });
-      this.onResize?.();
-    }
-
-    this.previousContainerWidth = width;
   }
 
   revert() {
@@ -237,7 +237,7 @@ export function useTextAnimator({ text }: UseTextAnimatorProps) {
 
     // Cleanup
     return () => {
-      clearTimeout(timeoutId);
+      window.clearTimeout(timeoutId);
       if (animator.current) {
         animator.current.reset();
       }

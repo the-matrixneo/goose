@@ -12,9 +12,9 @@ import FlappyGoose from './FlappyGoose';
 import GooseMessage from './GooseMessage';
 import ChatInput from './ChatInput';
 import { type View, ViewOptions } from '../App';
-import LoadingGoose from './LoadingGoose';
 import { ScrollAreaHandle } from './ui/scroll-area';
 import UserMessage from './UserMessage';
+import Splash from './Splash';
 import { SearchView } from './conversation/SearchView';
 import { createRecipe } from '../recipe';
 import { AgentHeader } from './AgentHeader';
@@ -23,6 +23,7 @@ import { fetchSessionDetails, generateSessionId } from '../sessions';
 import 'react-toastify/dist/ReactToastify.css';
 import { useMessageStream } from '../hooks/useMessageStream';
 import { SessionSummaryModal } from './context_management/SessionSummaryModal';
+import ParameterInputModal from './ParameterInputModal';
 import { Recipe } from '../recipe';
 import {
   ChatContextManagerProvider,
@@ -30,6 +31,9 @@ import {
 } from './context_management/ChatContextManager';
 import { ContextHandler } from './context_management/ContextHandler';
 import { LocalMessageStorage } from '../utils/localMessageStorage';
+import { useModelAndProvider } from './ModelAndProviderContext';
+import { getCostForModel } from '../utils/costDatabase';
+import { updateSystemPromptWithParameters } from '../utils/providerUtils';
 import {
   Message,
   createUserMessage,
@@ -41,15 +45,13 @@ import {
   getTextContent,
   TextContent,
 } from '../types/message';
-import SessionsSidebar from './GooseSidebar/AppSidebar';
 import { SidebarTrigger } from './ui/sidebar';
 import { SessionInsights } from './sessions/SessionsInsights';
 import { useSidebar } from './ui/sidebar';
 import { Button } from './ui/button';
-import { Gear, Idea } from './icons';
+import { Idea } from './icons';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/Tooltip';
-import { Bot, Folder, Save, Send } from 'lucide-react';
-import { ChatSmart } from './icons';
+import { Bot, Save, Send } from 'lucide-react';
 import { MainPanelLayout } from './Layout/MainPanelLayout';
 
 // Context for sharing current model info
@@ -72,6 +74,17 @@ const isUserMessage = (message: Message): boolean => {
     return false;
   }
   return true;
+};
+
+const substituteParameters = (prompt: string, params: Record<string, string>): string => {
+  let substitutedPrompt = prompt;
+
+  for (const key in params) {
+    // Escape special characters in the key (parameter) and match optional whitespace
+    const regex = new RegExp(`{{\\s*${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*}}`, 'g');
+    substitutedPrompt = substitutedPrompt.replace(regex, params[key]);
+  }
+  return substitutedPrompt;
 };
 
 export default function ChatView({
@@ -144,11 +157,27 @@ function ChatContentWithSidebar({
   const [showGame, setShowGame] = useState(false);
   const [isGeneratingRecipe, setIsGeneratingRecipe] = useState(false);
   const [sessionTokenCount, setSessionTokenCount] = useState<number>(0);
+  const [sessionInputTokens, setSessionInputTokens] = useState<number>(0);
+  const [sessionOutputTokens, setSessionOutputTokens] = useState<number>(0);
+  const [localInputTokens, setLocalInputTokens] = useState<number>(0);
+  const [localOutputTokens, setLocalOutputTokens] = useState<number>(0);
   const [ancestorMessages, setAncestorMessages] = useState<Message[]>([]);
   const [droppedFiles, setDroppedFiles] = useState<string[]>([]);
-  const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
+  const [isParameterModalOpen, setIsParameterModalOpen] = useState(false);
+  const [recipeParameters, setRecipeParameters] = useState<Record<string, string> | null>(null);
+  const [_sessionCosts, setSessionCosts] = useState<{
+    [key: string]: {
+      inputTokens: number;
+      outputTokens: number;
+      totalCost: number;
+    };
+  }>({});
+  const [readyForAutoUserPrompt, setReadyForAutoUserPrompt] = useState(false);
 
   const scrollRef = useRef<ScrollAreaHandle>(null);
+  const { currentModel, currentProvider } = useModelAndProvider();
+  const prevModelRef = useRef<string | undefined>();
+  const prevProviderRef = useRef<string | undefined>();
 
   const {
     summaryContent,
@@ -166,11 +195,23 @@ function ChatContentWithSidebar({
     window.electron.logInfo(
       'Initial messages when resuming session: ' + JSON.stringify(chat.messages, null, 2)
     );
+    // Set ready for auto user prompt after component initialization
+    setReadyForAutoUserPrompt(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Empty dependency array means this runs once on mount;
 
   // Get recipeConfig directly from appConfig
   const recipeConfig = window.appConfig.get('recipeConfig') as Recipe | null;
+
+  // Show parameter modal if recipe has parameters and they haven't been set yet
+  useEffect(() => {
+    if (recipeConfig?.parameters && recipeConfig.parameters.length > 0) {
+      // If we have parameters and they haven't been set yet, open the modal.
+      if (!recipeParameters) {
+        setIsParameterModalOpen(true);
+      }
+    }
+  }, [recipeConfig, recipeParameters]);
 
   // Store message in global history when it's added
   const storeMessageInHistory = useCallback((message: Message) => {
@@ -195,11 +236,16 @@ function ChatContentWithSidebar({
     handleSubmit: _submitMessage,
     updateMessageStreamBody,
     notifications,
+    sessionMetadata,
   } = useMessageStream({
     api: getApiUrl('/reply'),
     id: chat.id,
     initialMessages: chat.messages,
-    body: { session_id: chat.id, session_working_dir: window.appConfig.get('GOOSE_WORKING_DIR') },
+    body: {
+      session_id: chat.id,
+      session_working_dir: window.appConfig.get('GOOSE_WORKING_DIR'),
+      ...(recipeConfig?.scheduledJobId && { scheduled_job_id: recipeConfig.scheduledJobId }),
+    },
     onFinish: async (_message, _reason) => {
       window.electron.stopPowerSaveBlocker();
 
@@ -238,20 +284,9 @@ function ChatContentWithSidebar({
       const message =
         typeof messageOrString === 'string' ? createUserMessage(messageOrString) : messageOrString;
       storeMessageInHistory(message);
-
-      // If this is the first message in a new session, trigger a refresh immediately
-      // Only trigger if we're starting a completely new session (no existing messages)
-      if (messages.length === 0 && chat.messages.length === 0) {
-        console.log('ChatView: New session detected, emitting session-created event');
-        // Emit event to indicate a new session is being created
-        window.dispatchEvent(new CustomEvent('session-created'));
-        // Also update the refresh trigger
-        setRefreshTrigger((prev) => prev + 1);
-      }
-
       return originalAppend(message);
     },
-    [originalAppend, storeMessageInHistory, messages.length, chat.messages.length]
+    [originalAppend, storeMessageInHistory]
   );
 
   // for CLE events -- create a new session id for the next set of messages
@@ -318,6 +353,7 @@ function ChatContentWithSidebar({
           id: response.recipe.title || 'untitled',
           title: response.recipe.title || 'Untitled Recipe',
           description: response.recipe.description || '',
+          parameters: response.recipe.parameters || [],
           instructions: response.recipe.instructions || '',
           activities: response.recipe.activities || [],
           prompt: response.recipe.prompt || '',
@@ -362,8 +398,77 @@ function ChatContentWithSidebar({
 
   // Pre-fill input with recipe prompt instead of auto-sending it
   const initialPrompt = useMemo(() => {
-    return recipeConfig?.prompt || '';
-  }, [recipeConfig?.prompt]);
+    if (!recipeConfig?.prompt) return '';
+
+    const hasRequiredParams = recipeConfig.parameters && recipeConfig.parameters.length > 0;
+
+    // If params are required and have been collected, substitute them into the prompt.
+    if (hasRequiredParams && recipeParameters) {
+      return substituteParameters(recipeConfig.prompt, recipeParameters);
+    }
+
+    // If there are no parameters, return the original prompt.
+    if (!hasRequiredParams) {
+      return recipeConfig.prompt;
+    }
+
+    // Otherwise, we are waiting for parameters, so the input should be empty.
+    return '';
+  }, [recipeConfig, recipeParameters]);
+
+  // Auto-send the prompt for scheduled executions
+  useEffect(() => {
+    const hasRequiredParams = recipeConfig?.parameters && recipeConfig.parameters.length > 0;
+
+    if (
+      recipeConfig?.isScheduledExecution &&
+      recipeConfig?.prompt &&
+      (!hasRequiredParams || recipeParameters) &&
+      messages.length === 0 &&
+      !isLoading &&
+      readyForAutoUserPrompt
+    ) {
+      // Substitute parameters if they exist
+      const finalPrompt = recipeParameters
+        ? substituteParameters(recipeConfig.prompt, recipeParameters)
+        : recipeConfig.prompt;
+
+      console.log('Auto-sending substituted prompt for scheduled execution:', finalPrompt);
+
+      const userMessage = createUserMessage(finalPrompt);
+      setLastInteractionTime(Date.now());
+      window.electron.startPowerSaveBlocker();
+      append(userMessage);
+
+      setTimeout(() => {
+        if (scrollRef.current?.scrollToBottom) {
+          scrollRef.current.scrollToBottom();
+        }
+      }, 100);
+    }
+  }, [
+    recipeConfig?.isScheduledExecution,
+    recipeConfig?.prompt,
+    recipeConfig?.parameters,
+    recipeParameters,
+    messages.length,
+    isLoading,
+    readyForAutoUserPrompt,
+    append,
+    setLastInteractionTime,
+  ]);
+
+  const handleParameterSubmit = async (inputValues: Record<string, string>) => {
+    setRecipeParameters(inputValues);
+    setIsParameterModalOpen(false);
+
+    // Update the system prompt with parameter-substituted instructions
+    try {
+      await updateSystemPromptWithParameters(inputValues);
+    } catch (error) {
+      console.error('Failed to update system prompt with parameters:', error);
+    }
+  };
 
   // Handle submit
   const handleSubmit = (e: React.FormEvent) => {
@@ -542,12 +647,40 @@ function ChatContentWithSidebar({
       .reverse();
   }, [filteredMessages]);
 
+  // Simple token estimation function (roughly 4 characters per token)
+  const estimateTokens = (text: string): number => {
+    return Math.ceil(text.length / 4);
+  };
+
+  // Calculate token counts from messages
+  useEffect(() => {
+    let inputTokens = 0;
+    let outputTokens = 0;
+
+    messages.forEach((message) => {
+      const textContent = getTextContent(message);
+      if (textContent) {
+        const tokens = estimateTokens(textContent);
+        if (message.role === 'user') {
+          inputTokens += tokens;
+        } else if (message.role === 'assistant') {
+          outputTokens += tokens;
+        }
+      }
+    });
+
+    setLocalInputTokens(inputTokens);
+    setLocalOutputTokens(outputTokens);
+  }, [messages]);
+
   // Fetch session metadata to get token count
   useEffect(() => {
     const fetchSessionTokens = async () => {
       try {
         const sessionDetails = await fetchSessionDetails(chat.id);
         setSessionTokenCount(sessionDetails.metadata.total_tokens || 0);
+        setSessionInputTokens(sessionDetails.metadata.accumulated_input_tokens || 0);
+        setSessionOutputTokens(sessionDetails.metadata.accumulated_output_tokens || 0);
       } catch (err) {
         console.error('Error fetching session token count:', err);
       }
@@ -556,6 +689,87 @@ function ChatContentWithSidebar({
       fetchSessionTokens();
     }
   }, [chat.id, messages]);
+
+  // Update token counts when sessionMetadata changes from the message stream
+  useEffect(() => {
+    console.log('Session metadata received:', sessionMetadata);
+    if (sessionMetadata) {
+      setSessionTokenCount(sessionMetadata.totalTokens || 0);
+      setSessionInputTokens(sessionMetadata.accumulatedInputTokens || 0);
+      setSessionOutputTokens(sessionMetadata.accumulatedOutputTokens || 0);
+    }
+  }, [sessionMetadata]);
+
+  // Handle model changes and accumulate costs
+  useEffect(() => {
+    if (
+      prevModelRef.current !== undefined &&
+      prevProviderRef.current !== undefined &&
+      (prevModelRef.current !== currentModel || prevProviderRef.current !== currentProvider)
+    ) {
+      // Model/provider has changed, save the costs for the previous model
+      const prevKey = `${prevProviderRef.current}/${prevModelRef.current}`;
+
+      // Get pricing info for the previous model
+      const prevCostInfo = getCostForModel(prevProviderRef.current, prevModelRef.current);
+
+      if (prevCostInfo) {
+        const prevInputCost =
+          (sessionInputTokens || localInputTokens) * (prevCostInfo.input_token_cost || 0);
+        const prevOutputCost =
+          (sessionOutputTokens || localOutputTokens) * (prevCostInfo.output_token_cost || 0);
+        const prevTotalCost = prevInputCost + prevOutputCost;
+
+        // Save the accumulated costs for this model
+        setSessionCosts((prev) => ({
+          ...prev,
+          [prevKey]: {
+            inputTokens: sessionInputTokens || localInputTokens,
+            outputTokens: sessionOutputTokens || localOutputTokens,
+            totalCost: prevTotalCost,
+          },
+        }));
+      }
+
+      // Restore token counters from session metadata instead of resetting to 0
+      // This preserves the accumulated session tokens when switching models
+      // and ensures cost tracking remains accurate across model changes
+      if (sessionMetadata) {
+        // Use Math.max to ensure non-negative values and handle potential data issues
+        setSessionTokenCount(Math.max(0, sessionMetadata.totalTokens || 0));
+        setSessionInputTokens(Math.max(0, sessionMetadata.accumulatedInputTokens || 0));
+        setSessionOutputTokens(Math.max(0, sessionMetadata.accumulatedOutputTokens || 0));
+      } else {
+        // Fallback: if no session metadata, preserve current session tokens instead of resetting
+        // This handles edge cases where metadata might not be available yet
+        console.warn(
+          'No session metadata available during model change, preserving current tokens'
+        );
+      }
+      // Only reset local token estimation counters since they're model-specific
+      setLocalInputTokens(0);
+      setLocalOutputTokens(0);
+
+      console.log(
+        'Model changed from',
+        `${prevProviderRef.current}/${prevModelRef.current}`,
+        'to',
+        `${currentProvider}/${currentModel}`,
+        '- saved costs and restored session token counters'
+      );
+    }
+
+    prevModelRef.current = currentModel || undefined;
+    prevProviderRef.current = currentProvider || undefined;
+  }, [
+    currentModel,
+    currentProvider,
+    sessionInputTokens,
+    sessionOutputTokens,
+    localInputTokens,
+    localOutputTokens,
+    sessionMetadata,
+  ]);
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -732,15 +946,16 @@ function ChatContentWithSidebar({
             />
           )}
           {messages.length === 0 ? (
-            <>
-              <SearchView>{/* Empty search view when no messages */}</SearchView>
-            </>
+            <Splash
+              append={append}
+              activities={Array.isArray(recipeConfig?.activities) ? recipeConfig!.activities : null}
+              title={recipeConfig?.title}
+            />
           ) : (
             <>
               <SearchView>
                 {filteredMessages.map((message, index) => {
                   const isUser = isUserMessage(message);
-                  const nextMessage = filteredMessages[index + 1];
 
                   return (
                     <div
@@ -844,9 +1059,12 @@ function ChatContentWithSidebar({
             setView={setView}
             hasMessages={hasMessages}
             numTokens={sessionTokenCount}
+            // inputTokens={sessionInputTokens || localInputTokens}
+            // outputTokens={sessionOutputTokens || localOutputTokens}
             droppedFiles={droppedFiles}
             messages={messages}
             setMessages={setMessages}
+            // sessionCosts={sessionCosts}
           />
         </div>
       </MainPanelLayout>
@@ -862,6 +1080,13 @@ function ChatContentWithSidebar({
         }}
         summaryContent={summaryContent}
       />
+      {isParameterModalOpen && recipeConfig?.parameters && (
+        <ParameterInputModal
+          parameters={recipeConfig.parameters}
+          onSubmit={handleParameterSubmit}
+          onClose={() => setIsParameterModalOpen(false)}
+        />
+      )}
     </div>
   );
 }

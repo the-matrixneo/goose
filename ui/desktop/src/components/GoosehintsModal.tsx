@@ -1,5 +1,4 @@
-import React, { useEffect, useState } from 'react';
-import { Card } from './ui/card';
+import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Check } from './icons';
 import {

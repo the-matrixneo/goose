@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { View, ViewOptions } from '../../../App';
 import { useConfig } from '../../ConfigContext';
+import { getApiUrl, getSecretKey } from '../../../config';
 
 interface ToolSelectionStrategySectionProps {
   setView: (view: View, viewOptions?: ViewOptions) => void;
@@ -35,15 +36,65 @@ export const ToolSelectionStrategySection = ({
   setView: _setView,
 }: ToolSelectionStrategySectionProps) => {
   const [currentStrategy, setCurrentStrategy] = useState('default');
+  const [_error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const { read, upsert } = useConfig();
 
   const handleStrategyChange = async (newStrategy: string) => {
+    if (isLoading) return; // Prevent multiple simultaneous requests
+
+    setError(null); // Clear any previous errors
+    setIsLoading(true);
+
     try {
-      await upsert('GOOSE_ROUTER_TOOL_SELECTION_STRATEGY', newStrategy, false);
+      // First update the configuration
+      try {
+        await upsert('GOOSE_ROUTER_TOOL_SELECTION_STRATEGY', newStrategy, false);
+      } catch (error) {
+        console.error('Error updating configuration:', error);
+        setError(`Failed to update configuration: ${error}`);
+        setIsLoading(false);
+        return;
+      }
+
+      // Then update the backend
+      try {
+        const response = await fetch(getApiUrl('/agent/update_router_tool_selector'), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Secret-Key': getSecretKey(),
+          },
+        });
+
+        if (!response.ok) {
+          const errorData = await response
+            .json()
+            .catch(() => ({ error: 'Unknown error from backend' }));
+          throw new Error(errorData.error || 'Unknown error from backend');
+        }
+
+        // Parse the success response
+        const data = await response
+          .json()
+          .catch(() => ({ message: 'Tool selection strategy updated successfully' }));
+        if (data.error) {
+          throw new Error(data.error);
+        }
+      } catch (error) {
+        console.error('Error updating backend:', error);
+        setError(`Failed to update backend: ${error}`);
+        setIsLoading(false);
+        return;
+      }
+
+      // If both succeeded, update the UI
       setCurrentStrategy(newStrategy);
     } catch (error) {
       console.error('Error updating tool selection strategy:', error);
-      throw new Error(`Failed to store new tool selection strategy: ${newStrategy}`);
+      setError(`Failed to update tool selection strategy: ${error}`);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -55,6 +106,7 @@ export const ToolSelectionStrategySection = ({
       }
     } catch (error) {
       console.error('Error fetching current tool selection strategy:', error);
+      setError(`Failed to fetch current strategy: ${error}`);
     }
   }, [read]);
 
@@ -84,10 +136,11 @@ export const ToolSelectionStrategySection = ({
                 value={strategy.key}
                 checked={currentStrategy === strategy.key}
                 onChange={() => handleStrategyChange(strategy.key)}
+                disabled={isLoading}
                 className="peer sr-only"
               />
               <div
-                className="h-4 w-4 rounded-full border border-border-default 
+                className="h-4 w-4 rounded-full border border-border-default
                       peer-checked:border-[6px] peer-checked:border-black dark:peer-checked:border-white
                       peer-checked:bg-white dark:peer-checked:bg-black
                       transition-all duration-200 ease-in-out group-hover:border-border-default"

@@ -1,7 +1,7 @@
 use super::utils::verify_secret_key;
-use std::sync::Arc;
-use std::collections::HashMap;
 use chrono::{DateTime, Datelike};
+use std::collections::HashMap;
+use std::sync::Arc;
 
 use crate::state::AppState;
 use axum::{
@@ -12,11 +12,11 @@ use axum::{
 };
 use goose::message::Message;
 use goose::session;
-use goose::session::info::{get_session_info, SessionInfo, SortOrder};
+use goose::session::info::{get_valid_sorted_sessions, SessionInfo, SortOrder};
 use goose::session::SessionMetadata;
 use serde::Serialize;
+use tracing::{error, info};
 use utoipa::ToSchema;
-use tracing::{info, error};
 
 #[derive(Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -79,8 +79,8 @@ async fn list_sessions(
 ) -> Result<Json<SessionListResponse>, StatusCode> {
     verify_secret_key(&headers, &state)?;
 
-    let sessions =
-        get_session_info(SortOrder::Descending).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let sessions = get_valid_sorted_sessions(SortOrder::Descending)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     Ok(Json(SessionListResponse { sessions }))
 }
@@ -110,9 +110,11 @@ async fn get_session_history(
 ) -> Result<Json<SessionHistoryResponse>, StatusCode> {
     verify_secret_key(&headers, &state)?;
 
-    let session_path = session::get_path(session::Identifier::Name(session_id.clone()));
+    let session_path = match session::get_path(session::Identifier::Name(session_id.clone())) {
+        Ok(path) => path,
+        Err(_) => return Err(StatusCode::BAD_REQUEST),
+    };
 
-    // Read metadata
     let metadata = session::read_metadata(&session_path).map_err(|_| StatusCode::NOT_FOUND)?;
 
     let messages = match session::read_messages(&session_path) {
@@ -148,14 +150,13 @@ async fn get_session_insights(
     headers: HeaderMap,
 ) -> Result<Json<SessionInsights>, StatusCode> {
     info!("Received request for session insights");
-    
+
     verify_secret_key(&headers, &state)?;
 
-    let sessions = get_session_info(SortOrder::Descending)
-        .map_err(|e| {
-            error!("Failed to get session info: {:?}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+    let sessions = get_valid_sorted_sessions(SortOrder::Descending).map_err(|e| {
+        error!("Failed to get session info: {:?}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     // Filter out sessions without descriptions
     let sessions: Vec<SessionInfo> = sessions
@@ -167,7 +168,7 @@ async fn get_session_insights(
 
     // Calculate insights
     let total_sessions = sessions.len();
-    
+
     // Track directory usage
     let mut dir_counts: HashMap<String, usize> = HashMap::new();
     let mut total_duration = 0.0;
@@ -192,10 +193,12 @@ async fn get_session_insights(
 
         // Calculate session duration from messages
         let session_path = session::get_path(session::Identifier::Name(session.id.clone()));
-        if let Ok(messages) = session::read_messages(&session_path) {
-            if let (Some(first), Some(last)) = (messages.first(), messages.last()) {
-                let duration = (last.created - first.created) as f64 / 60.0; // Convert to minutes
-                total_duration += duration;
+        if let Ok(session_path) = session_path {
+            if let Ok(messages) = session::read_messages(&session_path) {
+                if let (Some(first), Some(last)) = (messages.first(), messages.last()) {
+                    let duration = (last.created - first.created) as f64 / 60.0; // Convert to minutes
+                    total_duration += duration;
+                }
             }
         }
     }
@@ -246,7 +249,7 @@ async fn get_activity_heatmap(
 ) -> Result<Json<Vec<ActivityHeatmapCell>>, StatusCode> {
     verify_secret_key(&headers, &state)?;
 
-    let sessions = get_session_info(SortOrder::Descending)
+    let sessions = get_valid_sorted_sessions(SortOrder::Descending)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     // Only sessions with a description
@@ -256,10 +259,13 @@ async fn get_activity_heatmap(
         .collect();
 
     // Map: (week, day) -> count
-    let mut heatmap: std::collections::HashMap<(usize, usize), usize> = std::collections::HashMap::new();
+    let mut heatmap: std::collections::HashMap<(usize, usize), usize> =
+        std::collections::HashMap::new();
 
     for session in &sessions {
-        if let Ok(date) = chrono::NaiveDateTime::parse_from_str(&session.modified, "%Y-%m-%d %H:%M:%S UTC") {
+        if let Ok(date) =
+            chrono::NaiveDateTime::parse_from_str(&session.modified, "%Y-%m-%d %H:%M:%S UTC")
+        {
             let date = date.date();
             let week = date.iso_week().week() as usize - 1; // 0-based week
             let day = date.weekday().num_days_from_sunday() as usize; // 0=Sun, 6=Sat

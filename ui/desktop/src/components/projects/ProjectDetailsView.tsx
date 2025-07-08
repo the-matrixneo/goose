@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Project } from '../../projects';
 import { Session, fetchSessions } from '../../sessions';
 import {
@@ -10,7 +10,6 @@ import {
 import { Button } from '../ui/button';
 import {
   ArrowLeft,
-  Plus,
   Loader,
   RefreshCcw,
   Edit,
@@ -20,7 +19,6 @@ import {
   ChevronLeft,
   LoaderCircle,
   AlertCircle,
-  Sparkles,
   Calendar,
   Target,
 } from 'lucide-react';
@@ -80,7 +78,7 @@ const ProjectSessions: React.FC<{
   onRetry: () => void;
   onRemoveSession: (sessionId: string) => void;
   onAddSession: () => void;
-}> = ({ sessions, isLoading, error, onRetry, onRemoveSession, onAddSession }) => {
+}> = ({ sessions, isLoading, error, onRetry }) => {
   return (
     <ScrollArea className="h-full w-full">
       <div className="pb-16">
@@ -182,10 +180,38 @@ const ProjectDetailsView: React.FC<ProjectDetailsViewProps> = ({ projectId, onBa
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  const loadProjectData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      // Fetch the project details
+      const projectData = await fetchProject(projectId);
+      setProject(projectData);
+
+      // Fetch all sessions
+      const allSessionsData = await fetchSessions();
+      setAllSessions(allSessionsData);
+
+      // Filter sessions that belong to this project
+      const projectSessions = allSessionsData.filter((session: Session) =>
+        projectData.sessionIds.includes(session.id)
+      );
+
+      setSessions(projectSessions);
+    } catch (err) {
+      console.error('Failed to load project data:', err);
+      setError('Failed to load project data');
+      toastError({ title: 'Error', msg: 'Failed to load project data' });
+    } finally {
+      setLoading(false);
+    }
+  }, [projectId]);
+
   // Fetch project details and associated sessions
   useEffect(() => {
     loadProjectData();
-  }, [projectId]);
+  }, [projectId, loadProjectData]);
 
   // Set up session creation listener to automatically associate new sessions with this project
   useEffect(() => {
@@ -241,35 +267,7 @@ const ProjectDetailsView: React.FC<ProjectDetailsViewProps> = ({ projectId, onBa
       window.removeEventListener('session-created', handleSessionCreated);
       window.removeEventListener('message-stream-finished', handleSessionCreated);
     };
-  }, [project]);
-
-  const loadProjectData = async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      // Fetch the project details
-      const projectData = await fetchProject(projectId);
-      setProject(projectData);
-
-      // Fetch all sessions
-      const allSessionsData = await fetchSessions();
-      setAllSessions(allSessionsData);
-
-      // Filter sessions that belong to this project
-      const projectSessions = allSessionsData.filter((session: Session) =>
-        projectData.sessionIds.includes(session.id)
-      );
-
-      setSessions(projectSessions);
-    } catch (err) {
-      console.error('Failed to load project data:', err);
-      setError('Failed to load project data');
-      toastError({ title: 'Error', msg: 'Failed to load project data' });
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [project, loadProjectData]);
 
   const handleRemoveSession = async (sessionId: string) => {
     if (!project) return;

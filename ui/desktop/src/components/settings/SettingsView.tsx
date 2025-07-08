@@ -1,5 +1,4 @@
 import { ScrollArea } from '../ui/scroll-area';
-import { useSidebar } from '../ui/sidebar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import type { View, ViewOptions } from '../../App';
 import ModelsSection from './models/ModelsSection';
@@ -7,16 +6,7 @@ import SessionSharingSection from './sessions/SessionSharingSection';
 import AppSettingsSection from './app/AppSettingsSection';
 import { ExtensionConfig } from '../../api';
 import { MainPanelLayout } from '../Layout/MainPanelLayout';
-import {
-  Bot,
-  Settings,
-  Share2,
-  Palette,
-  Wrench,
-  Monitor,
-  Target,
-  MessageSquare,
-} from 'lucide-react';
+import { Bot, Share2, Monitor, MessageSquare } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import ChatSettingsSection from './chat/ChatSettingsSection';
 
@@ -58,6 +48,20 @@ export default function SettingsView({
       }
     }
   }, [viewOptions.section]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [onClose]);
 
   return (
     <>

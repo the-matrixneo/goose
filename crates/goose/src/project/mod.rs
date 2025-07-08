@@ -65,4 +65,4 @@ impl From<&Project> for ProjectMetadata {
 pub use storage::{
     add_session_to_project, create_project, delete_project, ensure_project_dir, get_project,
     list_projects, remove_session_from_project, update_project,
-}; 
+};

@@ -5,7 +5,6 @@ import MarkdownContent from './MarkdownContent';
 import { Content, ToolRequestMessageContent, ToolResponseMessageContent } from '../types/message';
 import { snakeToTitleCase } from '../utils';
 import Dot, { LoadingStatus } from './ui/Dot';
-import Expand from './ui/Expand';
 import { NotificationEvent } from '../hooks/useMessageStream';
 
 interface ToolCallWithResponseProps {
@@ -131,7 +130,6 @@ function ToolCallView({
 
   // Tool call timing tracking
   const [startTime, setStartTime] = useState<number | null>(null);
-  const [elapsedTime, setElapsedTime] = useState<number | null>(null);
 
   // Track when tool call starts (when there's no response yet)
   useEffect(() => {
@@ -139,33 +137,6 @@ function ToolCallView({
       setStartTime(Date.now());
     }
   }, [toolResponse?.toolResult.status, startTime]);
-
-  // Calculate elapsed time while tool call is running
-  useEffect(() => {
-    if (startTime && loadingStatus === 'loading') {
-      const interval = setInterval(() => {
-        setElapsedTime(Date.now() - startTime);
-      }, 100); // Update every 100ms for smooth display
-
-      return () => clearInterval(interval);
-    } else if (startTime && loadingStatus !== 'loading') {
-      // Tool call finished, calculate final elapsed time
-      setElapsedTime(Date.now() - startTime);
-    }
-  }, [startTime, loadingStatus]);
-
-  // Format elapsed time for display
-  const formatElapsedTime = (ms: number): string => {
-    if (ms < 1000) {
-      return `${ms}ms`;
-    } else if (ms < 60000) {
-      return `${(ms / 1000).toFixed(1)}s`;
-    } else {
-      const minutes = Math.floor(ms / 60000);
-      const seconds = ((ms % 60000) / 1000).toFixed(0);
-      return `${minutes}m ${seconds}s`;
-    }
-  };
 
   const toolResults: { result: Content; isExpandToolResults: boolean }[] =
     loadingStatus === 'success' && Array.isArray(toolResponse?.toolResult.value)
@@ -203,58 +174,176 @@ function ToolCallView({
   const isRenderingProgress =
     loadingStatus === 'loading' && (progressEntries.length > 0 || (logs || []).length > 0);
 
-  const isShouldExpand = false; // Always start minimized
+  // Only expand if there are actual results that need to be shown, not just for tool details
+  const isShouldExpand = toolResults.some((v) => v.isExpandToolResults);
 
-  // Function to create a compact representation of arguments
-  const getCompactArguments = () => {
+  // Function to create a descriptive representation of what the tool is doing
+  const getToolDescription = (): string | null => {
     const args = toolCall.arguments as Record<string, ToolCallArgumentValue>;
-    const entries = Object.entries(args);
+    const toolName = toolCall.name.substring(toolCall.name.lastIndexOf('__') + 2);
 
-    if (entries.length === 0) return null;
+    // Helper function to get string value safely
+    const getStringValue = (value: ToolCallArgumentValue): string => {
+      return typeof value === 'string' ? value : JSON.stringify(value);
+    };
 
-    // For a single parameter, show key and truncated value
-    if (entries.length === 1) {
-      const [key, value] = entries[0];
-      const stringValue = typeof value === 'string' ? value : JSON.stringify(value);
-      const truncatedValue =
-        stringValue.length > 30 ? stringValue.substring(0, 30) + '...' : stringValue;
+    // Helper function to truncate long values
+    const truncate = (str: string, maxLength: number = 50): string => {
+      return str.length > maxLength ? str.substring(0, maxLength) + '...' : str;
+    };
 
-      return (
-        <span className="ml-2 text-text-muted truncate text-xs opacity-70">
-          {key}: {truncatedValue}
-        </span>
-      );
+    // Generate descriptive text based on tool type
+    switch (toolName) {
+      case 'text_editor':
+        if (args.command === 'write' && args.path) {
+          return `writing ${truncate(getStringValue(args.path))}`;
+        }
+        if (args.command === 'view' && args.path) {
+          return `reading ${truncate(getStringValue(args.path))}`;
+        }
+        if (args.command === 'str_replace' && args.path) {
+          return `editing ${truncate(getStringValue(args.path))}`;
+        }
+        if (args.command && args.path) {
+          return `${getStringValue(args.command)} ${truncate(getStringValue(args.path))}`;
+        }
+        break;
+
+      case 'shell':
+        if (args.command) {
+          return `running ${truncate(getStringValue(args.command))}`;
+        }
+        break;
+
+      case 'search':
+        if (args.name) {
+          return `searching for "${truncate(getStringValue(args.name))}"`;
+        }
+        if (args.mimeType) {
+          return `searching for ${getStringValue(args.mimeType)} files`;
+        }
+        break;
+
+      case 'read': {
+        if (args.uri) {
+          const uri = getStringValue(args.uri);
+          const fileId = uri.replace('gdrive:///', '');
+          return `reading file ${truncate(fileId)}`;
+        }
+        if (args.url) {
+          return `reading ${truncate(getStringValue(args.url))}`;
+        }
+        break;
+      }
+
+      case 'create_file':
+        if (args.name) {
+          return `creating ${truncate(getStringValue(args.name))}`;
+        }
+        break;
+
+      case 'update_file':
+        if (args.fileId) {
+          return `updating file ${truncate(getStringValue(args.fileId))}`;
+        }
+        break;
+
+      case 'sheets_tool': {
+        if (args.operation && args.spreadsheetId) {
+          const operation = getStringValue(args.operation);
+          const sheetId = truncate(getStringValue(args.spreadsheetId));
+          return `${operation} in sheet ${sheetId}`;
+        }
+        break;
+      }
+
+      case 'docs_tool': {
+        if (args.operation && args.documentId) {
+          const operation = getStringValue(args.operation);
+          const docId = truncate(getStringValue(args.documentId));
+          return `${operation} in document ${docId}`;
+        }
+        break;
+      }
+
+      case 'web_scrape':
+        if (args.url) {
+          return `scraping ${truncate(getStringValue(args.url))}`;
+        }
+        break;
+
+      case 'remember_memory':
+        if (args.category && args.data) {
+          return `storing ${getStringValue(args.category)}: ${truncate(getStringValue(args.data))}`;
+        }
+        break;
+
+      case 'retrieve_memories':
+        if (args.category) {
+          return `retrieving ${getStringValue(args.category)} memories`;
+        }
+        break;
+
+      case 'screen_capture':
+        if (args.window_title) {
+          return `capturing window "${truncate(getStringValue(args.window_title))}"`;
+        }
+        return 'capturing screen';
+
+      case 'automation_script':
+        if (args.language) {
+          return `running ${getStringValue(args.language)} script`;
+        }
+        break;
+
+      case 'final_output':
+        return 'final output';
+
+      case 'computer_control':
+        return 'poking around...';
+
+      default: {
+        // Fallback to showing key parameters for unknown tools
+        const entries = Object.entries(args);
+        if (entries.length === 0) return null;
+
+        // For a single parameter, show key and truncated value
+        if (entries.length === 1) {
+          const [key, value] = entries[0];
+          const stringValue = getStringValue(value);
+          const truncatedValue = truncate(stringValue, 30);
+          return `${key}: ${truncatedValue}`;
+        }
+
+        // For multiple parameters, just show the keys
+        return entries.map(([key]) => key).join(', ');
+      }
     }
 
-    // For multiple parameters, just show the keys
-    return (
-      <span className="ml-2 text-text-muted truncate text-xs opacity-70">
-        {entries.map(([key]) => key).join(', ')}
-      </span>
-    );
+    return null;
   };
 
   return (
     <div className="border border-borderSubtle rounded-lg overflow-hidden shadow-sm">
       <ToolCallExpandable
-        isStartExpanded={false}
-        isForceExpand={false}
-        className="bg-background-subtle bg-opacity-50"
+        isStartExpanded={isRenderingProgress}
+        isForceExpand={isShouldExpand}
         label={
-          <div className="flex items-center py-2">
-            <Dot size={4} loadingStatus={loadingStatus} />
-            <span className="ml-3 font-medium">
-              {snakeToTitleCase(toolCall.name.substring(toolCall.name.lastIndexOf('__') + 2))}
+          <>
+            <Dot size={2} loadingStatus={loadingStatus} />
+            <span className="ml-[10px]">
+              {(() => {
+                const description = getToolDescription();
+                if (description) {
+                  return description;
+                }
+                // Fallback to the original tool name formatting
+                return snakeToTitleCase(
+                  toolCall.name.substring(toolCall.name.lastIndexOf('__') + 2)
+                );
+              })()}
             </span>
-            {/* Display compact arguments inline */}
-            {isToolDetails && getCompactArguments()}
-            {/* Display elapsed time */}
-            {elapsedTime !== null && (
-              <span className="ml-auto text-xs text-text-muted opacity-70">
-                {formatElapsedTime(elapsedTime)}
-              </span>
-            )}
-          </div>
+          </>
         }
       >
         {/* Tool Details */}

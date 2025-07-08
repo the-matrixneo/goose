@@ -2,14 +2,7 @@ import { useEffect, useState } from 'react';
 import { Button } from '../../ui/button';
 import { ChevronDownIcon, SlidersHorizontal } from 'lucide-react';
 import { getTools, PermissionLevel, ToolInfo, upsertPermissions } from '../../../api';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '../../ui/dialog';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '../../ui/dialog';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 
 function getFirstSentence(text: string): string {
@@ -87,24 +80,6 @@ export default function PermissionModal({ extensionName, onClose }: PermissionMo
       console.error('Error saving permissions:', err);
     }
   };
-
-  const footerContent = (
-    <>
-      <Button
-        onClick={handleSave}
-        className="w-full h-[60px] rounded-none border-b border-borderSubtle bg-transparent hover:bg-bgSubtle text-textProminent font-medium text-md"
-      >
-        Save Changes
-      </Button>
-      <Button
-        onClick={onClose}
-        variant="ghost"
-        className="w-full h-[60px] rounded-none hover:bg-bgSubtle text-textSubtle hover:text-textStandard text-md font-regular"
-      >
-        Cancel
-      </Button>
-    </>
-  );
 
   return (
     <Dialog open={true} onOpenChange={(open) => !open && onClose()}>

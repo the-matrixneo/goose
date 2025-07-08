@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import ProjectsView from './ProjectsView';
 import ProjectDetailsView from './ProjectDetailsView';
 import { View, ViewOptions } from '../../App';
@@ -20,10 +20,6 @@ const ProjectsContainer: React.FC<ProjectsContainerProps> = ({ setView }) => {
     // Trigger a refresh of the projects list when returning from details
     setRefreshTrigger((prev) => prev + 1);
   };
-
-  const triggerRefresh = useCallback(() => {
-    setRefreshTrigger((prev) => prev + 1);
-  }, []);
 
   if (selectedProjectId) {
     return (

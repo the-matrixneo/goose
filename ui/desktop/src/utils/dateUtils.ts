@@ -1,10 +1,12 @@
+import { Session } from '../sessions';
+
 export interface DateGroup {
   label: string;
-  sessions: any[];
+  sessions: Session[];
   date: Date;
 }
 
-export function groupSessionsByDate(sessions: any[]): DateGroup[] {
+export function groupSessionsByDate(sessions: Session[]): DateGroup[] {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 

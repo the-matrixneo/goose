@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, ViewOptions } from '../../App';
 import { fetchSessionDetails, type SessionDetails } from '../../sessions';
 import SessionListView from './SessionListView';
@@ -16,23 +16,6 @@ const SessionsView: React.FC<SessionsViewProps> = ({ setView }) => {
   const [error, setError] = useState<string | null>(null);
   const [initialSessionId, setInitialSessionId] = useState<string | null>(null);
   const location = useLocation();
-
-  // Check if a session ID was passed in the location state (from SessionsInsights)
-  useEffect(() => {
-    const state = location.state as { selectedSessionId?: string } | null;
-    if (state?.selectedSessionId) {
-      // Set immediate loading state to prevent flash of session list
-      setIsLoadingSession(true);
-      setInitialSessionId(state.selectedSessionId);
-      handleSelectSession(state.selectedSessionId);
-      // Clear the state to prevent reloading on navigation
-      window.history.replaceState({}, document.title);
-    }
-  }, [location.state]);
-
-  const handleSelectSession = async (sessionId: string) => {
-    await loadSessionDetails(sessionId);
-  };
 
   const loadSessionDetails = async (sessionId: string) => {
     setIsLoadingSession(true);
@@ -57,6 +40,23 @@ const SessionsView: React.FC<SessionsViewProps> = ({ setView }) => {
       setInitialSessionId(null);
     }
   };
+
+  const handleSelectSession = useCallback(async (sessionId: string) => {
+    await loadSessionDetails(sessionId);
+  }, []);
+
+  // Check if a session ID was passed in the location state (from SessionsInsights)
+  useEffect(() => {
+    const state = location.state as { selectedSessionId?: string } | null;
+    if (state?.selectedSessionId) {
+      // Set immediate loading state to prevent flash of session list
+      setIsLoadingSession(true);
+      setInitialSessionId(state.selectedSessionId);
+      handleSelectSession(state.selectedSessionId);
+      // Clear the state to prevent reloading on navigation
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state, handleSelectSession]);
 
   const handleBackToSessions = () => {
     setSelectedSession(null);

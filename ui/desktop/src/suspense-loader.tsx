@@ -1,4 +1,3 @@
-import GooseLogo from './components/GooseLogo';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function SuspenseLoader() {

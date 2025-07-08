@@ -102,7 +102,9 @@ export async function createProject(request: CreateProjectRequest): Promise<Proj
     },
   });
   console.log('Raw createProject response:', response);
-  return ensureDefaultDirectory((response as any).project ?? response);
+  return ensureDefaultDirectory(
+    (response as { project?: Project }).project ?? (response as unknown as Project)
+  );
 }
 
 /**

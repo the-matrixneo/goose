@@ -7,7 +7,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../../../ui/dialog';
-import ProviderSetupHeader from './subcomponents/ProviderSetupHeader';
 import DefaultProviderSetupForm from './subcomponents/forms/DefaultProviderSetupForm';
 import ProviderSetupActions from './subcomponents/ProviderSetupActions';
 import ProviderLogo from './subcomponents/ProviderLogo';

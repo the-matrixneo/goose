@@ -1,15 +1,5 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
-import {
-  Folder,
-  FileText,
-  Clock,
-  MessageCircle,
-  Home,
-  Loader2,
-  Puzzle,
-  History,
-  FolderKanban,
-} from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { FileText, Clock, Home, Puzzle, History, FolderKanban } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -19,21 +9,14 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarGroup,
-  SidebarGroupLabel,
   SidebarGroupContent,
-  SidebarTrigger,
   useSidebar,
   SidebarSeparator,
 } from '../ui/sidebar';
-import { Button } from '../ui/button';
-import { ChatSmart, Time, Gear, LinkedIn, Youtube, Discord } from '../icons';
+import { ChatSmart, Gear } from '../icons';
 import { ViewOptions, View } from '../../App';
-import { useConfig } from '../ConfigContext';
 import { Recipe } from '../../recipe';
-import { saveRecipe, generateRecipeFilename } from '../../recipe/recipeStorage';
-import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/Tooltip';
-import ThemeSelector from './ThemeSelector';
-import GooseLogo from '../GooseLogo';
+import { saveRecipe } from '../../recipe/recipeStorage';
 import { useChatContext } from '../../contexts/ChatContext';
 import { Goose } from '../icons/Goose';
 
@@ -47,26 +30,22 @@ interface SidebarProps {
 }
 
 // Main Sidebar Component
-const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView, currentPath }) => {
+const AppSidebar: React.FC<SidebarProps> = ({ currentPath }) => {
   const navigate = useNavigate();
-  const [isVisible, setIsVisible] = useState(false);
+  // const isVisible = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [saveRecipeName, setSaveRecipeName] = useState('');
   const [saveGlobal, setSaveGlobal] = useState(true);
   const [saving, setSaving] = useState(false);
-  const { remove } = useConfig();
-  const { hasActiveSession, resetChat } = useChatContext();
+  const { resetChat } = useChatContext();
   const { state } = useSidebar();
-  const safeIsMacOS = (window?.electron?.platform || 'darwin') === 'darwin';
-
-  // Calculate padding based on sidebar state and macOS
-  const headerPadding = safeIsMacOS ? 'pl-8' : 'pl-4';
 
   useEffect(() => {
     // Trigger animation after a small delay
     const timer = setTimeout(() => {
-      setIsVisible(true);
+      // setIsVisible(true);
     }, 100);
+    // eslint-disable-next-line no-undef
     return () => clearTimeout(timer);
   }, []);
 
@@ -114,19 +93,6 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
     }
   };
 
-  const handleSaveRecipeClick = () => {
-    const currentRecipeConfig = window.appConfig.get('recipeConfig');
-
-    if (currentRecipeConfig && typeof currentRecipeConfig === 'object') {
-      const recipe = currentRecipeConfig as Recipe;
-      const suggestedName = generateRecipeFilename(recipe);
-      setSaveRecipeName(suggestedName);
-      setShowSaveDialog(true);
-    }
-  };
-
-  const recipeConfig = window.appConfig.get('recipeConfig');
-
   // Helper function to check if a path is active
   const isActivePath = (path: string) => {
     return currentPath === path;
@@ -135,13 +101,6 @@ const AppSidebar: React.FC<SidebarProps> = ({ setIsGoosehintsModalOpen, setView,
   return (
     <>
       <SidebarContent className="pt-16">
-        {/* <SidebarHeader>
-          <div className="flex items-center gap-2 pt-12 pb-4">
-            <GooseLogo size="small" />
-            <span className="text-base">codename goose</span>
-          </div>
-        </SidebarHeader> */}
-
         {/* Menu */}
         <SidebarMenu>
           {/* Navigation Group */}

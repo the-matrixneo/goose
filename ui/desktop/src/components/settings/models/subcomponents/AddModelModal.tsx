@@ -18,37 +18,6 @@ import { useModelAndProvider } from '../../../ModelAndProviderContext';
 import type { View } from '../../../../App';
 import Model, { getProviderMetadata } from '../modelInterface';
 
-const ModalButtons = ({
-  onSubmit,
-  onCancel,
-  _isValid: _,
-  _validationErrors: __,
-}: {
-  onSubmit: () => void;
-  onCancel: () => void;
-  _isValid: boolean;
-  _validationErrors: { provider: string; model: string };
-}) => (
-  <div>
-    <Button
-      type="submit"
-      variant="ghost"
-      onClick={onSubmit}
-      className="w-full h-[60px] rounded-none border-borderSubtle text-base hover:bg-bgSubtle text-textProminent font-regular"
-    >
-      Select model
-    </Button>
-    <Button
-      type="button"
-      variant="ghost"
-      onClick={onCancel}
-      className="w-full h-[60px] rounded-none border-t border-borderSubtle hover:text-textStandard text-textSubtle hover:bg-bgSubtle text-base font-regular"
-    >
-      Cancel
-    </Button>
-  </div>
-);
-
 type AddModelModalProps = {
   onClose: () => void;
   setView: (view: View) => void;

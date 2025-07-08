@@ -1,18 +1,9 @@
-import React, {
-  useEffect,
-  useRef,
-  useState,
-  useMemo,
-  useCallback,
-  useContext,
-  createContext,
-} from 'react';
+import React, { useEffect, useRef, useState, useMemo, useContext, createContext } from 'react';
 import { useLocation } from 'react-router-dom';
 import { getApiUrl } from '../config';
 import FlappyGoose from './FlappyGoose';
 import GooseMessage from './GooseMessage';
 import { type View, ViewOptions } from '../App';
-import LoadingGoose from './LoadingGoose';
 import { ScrollAreaHandle } from './ui/scroll-area';
 import UserMessage from './UserMessage';
 import { SearchView } from './conversation/SearchView';
@@ -29,7 +20,6 @@ import {
   useChatContextManager,
 } from './context_management/ChatContextManager';
 import { ContextHandler } from './context_management/ContextHandler';
-import { LocalMessageStorage } from '../utils/localMessageStorage';
 import { useChatContext } from '../contexts/ChatContext';
 import {
   Message,
@@ -39,12 +29,9 @@ import {
   ToolRequestMessageContent,
   ToolResponseMessageContent,
   ToolConfirmationRequestMessageContent,
-  getTextContent,
   TextContent,
 } from '../types/message';
-import BottomMenu from './bottom_menu/BottomMenu';
 import { SessionInsights } from './sessions/SessionsInsights';
-import { useSidebar } from './ui/sidebar';
 import { Button } from './ui/button';
 import { Idea } from './icons';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/Tooltip';
@@ -133,13 +120,8 @@ function HubContentWithSidebar({
   setView: (view: View, viewOptions?: ViewOptions) => void;
   setIsGoosehintsModalOpen: (isOpen: boolean) => void;
 }) {
-  const { open: isSidebarOpen } = useSidebar();
-  const safeIsMacOS = (window?.electron?.platform || 'darwin') === 'darwin';
   const location = useLocation();
   const { resetChat } = useChatContext();
-
-  // Calculate padding based on sidebar state and macOS
-  const headerPadding = !isSidebarOpen ? (safeIsMacOS ? 'pl-20' : 'pl-12') : 'pl-4';
 
   const [hasMessages, setHasMessages] = useState(false);
   const [lastInteractionTime, setLastInteractionTime] = useState<number>(Date.now());
@@ -148,7 +130,6 @@ function HubContentWithSidebar({
   const [sessionTokenCount, setSessionTokenCount] = useState<number>(0);
   const [ancestorMessages, setAncestorMessages] = useState<Message[]>([]);
   const [droppedFiles, setDroppedFiles] = useState<string[]>([]);
-  const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
   const [isInPairMode, setIsInPairMode] = useState(false);
   // New state to force showing insights when navigating to hub
   const [forceShowInsights, setForceShowInsights] = useState(true);
@@ -193,19 +174,9 @@ function HubContentWithSidebar({
   // Get recipeConfig directly from appConfig
   const recipeConfig = window.appConfig.get('recipeConfig') as Recipe | null;
 
-  // Store message in global history when it's added
-  const storeMessageInHistory = useCallback((message: Message) => {
-    if (isUserMessage(message)) {
-      const text = getTextContent(message);
-      if (text) {
-        LocalMessageStorage.addMessage(text);
-      }
-    }
-  }, []);
-
   const {
     messages,
-    append: originalAppend,
+    append,
     stop,
     isLoading,
     error,
@@ -252,28 +223,6 @@ function HubContentWithSidebar({
       }
     },
   });
-
-  // Wrap append to store messages in global history
-  const append = useCallback(
-    (messageOrString: Message | string) => {
-      const message =
-        typeof messageOrString === 'string' ? createUserMessage(messageOrString) : messageOrString;
-      storeMessageInHistory(message);
-
-      // If this is the first message in a new session, trigger a refresh immediately
-      // Only trigger if we're starting a completely new session (no existing messages)
-      if (messages.length === 0 && chat.messages.length === 0) {
-        console.log('Hub: New session detected, emitting session-created event');
-        // Emit event to indicate a new session is being created
-        window.dispatchEvent(new CustomEvent('session-created'));
-        // Also update the refresh trigger
-        setRefreshTrigger((prev) => prev + 1);
-      }
-
-      return originalAppend(message);
-    },
-    [originalAppend, storeMessageInHistory, messages.length, chat.messages.length]
-  );
 
   // for CLE events -- create a new session id for the next set of messages
   useEffect(() => {
@@ -767,7 +716,7 @@ function HubContentWithSidebar({
               <SearchView>
                 {filteredMessages.map((message, index) => {
                   const isUser = isUserMessage(message);
-                  const nextMessage = filteredMessages[index + 1];
+                  // const nextMessage = filteredMessages[index + 1];
 
                   return (
                     <div

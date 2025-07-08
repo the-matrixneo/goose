@@ -23,6 +23,7 @@ import Settings from './Settings';
 import Time from './Time';
 import { Gear } from './Gear';
 import Youtube from './Youtube';
+import { Microphone } from './Microphone';
 
 export {
   ArrowDown,
@@ -41,6 +42,7 @@ export {
   Edit,
   Idea,
   Gear,
+  Microphone,
   LinkedIn,
   More,
   Refresh,

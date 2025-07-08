@@ -1,6 +1,8 @@
 import { View, ViewOptions } from '../../../App';
 import { ModeSection } from '../mode/ModeSection';
 import { ToolSelectionStrategySection } from '../tool_selection_strategy/ToolSelectionStrategySection';
+import SchedulerSection from '../scheduler/SchedulerSection';
+import DictationSection from '../dictation/DictationSection';
 import { ResponseStylesSection } from '../response_styles/ResponseStylesSection';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../ui/card';
 
@@ -28,6 +30,28 @@ export default function ChatSettingsSection({ setView }: ChatSettingsSectionProp
         </CardHeader>
         <CardContent className="px-2">
           <ResponseStylesSection />
+        </CardContent>
+      </Card>
+
+      <Card className="pb-2 rounded-lg">
+        <CardHeader className="pb-0">
+          <CardTitle className="">Voice Dictation</CardTitle>
+          <CardDescription>Configure voice input for messages</CardDescription>
+        </CardHeader>
+        <CardContent className="px-2">
+          <DictationSection />
+        </CardContent>
+      </Card>
+
+      <Card className="pb-2 rounded-lg">
+        <CardHeader className="pb-0">
+          <CardTitle className="">Scheduling Engine</CardTitle>
+          <CardDescription>
+            Choose which scheduling backend to use for scheduled recipes and tasks
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="px-2">
+          <SchedulerSection />
         </CardContent>
       </Card>
 

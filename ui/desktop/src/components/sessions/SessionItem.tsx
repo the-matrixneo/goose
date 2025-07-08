@@ -14,7 +14,7 @@ const SessionItem: React.FC<SessionItemProps> = ({ session, extraActions }) => {
       <div>
         <div className="font-medium">{session.metadata.description || `Session ${session.id}`}</div>
         <div className="text-sm text-muted-foreground">
-          {formatDate(new Date(session.modified))} • {session.metadata.message_count} messages
+          {formatDate(session.modified)} • {session.metadata.message_count} messages
         </div>
         <div className="text-sm text-muted-foreground">{session.metadata.working_dir}</div>
       </div>

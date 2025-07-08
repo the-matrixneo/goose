@@ -37,14 +37,72 @@ export const SessionsSection: React.FC<SessionsSectionProps> = ({
   });
   const [sessionsWithDescriptions, setSessionsWithDescriptions] = useState<Set<string>>(new Set());
 
-  const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const groupSessions = useCallback((sessionsToGroup: Session[]) => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    const grouped: GroupedSessions = {
+      today: [],
+      yesterday: [],
+      older: {},
+    };
+
+    sessionsToGroup.forEach((session) => {
+      const sessionDate = new Date(session.modified);
+      const sessionDateOnly = new Date(
+        sessionDate.getFullYear(),
+        sessionDate.getMonth(),
+        sessionDate.getDate()
+      );
+
+      if (sessionDateOnly.getTime() === today.getTime()) {
+        grouped.today.push(session);
+      } else if (sessionDateOnly.getTime() === yesterday.getTime()) {
+        grouped.yesterday.push(session);
+      } else {
+        const dateKey = sessionDateOnly.toISOString().split('T')[0];
+        if (!grouped.older[dateKey]) {
+          grouped.older[dateKey] = [];
+        }
+        grouped.older[dateKey].push(session);
+      }
+    });
+
+    // Sort older sessions by date (newest first)
+    const sortedOlder: { [key: string]: Session[] } = {};
+    Object.keys(grouped.older)
+      .sort()
+      .reverse()
+      .forEach((key) => {
+        sortedOlder[key] = grouped.older[key];
+      });
+
+    grouped.older = sortedOlder;
+    setGroupedSessions(grouped);
+  }, []);
+
+  const loadSessions = useCallback(async () => {
+    try {
+      const sessions = await fetchSessions();
+      setSessions(sessions);
+      groupSessions(sessions);
+    } catch (err) {
+      console.error('Failed to load sessions:', err);
+      setSessions([]);
+      setGroupedSessions({ today: [], yesterday: [], older: {} });
+    }
+  }, [groupSessions]);
 
   // Debounced refresh function
   const debouncedRefresh = useCallback(() => {
     console.log('SessionsSection: Debounced refresh triggered');
     // Clear any existing timeout
     if (refreshTimeoutRef.current) {
-      clearTimeout(refreshTimeoutRef.current);
+      window.clearTimeout(refreshTimeoutRef.current);
     }
 
     // Set new timeout - reduced to 200ms for faster response
@@ -53,13 +111,13 @@ export const SessionsSection: React.FC<SessionsSectionProps> = ({
       loadSessions();
       refreshTimeoutRef.current = null;
     }, 200);
-  }, []);
+  }, [loadSessions]);
 
   // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
       if (refreshTimeoutRef.current) {
-        clearTimeout(refreshTimeoutRef.current);
+        window.clearTimeout(refreshTimeoutRef.current);
       }
     };
   }, []);
@@ -67,7 +125,7 @@ export const SessionsSection: React.FC<SessionsSectionProps> = ({
   useEffect(() => {
     console.log('SessionsSection: Initial load');
     loadSessions();
-  }, []);
+  }, [loadSessions]);
 
   // Add effect to refresh sessions when refreshTrigger changes
   useEffect(() => {
@@ -113,65 +171,7 @@ export const SessionsSection: React.FC<SessionsSectionProps> = ({
     } else {
       groupSessions(sessions);
     }
-  }, [searchTerm, sessions]);
-
-  const groupSessions = (sessionsToGroup: Session[]) => {
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-
-    const grouped: GroupedSessions = {
-      today: [],
-      yesterday: [],
-      older: {},
-    };
-
-    sessionsToGroup.forEach((session) => {
-      const sessionDate = new Date(session.modified);
-      const sessionDateOnly = new Date(
-        sessionDate.getFullYear(),
-        sessionDate.getMonth(),
-        sessionDate.getDate()
-      );
-
-      if (sessionDateOnly.getTime() === today.getTime()) {
-        grouped.today.push(session);
-      } else if (sessionDateOnly.getTime() === yesterday.getTime()) {
-        grouped.yesterday.push(session);
-      } else {
-        const dateKey = sessionDateOnly.toISOString().split('T')[0];
-        if (!grouped.older[dateKey]) {
-          grouped.older[dateKey] = [];
-        }
-        grouped.older[dateKey].push(session);
-      }
-    });
-
-    // Sort older sessions by date (newest first)
-    const sortedOlder: { [key: string]: Session[] } = {};
-    Object.keys(grouped.older)
-      .sort()
-      .reverse()
-      .forEach((key) => {
-        sortedOlder[key] = grouped.older[key];
-      });
-
-    grouped.older = sortedOlder;
-    setGroupedSessions(grouped);
-  };
-
-  const loadSessions = async () => {
-    try {
-      const sessions = await fetchSessions();
-      setSessions(sessions);
-      groupSessions(sessions);
-    } catch (err) {
-      console.error('Failed to load sessions:', err);
-      setSessions([]);
-      setGroupedSessions({ today: [], yesterday: [], older: {} });
-    }
-  };
+  }, [searchTerm, sessions, groupSessions]);
 
   // Component for individual session items with loading and animation states
   const SessionItem = ({ session }: { session: Session }) => {
@@ -203,7 +203,7 @@ export const SessionsSection: React.FC<SessionsSectionProps> = ({
           setIsAnimating(true);
         }
       }
-    }, [hasDescription, session.id, sessionsWithDescriptions, shouldShowLoading]);
+    }, [hasDescription, session.id, shouldShowLoading]);
 
     const handleClick = () => {
       console.log('SessionItem: Clicked on session:', session.id);
