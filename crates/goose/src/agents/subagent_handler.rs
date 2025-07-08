@@ -65,7 +65,7 @@ impl Agent {
         let extension_manager = Arc::new(self.extension_manager.read().await);
 
         // Run the complete subagent task
-        match manager
+        let result = match manager
             .run_complete_subagent_task(args, provider, extension_manager)
             .await
         {
@@ -74,6 +74,8 @@ impl Agent {
                 "Failed to run subagent task: {}",
                 e
             ))),
-        }
+        };
+
+        result
     }
 }

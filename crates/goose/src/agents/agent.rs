@@ -200,7 +200,7 @@ impl Agent {
             .extension_manager
             .read()
             .await
-            .get_prefixed_tools(None)
+            .get_prefixed_tools(None, Some("main"))
             .await?;
 
         // Add frontend tools directly - they don't need prefixing since they're already uniquely named
@@ -350,7 +350,7 @@ impl Agent {
         } else {
             // Clone the result to ensure no references to extension_manager are returned
             let result = extension_manager
-                .dispatch_tool_call(tool_call.clone())
+                .dispatch_tool_call(tool_call.clone(), Some("main"))
                 .await;
             match result {
                 Ok(call_result) => call_result,
@@ -512,6 +512,9 @@ impl Agent {
             _ => {
                 let mut extension_manager = self.extension_manager.write().await;
                 extension_manager.add_extension(extension.clone()).await?;
+                
+                // Grant namespace access to the main namespace for this extension
+                extension_manager.grant_namespace_access("main", vec![extension.name()]);
             }
         }
 
@@ -544,7 +547,7 @@ impl Agent {
     pub async fn list_tools(&self, extension_name: Option<String>) -> Vec<Tool> {
         let extension_manager = self.extension_manager.read().await;
         let mut prefixed_tools = extension_manager
-            .get_prefixed_tools(extension_name.clone())
+            .get_prefixed_tools(extension_name.clone(), Some("main"))
             .await
             .unwrap_or_default();
 
@@ -608,7 +611,7 @@ impl Agent {
                 // Add recent tool calls to the list, avoiding duplicates
                 for tool_name in recent_calls {
                     // Find the tool in the extension manager's tools
-                    if let Ok(extension_tools) = extension_manager.get_prefixed_tools(None).await {
+                    if let Ok(extension_tools) = extension_manager.get_prefixed_tools(None, Some("main")).await {
                         if let Some(tool) = extension_tools.iter().find(|t| t.name == tool_name) {
                             // Only add if not already in prefixed_tools
                             if !prefixed_tools.iter().any(|t| t.name == tool.name) {
@@ -651,6 +654,18 @@ impl Agent {
             .list_extensions()
             .await
             .expect("Failed to list extensions")
+    }
+
+    /// Grant namespace access to specific extensions
+    pub async fn grant_namespace_access(&self, namespace: &str, extensions: Vec<String>) {
+        let mut extension_manager = self.extension_manager.write().await;
+        extension_manager.grant_namespace_access(namespace, extensions);
+    }
+
+    /// Remove namespace permissions
+    pub async fn remove_namespace(&self, namespace: &str) {
+        let mut extension_manager = self.extension_manager.write().await;
+        extension_manager.remove_namespace(namespace);
     }
 
     /// Handle a confirmation response for a tool request
@@ -1160,7 +1175,7 @@ impl Agent {
 
     pub async fn get_plan_prompt(&self) -> anyhow::Result<String> {
         let extension_manager = self.extension_manager.read().await;
-        let tools = extension_manager.get_prefixed_tools(None).await?;
+        let tools = extension_manager.get_prefixed_tools(None, Some("main")).await?;
         let tools_info = tools
             .into_iter()
             .map(|tool| {
@@ -1203,7 +1218,7 @@ impl Agent {
         );
 
         let recipe_prompt = prompt_manager.get_recipe_prompt().await;
-        let tools = extension_manager.get_prefixed_tools(None).await?;
+        let tools = extension_manager.get_prefixed_tools(None, Some("main")).await?;
 
         messages.push(Message::user().with_text(recipe_prompt));
 

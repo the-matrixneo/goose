@@ -34,6 +34,7 @@ pub struct ExtensionManager {
     clients: HashMap<String, McpClientBox>,
     instructions: HashMap<String, String>,
     resource_capable_extensions: HashSet<String>,
+    namespace_permissions: HashMap<String, HashSet<String>>,
 }
 
 /// A flattened representation of a resource used by the agent to prepare inference
@@ -104,6 +105,7 @@ impl ExtensionManager {
             clients: HashMap::new(),
             instructions: HashMap::new(),
             resource_capable_extensions: HashSet::new(),
+            namespace_permissions: HashMap::new(),
         }
     }
 
@@ -322,7 +324,7 @@ impl ExtensionManager {
         let enabled_extensions_count = self.clients.len();
 
         let total_tools = self
-            .get_prefixed_tools(None)
+            .get_prefixed_tools(None, None)
             .await
             .map(|tools| tools.len())
             .unwrap_or(0);
@@ -358,9 +360,23 @@ impl ExtensionManager {
     pub async fn get_prefixed_tools(
         &self,
         extension_name: Option<String>,
+        namespace: Option<&str>, // NEW: optional namespace filter
     ) -> ExtensionResult<Vec<Tool>> {
         // Filter clients based on the provided extension_name or include all if None
         let filtered_clients = self.clients.iter().filter(|(name, _)| {
+            // If namespace is provided, check permissions first
+            if let Some(ns) = namespace {
+                let allowed_extensions = self.namespace_permissions
+                    .get(ns)
+                    .cloned()
+                    .unwrap_or_default();
+                
+                if !allowed_extensions.contains(*name) {
+                    return false; // Namespace doesn't have access to this extension
+                }
+            }
+            
+            // Then apply extension name filter if provided
             if let Some(ref name_filter) = extension_name {
                 *name == name_filter
             } else {
@@ -416,10 +432,23 @@ impl ExtensionManager {
     }
 
     /// Get client resources and their contents
-    pub async fn get_resources(&self) -> ExtensionResult<Vec<ResourceItem>> {
+    pub async fn get_resources(&self, namespace: Option<&str>) -> ExtensionResult<Vec<ResourceItem>> {
         let mut result: Vec<ResourceItem> = Vec::new();
 
-        for (name, client) in &self.clients {
+        // Filter clients based on namespace if provided
+        let filtered_clients = self.clients.iter().filter(|(name, _)| {
+            if let Some(ns) = namespace {
+                let allowed_extensions = self.namespace_permissions
+                    .get(ns)
+                    .cloned()
+                    .unwrap_or_default();
+                allowed_extensions.contains(*name)
+            } else {
+                true // No namespace filter
+            }
+        });
+
+        for (name, client) in filtered_clients {
             let client_guard = client.lock().await;
             let resources = client_guard.list_resources(None).await?;
 
@@ -639,11 +668,26 @@ impl ExtensionManager {
         }
     }
 
-    pub async fn dispatch_tool_call(&self, tool_call: ToolCall) -> Result<ToolCallResult> {
+    pub async fn dispatch_tool_call(&self, tool_call: ToolCall, namespace: Option<&str>) -> Result<ToolCallResult> {
         // Dispatch tool call based on the prefix naming convention
         let (client_name, client) = self
             .get_client_for_tool(&tool_call.name)
             .ok_or_else(|| ToolError::NotFound(tool_call.name.clone()))?;
+
+        // Check namespace permissions if provided
+        if let Some(ns) = namespace {
+            let allowed_extensions = self.namespace_permissions
+                .get(ns)
+                .cloned()
+                .unwrap_or_default();
+            
+            if !allowed_extensions.contains(client_name) {
+                return Err(ToolError::NotFound(format!(
+                    "Tool '{}' not available in namespace '{}'",
+                    tool_call.name, ns
+                )).into());
+            }
+        }
 
         // rsplit returns the iterator in reverse, tool_name is then at 0
         let tool_name = tool_call
@@ -822,6 +866,19 @@ impl ExtensionManager {
 
         Ok(vec![Content::text(output_parts.join("\n"))])
     }
+
+    /// Grant namespace access to specific extensions
+    pub fn grant_namespace_access(&mut self, namespace: &str, extensions: Vec<String>) {
+        self.namespace_permissions
+            .entry(namespace.to_string())
+            .or_default()
+            .extend(extensions);
+    }
+
+    /// Remove namespace permissions
+    pub fn remove_namespace(&mut self, namespace: &str) {
+        self.namespace_permissions.remove(namespace);
+    }
 }
 
 #[cfg(test)]
@@ -967,7 +1024,7 @@ mod tests {
             arguments: json!({}),
         };
 
-        let result = extension_manager.dispatch_tool_call(tool_call).await;
+        let result = extension_manager.dispatch_tool_call(tool_call, None).await;
         assert!(result.is_ok());
 
         let tool_call = ToolCall {
@@ -975,7 +1032,7 @@ mod tests {
             arguments: json!({}),
         };
 
-        let result = extension_manager.dispatch_tool_call(tool_call).await;
+        let result = extension_manager.dispatch_tool_call(tool_call, None).await;
         assert!(result.is_ok());
 
         // verify a multiple underscores dispatch
@@ -984,7 +1041,7 @@ mod tests {
             arguments: json!({}),
         };
 
-        let result = extension_manager.dispatch_tool_call(tool_call).await;
+        let result = extension_manager.dispatch_tool_call(tool_call, None).await;
         assert!(result.is_ok());
 
         // Test unicode in tool name, "client 🚀" should become "client_"
@@ -993,7 +1050,7 @@ mod tests {
             arguments: json!({}),
         };
 
-        let result = extension_manager.dispatch_tool_call(tool_call).await;
+        let result = extension_manager.dispatch_tool_call(tool_call, None).await;
         assert!(result.is_ok());
 
         let tool_call = ToolCall {
@@ -1001,7 +1058,7 @@ mod tests {
             arguments: json!({}),
         };
 
-        let result = extension_manager.dispatch_tool_call(tool_call).await;
+        let result = extension_manager.dispatch_tool_call(tool_call, None).await;
         assert!(result.is_ok());
 
         // this should error out, specifically for an ToolError::ExecutionError
@@ -1011,7 +1068,7 @@ mod tests {
         };
 
         let result = extension_manager
-            .dispatch_tool_call(invalid_tool_call)
+            .dispatch_tool_call(invalid_tool_call, None)
             .await
             .unwrap()
             .result
@@ -1029,7 +1086,7 @@ mod tests {
         };
 
         let result = extension_manager
-            .dispatch_tool_call(invalid_tool_call)
+            .dispatch_tool_call(invalid_tool_call, None)
             .await;
         if let Err(err) = result {
             let tool_err = err.downcast_ref::<ToolError>().expect("Expected ToolError");

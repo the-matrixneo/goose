@@ -38,6 +38,9 @@ No extensions are defined. You should let the user know that they should add ext
 
 {{tool_selection_strategy}}
 
+# Tool Calling
+For maximum efficiency, whenever you need to perform multiple independent operations, invoke all relevant tools simultaneously rather than sequentially.
+
 # Response Guidelines
 
 - Use Markdown formatting for all responses.

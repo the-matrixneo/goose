@@ -301,7 +301,7 @@ impl SubAgent {
 
             for extension_name in recipe_extensions.iter() {
                 match extension_manager
-                    .get_prefixed_tools(Some(extension_name.clone()))
+                    .get_prefixed_tools(Some(extension_name.clone()), Some(&self.id))
                     .await
                 {
                     Ok(mut ext_tools) => {
@@ -344,7 +344,7 @@ impl SubAgent {
                 "Subagent {} operating in inheritance mode, using all parent tools",
                 self.id
             );
-            let parent_tools = extension_manager.get_prefixed_tools(None).await?;
+            let parent_tools = extension_manager.get_prefixed_tools(None, Some(&self.id)).await?;
             debug!(
                 "Subagent {} has {} parent tools before filtering",
                 self.id,
@@ -435,7 +435,7 @@ impl SubAgent {
                                 .await
                             } else {
                                 match extension_manager
-                                    .dispatch_tool_call(tool_call.clone())
+                                    .dispatch_tool_call(tool_call.clone(), Some(&self.id))
                                     .await
                                 {
                                     Ok(result) => result.result.await,
@@ -577,6 +577,20 @@ impl SubAgent {
     /// Get the list of extensions that weren't enabled
     pub async fn get_missing_extensions(&self) -> Vec<String> {
         self.missing_extensions.lock().await.clone()
+    }
+
+    /// Grant namespace access to specific extensions for this subagent
+    pub async fn grant_namespace_access(
+        &self,
+        extension_manager: &mut ExtensionManager,
+        extensions: Vec<String>,
+    ) {
+        extension_manager.grant_namespace_access(&self.id, extensions);
+    }
+
+    /// Remove namespace permissions for this subagent
+    pub async fn remove_namespace(&self, extension_manager: &mut ExtensionManager) {
+        extension_manager.remove_namespace(&self.id);
     }
 
     /// Filter out subagent spawning tools to prevent infinite recursion
