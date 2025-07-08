@@ -5,6 +5,10 @@ use std::sync::Arc;
 
 #[cfg(test)]
 mod tests {
+    use std::sync::atomic::AtomicUsize;
+
+    use tokio::sync::mpsc;
+
     use super::*;
     use crate::agents::sub_recipe_execution_tool::types::Task;
 
@@ -18,8 +22,6 @@ mod tests {
             task_receiver: Arc::new(tokio::sync::Mutex::new(task_rx)),
             result_sender: result_tx,
             active_workers: Arc::new(AtomicUsize::new(0)),
-            should_stop: Arc::new(AtomicBool::new(false)),
-            completed_tasks: Arc::new(AtomicUsize::new(0)),
             dashboard: None,
         });
 
@@ -30,7 +32,6 @@ mod tests {
         assert!(!handle.is_finished());
 
         // Signal stop and close the channel to let the worker exit
-        shared_state.should_stop.store(true, Ordering::SeqCst);
         drop(task_tx); // Close the channel
 
         // Wait for the worker to finish

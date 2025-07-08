@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use std::{collections::HashMap, fs};
+use std::fs;
 
 use anyhow::Result;
 use mcp_core::tool::{Tool, ToolAnnotations};
@@ -7,6 +7,8 @@ use serde_json::{json, Map, Value};
 
 use crate::agents::sub_recipe_execution_tool::lib::Task;
 use crate::recipe::{Recipe, RecipeParameter, RecipeParameterRequirement, SubRecipe};
+
+use super::param_utils::prepare_command_params;
 
 pub const SUB_RECIPE_TASK_TOOL_NAME_PREFIX: &str = "subrecipe__create_task";
 
@@ -153,74 +155,6 @@ fn get_input_schema(sub_recipe: &SubRecipe) -> Result<Value> {
         }
     }
     Ok(create_input_schema(param_properties, param_required))
-}
-
-fn extract_run_params(
-    sub_recipe: &SubRecipe,
-) -> (HashMap<String, String>, Vec<HashMap<String, String>>) {
-    let base_params = sub_recipe.values.clone().unwrap_or_default();
-
-    let run_params = sub_recipe
-        .executions
-        .as_ref()
-        .and_then(|e| e.runs.as_ref())
-        .map(|runs| {
-            runs.iter()
-                .map(|run| {
-                    let mut params = base_params.clone();
-                    if let Some(run_values) = &run.values {
-                        params.extend(run_values.clone());
-                    }
-                    params
-                })
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default();
-    (base_params, run_params)
-}
-
-fn prepare_command_params(
-    sub_recipe: &SubRecipe,
-    params_from_tool_call: Vec<Value>,
-) -> Result<Vec<HashMap<String, String>>> {
-    let (base_params, run_params) = extract_run_params(sub_recipe);
-
-    if params_from_tool_call.is_empty() {
-        return Ok(run_params);
-    }
-
-    if !run_params.is_empty() && run_params.len() != params_from_tool_call.len() {
-        return Err(anyhow::anyhow!(
-            "The number of runs in the sub recipe ({}) does not match the number of task parameters ({})",
-            run_params.len(),
-            params_from_tool_call.len()
-        ));
-    }
-
-    let run_params_for_merging = if run_params.is_empty() {
-        vec![base_params; params_from_tool_call.len()]
-    } else {
-        run_params
-    };
-
-    let merged_params = params_from_tool_call
-        .into_iter()
-        .zip(run_params_for_merging)
-        .map(|(tool_param, mut run_param_map)| {
-            if let Some(param_obj) = tool_param.as_object() {
-                for (key, value) in param_obj {
-                    let value_str = value
-                        .as_str()
-                        .map(String::from)
-                        .unwrap_or_else(|| value.to_string());
-                    run_param_map.entry(key.clone()).or_insert(value_str);
-                }
-            }
-            run_param_map
-        })
-        .collect();
-
-    Ok(merged_params)
 }
 
 #[cfg(test)]
