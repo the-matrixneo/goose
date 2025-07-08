@@ -144,6 +144,7 @@ pub struct SubRecipe {
 pub struct Execution {
     #[serde(default)]
     pub parallel: bool,
+    pub timeout_in_seconds: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub runs: Option<Vec<ExecutionRun>>,
 }

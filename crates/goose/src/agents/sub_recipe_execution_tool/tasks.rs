@@ -11,11 +11,11 @@ use crate::agents::sub_recipe_execution_tool::types::{Task, TaskResult, TaskStat
 
 pub async fn process_task(
     task: &Task,
-    timeout_seconds: u64,
     task_execution_tracker: Arc<TaskExecutionTracker>,
 ) -> TaskResult {
+    let timeout_in_seconds = task.timeout_in_seconds.unwrap_or(300);
     let task_clone = task.clone();
-    let timeout_duration = Duration::from_secs(timeout_seconds);
+    let timeout_duration = Duration::from_secs(timeout_in_seconds);
 
     match timeout(
         timeout_duration,

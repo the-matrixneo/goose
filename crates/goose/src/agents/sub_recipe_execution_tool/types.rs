@@ -10,6 +10,7 @@ use crate::agents::sub_recipe_execution_tool::task_execution_tracker::TaskExecut
 pub struct Task {
     pub id: String,
     pub task_type: String,
+    pub timeout_in_seconds: Option<u64>,
     pub payload: Value,
 }
 
@@ -110,8 +111,6 @@ impl SharedState {
 pub struct Config {
     #[serde(default = "default_max_workers")]
     pub max_workers: usize,
-    #[serde(default = "default_timeout")]
-    pub timeout_seconds: u64,
     #[serde(default = "default_initial_workers")]
     pub initial_workers: usize,
 }
@@ -120,7 +119,6 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             max_workers: default_max_workers(),
-            timeout_seconds: default_timeout(),
             initial_workers: default_initial_workers(),
         }
     }
@@ -129,9 +127,7 @@ impl Default for Config {
 fn default_max_workers() -> usize {
     10
 }
-fn default_timeout() -> u64 {
-    300
-}
+
 fn default_initial_workers() -> usize {
     2
 }

@@ -29,7 +29,7 @@ pub async fn execute_tasks(
     match execution_mode {
         "sequential" => {
             if task_count == 1 {
-                let response = execute_single_task(&tasks[0], config, notifier).await;
+                let response = execute_single_task(&tasks[0], notifier).await;
                 serde_json::to_value(response)
                     .map_err(|e| format!("Failed to serialize response: {}", e))
             } else {

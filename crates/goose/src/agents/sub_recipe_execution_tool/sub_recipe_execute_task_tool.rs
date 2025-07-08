@@ -62,6 +62,10 @@ Pre-created Task Based:
                                 "default": "sub_recipe",
                                 "description": "the type of task to execute, can be one of: sub_recipe, text_instruction"
                             },
+                            "timeout_in_seconds": {
+                                "type": "number",
+                                "description": "timeout in seconds for the task."
+                            },
                             "payload": {
                                 "type": "object",
                                 "properties": {
@@ -97,9 +101,6 @@ Pre-created Task Based:
                 "config": {
                     "type": "object",
                     "properties": {
-                        "timeout_seconds": {
-                            "type": "number"
-                        },
                         "max_workers": {
                             "type": "number"
                         },
@@ -126,11 +127,9 @@ pub async fn run_tasks(execute_data: Value) -> ToolCallResult {
 
     let result_future = async move {
         let execute_data_clone = execute_data.clone();
-        let default_execution_mode_value = Value::String("sequential".to_string());
         let execution_mode = execute_data_clone
             .get("execution_mode")
-            .unwrap_or(&default_execution_mode_value)
-            .as_str()
+            .and_then(|v| v.as_str())
             .unwrap_or("sequential");
 
         match execute_tasks(execute_data, execution_mode, notification_tx).await {

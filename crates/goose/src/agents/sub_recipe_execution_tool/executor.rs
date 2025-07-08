@@ -17,7 +17,6 @@ const EXECUTION_STATUS_COMPLETED: &str = "completed";
 
 pub async fn execute_single_task(
     task: &Task,
-    config: Config,
     notifier: mpsc::Sender<JsonRpcMessage>,
 ) -> ExecutionResponse {
     let start_time = Instant::now();
@@ -26,7 +25,7 @@ pub async fn execute_single_task(
         DisplayMode::SingleTaskOutput,
         notifier,
     ));
-    let result = process_task(task, config.timeout_seconds, task_execution_tracker).await;
+    let result = process_task(task, task_execution_tracker).await;
     let execution_time = start_time.elapsed().as_millis();
     let stats = calculate_stats(&[result.clone()], execution_time);
 
@@ -69,7 +68,7 @@ pub async fn execute_tasks_in_parallel(
     let worker_count = std::cmp::min(task_count, config.max_workers);
     let mut worker_handles = Vec::new();
     for i in 0..worker_count {
-        let handle = spawn_worker(shared_state.clone(), i, config.timeout_seconds);
+        let handle = spawn_worker(shared_state.clone(), i);
         worker_handles.push(handle);
     }
 
