@@ -1,9 +1,7 @@
-use crate::agents::sub_recipe_execution_tool::tasks::process_task;
-use crate::agents::sub_recipe_execution_tool::types::{Task, TaskResult};
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use crate::agents::sub_recipe_execution_tool::dashboard::TaskDashboard;
+use crate::agents::sub_recipe_execution_tool::tasks::{process_task, process_task_with_dashboard};
+use crate::agents::sub_recipe_execution_tool::types::{SharedState, Task, TaskResult};
 use std::sync::Arc;
-use tokio::sync::mpsc;
-use tokio::time::{sleep, Duration};
 
 #[cfg(test)]
 mod tests {
@@ -22,6 +20,7 @@ mod tests {
             active_workers: Arc::new(AtomicUsize::new(0)),
             should_stop: Arc::new(AtomicBool::new(false)),
             completed_tasks: Arc::new(AtomicUsize::new(0)),
+            dashboard: None,
         });
 
         // Test that spawn_worker returns a JoinHandle
@@ -40,21 +39,33 @@ mod tests {
     }
 }
 
-pub struct SharedState {
-    pub task_receiver: Arc<tokio::sync::Mutex<mpsc::Receiver<Task>>>,
-    pub result_sender: mpsc::Sender<TaskResult>,
-    pub active_workers: Arc<AtomicUsize>,
-    pub should_stop: Arc<AtomicBool>,
-    pub completed_tasks: Arc<AtomicUsize>,
+async fn receive_task(state: &SharedState) -> Option<Task> {
+    let mut receiver = state.task_receiver.lock().await;
+    receiver.recv().await
 }
 
-// Spawn a worker task
+async fn execute_task(
+    task: Task,
+    timeout: u64,
+    dashboard: Option<Arc<TaskDashboard>>,
+) -> TaskResult {
+    if let Some(dashboard) = &dashboard {
+        dashboard.start_task(&task.id).await;
+    }
+
+    if let Some(dashboard) = dashboard {
+        process_task_with_dashboard(&task, timeout, Some(dashboard)).await
+    } else {
+        process_task(&task, timeout).await
+    }
+}
+
 pub fn spawn_worker(
     state: Arc<SharedState>,
     worker_id: usize,
     timeout_seconds: u64,
 ) -> tokio::task::JoinHandle<()> {
-    state.active_workers.fetch_add(1, Ordering::SeqCst);
+    state.increment_active_workers();
 
     tokio::spawn(async move {
         worker_loop(state, worker_id, timeout_seconds).await;
@@ -62,72 +73,14 @@ pub fn spawn_worker(
 }
 
 async fn worker_loop(state: Arc<SharedState>, _worker_id: usize, timeout_seconds: u64) {
-    loop {
-        // Try to receive a task
-        let task = {
-            let mut receiver = state.task_receiver.lock().await;
-            receiver.recv().await
-        };
+    while let Some(task) = receive_task(&state).await {
+        let result = execute_task(task, timeout_seconds, state.dashboard.clone()).await;
 
-        match task {
-            Some(task) => {
-                // Process the task
-                let result = process_task(&task, timeout_seconds).await;
-
-                // Send result
-                let _ = state.result_sender.send(result).await;
-
-                // Update completed count
-                state.completed_tasks.fetch_add(1, Ordering::SeqCst);
-            }
-            None => {
-                // Channel closed, exit worker
-                break;
-            }
-        }
-
-        // Check if we should stop
-        if state.should_stop.load(Ordering::SeqCst) {
+        if let Err(e) = state.result_sender.send(result).await {
+            eprintln!("Worker failed to send result: {}", e);
             break;
         }
     }
 
-    // Worker is exiting
-    state.active_workers.fetch_sub(1, Ordering::SeqCst);
-}
-
-// Scaling controller that monitors queue and spawns workers
-pub async fn run_scaler(
-    state: Arc<SharedState>,
-    task_count: usize,
-    max_workers: usize,
-    timeout_seconds: u64,
-) {
-    let mut worker_count = 0;
-
-    loop {
-        sleep(Duration::from_millis(100)).await;
-
-        let active = state.active_workers.load(Ordering::SeqCst);
-        let completed = state.completed_tasks.load(Ordering::SeqCst);
-        let pending = task_count.saturating_sub(completed);
-
-        // Simple scaling logic: spawn worker if many pending tasks and under limit
-        if pending > active * 2 && active < max_workers && worker_count < max_workers {
-            let _handle = spawn_worker(state.clone(), worker_count, timeout_seconds);
-            worker_count += 1;
-        }
-
-        // If all tasks completed, signal stop
-        if completed >= task_count {
-            state.should_stop.store(true, Ordering::SeqCst);
-            break;
-        }
-
-        // If no active workers and tasks remaining, spawn one
-        if active == 0 && pending > 0 {
-            let _handle = spawn_worker(state.clone(), worker_count, timeout_seconds);
-            worker_count += 1;
-        }
-    }
+    state.decrement_active_workers();
 }
