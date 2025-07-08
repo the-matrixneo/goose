@@ -52,11 +52,11 @@ export default function UserMessage({ message }: UserMessageProps) {
             </div>
           )}
 
-          <div className="relative h-[22px] flex justify-end text-right overflow-hidden">
-            <div className="absolute font-mono right-4 w-40 text-xs text-text-muted pt-1 transition-all duration-200 group-hover:-translate-y-4 group-hover:opacity-0">
+          <div className="relative h-[22px] flex justify-end text-right">
+            <div className="absolute w-40 font-mono right-0 text-xs text-text-muted pt-1 transition-all duration-200 group-hover:-translate-y-4 group-hover:opacity-0">
               {timestamp}
             </div>
-            <div className="absolute right-4 pt-1">
+            <div className="absolute right-0 pt-1">
               <MessageCopyLink text={displayText} contentRef={contentRef} />
             </div>
           </div>
