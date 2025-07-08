@@ -1,10 +1,9 @@
 import { Sliders } from 'lucide-react';
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useModelAndProvider } from '../../../ModelAndProviderContext';
 import { AddModelModal } from '../subcomponents/AddModelModal';
 import { LeadWorkerSettings } from '../subcomponents/LeadWorkerSettings';
 import { View } from '../../../../App';
-import { Tooltip, TooltipTrigger, TooltipContent } from '../../../ui/Tooltip';
 import { Dialog, DialogContent } from '../../../ui/dialog';
 import {
   DropdownMenu,
@@ -31,11 +30,6 @@ export default function ModelsBottomBar({ dropdownRef, setView, alerts }: Models
   const [isAddModelModalOpen, setIsAddModelModalOpen] = useState(false);
   const [isLeadWorkerModalOpen, setIsLeadWorkerModalOpen] = useState(false);
   const [isLeadWorkerActive, setIsLeadWorkerActive] = useState(false);
-  const [isModelTruncated, setIsModelTruncated] = useState(false);
-  // eslint-disable-next-line no-undef
-  const modelRef = useRef<HTMLSpanElement>(null);
-  const [isTooltipOpen, setIsTooltipOpen] = useState(false);
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   // Check if lead/worker mode is active
   useEffect(() => {
@@ -67,85 +61,36 @@ export default function ModelsBottomBar({ dropdownRef, setView, alerts }: Models
     }
   }, [currentProvider, getCurrentModelAndProviderForDisplay]);
 
-  useEffect(() => {
-    const checkTruncation = () => {
-      if (modelRef.current) {
-        setIsModelTruncated(modelRef.current.scrollWidth > modelRef.current.clientWidth);
-      }
-    };
-    checkTruncation();
-    window.addEventListener('resize', checkTruncation);
-    return () => window.removeEventListener('resize', checkTruncation);
-  }, [displayModel]);
-
-  useEffect(() => {
-    setIsTooltipOpen(false);
-  }, [isModelTruncated]);
-
-  const handleTooltipOpenChange = useCallback(
-    (open: boolean) => {
-      // Only allow tooltip to open if dropdown is closed
-      if (!isDropdownOpen) {
-        setIsTooltipOpen(open);
-      }
-    },
-    [isDropdownOpen]
-  );
-
-  const handleDropdownOpenChange = useCallback((open: boolean) => {
-    setIsDropdownOpen(open);
-    // Close tooltip when dropdown opens
-    if (open) {
-      setIsTooltipOpen(false);
-    }
-  }, []);
-
   return (
     <div className="relative flex items-center" ref={dropdownRef}>
-      <Tooltip open={isTooltipOpen && !isDropdownOpen} onOpenChange={handleTooltipOpenChange}>
-        <TooltipTrigger>
-          <DropdownMenu open={isDropdownOpen} onOpenChange={handleDropdownOpenChange}>
-            <DropdownMenuTrigger asChild>
-              <div className="flex items-center hover:cursor-pointer max-w-[180px] md:max-w-[200px] lg:max-w-[380px] min-w-0 group hover:text-textStandard transition-colors">
-                <div className="mr-1 mt-0.5">
-                  <BottomMenuAlertPopover alerts={alerts} />
-                </div>
-                <span
-                  ref={modelRef}
-                  className="truncate text-text-default/70 hover:text-text-default hover:scale-100 hover:bg-transparent text-xs max-w-[130px] md:max-w-[200px] lg:max-w-[360px] min-w-0 block"
-                >
-                  {displayModel}
-                  {isLeadWorkerActive && modelMode && (
-                    <span className="ml-1 text-[10px] opacity-60">({modelMode})</span>
-                  )}
-                </span>
-              </div>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent side="top" align="center" className="w-64 text-sm">
-              <div className="text-sm text-textProminent mt-2 ml-2">Current:</div>
-              <div className="flex items-center justify-between text-sm ml-2 pb-2 border-b border-borderSubtle mb-2">
-                {currentModel} -- {displayProvider}
-              </div>
-              <DropdownMenuItem onClick={() => setIsAddModelModalOpen(true)}>
-                <span>Change Model</span>
-                <Sliders className="ml-auto h-4 w-4 rotate-90" />
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setIsLeadWorkerModalOpen(true)}>
-                <span>Lead/Worker Settings</span>
-                <Sliders className="ml-auto h-4 w-4" />
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </TooltipTrigger>
-        {isModelTruncated && (
-          <TooltipContent className="max-w-96 overflow-auto scrollbar-thin text-left" side="top">
+      <div>
+        <BottomMenuAlertPopover alerts={alerts} />
+      </div>
+      <DropdownMenu>
+        <DropdownMenuTrigger className="flex items-center hover:cursor-pointer max-w-[180px] md:max-w-[200px] lg:max-w-[380px] min-w-0 group hover:text-textStandard transition-colors">
+          <span className="truncate text-text-default/70 hover:text-text-default hover:scale-100 hover:bg-transparent text-xs max-w-[130px] md:max-w-[200px] lg:max-w-[360px] min-w-0 block">
             {displayModel}
             {isLeadWorkerActive && modelMode && (
               <span className="ml-1 text-[10px] opacity-60">({modelMode})</span>
             )}
-          </TooltipContent>
-        )}
-      </Tooltip>
+          </span>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent side="top" align="center" className="w-64 text-sm">
+          <h6 className="text-xs text-textProminent mt-2 ml-2">Current model</h6>
+          <p className="flex items-center justify-between text-sm mx-2 pb-2 border-b mb-2">
+            {currentModel}
+            {displayProvider && ` — ${displayProvider}`}
+          </p>
+          <DropdownMenuItem onClick={() => setIsAddModelModalOpen(true)}>
+            <span>Change Model</span>
+            <Sliders className="ml-auto h-4 w-4 rotate-90" />
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setIsLeadWorkerModalOpen(true)}>
+            <span>Lead/Worker Settings</span>
+            <Sliders className="ml-auto h-4 w-4" />
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
 
       {isAddModelModalOpen ? (
         <AddModelModal setView={setView} onClose={() => setIsAddModelModalOpen(false)} />

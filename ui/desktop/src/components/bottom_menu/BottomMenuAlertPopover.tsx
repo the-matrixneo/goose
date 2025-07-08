@@ -18,7 +18,7 @@ export default function BottomMenuAlertPopover({ alerts }: AlertPopoverProps) {
   const [popoverPosition, setPopoverPosition] = useState({ top: 0, left: 0 });
   const previousAlertsRef = useRef<Alert[]>([]);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout>>();
-  const triggerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
 
   // Calculate popover position
@@ -158,9 +158,12 @@ export default function BottomMenuAlertPopover({ alerts }: AlertPopoverProps) {
   return (
     <>
       <div className="relative">
-        <div
+        <button
           ref={triggerRef}
-          className="cursor-pointer flex items-center justify-center min-w-5 min-h-5"
+          className="cursor-pointer flex items-center justify-center min-w-5 min-h-5 hover:bg-background-muted"
+          onClick={() => {
+            setIsOpen(true);
+          }}
           onMouseEnter={() => {
             setIsOpen(true);
             setIsHovered(true);
@@ -179,10 +182,10 @@ export default function BottomMenuAlertPopover({ alerts }: AlertPopoverProps) {
             }, 100);
           }}
         >
-          <div className={cn('relative', '-right-2', triggerColor)}>
+          <div className={cn('relative', triggerColor)}>
             <FaCircle size={5} />
           </div>
-        </div>
+        </button>
       </div>
 
       {/* Popover rendered separately to avoid blocking clicks */}
