@@ -7,6 +7,7 @@ use tokio::time::{sleep, Duration, Instant};
 
 use crate::agents::sub_recipe_execution_tool::types::{Task, TaskInfo, TaskResult, TaskStatus};
 use crate::agents::sub_recipe_execution_tool::utils::{count_by_status, get_task_name};
+use serde_json::Value;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum DisplayMode {
@@ -15,6 +16,28 @@ pub enum DisplayMode {
 }
 
 const THROTTLE_INTERVAL_MS: u64 = 1000;
+
+fn format_task_metadata(task_info: &TaskInfo) -> String {
+    if let Some(params) = task_info.task.get_command_parameters() {
+        if params.is_empty() {
+            return String::new();
+        }
+
+        params
+            .iter()
+            .map(|(key, value)| {
+                let value_str = match value {
+                    Value::String(s) => s.clone(),
+                    _ => value.to_string(),
+                };
+                format!("{}={}", key, value_str)
+            })
+            .collect::<Vec<_>>()
+            .join(",")
+    } else {
+        String::new()
+    }
+}
 
 pub struct TaskExecutionTracker {
     tasks: Arc<RwLock<HashMap<String, TaskInfo>>>,
@@ -157,6 +180,8 @@ impl TaskExecutionTracker {
                                 }),
                                 "current_output": task_info.current_output,
                                 "task_type": task_info.task.task_type,
+                                "task_name": get_task_name(task_info),
+                                "task_metadata": format_task_metadata(task_info),
                                 "error": task_info.error()
                             })
                         }).collect::<Vec<_>>()

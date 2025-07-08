@@ -9,7 +9,6 @@ pub const TASK_EXECUTION_NOTIFICATION_TYPE: &str = "task_execution";
 pub fn format_tasks_update(data: &Value) -> String {
     let mut display = String::new();
 
-    // Determine if this is initial display or update
     static mut INITIAL_SHOWN: bool = false;
     unsafe {
         if !INITIAL_SHOWN {
@@ -37,58 +36,131 @@ pub fn format_tasks_update(data: &Value) -> String {
     }
 
     if let Some(tasks) = data.get("tasks").and_then(|t| t.as_array()) {
-        for task in tasks {
-            let id = task.get("id").and_then(|v| v.as_str()).unwrap_or("unknown");
-            let status = task
-                .get("status")
-                .and_then(|v| v.as_str())
-                .unwrap_or("unknown");
-            let task_type = task
-                .get("task_type")
-                .and_then(|v| v.as_str())
-                .unwrap_or("task");
+        let mut sorted_tasks: Vec<_> = tasks.iter().collect();
+        sorted_tasks.sort_by_key(|task| task.get("id").and_then(|v| v.as_str()).unwrap_or(""));
 
-            let status_icon = match status {
-                "Pending" => "⏳",
-                "Running" => "🏃",
-                "Completed" => "✅",
-                "Failed" => "❌",
-                _ => "◯",
-            };
-
-            display.push_str(&format!(
-                "{} {} ({}): {}\n",
-                status_icon, id, task_type, status
-            ));
-
-            if status == "Running" {
-                if let Some(output) = task.get("current_output").and_then(|v| v.as_str()) {
-                    if !output.trim().is_empty() {
-                        let lines: Vec<&str> = output.lines().collect();
-                        if lines.len() > 3 {
-                            display.push_str("   ...\n");
-                            for line in lines.iter().rev().take(3).rev() {
-                                display.push_str(&format!("   {}\n", line));
-                            }
-                        } else {
-                            for line in lines {
-                                display.push_str(&format!("   {}\n", line));
-                            }
-                        }
-                    }
-                }
-            }
-
-            if status == "Failed" {
-                if let Some(error) = task.get("error").and_then(|v| v.as_str()) {
-                    display.push_str(&format!("   Error: {}\n", error));
-                }
-            }
+        for task in sorted_tasks {
+            display.push_str(&format_task_from_json(task));
         }
     }
 
     display.push_str(CLEAR_BELOW);
     display
+}
+
+fn format_task_from_json(task: &Value) -> String {
+    let mut task_display = String::new();
+
+    let id = task.get("id").and_then(|v| v.as_str()).unwrap_or("unknown");
+    let status = task
+        .get("status")
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown");
+    let task_type = task
+        .get("task_type")
+        .and_then(|v| v.as_str())
+        .unwrap_or("task");
+    let task_name = task.get("task_name").and_then(|v| v.as_str()).unwrap_or(id);
+    let task_metadata = task
+        .get("task_metadata")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let status_icon = match status {
+        "Pending" => "⏳",
+        "Running" => "🏃",
+        "Completed" => "✅",
+        "Failed" => "❌",
+        _ => "◯",
+    };
+
+    task_display.push_str(&format!(
+        "{} {} ({}){}\n",
+        status_icon, task_name, task_type, CLEAR_TO_EOL
+    ));
+
+    if !task_metadata.is_empty() {
+        task_display.push_str(&format!(
+            "   📋 Parameters: {}{}\n",
+            task_metadata, CLEAR_TO_EOL
+        ));
+    }
+
+    if let Some(duration_secs) = task.get("duration_secs").and_then(|v| v.as_f64()) {
+        task_display.push_str(&format!("   ⏱️  {:.1}s{}\n", duration_secs, CLEAR_TO_EOL));
+    }
+
+    if status == "Running" {
+        if let Some(current_output) = task.get("current_output").and_then(|v| v.as_str()) {
+            if !current_output.trim().is_empty() {
+                let processed_output = process_output_for_display(current_output);
+                if !processed_output.is_empty() {
+                    task_display.push_str(&format!("   💬 {}{}\n", processed_output, CLEAR_TO_EOL));
+                }
+            }
+        }
+    }
+
+    if status == "Failed" {
+        if let Some(error) = task.get("error").and_then(|v| v.as_str()) {
+            let error_preview = truncate_with_ellipsis(error, 80);
+            task_display.push_str(&format!(
+                "   ⚠️  {}{}\n",
+                error_preview.replace('\n', " "),
+                CLEAR_TO_EOL
+            ));
+        }
+    }
+
+    task_display.push_str(&format!("{}\n", CLEAR_TO_EOL));
+    task_display
+}
+
+fn process_output_for_display(output: &str) -> String {
+    const MAX_OUTPUT_LINES: usize = 2;
+    const OUTPUT_PREVIEW_LENGTH: usize = 100;
+
+    let lines: Vec<&str> = output.lines().collect();
+    let recent_lines = if lines.len() > MAX_OUTPUT_LINES {
+        &lines[lines.len() - MAX_OUTPUT_LINES..]
+    } else {
+        &lines
+    };
+
+    let clean_output = recent_lines.join(" | ");
+    let stripped = strip_ansi_codes(&clean_output);
+    truncate_with_ellipsis(&stripped, OUTPUT_PREVIEW_LENGTH)
+}
+
+fn truncate_with_ellipsis(text: &str, max_len: usize) -> String {
+    if text.len() > max_len {
+        format!("{}...", &text[..max_len.saturating_sub(3)])
+    } else {
+        text.to_string()
+    }
+}
+
+fn strip_ansi_codes(text: &str) -> String {
+    let mut result = String::new();
+    let mut chars = text.chars();
+
+    while let Some(ch) = chars.next() {
+        if ch == '\x1b' {
+            if chars.next() == Some('[') {
+                loop {
+                    match chars.next() {
+                        Some(c) if c.is_ascii_alphabetic() => break,
+                        Some(_) => continue,
+                        None => break,
+                    }
+                }
+            }
+        } else {
+            result.push(ch);
+        }
+    }
+
+    result
 }
 
 pub fn format_tasks_complete(data: &Value) -> String {

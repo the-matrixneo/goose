@@ -79,7 +79,7 @@ fn build_command(task: &Task) -> Result<(Command, String), String> {
 
         output_identifier = format!("sub-recipe {}", sub_recipe_name);
         let mut cmd = Command::new("goose");
-        cmd.arg("run").arg("--recipe").arg(path);
+        cmd.arg("run").arg("--recipe").arg(path).arg("--no-session");
 
         for (key, value) in command_parameters {
             let key_str = key.to_string();
