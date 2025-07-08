@@ -978,7 +978,7 @@ export default function ChatInput({
               </>
             )}
             <ModelsBottomBar dropdownRef={dropdownRef} setView={setView} alerts={alerts} />
-            <div className="w-px h-4 bg-border-default mx-2"></div>
+            <div className="w-px h-4 bg-border-default mx-2" />
             <BottomMenuModeSelection setView={setView} />
             {messages.length > 0 && (
               <ManualSummarizeButton

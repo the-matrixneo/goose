@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ScrollText } from 'lucide-react';
+import { cn } from '../../utils';
 import {
   Dialog,
   DialogContent,
@@ -47,11 +48,13 @@ export const ManualSummarizeButton: React.FC<ManualSummarizeButtonProps> = ({
 
   return (
     <>
+      <div className="w-px h-4 bg-border-default mx-2" />
       <div className="relative flex items-center">
         <button
-          className={`flex items-center justify-center text-text-default/70 hover:text-text-default text-xs ${
-            isLoadingSummary || isLoading ? 'cursor-not-allowed' : ''
-          }`}
+          className={cn(
+            'flex items-center justify-center text-text-default/70 hover:text-text-default text-xs cursor-pointer',
+            (isLoadingSummary || isLoading) && 'cursor-not-allowed'
+          )}
           onClick={handleClick}
           disabled={isLoadingSummary || isLoading}
           title="Summarize conversation context"
