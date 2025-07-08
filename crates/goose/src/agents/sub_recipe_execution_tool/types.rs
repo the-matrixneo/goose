@@ -93,7 +93,7 @@ pub struct SharedState {
     pub task_receiver: Arc<tokio::sync::Mutex<mpsc::Receiver<Task>>>,
     pub result_sender: mpsc::Sender<TaskResult>,
     pub active_workers: Arc<AtomicUsize>,
-    pub dashboard: Option<Arc<TaskDashboard>>,
+    pub dashboard: Arc<TaskDashboard>,
 }
 
 impl SharedState {

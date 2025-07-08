@@ -66,7 +66,6 @@ pub fn strip_ansi_codes(text: &str) -> String {
     result
 }
 
-
 pub fn get_status_icon(status: &TaskStatus) -> &'static str {
     match status {
         TaskStatus::Pending => "⏳",

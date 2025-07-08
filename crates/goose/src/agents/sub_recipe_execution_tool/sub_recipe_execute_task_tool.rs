@@ -4,6 +4,9 @@ use serde_json::Value;
 use crate::agents::{
     sub_recipe_execution_tool::lib::execute_tasks, tool_execution::ToolCallResult,
 };
+use mcp_core::protocol::JsonRpcMessage;
+use tokio::sync::mpsc;
+use tokio_stream;
 
 pub const SUB_RECIPE_EXECUTE_TASK_TOOL_NAME: &str = "sub_recipe__execute_task";
 pub fn create_sub_recipe_execute_task_tool() -> Tool {
@@ -119,18 +122,31 @@ Pre-created Task Based:
 }
 
 pub async fn run_tasks(execute_data: Value) -> ToolCallResult {
-    let execute_data_clone = execute_data.clone();
-    let default_execution_mode_value = Value::String("sequential".to_string());
-    let execution_mode = execute_data_clone
-        .get("execution_mode")
-        .unwrap_or(&default_execution_mode_value)
-        .as_str()
-        .unwrap_or("sequential");
-    match execute_tasks(execute_data, execution_mode).await {
-        Ok(result) => {
-            let output = serde_json::to_string(&result).unwrap();
-            ToolCallResult::from(Ok(vec![Content::text(output)]))
+    let (notification_tx, notification_rx) = mpsc::channel::<JsonRpcMessage>(100);
+
+    let result_future = async move {
+        let execute_data_clone = execute_data.clone();
+        let default_execution_mode_value = Value::String("sequential".to_string());
+        let execution_mode = execute_data_clone
+            .get("execution_mode")
+            .unwrap_or(&default_execution_mode_value)
+            .as_str()
+            .unwrap_or("sequential");
+
+        match execute_tasks(execute_data, execution_mode, notification_tx).await {
+            Ok(result) => {
+                let output = serde_json::to_string(&result).unwrap();
+                Ok(vec![Content::text(output)])
+            }
+            Err(e) => Err(ToolError::ExecutionError(e.to_string())),
         }
-        Err(e) => ToolCallResult::from(Err(ToolError::ExecutionError(e.to_string()))),
+    };
+
+    // Convert receiver to stream
+    let notification_stream = tokio_stream::wrappers::ReceiverStream::new(notification_rx);
+
+    ToolCallResult {
+        result: Box::new(Box::pin(result_future)),
+        notification_stream: Some(Box::new(notification_stream)),
     }
 }

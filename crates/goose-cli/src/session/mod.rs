@@ -15,6 +15,7 @@ use goose::permission::Permission;
 use goose::permission::PermissionConfirmation;
 use goose::providers::base::Provider;
 pub use goose::session::Identifier;
+use std::io::Write;
 
 use anyhow::{Context, Result};
 use completion::GooseCompleter;
@@ -1011,8 +1012,11 @@ impl Session {
                                                     };
                                                     (formatted, Some(subagent_id.to_string()), Some(notification_type.to_string()))
                                                 } else if let Some(Value::String(output)) = o.get("output") {
-                                                    // Fallback for other MCP notification types
+                                                    // Shell tool notification
                                                     (output.to_owned(), None, None)
+                                                } else if let Some(Value::String(display)) = o.get("display") {
+                                                    // Dashboard notification - return raw display content with ANSI codes
+                                                    (display.to_owned(), None, Some("dashboard".to_string()))
                                                 } else {
                                                     (data.to_string(), None, None)
                                                 }
@@ -1021,6 +1025,21 @@ impl Session {
                                                 (v.to_string(), None, None)
                                             },
                                         };
+
+                                        // Handle dashboard notifications specially - print raw content with ANSI codes
+                                        if let Some(ref notification_type) = _notification_type {
+                                            if notification_type == "dashboard" {
+                                                if interactive {
+                                                    let _ = progress_bars.hide();
+                                                    print!("{}", formatted_message);
+                                                    std::io::stdout().flush().unwrap();
+                                                } else {
+                                                    print!("{}", formatted_message);
+                                                    std::io::stdout().flush().unwrap();
+                                                }
+                                                continue; // Skip the normal notification handling below
+                                            }
+                                        }
 
                                         // Handle subagent notifications - show immediately
                                         if let Some(_id) = subagent_id {

@@ -61,31 +61,6 @@ impl SubRecipeManager {
         }
     }
 
-    // async fn call_sub_recipe_tool(
-    //     &self,
-    //     tool_name: &str,
-    //     params: Value,
-    // ) -> Result<Vec<Content>, ToolError> {
-    //     let sub_recipe = self.sub_recipes.get(tool_name).ok_or_else(|| {
-    //         let sub_recipe_name = tool_name
-    //             .strip_prefix(SUB_RECIPE_TOOL_NAME_PREFIX)
-    //             .and_then(|s| s.strip_prefix("_"))
-    //             .ok_or_else(|| {
-    //                 ToolError::InvalidParameters(format!(
-    //                     "Invalid sub-recipe tool name format: {}",
-    //                     tool_name
-    //                 ))
-    //             })
-    //             .unwrap();
-
-    //         ToolError::InvalidParameters(format!("Sub-recipe '{}' not found", sub_recipe_name))
-    //     })?;
-
-    //     let output = run_sub_recipe(sub_recipe, params).await.map_err(|e| {
-    //         ToolError::ExecutionError(format!("Sub-recipe execution failed: {}", e))
-    //     })?;
-    //     Ok(vec![Content::text(output)])
-    // }
     async fn call_sub_recipe_tool(
         &self,
         tool_name: &str,

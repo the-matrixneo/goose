@@ -1,13 +1,20 @@
+use mcp_core::protocol::{JsonRpcMessage, JsonRpcNotification};
+use serde_json::json;
 use std::collections::HashMap;
-use std::io::{self, Write};
 use std::sync::Arc;
-use tokio::sync::RwLock;
+use tokio::sync::{mpsc, RwLock};
 use tokio::time::{sleep, Duration, Instant};
 
 use crate::agents::sub_recipe_execution_tool::types::{Task, TaskInfo, TaskResult, TaskStatus};
 use crate::agents::sub_recipe_execution_tool::utils::{
-    count_by_status, format_task_display, get_task_name, process_output_lines,
+    count_by_status, format_task_display, get_task_name,
 };
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum DisplayMode {
+    Dashboard,
+    SingleTaskOutput,
+}
 
 const THROTTLE_INTERVAL_MS: u64 = 1000;
 const CLEAR_SCREEN: &str = "\x1b[2J\x1b[H";
@@ -20,10 +27,16 @@ pub struct TaskDashboard {
     last_display: Arc<RwLock<String>>,
     last_refresh: Arc<RwLock<Instant>>,
     initial_display_shown: Arc<RwLock<bool>>,
+    notifier: mpsc::Sender<JsonRpcMessage>,
+    display_mode: DisplayMode,
 }
 
 impl TaskDashboard {
-    pub fn new(tasks: Vec<Task>) -> Self {
+    pub fn new(
+        tasks: Vec<Task>,
+        display_mode: DisplayMode,
+        notifier: mpsc::Sender<JsonRpcMessage>,
+    ) -> Self {
         let task_map = tasks
             .into_iter()
             .map(|task| {
@@ -47,6 +60,8 @@ impl TaskDashboard {
             last_display: Arc::new(RwLock::new(String::new())),
             last_refresh: Arc::new(RwLock::new(Instant::now())),
             initial_display_shown: Arc::new(RwLock::new(false)),
+            notifier,
+            display_mode,
         }
     }
 
@@ -71,15 +86,34 @@ impl TaskDashboard {
         self.refresh_display().await;
     }
 
-    pub async fn update_task_output(&self, task_id: &str, output: &str) {
-        let mut tasks = self.tasks.write().await;
-        if let Some(task_info) = tasks.get_mut(task_id) {
-            task_info.current_output = process_output_lines(output);
-        }
-        drop(tasks);
+    pub async fn send_live_output(&self, task_id: &str, line: &str) {
+        match self.display_mode {
+            DisplayMode::SingleTaskOutput => {
+                let _ = self
+                    .notifier
+                    .try_send(JsonRpcMessage::Notification(JsonRpcNotification {
+                        jsonrpc: "2.0".to_string(),
+                        method: "notifications/message".to_string(),
+                        params: Some(json!({
+                            "data": {
+                                "type": "dashboard",
+                                "display": format!("{}\n", line)
+                            }
+                        })),
+                    }));
+            }
+            DisplayMode::Dashboard => {
+                let mut tasks = self.tasks.write().await;
+                if let Some(task_info) = tasks.get_mut(task_id) {
+                    task_info.current_output.push_str(line);
+                    task_info.current_output.push('\n');
+                }
+                drop(tasks);
 
-        if !self.should_throttle_refresh().await {
-            self.refresh_display().await;
+                if !self.should_throttle_refresh().await {
+                    self.refresh_display().await;
+                }
+            }
         }
     }
 
@@ -123,64 +157,98 @@ impl TaskDashboard {
     async fn update_display_if_changed(&self, display: String) {
         let mut last_display = self.last_display.write().await;
         if *last_display != display {
-            print!("{}", display);
-            io::stdout().flush().unwrap();
+            let _ = self
+                .notifier
+                .try_send(JsonRpcMessage::Notification(JsonRpcNotification {
+                    jsonrpc: "2.0".to_string(),
+                    method: "notifications/message".to_string(),
+                    params: Some(json!({
+                        "data": {
+                            "type": "dashboard",
+                            "display": display.clone()
+                        }
+                    })),
+                }));
             *last_display = display;
         }
     }
 
     pub async fn refresh_display(&self) {
-        let tasks = self.tasks.read().await;
-        let mut display = String::new();
+        match self.display_mode {
+            DisplayMode::Dashboard => {
+                let tasks = self.tasks.read().await;
+                let mut display = String::new();
 
-        let mut initial_shown = self.initial_display_shown.write().await;
-        self.render_header(&mut display, &mut initial_shown);
-        drop(initial_shown);
+                let mut initial_shown = self.initial_display_shown.write().await;
+                self.render_header(&mut display, &mut initial_shown);
+                drop(initial_shown);
 
-        self.render_progress_line(&mut display, &tasks);
+                self.render_progress_line(&mut display, &tasks);
 
-        let mut task_list: Vec<_> = tasks.values().collect();
-        task_list.sort_by_key(|t| &t.task.id);
+                let mut task_list: Vec<_> = tasks.values().collect();
+                task_list.sort_by_key(|t| &t.task.id);
 
-        for task_info in task_list {
-            self.render_task(&mut display, task_info);
+                for task_info in task_list {
+                    self.render_task(&mut display, task_info);
+                }
+
+                display.push_str(CLEAR_BELOW);
+
+                self.update_display_if_changed(display).await;
+            }
+            DisplayMode::SingleTaskOutput => {
+                // No dashboard display needed for single task output mode
+                // Live output is handled via send_live_output method
+            }
         }
-
-        display.push_str(CLEAR_BELOW);
-
-        self.update_display_if_changed(display).await;
     }
 
     pub async fn show_final_summary(&self) {
         let tasks = self.tasks.read().await;
 
-        println!("Execution Complete!");
-        println!("═══════════════════════");
+        let mut summary = String::new();
+        summary.push_str("Execution Complete!\n");
+        summary.push_str("═══════════════════════\n");
 
         let (total, _, _, completed, failed) = count_by_status(&tasks);
 
-        println!("Total Tasks: {}", total);
-        println!("✅ Completed: {}", completed);
-        println!("❌ Failed: {}", failed);
-        println!(
-            "📈 Success Rate: {:.1}%",
+        summary.push_str(&format!("Total Tasks: {}\n", total));
+        summary.push_str(&format!("✅ Completed: {}\n", completed));
+        summary.push_str(&format!("❌ Failed: {}\n", failed));
+        summary.push_str(&format!(
+            "📈 Success Rate: {:.1}%\n",
             (completed as f64 / total as f64) * 100.0
-        );
+        ));
 
         if failed > 0 {
-            println!("\n❌ Failed Tasks:");
+            summary.push_str("\n❌ Failed Tasks:\n");
             for task_info in tasks.values() {
                 if matches!(task_info.status, TaskStatus::Failed) {
                     let task_name = get_task_name(task_info);
-                    println!("   • {}", task_name);
+                    summary.push_str(&format!("   • {}\n", task_name));
                     if let Some(error) = task_info.error() {
-                        println!("     Error: {}", error);
+                        summary.push_str(&format!("     Error: {}\n", error));
                     }
                 }
             }
         }
 
-        println!("\n📝 Generating summary...");
+        summary.push_str("\n📝 Generating summary...\n");
+
+        // Send the final summary via notification
+        let _ = self
+            .notifier
+            .try_send(JsonRpcMessage::Notification(JsonRpcNotification {
+                jsonrpc: "2.0".to_string(),
+                method: "notifications/message".to_string(),
+                params: Some(json!({
+                    "data": {
+                        "type": "dashboard",
+                        "display": summary
+                    }
+                })),
+            }));
+
         sleep(Duration::from_millis(500)).await;
     }
 }
