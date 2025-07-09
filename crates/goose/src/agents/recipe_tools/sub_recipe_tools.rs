@@ -57,10 +57,7 @@ pub async fn create_sub_recipe_task(sub_recipe: &SubRecipe, params: Value) -> Re
             Task {
                 id: uuid::Uuid::new_v4().to_string(),
                 task_type: "sub_recipe".to_string(),
-                timeout_in_seconds: sub_recipe
-                    .executions
-                    .as_ref()
-                    .and_then(|e| e.timeout_in_seconds),
+                timeout_in_seconds: sub_recipe.timeout_in_seconds,
                 payload,
             }
         })

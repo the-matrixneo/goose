@@ -30,17 +30,45 @@ pub async fn execute_tasks(
         "sequential" => {
             if task_count == 1 {
                 let response = execute_single_task(&tasks[0], notifier).await;
-                serde_json::to_value(response)
-                    .map_err(|e| format!("Failed to serialize response: {}", e))
+                handle_response(response)
             } else {
                 Err("Sequential execution mode requires exactly one task".to_string())
             }
         }
         "parallel" => {
-            let response = execute_tasks_in_parallel(tasks, config, notifier).await;
-            serde_json::to_value(response)
-                .map_err(|e| format!("Failed to serialize response: {}", e))
+            let response: ExecutionResponse = execute_tasks_in_parallel(tasks, config, notifier).await;
+            handle_response(response)
         }
         _ => Err("Invalid execution mode".to_string()),
     }
+}
+
+fn handle_response(response: ExecutionResponse) -> Result<Value, String> {
+    if response.stats.failed > 0 {
+        let failed_tasks: Vec<String> = response.results
+            .iter()
+            .filter(|r| matches!(r.status, TaskStatus::Failed))
+            .map(|r| {
+                let error_msg = r.error.as_ref().map(|s| s.as_str()).unwrap_or("Unknown error");
+                format!("Task '{}' ({}): {}", r.task_id, get_task_description(r), error_msg)
+            })
+            .collect();
+        
+        let error_summary = format!(
+            "{}/{} tasks failed:\n{}",
+            response.stats.failed,
+            response.stats.total_tasks,
+            failed_tasks.join("\n")
+        );
+        
+        return Err(error_summary);
+    }
+    serde_json::to_value(response)
+        .map_err(|e| format!("Failed to serialize response: {}", e))
+}
+
+fn get_task_description(result: &TaskResult) -> String {
+    // We'd need to reconstruct task info from the result or pass it through
+    // For now, just use the task_id as placeholder
+    format!("ID: {}", result.task_id)
 }

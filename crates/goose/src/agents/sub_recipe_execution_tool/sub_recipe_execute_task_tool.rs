@@ -13,7 +13,6 @@ pub fn create_sub_recipe_execute_task_tool() -> Tool {
     Tool::new(
         SUB_RECIPE_EXECUTE_TASK_TOOL_NAME,
         "Only use this tool when you execute sub recipe task.
-
 EXECUTION STRATEGY DECISION:
 1. PRE-CREATED TASKS: If tasks were created by subrecipe__create_task_* tools, check the execution_mode in the response:
    - If execution_mode is 'parallel', use parallel execution

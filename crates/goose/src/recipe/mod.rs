@@ -135,6 +135,7 @@ pub struct Response {
 pub struct SubRecipe {
     pub name: String,
     pub path: String,
+    pub timeout_in_seconds: Option<u64>,
     #[serde(default, deserialize_with = "deserialize_value_map_as_string")]
     pub values: Option<HashMap<String, String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -144,7 +145,6 @@ pub struct SubRecipe {
 pub struct Execution {
     #[serde(default)]
     pub parallel: bool,
-    pub timeout_in_seconds: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub runs: Option<Vec<ExecutionRun>>,
 }
