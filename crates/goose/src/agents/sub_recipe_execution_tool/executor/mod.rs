@@ -5,7 +5,7 @@ use tokio::sync::mpsc;
 use tokio::time::Instant;
 
 use crate::agents::sub_recipe_execution_tool::lib::{
-    Config, ExecutionResponse, ExecutionStats, SharedState, Task, TaskResult, TaskStatus,
+    ExecutionResponse, ExecutionStats, SharedState, Task, TaskResult, TaskStatus,
 };
 use crate::agents::sub_recipe_execution_tool::task_execution_tracker::{
     DisplayMode, TaskExecutionTracker,
@@ -17,6 +17,7 @@ use crate::agents::sub_recipe_execution_tool::workers::spawn_worker;
 mod tests;
 
 const EXECUTION_STATUS_COMPLETED: &str = "completed";
+const DEFAULT_MAX_WORKERS: usize = 10;
 
 pub async fn execute_single_task(
     task: &Task,
@@ -41,7 +42,6 @@ pub async fn execute_single_task(
 
 pub async fn execute_tasks_in_parallel(
     tasks: Vec<Task>,
-    config: Config,
     notifier: mpsc::Sender<JsonRpcMessage>,
 ) -> ExecutionResponse {
     let task_execution_tracker = Arc::new(TaskExecutionTracker::new(
@@ -67,8 +67,7 @@ pub async fn execute_tasks_in_parallel(
 
     let shared_state = create_shared_state(task_rx, result_tx, task_execution_tracker.clone());
 
-    // Simple static worker allocation - no dynamic scaling needed
-    let worker_count = std::cmp::min(task_count, config.max_workers);
+    let worker_count = std::cmp::min(task_count, DEFAULT_MAX_WORKERS);
     let mut worker_handles = Vec::new();
     for i in 0..worker_count {
         let handle = spawn_worker(shared_state.clone(), i);

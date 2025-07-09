@@ -97,14 +97,6 @@ Pre-created Task Based:
                         "required": ["id", "payload"]
                     },
                     "description": "The tasks to run in parallel"
-                },
-                "config": {
-                    "type": "object",
-                    "properties": {
-                        "max_workers": {
-                            "type": "number"
-                        }
-                    }
                 }
             },
             "required": ["tasks"]

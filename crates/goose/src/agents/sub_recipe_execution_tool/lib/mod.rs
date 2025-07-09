@@ -2,7 +2,7 @@ use crate::agents::sub_recipe_execution_tool::executor::{
     execute_single_task, execute_tasks_in_parallel,
 };
 pub use crate::agents::sub_recipe_execution_tool::types::{
-    Config, ExecutionMode, ExecutionResponse, ExecutionStats, SharedState, Task, TaskResult,
+    ExecutionMode, ExecutionResponse, ExecutionStats, SharedState, Task, TaskResult,
     TaskStatus,
 };
 
@@ -22,13 +22,6 @@ pub async fn execute_tasks(
         serde_json::from_value(input.get("tasks").ok_or("Missing tasks field")?.clone())
             .map_err(|e| format!("Failed to parse tasks: {}", e))?;
 
-    let config: Config = if let Some(config_value) = input.get("config") {
-        serde_json::from_value(config_value.clone())
-            .map_err(|e| format!("Failed to parse config: {}", e))?
-    } else {
-        Config::default()
-    };
-
     let task_count = tasks.len();
     match execution_mode {
         ExecutionMode::Sequential => {
@@ -41,7 +34,7 @@ pub async fn execute_tasks(
         }
         ExecutionMode::Parallel => {
             let response: ExecutionResponse =
-                execute_tasks_in_parallel(tasks, config, notifier).await;
+                execute_tasks_in_parallel(tasks, notifier).await;
             handle_response(response)
         }
     }

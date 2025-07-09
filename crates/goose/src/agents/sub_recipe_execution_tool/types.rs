@@ -124,25 +124,6 @@ impl SharedState {
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
-pub struct Config {
-    #[serde(default = "default_max_workers")]
-    pub max_workers: usize,
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            max_workers: default_max_workers(),
-        }
-    }
-}
-
-const DEFAULT_MAX_WORKERS: usize = 10;
-
-fn default_max_workers() -> usize {
-    DEFAULT_MAX_WORKERS
-}
 
 #[derive(Debug, Serialize)]
 pub struct ExecutionStats {
