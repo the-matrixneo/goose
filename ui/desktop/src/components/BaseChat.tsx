@@ -55,7 +55,7 @@ function BaseChatContent({
   renderAfterMessages,
   customChatInputProps = {},
   customMainLayoutProps = {},
-  contentClassName = "",
+  contentClassName = '',
 }: BaseChatProps) {
   const location = useLocation();
 
@@ -169,6 +169,7 @@ function BaseChatContent({
           className={`flex flex-col min-w-0 flex-1 overflow-y-scroll relative ${contentClassName}`}
           onDrop={handleDrop}
           onDragOver={handleDragOver}
+          data-drop-zone="true"
         >
           {/* Custom content before messages */}
           {renderBeforeMessages && renderBeforeMessages()}

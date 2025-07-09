@@ -20,6 +20,7 @@ import { toastError } from '../toasts';
 import MentionPopover, { FileItemWithMatch } from './MentionPopover';
 import { COST_TRACKING_ENABLED } from '../updates';
 import { CostTracker } from './bottom_menu/CostTracker';
+import { DroppedFile, useFileDrop } from '../hooks/useFileDrop';
 
 interface PastedImage {
   id: string;
@@ -49,7 +50,7 @@ interface ChatInputProps {
   onStop?: () => void;
   commandHistory?: string[]; // Current chat's message history
   initialValue?: string;
-  droppedFiles?: string[];
+  droppedFiles?: DroppedFile[];
   onFilesProcessed?: () => void; // Callback to clear dropped files after processing
   setView: (view: View) => void;
   numTokens?: number;
@@ -175,7 +176,27 @@ export default function ChatInput({
   const [isInGlobalHistory, setIsInGlobalHistory] = useState(false);
   const [hasUserTyped, setHasUserTyped] = useState(false);
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
-  const [processedFilePaths, setProcessedFilePaths] = useState<string[]>([]);
+
+  // Use shared file drop hook for ChatInput
+  const {
+    droppedFiles: localDroppedFiles,
+    setDroppedFiles: setLocalDroppedFiles,
+    handleDrop: handleLocalDrop,
+    handleDragOver: handleLocalDragOver,
+  } = useFileDrop();
+
+  // Merge local dropped files with parent dropped files
+  const allDroppedFiles = [...droppedFiles, ...localDroppedFiles];
+
+  const handleRemoveDroppedFile = (idToRemove: string) => {
+    // Remove from local dropped files
+    setLocalDroppedFiles((prev) => prev.filter((file) => file.id !== idToRemove));
+
+    // If it's from parent, call the parent's callback
+    if (onFilesProcessed && droppedFiles.some((file) => file.id === idToRemove)) {
+      onFilesProcessed();
+    }
+  };
 
   const handleRemovePastedImage = (idToRemove: string) => {
     const imageToRemove = pastedImages.find((img) => img.id === idToRemove);
@@ -350,22 +371,6 @@ export default function ChatInput({
   const minHeight = '1rem';
   const maxHeight = 10 * 24;
 
-  // If we have dropped files, add them to the input and update our state.
-  useEffect(() => {
-    if (processedFilePaths !== droppedFiles && droppedFiles.length > 0) {
-      // Append file paths that aren't in displayValue.
-      const currentText = displayValue || '';
-      const joinedPaths = currentText.trim()
-        ? `${currentText.trim()} ${droppedFiles.filter((path) => !currentText.includes(path)).join(' ')}`
-        : droppedFiles.join(' ');
-
-      setDisplayValue(joinedPaths);
-      setValue(joinedPaths);
-      textAreaRef.current?.focus();
-      setProcessedFilePaths(droppedFiles);
-    }
-  }, [droppedFiles, processedFilePaths, displayValue]);
-
   // Debounced function to update actual value
   const debouncedSetValue = useMemo(
     () =>
@@ -455,48 +460,60 @@ export default function ChatInput({
           id: `error-${Date.now()}`,
           dataUrl: '',
           isLoading: false,
-          error: `Cannot paste ${imageFiles.length} image(s). Maximum ${MAX_IMAGES_PER_MESSAGE} images per message allowed.`,
+          error: `Cannot paste ${imageFiles.length} image(s). Maximum ${MAX_IMAGES_PER_MESSAGE} images per message allowed. Currently have ${pastedImages.length}.`,
         },
       ]);
 
-      // Remove the error message after 3 seconds
+      // Remove the error message after 5 seconds
       setTimeout(() => {
         setPastedImages((prev) => prev.filter((img) => !img.id.startsWith('error-')));
-      }, 3000);
+      }, 5000);
 
       return;
     }
 
     evt.preventDefault();
 
+    // Process each image file
+    const newImages: PastedImage[] = [];
+
     for (const file of imageFiles) {
       // Check individual file size before processing
       if (file.size > MAX_IMAGE_SIZE_MB * 1024 * 1024) {
         const errorId = `error-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-        setPastedImages((prev) => [
-          ...prev,
-          {
-            id: errorId,
-            dataUrl: '',
-            isLoading: false,
-            error: `Image too large (${Math.round(file.size / (1024 * 1024))}MB). Maximum ${MAX_IMAGE_SIZE_MB}MB allowed.`,
-          },
-        ]);
+        newImages.push({
+          id: errorId,
+          dataUrl: '',
+          isLoading: false,
+          error: `Image too large (${Math.round(file.size / (1024 * 1024))}MB). Maximum ${MAX_IMAGE_SIZE_MB}MB allowed.`,
+        });
 
-        // Remove the error message after 3 seconds
+        // Remove the error message after 5 seconds
         setTimeout(() => {
           setPastedImages((prev) => prev.filter((img) => img.id !== errorId));
-        }, 3000);
+        }, 5000);
 
         continue;
       }
 
+      const imageId = `img-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
+      // Add the image with loading state
+      newImages.push({
+        id: imageId,
+        dataUrl: '',
+        isLoading: true,
+      });
+
+      // Process the image asynchronously
       const reader = new FileReader();
       reader.onload = async (e) => {
         const dataUrl = e.target?.result as string;
         if (dataUrl) {
-          const imageId = `img-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-          setPastedImages((prev) => [...prev, { id: imageId, dataUrl, isLoading: true }]);
+          // Update the image with the data URL
+          setPastedImages((prev) =>
+            prev.map((img) => (img.id === imageId ? { ...img, dataUrl, isLoading: true } : img))
+          );
 
           try {
             const result = await window.electron.saveDataUrlToTemp(dataUrl, imageId);
@@ -519,8 +536,21 @@ export default function ChatInput({
           }
         }
       };
+      reader.onerror = () => {
+        console.error('Failed to read image file:', file.name);
+        setPastedImages((prev) =>
+          prev.map((img) =>
+            img.id === imageId
+              ? { ...img, error: 'Failed to read image file.', isLoading: false }
+              : img
+          )
+        );
+      };
       reader.readAsDataURL(file);
     }
+
+    // Add all new images to the existing list
+    setPastedImages((prev) => [...prev, ...newImages]);
   };
 
   // Cleanup debounced functions on unmount
@@ -623,18 +653,25 @@ export default function ChatInput({
       .filter((img) => img.filePath && !img.error && !img.isLoading)
       .map((img) => img.filePath as string);
 
+    // Get paths from all dropped files (both parent and local)
+    const droppedFilePaths = allDroppedFiles
+      .filter((file) => !file.error && !file.isLoading)
+      .map((file) => file.path);
+
     let textToSend = displayValue.trim();
 
-    if (validPastedImageFilesPaths.length > 0) {
-      const pathsString = validPastedImageFilesPaths.join(' ');
+    // Combine pasted images and dropped files
+    const allFilePaths = [...validPastedImageFilesPaths, ...droppedFilePaths];
+    if (allFilePaths.length > 0) {
+      const pathsString = allFilePaths.join(' ');
       textToSend = textToSend ? `${textToSend} ${pathsString}` : pathsString;
     }
 
     if (textToSend) {
       if (displayValue.trim()) {
         LocalMessageStorage.addMessage(displayValue);
-      } else if (validPastedImageFilesPaths.length > 0) {
-        LocalMessageStorage.addMessage(validPastedImageFilesPaths.join(' '));
+      } else if (allFilePaths.length > 0) {
+        LocalMessageStorage.addMessage(allFilePaths.join(' '));
       }
 
       handleSubmit(
@@ -648,10 +685,13 @@ export default function ChatInput({
       setSavedInput('');
       setIsInGlobalHistory(false);
       setHasUserTyped(false);
-      
-      // Clear dropped files after processing
+
+      // Clear both parent and local dropped files after processing
       if (onFilesProcessed && droppedFiles.length > 0) {
         onFilesProcessed();
+      }
+      if (localDroppedFiles.length > 0) {
+        setLocalDroppedFiles([]);
       }
     }
   };
@@ -710,7 +750,8 @@ export default function ChatInput({
       const canSubmit =
         !isLoading &&
         (displayValue.trim() ||
-          pastedImages.some((img) => img.filePath && !img.error && !img.isLoading));
+          pastedImages.some((img) => img.filePath && !img.error && !img.isLoading) ||
+          allDroppedFiles.some((file) => !file.error && !file.isLoading));
       if (canSubmit) {
         performSubmit();
       }
@@ -722,7 +763,8 @@ export default function ChatInput({
     const canSubmit =
       !isLoading &&
       (displayValue.trim() ||
-        pastedImages.some((img) => img.filePath && !img.error && !img.isLoading));
+        pastedImages.some((img) => img.filePath && !img.error && !img.isLoading) ||
+        allDroppedFiles.some((file) => !file.error && !file.isLoading));
     if (canSubmit) {
       performSubmit();
     }
@@ -761,8 +803,11 @@ export default function ChatInput({
   };
 
   const hasSubmittableContent =
-    displayValue.trim() || pastedImages.some((img) => img.filePath && !img.error && !img.isLoading);
+    displayValue.trim() ||
+    pastedImages.some((img) => img.filePath && !img.error && !img.isLoading) ||
+    allDroppedFiles.some((file) => !file.error && !file.isLoading);
   const isAnyImageLoading = pastedImages.some((img) => img.isLoading);
+  const isAnyDroppedFileLoading = allDroppedFiles.some((file) => file.isLoading);
 
   return (
     <div
@@ -773,6 +818,9 @@ export default function ChatInput({
           ? 'border-borderProminent hover:border-borderProminent'
           : 'border-borderSubtle hover:border-borderStandard'
       } bg-bgApp z-10`}
+      data-drop-zone="true"
+      onDrop={handleLocalDrop}
+      onDragOver={handleLocalDragOver}
     >
       <div className="p-2 pb-0">
         <DirSwitcher hasMessages={messages.length > 0} />
@@ -813,8 +861,10 @@ export default function ChatInput({
           )}
         </div>
 
-        {pastedImages.length > 0 && (
+        {/* Combined files and images preview */}
+        {(pastedImages.length > 0 || allDroppedFiles.length > 0) && (
           <div className="flex flex-wrap gap-2 p-2 border-t border-borderSubtle">
+            {/* Render pasted images first */}
             {pastedImages.map((img) => (
               <div key={img.id} className="relative group w-20 h-20">
                 {img.dataUrl && (
@@ -854,6 +904,62 @@ export default function ChatInput({
                     onClick={() => handleRemovePastedImage(img.id)}
                     className="absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity z-10"
                     aria-label="Remove image"
+                    variant="outline"
+                    size="xs"
+                  >
+                    <Close />
+                  </Button>
+                )}
+              </div>
+            ))}
+
+            {/* Render dropped files after pasted images */}
+            {allDroppedFiles.map((file) => (
+              <div key={file.id} className="relative group">
+                {file.isImage ? (
+                  // Image preview
+                  <div className="w-20 h-20">
+                    {file.dataUrl && (
+                      <img
+                        src={file.dataUrl}
+                        alt={file.name}
+                        className={`w-full h-full object-cover rounded border ${file.error ? 'border-red-500' : 'border-borderStandard'}`}
+                      />
+                    )}
+                    {file.isLoading && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 rounded">
+                        <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-white"></div>
+                      </div>
+                    )}
+                    {file.error && !file.isLoading && (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-black bg-opacity-75 rounded p-1 text-center">
+                        <p className="text-red-400 text-[10px] leading-tight break-all">
+                          {file.error.substring(0, 30)}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  // File box preview
+                  <div className="flex items-center gap-2 px-3 py-2 bg-bgSubtle border border-borderStandard rounded-lg min-w-[120px] max-w-[200px]">
+                    <div className="flex-shrink-0 w-8 h-8 bg-bgApp border border-borderSubtle rounded flex items-center justify-center text-xs font-mono text-textSubtle">
+                      {file.name.split('.').pop()?.toUpperCase() || 'FILE'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-textStandard truncate" title={file.name}>
+                        {file.name}
+                      </p>
+                      <p className="text-xs text-textSubtle">{file.type || 'Unknown type'}</p>
+                    </div>
+                  </div>
+                )}
+                {!file.isLoading && (
+                  <Button
+                    type="button"
+                    shape="round"
+                    onClick={() => handleRemoveDroppedFile(file.id)}
+                    className="absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity z-10"
+                    aria-label="Remove file"
                     variant="outline"
                     size="xs"
                   >
@@ -948,21 +1054,31 @@ export default function ChatInput({
                 size="xs"
                 variant="outline"
                 disabled={
-                  !hasSubmittableContent || isAnyImageLoading || isRecording || isTranscribing
+                  !hasSubmittableContent ||
+                  isAnyImageLoading ||
+                  isAnyDroppedFileLoading ||
+                  isRecording ||
+                  isTranscribing
                 }
                 className={`text-text-muted ${
-                  !hasSubmittableContent || isAnyImageLoading || isRecording || isTranscribing
+                  !hasSubmittableContent ||
+                  isAnyImageLoading ||
+                  isAnyDroppedFileLoading ||
+                  isRecording ||
+                  isTranscribing
                     ? 'text-textSubtle cursor-not-allowed'
                     : 'bg-bgAppInverse text-textProminentInverse hover:cursor-pointer'
                 }`}
                 title={
                   isAnyImageLoading
                     ? 'Waiting for images to save...'
-                    : isRecording
-                      ? 'Recording...'
-                      : isTranscribing
-                        ? 'Transcribing...'
-                        : 'Send'
+                    : isAnyDroppedFileLoading
+                      ? 'Processing dropped files...'
+                      : isRecording
+                        ? 'Recording...'
+                        : isTranscribing
+                          ? 'Transcribing...'
+                          : 'Send'
                 }
               >
                 <Send />

@@ -834,6 +834,56 @@ export default function App() {
     };
   }, []);
 
+  // Prevent default drag and drop behavior globally to avoid opening files in new windows
+  // but allow our React components to handle drops in designated areas
+  useEffect(() => {
+    console.log('Setting up global drag and drop prevention');
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const preventDefaults = (e: any) => {
+      // Only prevent default if we're not over a designated drop zone
+      const target = e.target as HTMLElement;
+      const isOverDropZone = target.closest('[data-drop-zone="true"]') !== null;
+
+      if (!isOverDropZone) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const handleDragOver = (e: any) => {
+      // Always prevent default for dragover to allow dropping
+      e.preventDefault();
+      e.stopPropagation();
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const handleDrop = (e: any) => {
+      // Only prevent default if we're not over a designated drop zone
+      const target = e.target as HTMLElement;
+      const isOverDropZone = target.closest('[data-drop-zone="true"]') !== null;
+
+      if (!isOverDropZone) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+
+    // Add event listeners to document to catch drag events
+    document.addEventListener('dragenter', preventDefaults, false);
+    document.addEventListener('dragleave', preventDefaults, false);
+    document.addEventListener('dragover', handleDragOver, false);
+    document.addEventListener('drop', handleDrop, false);
+
+    return () => {
+      document.removeEventListener('dragenter', preventDefaults, false);
+      document.removeEventListener('dragleave', preventDefaults, false);
+      document.removeEventListener('dragover', handleDragOver, false);
+      document.removeEventListener('drop', handleDrop, false);
+    };
+  }, []);
+
   useEffect(() => {
     console.log('Setting up fatal error handler');
     const handleFatalError = (_event: IpcRendererEvent, ...args: unknown[]) => {

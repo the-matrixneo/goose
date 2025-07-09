@@ -48,6 +48,7 @@ import {
 import { SidebarTrigger } from './ui/sidebar';
 import { SessionInsights } from './sessions/SessionsInsights';
 import { useSidebar } from './ui/sidebar';
+import { useFileDrop } from '../hooks/useFileDrop';
 import { Button } from './ui/button';
 import { Idea } from './icons';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/Tooltip';
@@ -161,7 +162,6 @@ function ChatContentWithSidebar({
   const [localInputTokens, setLocalInputTokens] = useState<number>(0);
   const [localOutputTokens, setLocalOutputTokens] = useState<number>(0);
   const [ancestorMessages, setAncestorMessages] = useState<Message[]>([]);
-  const [droppedFiles, setDroppedFiles] = useState<string[]>([]);
   const [isParameterModalOpen, setIsParameterModalOpen] = useState(false);
   const [recipeParameters, setRecipeParameters] = useState<Record<string, string> | null>(null);
   const [_sessionCosts, setSessionCosts] = useState<{
@@ -188,6 +188,9 @@ function ChatContentWithSidebar({
     hasContextHandlerContent,
     getContextHandlerType,
   } = useChatContextManager();
+
+  // Use shared file drop
+  const { droppedFiles, setDroppedFiles, handleDrop, handleDragOver } = useFileDrop();
 
   useEffect(() => {
     // Log all messages when the component first mounts
@@ -764,22 +767,6 @@ function ChatContentWithSidebar({
     sessionMetadata,
   ]);
 
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    const files = e.dataTransfer.files;
-    if (files.length > 0) {
-      const paths: string[] = [];
-      for (let i = 0; i < files.length; i++) {
-        paths.push(window.electron.getPathForFile(files[i]));
-      }
-      setDroppedFiles(paths);
-    }
-  };
-
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-  };
-
   const toolCallNotifications = notifications.reduce((map, item) => {
     const key = item.request_id;
     if (!map.has(key)) {
@@ -920,6 +907,7 @@ function ChatContentWithSidebar({
           className="flex flex-col min-w-0 flex-1 overflow-y-scroll relative pl-6 pr-4 pb-16 pt-2"
           onDrop={handleDrop}
           onDragOver={handleDragOver}
+          data-drop-zone="true"
         >
           {/* Session Insights at the top */}
           {messages.length === 0 && <SessionInsights />}
@@ -1054,6 +1042,7 @@ function ChatContentWithSidebar({
             // inputTokens={sessionInputTokens || localInputTokens}
             // outputTokens={sessionOutputTokens || localOutputTokens}
             droppedFiles={droppedFiles}
+            onFilesProcessed={() => setDroppedFiles([])} // Clear dropped files after processing
             messages={messages}
             setMessages={setMessages}
             // sessionCosts={sessionCosts}
