@@ -18,7 +18,7 @@
  * and input behavior to create a welcoming onboarding experience.
  */
 
-import React, { useState, useEffect, useContext, createContext } from 'react';
+import { useState, useEffect, useContext, createContext } from 'react';
 import { useLocation } from 'react-router-dom';
 import FlappyGoose from './FlappyGoose';
 import { type View, ViewOptions } from '../App';
@@ -79,14 +79,13 @@ export default function Hub({
     }
   }, [location.pathname, chat.messages.length]);
 
-  // Handle submit for the initial ChatInput (when no messages)
-  const handleInitialSubmit = (e: React.FormEvent) => {
-    const customEvent = e as unknown as CustomEvent;
-    const combinedTextFromInput = customEvent.detail?.value || '';
-
-    if (combinedTextFromInput.trim()) {
-      // Navigate to pair page with animation disabled
-      setView('pair', { disableAnimation: true });
+  // Handle message submission callback (called after message is submitted)
+  const handleMessageSubmit = (message: string) => {
+    if (message.trim() && (chat.messages.length === 0 || forceShowInsights)) {
+      // Navigate to pair page after message is submitted
+      setTimeout(() => {
+        setView('pair', { disableAnimation: true });
+      }, 100);
     }
   };
 
@@ -204,10 +203,7 @@ export default function Hub({
 
   // Custom chat input props for Hub-specific behavior
   const customChatInputProps = {
-    handleSubmit:
-      forceShowInsights || (chat.messages.length === 0 && !isInPairMode)
-        ? handleInitialSubmit
-        : undefined,
+    // Remove the handleSubmit override since we're using the callback approach
     messages: forceShowInsights ? [] : undefined,
   };
 
@@ -259,6 +255,7 @@ export default function Hub({
         setChat={setChat}
         setView={setView}
         setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
+        onMessageSubmit={handleMessageSubmit}
         renderHeader={renderHeader}
         renderBeforeMessages={renderBeforeMessages}
         customChatInputProps={customChatInputProps}

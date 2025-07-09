@@ -80,6 +80,7 @@ interface BaseChatProps {
   setIsGoosehintsModalOpen?: (isOpen: boolean) => void;
   enableLocalStorage?: boolean;
   onMessageStreamFinish?: () => void;
+  onMessageSubmit?: (message: string) => void; // Callback after message is submitted
   renderHeader?: () => React.ReactNode;
   renderBeforeMessages?: () => React.ReactNode;
   renderAfterMessages?: () => React.ReactNode;
@@ -94,6 +95,7 @@ function BaseChatContent({
   setView,
   enableLocalStorage = false,
   onMessageStreamFinish,
+  onMessageSubmit,
   renderHeader,
   renderBeforeMessages,
   renderAfterMessages,
@@ -196,6 +198,11 @@ function BaseChatContent({
             );
           }
         : undefined;
+
+    // Call the callback if provided (for Hub to handle navigation)
+    if (onMessageSubmit && combinedTextFromInput.trim()) {
+      onMessageSubmit(combinedTextFromInput);
+    }
 
     engineHandleSubmit(combinedTextFromInput, onSummaryReset);
   };
