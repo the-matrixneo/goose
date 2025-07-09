@@ -37,6 +37,7 @@ impl SubAgentManager {
         args: SpawnSubAgentArgs,
         provider: Arc<dyn Provider>,
         extension_manager: Arc<tokio::sync::RwLockReadGuard<'_, ExtensionManager>>,
+        namespace_manager: Arc<super::namespace::NamespaceManager>,
     ) -> Result<String> {
         debug!("Spawning interactive subagent");
 
@@ -68,6 +69,7 @@ impl SubAgentManager {
             Arc::clone(&provider),
             Arc::clone(&extension_manager),
             self.mcp_notification_tx.clone(),
+            namespace_manager,
         )
         .await?;
         let subagent_id = subagent.id.clone();
@@ -293,6 +295,7 @@ impl SubAgentManager {
         args: SpawnSubAgentArgs,
         provider: Arc<dyn Provider>,
         extension_manager: Arc<tokio::sync::RwLockReadGuard<'_, ExtensionManager>>,
+        namespace_manager: Arc<super::namespace::NamespaceManager>,
     ) -> Result<String> {
         debug!("Running complete subagent task");
 
@@ -325,6 +328,7 @@ impl SubAgentManager {
             Arc::clone(&provider),
             Arc::clone(&extension_manager),
             self.mcp_notification_tx.clone(),
+            namespace_manager,
         )
         .await?;
         let subagent_id = subagent.id.clone();

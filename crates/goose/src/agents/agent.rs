@@ -29,6 +29,7 @@ use tracing::{debug, error, instrument};
 
 use crate::agents::extension::{ExtensionConfig, ExtensionError, ExtensionResult, ToolInfo};
 use crate::agents::extension_manager::{get_parameter_names, ExtensionManager};
+use crate::agents::namespace::NamespaceManager;
 use crate::agents::platform_tools::{
     PLATFORM_LIST_RESOURCES_TOOL_NAME, PLATFORM_MANAGE_EXTENSIONS_TOOL_NAME,
     PLATFORM_MANAGE_SCHEDULE_TOOL_NAME, PLATFORM_READ_RESOURCE_TOOL_NAME,
@@ -62,6 +63,7 @@ const DEFAULT_MAX_TURNS: u32 = 1000;
 pub struct Agent {
     pub(super) provider: Mutex<Option<Arc<dyn Provider>>>,
     pub(super) extension_manager: RwLock<ExtensionManager>,
+    pub(super) namespace_manager: Arc<NamespaceManager>,
     pub(super) sub_recipe_manager: Mutex<SubRecipeManager>,
     pub(super) final_output_tool: Mutex<Option<FinalOutputTool>>,
     pub(super) frontend_tools: Mutex<HashMap<String, FrontendTool>>,
@@ -136,6 +138,7 @@ impl Agent {
         Self {
             provider: Mutex::new(None),
             extension_manager: RwLock::new(ExtensionManager::new()),
+            namespace_manager: Arc::new(NamespaceManager::new()),
             sub_recipe_manager: Mutex::new(SubRecipeManager::new()),
             final_output_tool: Mutex::new(None),
             frontend_tools: Mutex::new(HashMap::new()),
@@ -195,12 +198,12 @@ impl Agent {
     }
 
     /// Get all tools from all clients with proper prefixing
-    pub async fn get_prefixed_tools(&self) -> ExtensionResult<Vec<Tool>> {
+    pub async fn get_prefixed_tools(&self, namespace: Option<String>) -> ExtensionResult<Vec<Tool>> {
         let mut tools = self
             .extension_manager
             .read()
             .await
-            .get_prefixed_tools(None)
+            .get_prefixed_tools_with_namespace(None, namespace, Some(Arc::clone(&self.namespace_manager)))
             .await?;
 
         // Add frontend tools directly - they don't need prefixing since they're already uniquely named
@@ -348,6 +351,21 @@ impl Agent {
             };
             ToolCallResult::from(Ok(selected_tools))
         } else {
+            // Check namespace access for extension tools
+            let extension_name = tool_call.name.split("__").next();
+            if let Some(ext_name) = extension_name {
+                // Check if the extension has access to the "main" namespace
+                if !self.namespace_manager.has_access("main", ext_name) {
+                    return (
+                        request_id,
+                        Err(ToolError::ExecutionError(format!(
+                            "Extension '{}' does not have access to the main namespace",
+                            ext_name
+                        ))),
+                    );
+                }
+            }
+            
             // Clone the result to ensure no references to extension_manager are returned
             let result = extension_manager
                 .dispatch_tool_call(tool_call.clone())
@@ -512,6 +530,10 @@ impl Agent {
             _ => {
                 let mut extension_manager = self.extension_manager.write().await;
                 extension_manager.add_extension(extension.clone()).await?;
+                
+                // Grant access to the "main" namespace for the new extension
+                let extension_name = extension.name();
+                self.namespace_manager.grant_access("main", vec![extension_name]);
             }
         }
 
@@ -544,7 +566,7 @@ impl Agent {
     pub async fn list_tools(&self, extension_name: Option<String>) -> Vec<Tool> {
         let extension_manager = self.extension_manager.read().await;
         let mut prefixed_tools = extension_manager
-            .get_prefixed_tools(extension_name.clone())
+            .get_prefixed_tools_with_namespace(extension_name.clone(), None, Some(Arc::clone(&self.namespace_manager)))
             .await
             .unwrap_or_default();
 
@@ -626,6 +648,12 @@ impl Agent {
     pub async fn remove_extension(&self, name: &str) -> Result<()> {
         let mut extension_manager = self.extension_manager.write().await;
         extension_manager.remove_extension(name).await?;
+
+        // Revoke access from all namespaces for the removed extension
+        let namespaces = self.namespace_manager.list_namespaces(name);
+        for namespace in namespaces {
+            let _ = self.namespace_manager.revoke_access(&namespace, name);
+        }
 
         // If vector tool selection is enabled, remove tools from the index
         let selector = self.router_tool_selector.lock().await.clone();

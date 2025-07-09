@@ -17,6 +17,7 @@ use tokio::sync::{mpsc, Mutex, RwLock};
 use tracing::{debug, error, instrument};
 use uuid::Uuid;
 
+use crate::agents::namespace::NamespaceManager;
 use crate::agents::platform_tools::{
     self, PLATFORM_LIST_RESOURCES_TOOL_NAME, PLATFORM_READ_RESOURCE_TOOL_NAME,
     PLATFORM_SEARCH_AVAILABLE_EXTENSIONS_TOOL_NAME,
@@ -96,6 +97,7 @@ pub struct SubAgent {
     pub recipe_extensions: Arc<Mutex<Vec<String>>>,
     pub missing_extensions: Arc<Mutex<Vec<String>>>, // Track extensions that weren't enabled
     pub mcp_notification_tx: mpsc::Sender<JsonRpcMessage>, // For MCP notifications
+    pub namespace_access: Arc<Mutex<NamespaceManager>>, // Access to namespace manager
 }
 
 impl SubAgent {
@@ -106,6 +108,7 @@ impl SubAgent {
         _provider: Arc<dyn Provider>,
         extension_manager: Arc<tokio::sync::RwLockReadGuard<'_, ExtensionManager>>,
         mcp_notification_tx: mpsc::Sender<JsonRpcMessage>,
+        namespace_manager: Arc<NamespaceManager>,
     ) -> Result<(Arc<Self>, tokio::task::JoinHandle<()>), anyhow::Error> {
         debug!("Creating new subagent with id: {}", config.id);
 
@@ -132,6 +135,16 @@ impl SubAgent {
             recipe_extensions = existing_extensions;
         }
 
+        // Create a namespace manager for this subagent
+        let subagent_namespace_manager = Arc::new(Mutex::new(NamespaceManager::new()));
+        
+        // Grant access to namespaces based on subagent configuration
+        // For now, grant access to a namespace named after the subagent ID
+        let subagent_namespace = format!("subagent_{}", config.id);
+        if !recipe_extensions.is_empty() {
+            subagent_namespace_manager.lock().await.grant_access(&subagent_namespace, recipe_extensions.clone());
+        }
+
         let subagent = Arc::new(SubAgent {
             id: config.id.clone(),
             conversation: Arc::new(Mutex::new(Vec::new())),
@@ -142,6 +155,7 @@ impl SubAgent {
             recipe_extensions: Arc::new(Mutex::new(recipe_extensions)),
             missing_extensions: Arc::new(Mutex::new(missing_extensions)),
             mcp_notification_tx,
+            namespace_access: subagent_namespace_manager,
         });
 
         // Send initial MCP notification

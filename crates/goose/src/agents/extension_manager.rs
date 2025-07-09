@@ -13,6 +13,7 @@ use tokio_stream::wrappers::ReceiverStream;
 use tracing::{error, warn};
 
 use super::extension::{ExtensionConfig, ExtensionError, ExtensionInfo, ExtensionResult, ToolInfo};
+use super::namespace::NamespaceManager;
 use super::tool_execution::ToolCallResult;
 use crate::agents::extension::Envs;
 use crate::config::{Config, ExtensionConfigManager};
@@ -369,6 +370,76 @@ impl ExtensionManager {
         });
 
         let client_futures = filtered_clients.map(|(name, client)| {
+            let name = name.clone();
+            let client = client.clone();
+
+            task::spawn(async move {
+                let mut tools = Vec::new();
+                let client_guard = client.lock().await;
+                let mut client_tools = client_guard.list_tools(None).await?;
+
+                loop {
+                    for tool in client_tools.tools {
+                        tools.push(Tool::new(
+                            format!("{}__{}", name, tool.name),
+                            &tool.description,
+                            tool.input_schema,
+                            tool.annotations,
+                        ));
+                    }
+
+                    // Exit loop when there are no more pages
+                    if client_tools.next_cursor.is_none() {
+                        break;
+                    }
+
+                    client_tools = client_guard.list_tools(client_tools.next_cursor).await?;
+                }
+
+                Ok::<Vec<Tool>, ExtensionError>(tools)
+            })
+        });
+
+        // Collect all results concurrently
+        let results = future::join_all(client_futures).await;
+
+        // Aggregate tools and handle errors
+        let mut tools = Vec::new();
+        for result in results {
+            match result {
+                Ok(Ok(client_tools)) => tools.extend(client_tools),
+                Ok(Err(err)) => return Err(err),
+                Err(join_err) => return Err(ExtensionError::from(join_err)),
+            }
+        }
+
+        Ok(tools)
+    }
+
+    /// Get all tools from all clients with proper prefixing, filtered by namespace access
+    pub async fn get_prefixed_tools_with_namespace(
+        &self,
+        extension_name: Option<String>,
+        namespace: Option<String>,
+        namespace_manager: Option<Arc<NamespaceManager>>,
+    ) -> ExtensionResult<Vec<Tool>> {
+        // Filter clients based on the provided extension_name or include all if None
+        let filtered_clients = self.clients.iter().filter(|(name, _)| {
+            if let Some(ref name_filter) = extension_name {
+                *name == name_filter
+            } else {
+                true
+            }
+        });
+
+        // Further filter by namespace access if namespace_manager is provided
+        let namespace_filtered_clients = if let (Some(ns), Some(nm)) = (&namespace, namespace_manager) {
+            filtered_clients.filter(|(name, _)| nm.has_access(ns, name))
+        } else {
+            filtered_clients
+        };
+
+        let client_futures = namespace_filtered_clients.map(|(name, client)| {
             let name = name.clone();
             let client = client.clone();
 

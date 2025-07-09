@@ -66,7 +66,7 @@ impl Agent {
 
         // Run the complete subagent task
         match manager
-            .run_complete_subagent_task(args, provider, extension_manager)
+            .run_complete_subagent_task(args, provider, extension_manager, Arc::clone(&self.namespace_manager))
             .await
         {
             Ok(result) => Ok(vec![Content::text(result)]),
