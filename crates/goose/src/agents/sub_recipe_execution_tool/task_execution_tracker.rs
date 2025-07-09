@@ -15,7 +15,7 @@ pub enum DisplayMode {
     SingleTaskOutput,
 }
 
-const THROTTLE_INTERVAL_MS: u64 = 1000;
+const THROTTLE_INTERVAL_MS: u64 = 250;
 
 fn format_task_metadata(task_info: &TaskInfo) -> String {
     if let Some(params) = task_info.task.get_command_parameters() {
@@ -85,7 +85,7 @@ impl TaskExecutionTracker {
             task_info.start_time = Some(Instant::now());
         }
         drop(tasks);
-        self.refresh_display().await;
+        self.force_refresh_display().await;
     }
 
     pub async fn complete_task(&self, task_id: &str, result: TaskResult) {
@@ -96,7 +96,7 @@ impl TaskExecutionTracker {
             task_info.result = Some(result);
         }
         drop(tasks);
-        self.refresh_display().await;
+        self.force_refresh_display().await;
     }
 
     pub async fn get_current_output(&self, task_id: &str) -> Option<String> {
@@ -189,7 +189,8 @@ impl TaskExecutionTracker {
                                 "task_type": task_info.task.task_type,
                                 "task_name": get_task_name(task_info),
                                 "task_metadata": format_task_metadata(task_info),
-                                "error": task_info.error()
+                                "error": task_info.error(),
+                                "result_data": task_info.data()
                             })
                         }).collect::<Vec<_>>()
                     }
@@ -205,6 +206,23 @@ impl TaskExecutionTracker {
             DisplayMode::SingleTaskOutput => {
                 // No dashboard display needed for single task output mode
                 // Live output is handled via send_live_output method
+            }
+        }
+    }
+
+    // Force refresh without throttling - used for important status changes
+    async fn force_refresh_display(&self) {
+        match self.display_mode {
+            DisplayMode::MultipleTasksOutput => {
+                // Reset throttle timer to allow immediate update
+                let mut last_refresh = self.last_refresh.write().await;
+                *last_refresh = Instant::now() - Duration::from_millis(THROTTLE_INTERVAL_MS + 1);
+                drop(last_refresh);
+
+                self.send_tasks_update().await;
+            }
+            DisplayMode::SingleTaskOutput => {
+                // No dashboard display needed for single task output mode
             }
         }
     }

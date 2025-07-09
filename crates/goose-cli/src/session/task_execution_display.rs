@@ -101,6 +101,15 @@ fn format_task_from_json(task: &Value) -> String {
         }
     }
 
+    if status == "Completed" {
+        if let Some(result_data) = task.get("result_data") {
+            let result_preview = format_result_data_for_display(result_data);
+            if !result_preview.is_empty() {
+                task_display.push_str(&format!("   📄 {}{}\n", result_preview, CLEAR_TO_EOL));
+            }
+        }
+    }
+
     if status == "Failed" {
         if let Some(error) = task.get("error").and_then(|v| v.as_str()) {
             let error_preview = truncate_with_ellipsis(error, 80);
@@ -116,6 +125,25 @@ fn format_task_from_json(task: &Value) -> String {
     task_display
 }
 
+fn format_result_data_for_display(result_data: &Value) -> String {
+    match result_data {
+        Value::String(s) => strip_ansi_codes(s),
+        Value::Object(obj) => {
+            // Handle specific result formats
+            if let Some(partial_output) = obj.get("partial_output").and_then(|v| v.as_str()) {
+                format!("Partial output: {}", partial_output)
+            } else {
+                // Generic object display
+                serde_json::to_string_pretty(obj).unwrap_or_default()
+            }
+        }
+        Value::Array(arr) => serde_json::to_string_pretty(arr).unwrap_or_default(),
+        Value::Bool(b) => b.to_string(),
+        Value::Number(n) => n.to_string(),
+        Value::Null => "null".to_string(),
+    }
+}
+
 fn process_output_for_display(output: &str) -> String {
     const MAX_OUTPUT_LINES: usize = 2;
     const OUTPUT_PREVIEW_LENGTH: usize = 100;
@@ -127,7 +155,7 @@ fn process_output_for_display(output: &str) -> String {
         &lines
     };
 
-    let clean_output = recent_lines.join(" | ");
+    let clean_output = recent_lines.join(" ... ");
     let stripped = strip_ansi_codes(&clean_output);
     truncate_with_ellipsis(&stripped, OUTPUT_PREVIEW_LENGTH)
 }
