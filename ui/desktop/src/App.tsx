@@ -837,8 +837,6 @@ export default function App() {
   // Prevent default drag and drop behavior globally to avoid opening files in new windows
   // but allow our React components to handle drops in designated areas
   useEffect(() => {
-    console.log('Setting up global drag and drop prevention');
-
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const preventDefaults = (e: any) => {
       // Only prevent default if we're not over a designated drop zone

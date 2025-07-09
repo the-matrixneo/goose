@@ -1,3 +1,23 @@
+/**
+ * Hub Component
+ *
+ * The Hub is the main landing page and entry point for the Goose Desktop application.
+ * It serves as the welcome screen and initial chat interface where users start new conversations.
+ *
+ * Key Responsibilities:
+ * - Displays SessionInsights when no active conversation exists
+ * - Shows a "Continue Session" dialog when resuming an existing session
+ * - Handles the initial message submission that transitions users to the Pair view
+ * - Provides access to recipe management and .goosehints configuration
+ * - Manages the transition between empty state and active conversation state
+ *
+ * Navigation Flow:
+ * Hub (landing) → Pair (active conversation) → Hub (new session)
+ *
+ * The Hub uses BaseChat as its foundation but customizes the header, content areas,
+ * and input behavior to create a welcoming onboarding experience.
+ */
+
 import React, { useState, useEffect, useContext, createContext } from 'react';
 import { useLocation } from 'react-router-dom';
 import FlappyGoose from './FlappyGoose';
