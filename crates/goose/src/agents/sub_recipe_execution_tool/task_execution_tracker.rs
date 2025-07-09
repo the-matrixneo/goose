@@ -99,6 +99,13 @@ impl TaskExecutionTracker {
         self.refresh_display().await;
     }
 
+    pub async fn get_current_output(&self, task_id: &str) -> Option<String> {
+        let tasks = self.tasks.read().await;
+        tasks
+            .get(task_id)
+            .map(|task_info| task_info.current_output.clone())
+    }
+
     pub async fn send_live_output(&self, task_id: &str, line: &str) {
         match self.display_mode {
             DisplayMode::SingleTaskOutput => {

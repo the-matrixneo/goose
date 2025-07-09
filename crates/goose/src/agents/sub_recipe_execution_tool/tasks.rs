@@ -17,6 +17,7 @@ pub async fn process_task(
     let task_clone = task.clone();
     let timeout_duration = Duration::from_secs(timeout_in_seconds);
 
+    let task_execution_tracker_clone = task_execution_tracker.clone();
     match timeout(
         timeout_duration,
         get_task_result(task_clone, task_execution_tracker),
@@ -35,12 +36,21 @@ pub async fn process_task(
             data: None,
             error: Some(error),
         },
-        Err(_) => TaskResult {
-            task_id: task.id.clone(),
-            status: TaskStatus::Failed,
-            data: None,
-            error: Some("Task timeout".to_string()),
-        },
+        Err(_) => {
+            let current_output = task_execution_tracker_clone
+                .get_current_output(&task.id)
+                .await
+                .unwrap_or_default();
+
+            TaskResult {
+                task_id: task.id.clone(),
+                status: TaskStatus::Failed,
+                data: Some(serde_json::json!({
+                    "partial_output": current_output
+                })),
+                error: Some(format!("Task timed out after {}s", timeout_in_seconds)),
+            }
+        }
     }
 }
 
@@ -158,7 +168,6 @@ fn spawn_output_reader(
             buffer.push('\n');
 
             if !is_stderr {
-                // Use dashboard's smart output handling based on display mode
                 task_execution_tracker
                     .send_live_output(&task_id, &line)
                     .await;
