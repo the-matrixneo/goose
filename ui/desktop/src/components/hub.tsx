@@ -30,7 +30,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from './ui/Tooltip';
 import { Bot, Save, Send } from 'lucide-react';
 import { useChatContext } from '../contexts/ChatContext';
 import BaseChat from './BaseChat';
-import { SearchView } from './conversation/SearchView';
 import { Recipe } from '../recipe';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -189,11 +188,6 @@ export default function Hub({
     <>
       {/* Session Insights - always show on hub page regardless of message count */}
       {(chat.messages.length === 0 || forceShowInsights) && !isInPairMode && <SessionInsights />}
-
-      {/* Empty search view when no messages or insights forced */}
-      {(chat.messages.length === 0 || forceShowInsights) && !isInPairMode && (
-        <SearchView>{/* Empty search view when no messages or insights forced */}</SearchView>
-      )}
     </>
   );
 
@@ -255,6 +249,7 @@ export default function Hub({
         renderHeader={renderHeader}
         renderBeforeMessages={renderBeforeMessages}
         customChatInputProps={customChatInputProps}
+        disableSearch={true}
       />
       {showGame && <FlappyGoose onClose={() => setShowGame(false)} />}
     </div>

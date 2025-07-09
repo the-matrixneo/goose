@@ -92,6 +92,7 @@ interface BaseChatProps {
   customChatInputProps?: Record<string, unknown>;
   customMainLayoutProps?: Record<string, unknown>;
   contentClassName?: string; // Add custom class for content area
+  disableSearch?: boolean; // Disable search functionality (for Hub)
 }
 
 function BaseChatContent({
@@ -107,6 +108,7 @@ function BaseChatContent({
   customChatInputProps = {},
   customMainLayoutProps = {},
   contentClassName = '',
+  disableSearch = false,
 }: BaseChatProps) {
   const location = useLocation();
   const scrollRef = useRef<ScrollAreaHandle>(null);
@@ -238,6 +240,61 @@ function BaseChatContent({
     }
   };
 
+  // Helper function to render messages
+  const renderMessages = () => {
+    return filteredMessages.map((message, index) => {
+      const isUser = isUserMessage(message);
+
+      return (
+        <div
+          key={message.id || index}
+          className={`relative ${index === 0 ? 'mt-0' : 'mt-4'} ${isUser ? 'user' : 'assistant'}`}
+          data-testid="message-container"
+        >
+          {isUser ? (
+            <>
+              {hasContextHandlerContent(message) ? (
+                <ContextHandler
+                  messages={messages}
+                  messageId={message.id ?? message.created.toString()}
+                  chatId={chat.id}
+                  workingDir={window.appConfig.get('GOOSE_WORKING_DIR') as string}
+                  contextType={getContextHandlerType(message)}
+                />
+              ) : (
+                <UserMessage message={message} />
+              )}
+            </>
+          ) : (
+            <>
+              {hasContextHandlerContent(message) ? (
+                <ContextHandler
+                  messages={messages}
+                  messageId={message.id ?? message.created.toString()}
+                  chatId={chat.id}
+                  workingDir={window.appConfig.get('GOOSE_WORKING_DIR') as string}
+                  contextType={getContextHandlerType(message)}
+                />
+              ) : (
+                <GooseMessage
+                  messageHistoryIndex={chat?.messageHistoryIndex}
+                  message={message}
+                  messages={messages}
+                  append={append}
+                  appendMessage={(newMessage) => {
+                    const updatedMessages = [...messages, newMessage];
+                    setMessages(updatedMessages);
+                  }}
+                  toolCallNotifications={toolCallNotifications}
+                />
+              )}
+            </>
+          )}
+        </div>
+      );
+    });
+  };
+
   return (
     <div>
       <MainPanelLayout {...customMainLayoutProps}>
@@ -278,59 +335,13 @@ function BaseChatContent({
           {/* Messages */}
           {messages.length > 0 && (
             <>
-              <SearchView>
-                {filteredMessages.map((message, index) => {
-                  const isUser = isUserMessage(message);
-
-                  return (
-                    <div
-                      key={message.id || index}
-                      className={`relative ${index === 0 ? 'mt-0' : 'mt-4'} ${isUser ? 'user' : 'assistant'}`}
-                      data-testid="message-container"
-                    >
-                      {isUser ? (
-                        <>
-                          {hasContextHandlerContent(message) ? (
-                            <ContextHandler
-                              messages={messages}
-                              messageId={message.id ?? message.created.toString()}
-                              chatId={chat.id}
-                              workingDir={window.appConfig.get('GOOSE_WORKING_DIR') as string}
-                              contextType={getContextHandlerType(message)}
-                            />
-                          ) : (
-                            <UserMessage message={message} />
-                          )}
-                        </>
-                      ) : (
-                        <>
-                          {hasContextHandlerContent(message) ? (
-                            <ContextHandler
-                              messages={messages}
-                              messageId={message.id ?? message.created.toString()}
-                              chatId={chat.id}
-                              workingDir={window.appConfig.get('GOOSE_WORKING_DIR') as string}
-                              contextType={getContextHandlerType(message)}
-                            />
-                          ) : (
-                            <GooseMessage
-                              messageHistoryIndex={chat?.messageHistoryIndex}
-                              message={message}
-                              messages={messages}
-                              append={append}
-                              appendMessage={(newMessage) => {
-                                const updatedMessages = [...messages, newMessage];
-                                setMessages(updatedMessages);
-                              }}
-                              toolCallNotifications={toolCallNotifications}
-                            />
-                          )}
-                        </>
-                      )}
-                    </div>
-                  );
-                })}
-              </SearchView>
+              {disableSearch ? (
+                // Render messages without SearchView wrapper when search is disabled
+                renderMessages()
+              ) : (
+                // Render messages with SearchView wrapper when search is enabled
+                <SearchView>{renderMessages()}</SearchView>
+              )}
 
               {error && (
                 <div className="flex flex-col items-center justify-center p-4">
