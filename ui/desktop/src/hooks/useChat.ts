@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ChatType } from '../components/ChatView';
+import { ChatType } from '../components/BaseChat';
 import { fetchSessionDetails, generateSessionId } from '../sessions';
 import { View, ViewOptions } from '../App';
 

@@ -42,7 +42,7 @@
  * while remaining flexible enough to support different UI contexts (Hub vs Pair).
  */
 
-import React, { useEffect, useContext, createContext } from 'react';
+import React, { useEffect, useContext, createContext, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import GooseMessage from './GooseMessage';
 import UserMessage from './UserMessage';
@@ -59,6 +59,7 @@ import { ContextHandler } from './context_management/ContextHandler';
 import { type View, ViewOptions } from '../App';
 import { MainPanelLayout } from './Layout/MainPanelLayout';
 import ChatInput from './ChatInput';
+import { ScrollArea, ScrollAreaHandle } from './ui/scroll-area';
 import { useChatEngine } from '../hooks/useChatEngine';
 import { useRecipeManager } from '../hooks/useRecipeManager';
 import { useSessionContinuation } from '../hooks/useSessionContinuation';
@@ -108,6 +109,7 @@ function BaseChatContent({
   contentClassName = '',
 }: BaseChatProps) {
   const location = useLocation();
+  const scrollRef = useRef<ScrollAreaHandle>(null);
 
   // Get disableAnimation from location state
   const disableAnimation = location.state?.disableAnimation || false;
@@ -150,7 +152,17 @@ function BaseChatContent({
   } = useChatEngine({
     chat,
     setChat,
-    onMessageStreamFinish,
+    onMessageStreamFinish: () => {
+      // Auto-scroll to bottom when message stream finishes
+      setTimeout(() => {
+        if (scrollRef.current?.scrollToBottom) {
+          scrollRef.current.scrollToBottom();
+        }
+      }, 300);
+
+      // Call the original callback if provided
+      onMessageStreamFinish?.();
+    },
     enableLocalStorage,
   });
 
@@ -209,6 +221,21 @@ function BaseChatContent({
     }
 
     engineHandleSubmit(combinedTextFromInput, onSummaryReset);
+
+    // Auto-scroll to bottom after submitting
+    if (onSummaryReset) {
+      // If we're resetting with summary, delay the scroll a bit more
+      setTimeout(() => {
+        if (scrollRef.current?.scrollToBottom) {
+          scrollRef.current.scrollToBottom();
+        }
+      }, 200);
+    } else {
+      // Immediate scroll for regular submit
+      if (scrollRef.current?.scrollToBottom) {
+        scrollRef.current.scrollToBottom();
+      }
+    }
   };
 
   return (
@@ -220,11 +247,15 @@ function BaseChatContent({
         {/* Custom header */}
         {renderHeader && renderHeader()}
 
-        <div
-          className={`flex flex-col min-w-0 flex-1 overflow-y-scroll relative ${contentClassName}`}
+        <ScrollArea
+          ref={scrollRef}
+          className={`flex-1 ${contentClassName}`}
+          autoScroll
           onDrop={handleDrop}
           onDragOver={handleDragOver}
           data-drop-zone="true"
+          paddingX={6}
+          paddingY={0}
         >
           {/* Custom content before messages */}
           {renderBeforeMessages && renderBeforeMessages()}
@@ -329,7 +360,7 @@ function BaseChatContent({
 
           {/* Custom content after messages */}
           {renderAfterMessages && renderAfterMessages()}
-        </div>
+        </ScrollArea>
 
         <div
           className={`relative z-10 ${disableAnimation ? '' : 'animate-[fadein_400ms_ease-in_forwards]'}`}
