@@ -5,6 +5,9 @@ use goose::agents::sub_recipe_execution_tool::notification_events::{
 use serde_json::Value;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+#[cfg(test)]
+mod tests;
+
 const CLEAR_SCREEN: &str = "\x1b[2J\x1b[H";
 const MOVE_TO_PROGRESS_LINE: &str = "\x1b[4;1H";
 const CLEAR_TO_EOL: &str = "\x1b[K";
@@ -60,14 +63,24 @@ fn strip_ansi_codes(text: &str) -> String {
 
     while let Some(ch) = chars.next() {
         if ch == '\x1b' {
-            if chars.next() == Some('[') {
-                loop {
-                    match chars.next() {
-                        Some(c) if c.is_ascii_alphabetic() => break,
-                        Some(_) => continue,
-                        None => break,
+            if let Some(next_ch) = chars.next() {
+                if next_ch == '[' {
+                    // This is an ANSI escape sequence, consume until alphabetic character
+                    loop {
+                        match chars.next() {
+                            Some(c) if c.is_ascii_alphabetic() => break,
+                            Some(_) => continue,
+                            None => break,
+                        }
                     }
+                } else {
+                    // Not an ANSI sequence, keep both characters
+                    result.push(ch);
+                    result.push(next_ch);
                 }
+            } else {
+                // End of string after \x1b
+                result.push(ch);
             }
         } else {
             result.push(ch);
@@ -130,7 +143,7 @@ fn format_tasks_update_from_event(event: &TaskExecutionNotificationEvent) -> Str
         sorted_tasks.sort_by(|a, b| a.id.cmp(&b.id));
 
         for task in sorted_tasks {
-            display.push_str(&format_task_from_struct(&task));
+            display.push_str(&format_task_display(&task));
         }
 
         display.push_str(CLEAR_BELOW);
@@ -172,7 +185,7 @@ fn format_tasks_complete_from_event(event: &TaskExecutionNotificationEvent) -> S
     }
 }
 
-fn format_task_from_struct(task: &TaskInfo) -> String {
+fn format_task_display(task: &TaskInfo) -> String {
     let mut task_display = String::new();
 
     let status_icon = match task.status {

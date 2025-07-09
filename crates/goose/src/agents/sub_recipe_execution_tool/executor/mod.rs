@@ -13,6 +13,9 @@ use crate::agents::sub_recipe_execution_tool::task_execution_tracker::{
 use crate::agents::sub_recipe_execution_tool::tasks::process_task;
 use crate::agents::sub_recipe_execution_tool::workers::spawn_worker;
 
+#[cfg(test)]
+mod tests;
+
 const EXECUTION_STATUS_COMPLETED: &str = "completed";
 
 pub async fn execute_single_task(

@@ -6,6 +6,9 @@ pub use crate::agents::sub_recipe_execution_tool::types::{
     TaskStatus,
 };
 
+#[cfg(test)]
+mod tests;
+
 use mcp_core::protocol::JsonRpcMessage;
 use serde_json::Value;
 use tokio::sync::mpsc;
