@@ -1223,9 +1223,11 @@ export default function App() {
               {/*<Route*/}
               {/*  path="projects"*/}
               {/*  element={*/}
-              {/*    <ChatProvider chat={chat} setChat={setChat}>*/}
-              {/*      <ProjectsRoute />*/}
-              {/*    </ChatProvider>*/}
+              {/*    <ProviderGuard>*/}
+              {/*      <ChatProvider chat={chat} setChat={setChat}>*/}
+              {/*        <ProjectsRoute />*/}
+              {/*      </ChatProvider>*/}
+              {/*    </ProviderGuard>  */}
               {/*  }*/}
               {/*/>*/}
             </Route>
