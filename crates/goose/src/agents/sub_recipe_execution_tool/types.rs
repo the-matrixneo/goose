@@ -16,11 +16,9 @@ pub struct Task {
 
 impl Task {
     pub fn get_sub_recipe(&self) -> Option<&Map<String, Value>> {
-        if self.task_type == "sub_recipe" {
-            self.payload.get("sub_recipe").and_then(|sr| sr.as_object())
-        } else {
-            None
-        }
+        (self.task_type == "sub_recipe")
+            .then(|| self.payload.get("sub_recipe")?.as_object())
+            .flatten()
     }
 
     pub fn get_command_parameters(&self) -> Option<&Map<String, Value>> {
@@ -124,12 +122,15 @@ impl Default for Config {
     }
 }
 
+const DEFAULT_MAX_WORKERS: usize = 10;
+const DEFAULT_INITIAL_WORKERS: usize = 2;
+
 fn default_max_workers() -> usize {
-    10
+    DEFAULT_MAX_WORKERS
 }
 
 fn default_initial_workers() -> usize {
-    2
+    DEFAULT_INITIAL_WORKERS
 }
 
 #[derive(Debug, Serialize)]

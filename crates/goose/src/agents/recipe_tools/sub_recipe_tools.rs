@@ -11,6 +11,8 @@ use crate::recipe::{Recipe, RecipeParameter, RecipeParameterRequirement, SubReci
 use super::param_utils::prepare_command_params;
 
 pub const SUB_RECIPE_TASK_TOOL_NAME_PREFIX: &str = "subrecipe__create_task";
+const EXECUTION_MODE_PARALLEL: &str = "parallel";
+const EXECUTION_MODE_SEQUENTIAL: &str = "sequential";
 
 pub fn create_sub_recipe_task_tool(sub_recipe: &SubRecipe) -> Tool {
     let input_schema = get_input_schema(sub_recipe).unwrap();
@@ -37,14 +39,19 @@ pub fn create_sub_recipe_task_tool(sub_recipe: &SubRecipe) -> Tool {
     )
 }
 
-pub async fn create_sub_recipe_task(sub_recipe: &SubRecipe, params: Value) -> Result<String> {
+fn extract_task_parameters(params: &Value) -> &Vec<Value> {
     let empty_vec = vec![];
-    let task_params_array = params
+    params
         .get("task_parameters")
         .and_then(|v| v.as_array())
-        .unwrap_or(&empty_vec);
-    let command_params = prepare_command_params(sub_recipe, task_params_array.clone())?;
-    let tasks = command_params
+        .unwrap_or(&empty_vec)
+}
+
+fn create_tasks_from_params(
+    sub_recipe: &SubRecipe,
+    command_params: &[std::collections::HashMap<String, String>],
+) -> Vec<Task> {
+    command_params
         .iter()
         .map(|task_command_param| {
             let payload = json!({
@@ -61,16 +68,36 @@ pub async fn create_sub_recipe_task(sub_recipe: &SubRecipe, params: Value) -> Re
                 payload,
             }
         })
-        .collect::<Vec<Task>>();
+        .collect()
+}
+
+fn get_execution_mode(sub_recipe: &SubRecipe) -> &'static str {
     let is_parallel = sub_recipe
         .executions
         .as_ref()
         .map(|e| e.parallel)
         .unwrap_or(false);
-    let task_execution_payload = json!({
+    
+    if is_parallel {
+        EXECUTION_MODE_PARALLEL
+    } else {
+        EXECUTION_MODE_SEQUENTIAL
+    }
+}
+
+fn create_task_execution_payload(tasks: Vec<Task>, execution_mode: &str) -> Value {
+    json!({
         "tasks": tasks,
-        "execution_mode": if is_parallel { "parallel" } else { "sequential" }
-    });
+        "execution_mode": execution_mode
+    })
+}
+
+pub async fn create_sub_recipe_task(sub_recipe: &SubRecipe, params: Value) -> Result<String> {
+    let task_params_array = extract_task_parameters(&params);
+    let command_params = prepare_command_params(sub_recipe, task_params_array.clone())?;
+    let tasks = create_tasks_from_params(sub_recipe, &command_params);
+    let execution_mode = get_execution_mode(sub_recipe);
+    let task_execution_payload = create_task_execution_payload(tasks, execution_mode);
 
     let tasks_json = serde_json::to_string(&task_execution_payload)
         .map_err(|e| anyhow::anyhow!("Failed to serialize task list: {}", e))?;

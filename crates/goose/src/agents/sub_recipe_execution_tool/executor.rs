@@ -58,7 +58,7 @@ pub async fn execute_tasks_in_parallel(
     let (task_tx, task_rx, result_tx, mut result_rx) = create_channels(task_count);
 
     if let Err(e) = send_tasks_to_channel(tasks, task_tx).await {
-        eprintln!("Execution failed: {}", e);
+        tracing::error!("Task execution failed: {}", e);
         return create_error_response(e);
     }
 
@@ -76,7 +76,7 @@ pub async fn execute_tasks_in_parallel(
 
     for handle in worker_handles {
         if let Err(e) = handle.await {
-            eprintln!("Worker error: {}", e);
+            tracing::error!("Worker error: {}", e);
         }
     }
 
@@ -180,7 +180,8 @@ async fn collect_results(
     results
 }
 
-fn create_error_response(_error: String) -> ExecutionResponse {
+fn create_error_response(error: String) -> ExecutionResponse {
+    tracing::error!("Creating error response: {}", error);
     ExecutionResponse {
         status: "failed".to_string(),
         results: vec![],

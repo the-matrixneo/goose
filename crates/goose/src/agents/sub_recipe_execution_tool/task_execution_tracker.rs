@@ -16,6 +16,7 @@ pub enum DisplayMode {
 }
 
 const THROTTLE_INTERVAL_MS: u64 = 250;
+const COMPLETION_NOTIFICATION_DELAY_MS: u64 = 500;
 
 fn format_task_metadata(task_info: &TaskInfo) -> String {
     if let Some(params) = task_info.task.get_command_parameters() {
@@ -110,7 +111,7 @@ impl TaskExecutionTracker {
         match self.display_mode {
             DisplayMode::SingleTaskOutput => {
                 // Send raw output data - let subscriber format it
-                let _ = self
+                if let Err(e) = self
                     .notifier
                     .try_send(JsonRpcMessage::Notification(JsonRpcNotification {
                         jsonrpc: "2.0".to_string(),
@@ -123,7 +124,9 @@ impl TaskExecutionTracker {
                                 "output": line
                             }
                         })),
-                    }));
+                    })) {
+                    tracing::warn!("Failed to send live output notification: {}", e);
+                }
             }
             DisplayMode::MultipleTasksOutput => {
                 let mut tasks = self.tasks.write().await;
@@ -157,7 +160,7 @@ impl TaskExecutionTracker {
         let task_list: Vec<_> = tasks.values().collect();
         let (total, pending, running, completed, failed) = count_by_status(&tasks);
 
-        let _ = self
+        if let Err(e) = self
             .notifier
             .try_send(JsonRpcMessage::Notification(JsonRpcNotification {
                 jsonrpc: "2.0".to_string(),
@@ -195,7 +198,9 @@ impl TaskExecutionTracker {
                         }).collect::<Vec<_>>()
                     }
                 })),
-            }));
+            })) {
+            tracing::warn!("Failed to send tasks update notification: {}", e);
+        }
     }
 
     pub async fn refresh_display(&self) {
@@ -244,7 +249,7 @@ impl TaskExecutionTracker {
             })
             .collect();
 
-        let _ = self
+        if let Err(e) = self
             .notifier
             .try_send(JsonRpcMessage::Notification(JsonRpcNotification {
                 jsonrpc: "2.0".to_string(),
@@ -262,8 +267,11 @@ impl TaskExecutionTracker {
                         "failed_tasks": failed_tasks
                     }
                 })),
-            }));
+            })) {
+            tracing::warn!("Failed to send tasks complete notification: {}", e);
+        }
 
-        sleep(Duration::from_millis(500)).await;
+        // Brief delay to ensure completion notification is processed
+        sleep(Duration::from_millis(COMPLETION_NOTIFICATION_DELAY_MS)).await;
     }
 }

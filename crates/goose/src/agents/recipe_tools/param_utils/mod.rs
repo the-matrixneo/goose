@@ -32,10 +32,11 @@ pub fn validate_param_counts(
     run_params: &[HashMap<String, String>],
     params_from_tool_call: &[Value],
 ) -> Result<()> {
-    if !run_params.is_empty()
-        && run_params.len() != params_from_tool_call.len()
-        && params_from_tool_call.len() > 1
-    {
+    let has_run_params = !run_params.is_empty();
+    let multiple_params_from_tool_call = params_from_tool_call.len() > 1;
+    let count_mismatch = run_params.len() != params_from_tool_call.len();
+
+    if has_run_params && multiple_params_from_tool_call && count_mismatch {
         return Err(anyhow::anyhow!(
             "The number of runs in the sub recipe ({}) does not match the number of task parameters ({})",
             run_params.len(),

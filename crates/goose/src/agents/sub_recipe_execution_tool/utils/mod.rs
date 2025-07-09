@@ -10,9 +10,6 @@ pub fn get_task_name(task_info: &TaskInfo) -> &str {
         .unwrap_or(&task_info.task.id)
 }
 
-pub fn get_command_parameters(task_info: &TaskInfo) -> Option<&Map<String, Value>> {
-    task_info.task.get_command_parameters()
-}
 
 pub fn count_by_status(tasks: &HashMap<String, TaskInfo>) -> (usize, usize, usize, usize, usize) {
     let total = tasks.len();

@@ -3,6 +3,17 @@ use crate::agents::sub_recipe_execution_tool::utils::{count_by_status, get_task_
 use serde_json::json;
 use std::collections::HashMap;
 
+fn create_task_info_with_defaults(task: Task, status: TaskStatus) -> TaskInfo {
+    TaskInfo {
+        task,
+        status,
+        start_time: None,
+        end_time: None,
+        result: None,
+        current_output: String::new(),
+    }
+}
+
 mod test_get_task_name {
     use super::*;
 
@@ -20,14 +31,7 @@ mod test_get_task_name {
             }),
         };
 
-        let task_info = TaskInfo {
-            task: sub_recipe_task,
-            status: TaskStatus::Pending,
-            start_time: None,
-            end_time: None,
-            result: None,
-            current_output: String::new(),
-        };
+        let task_info = create_task_info_with_defaults(sub_recipe_task, TaskStatus::Pending);
 
         assert_eq!(get_task_name(&task_info), "my_recipe");
     }
@@ -41,14 +45,7 @@ mod test_get_task_name {
             payload: json!({"text_instruction": "do something"}),
         };
 
-        let task_info = TaskInfo {
-            task: text_task,
-            status: TaskStatus::Pending,
-            start_time: None,
-            end_time: None,
-            result: None,
-            current_output: String::new(),
-        };
+        let task_info = create_task_info_with_defaults(text_task, TaskStatus::Pending);
 
         assert_eq!(get_task_name(&task_info), "task_2");
     }
@@ -67,14 +64,7 @@ mod test_get_task_name {
             }),
         };
 
-        let task_info = TaskInfo {
-            task: malformed_task,
-            status: TaskStatus::Pending,
-            start_time: None,
-            end_time: None,
-            result: None,
-            current_output: String::new(),
-        };
+        let task_info = create_task_info_with_defaults(malformed_task, TaskStatus::Pending);
 
         assert_eq!(get_task_name(&task_info), "task_3");
     }
@@ -88,14 +78,7 @@ mod test_get_task_name {
             payload: json!({}), // missing "sub_recipe" field
         };
 
-        let task_info = TaskInfo {
-            task: malformed_task,
-            status: TaskStatus::Pending,
-            start_time: None,
-            end_time: None,
-            result: None,
-            current_output: String::new(),
-        };
+        let task_info = create_task_info_with_defaults(malformed_task, TaskStatus::Pending);
 
         assert_eq!(get_task_name(&task_info), "task_4");
     }
@@ -105,19 +88,13 @@ mod count_by_status {
     use super::*;
 
     fn create_test_task(id: &str, status: TaskStatus) -> TaskInfo {
-        TaskInfo {
-            task: Task {
-                id: id.to_string(),
-                task_type: "test".to_string(),
-                timeout_in_seconds: None,
-                payload: json!({}),
-            },
-            status,
-            start_time: None,
-            end_time: None,
-            result: None,
-            current_output: String::new(),
-        }
+        let task = Task {
+            id: id.to_string(),
+            task_type: "test".to_string(),
+            timeout_in_seconds: None,
+            payload: json!({}),
+        };
+        create_task_info_with_defaults(task, status)
     }
 
     #[test]

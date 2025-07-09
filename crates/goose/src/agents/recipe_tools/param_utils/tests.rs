@@ -1,11 +1,9 @@
-#[cfg(test)]
-mod tests {
-    use std::collections::HashMap;
+use std::collections::HashMap;
 
-    use crate::recipe::{Execution, ExecutionRun, SubRecipe};
-    use serde_json::json;
+use crate::recipe::{Execution, ExecutionRun, SubRecipe};
+use serde_json::json;
 
-    use crate::agents::recipe_tools::param_utils::prepare_command_params;
+use crate::agents::recipe_tools::param_utils::prepare_command_params;
 
     fn setup_default_sub_recipe() -> SubRecipe {
         let sub_recipe = SubRecipe {
@@ -233,4 +231,3 @@ mod tests {
             }
         }
     }
-}

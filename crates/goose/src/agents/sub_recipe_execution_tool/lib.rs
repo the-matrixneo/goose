@@ -44,46 +44,55 @@ pub async fn execute_tasks(
     }
 }
 
+fn extract_failed_tasks(results: &[TaskResult]) -> Vec<String> {
+    results
+        .iter()
+        .filter(|r| matches!(r.status, TaskStatus::Failed))
+        .map(|r| format_failed_task_error(r))
+        .collect()
+}
+
+fn format_failed_task_error(result: &TaskResult) -> String {
+    let error_msg = result.error.as_deref().unwrap_or("Unknown error");
+    let partial_output = result
+        .data
+        .as_ref()
+        .and_then(|d| d.get("partial_output"))
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or("No output captured");
+
+    format!(
+        "Task '{}' ({}): {}\nOutput: {}",
+        result.task_id,
+        get_task_description(result),
+        error_msg,
+        partial_output
+    )
+}
+
+fn format_error_summary(failed_count: usize, total_count: usize, failed_tasks: Vec<String>) -> String {
+    format!(
+        "{}/{} tasks failed:\n{}",
+        failed_count,
+        total_count,
+        failed_tasks.join("\n")
+    )
+}
+
 fn handle_response(response: ExecutionResponse) -> Result<Value, String> {
     if response.stats.failed > 0 {
-        let failed_tasks: Vec<String> = response
-            .results
-            .iter()
-            .filter(|r| matches!(r.status, TaskStatus::Failed))
-            .map(|r| {
-                let error_msg = r.error.as_deref().unwrap_or("Unknown error");
-                let partial_output = r
-                    .data
-                    .as_ref()
-                    .and_then(|d| d.get("partial_output"))
-                    .and_then(|v| v.as_str())
-                    .filter(|s| !s.trim().is_empty())
-                    .unwrap_or("No output captured");
-
-                format!(
-                    "Task '{}' ({}): {}, \noutput: {}",
-                    r.task_id,
-                    get_task_description(r),
-                    error_msg,
-                    partial_output
-                )
-            })
-            .collect();
-
-        let error_summary = format!(
-            "{}/{} tasks failed:\n{}",
+        let failed_tasks = extract_failed_tasks(&response.results);
+        let error_summary = format_error_summary(
             response.stats.failed,
             response.stats.total_tasks,
-            failed_tasks.join("\n")
+            failed_tasks,
         );
-
         return Err(error_summary);
     }
     serde_json::to_value(response).map_err(|e| format!("Failed to serialize response: {}", e))
 }
 
 fn get_task_description(result: &TaskResult) -> String {
-    // We'd need to reconstruct task info from the result or pass it through
-    // For now, just use the task_id as placeholder
     format!("ID: {}", result.task_id)
 }

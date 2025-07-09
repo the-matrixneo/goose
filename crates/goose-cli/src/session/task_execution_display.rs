@@ -1,4 +1,5 @@
 use serde_json::Value;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 const CLEAR_SCREEN: &str = "\x1b[2J\x1b[H";
 const MOVE_TO_PROGRESS_LINE: &str = "\x1b[4;1H";
@@ -6,19 +7,17 @@ const CLEAR_TO_EOL: &str = "\x1b[K";
 const CLEAR_BELOW: &str = "\x1b[J";
 pub const TASK_EXECUTION_NOTIFICATION_TYPE: &str = "task_execution";
 
+static INITIAL_SHOWN: AtomicBool = AtomicBool::new(false);
+
 pub fn format_tasks_update(data: &Value) -> String {
     let mut display = String::new();
 
-    static mut INITIAL_SHOWN: bool = false;
-    unsafe {
-        if !INITIAL_SHOWN {
-            display.push_str(CLEAR_SCREEN);
-            display.push_str("🎯 Task Execution Dashboard\n");
-            display.push_str("═══════════════════════════\n\n");
-            INITIAL_SHOWN = true;
-        } else {
-            display.push_str(MOVE_TO_PROGRESS_LINE);
-        }
+    if !INITIAL_SHOWN.swap(true, Ordering::SeqCst) {
+        display.push_str(CLEAR_SCREEN);
+        display.push_str("🎯 Task Execution Dashboard\n");
+        display.push_str("═══════════════════════════\n\n");
+    } else {
+        display.push_str(MOVE_TO_PROGRESS_LINE);
     }
 
     if let Some(stats) = data.get("stats") {

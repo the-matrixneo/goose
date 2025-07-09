@@ -21,7 +21,7 @@ async fn worker_loop(state: Arc<SharedState>, _worker_id: usize) {
         let result = process_task(&task, state.task_execution_tracker.clone()).await;
 
         if let Err(e) = state.result_sender.send(result).await {
-            eprintln!("Worker failed to send result: {}", e);
+            tracing::error!("Worker failed to send result: {}", e);
             break;
         }
     }

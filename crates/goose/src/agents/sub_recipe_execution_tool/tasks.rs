@@ -9,11 +9,13 @@ use tokio::time::timeout;
 use crate::agents::sub_recipe_execution_tool::task_execution_tracker::TaskExecutionTracker;
 use crate::agents::sub_recipe_execution_tool::types::{Task, TaskResult, TaskStatus};
 
+const DEFAULT_TASK_TIMEOUT_SECONDS: u64 = 300;
+
 pub async fn process_task(
     task: &Task,
     task_execution_tracker: Arc<TaskExecutionTracker>,
 ) -> TaskResult {
-    let timeout_in_seconds = task.timeout_in_seconds.unwrap_or(300);
+    let timeout_in_seconds = task.timeout_in_seconds.unwrap_or(DEFAULT_TASK_TIMEOUT_SECONDS);
     let task_clone = task.clone();
     let timeout_duration = Duration::from_secs(timeout_in_seconds);
 
@@ -75,17 +77,19 @@ async fn get_task_result(
 }
 
 fn build_command(task: &Task) -> Result<(Command, String), String> {
+    let task_error = |field: &str| format!("Task {}: Missing {}", task.id, field);
+    
     let mut output_identifier = task.id.clone();
     let mut command = if task.task_type == "sub_recipe" {
         let sub_recipe_name = task
             .get_sub_recipe_name()
-            .ok_or("Missing sub_recipe name")?;
+            .ok_or_else(|| task_error("sub_recipe name"))?;
         let path = task
             .get_sub_recipe_path()
-            .ok_or("Missing sub_recipe path")?;
+            .ok_or_else(|| task_error("sub_recipe path"))?;
         let command_parameters = task
             .get_command_parameters()
-            .ok_or("Missing command_parameters")?;
+            .ok_or_else(|| task_error("command_parameters"))?;
 
         output_identifier = format!("sub-recipe {}", sub_recipe_name);
         let mut cmd = Command::new("goose");
@@ -101,7 +105,7 @@ fn build_command(task: &Task) -> Result<(Command, String), String> {
     } else {
         let text = task
             .get_text_instruction()
-            .ok_or("Missing text_instruction")?;
+            .ok_or_else(|| task_error("text_instruction"))?;
         let mut cmd = Command::new("goose");
         cmd.arg("run").arg("--text").arg(text);
         cmd
@@ -172,11 +176,27 @@ fn spawn_output_reader(
                     .send_live_output(&task_id, &line)
                     .await;
             } else {
-                eprintln!("[stderr for {}] {}", output_identifier, line);
+                tracing::warn!("Task stderr [{}]: {}", output_identifier, line);
             }
         }
         buffer
     })
+}
+
+fn extract_json_from_line(line: &str) -> Option<String> {
+    let start = line.find('{')?;
+    let end = line.rfind('}')?;
+    
+    if start >= end {
+        return None;
+    }
+    
+    let potential_json = &line[start..=end];
+    if serde_json::from_str::<Value>(potential_json).is_ok() {
+        Some(potential_json.to_string())
+    } else {
+        None
+    }
 }
 
 fn process_output(stdout_output: String) -> Result<Value, String> {
@@ -186,14 +206,9 @@ fn process_output(stdout_output: String) -> Result<Value, String> {
         .next_back()
         .unwrap_or("");
 
-    if let (Some(start), Some(end)) = (last_line.find('{'), last_line.rfind('}')) {
-        if start < end {
-            let potential_json = &last_line[start..=end];
-
-            if serde_json::from_str::<Value>(potential_json).is_ok() {
-                return Ok(Value::String(potential_json.to_string()));
-            }
-        }
+    if let Some(json_string) = extract_json_from_line(last_line) {
+        Ok(Value::String(json_string))
+    } else {
+        Ok(Value::String(stdout_output))
     }
-    Ok(Value::String(stdout_output))
 }
