@@ -50,6 +50,7 @@ interface ChatInputProps {
   commandHistory?: string[]; // Current chat's message history
   initialValue?: string;
   droppedFiles?: string[];
+  onFilesProcessed?: () => void; // Callback to clear dropped files after processing
   setView: (view: View) => void;
   numTokens?: number;
   inputTokens?: number;
@@ -73,6 +74,7 @@ export default function ChatInput({
   commandHistory = [],
   initialValue = '',
   droppedFiles = [],
+  onFilesProcessed,
   setView,
   numTokens,
   inputTokens,
@@ -646,6 +648,11 @@ export default function ChatInput({
       setSavedInput('');
       setIsInGlobalHistory(false);
       setHasUserTyped(false);
+      
+      // Clear dropped files after processing
+      if (onFilesProcessed && droppedFiles.length > 0) {
+        onFilesProcessed();
+      }
     }
   };
 

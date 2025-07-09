@@ -116,7 +116,7 @@ function BaseChatContent({
   });
 
   // Use shared file drop
-  const { droppedFiles, handleDrop, handleDragOver } = useFileDrop();
+  const { droppedFiles, setDroppedFiles, handleDrop, handleDragOver } = useFileDrop();
 
   // Use shared cost tracking
   const { sessionCosts } = useCostTracking({
@@ -290,6 +290,7 @@ function BaseChatContent({
             inputTokens={sessionInputTokens || localInputTokens}
             outputTokens={sessionOutputTokens || localOutputTokens}
             droppedFiles={droppedFiles}
+            onFilesProcessed={() => setDroppedFiles([])} // Clear dropped files after processing
             messages={messages}
             setMessages={setMessages}
             disableAnimation={disableAnimation}
