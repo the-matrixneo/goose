@@ -13,6 +13,7 @@ import { GoosehintsModal } from './components/GoosehintsModal';
 import { type ExtensionConfig } from './extensions';
 import AnnouncementModal from './components/AnnouncementModal';
 import { generateSessionId } from './sessions';
+import ProviderGuard from './components/ProviderGuard';
 
 import Hub, { type ChatType } from './components/hub';
 import Pair from './components/pair';
@@ -142,6 +143,9 @@ const HubRouteWrapper = ({
           case 'recipeEditor':
             navigate('/recipe-editor', { state: options });
             break;
+          case 'welcome':
+            navigate('/welcome');
+            break;
           default:
             navigate('/');
         }
@@ -200,6 +204,9 @@ const PairRouteWrapper = ({
           case 'recipeEditor':
             navigate('/recipe-editor', { state: options });
             break;
+          case 'welcome':
+            navigate('/welcome');
+            break;
           default:
             navigate('/');
         }
@@ -249,6 +256,9 @@ const SettingsRoute = () => {
           case 'recipeEditor':
             navigate('/recipe-editor', { state: options });
             break;
+          case 'welcome':
+            navigate('/welcome');
+            break;
           default:
             navigate('/');
         }
@@ -295,6 +305,9 @@ const SessionsRoute = () => {
             break;
           case 'recipeEditor':
             navigate('/recipe-editor', { state: options });
+            break;
+          case 'welcome':
+            navigate('/welcome');
             break;
           default:
             navigate('/');
@@ -360,13 +373,24 @@ const PermissionRoute = () => {
 const ConfigureProvidersRoute = () => {
   const navigate = useNavigate();
 
-  return <ProviderSettings onClose={() => navigate('/')} isOnboarding={false} />;
+  return (
+    <div className="w-screen h-screen bg-background-default">
+      <ProviderSettings
+        onClose={() => navigate('/settings', { state: { section: 'models' } })}
+        isOnboarding={false}
+      />
+    </div>
+  );
 };
 
 const WelcomeRoute = () => {
   const navigate = useNavigate();
 
-  return <ProviderSettings onClose={() => navigate('/')} isOnboarding={true} />;
+  return (
+    <div className="w-screen h-screen bg-background-default">
+      <ProviderSettings onClose={() => navigate('/')} isOnboarding={true} />
+    </div>
+  );
 };
 
 // Wrapper component for SharedSessionRoute to access parent state
@@ -1092,6 +1116,8 @@ export default function App() {
         <div className="relative w-screen h-screen overflow-hidden bg-background-muted flex flex-col">
           <div className="titlebar-drag-region" />
           <Routes>
+            <Route path="welcome" element={<WelcomeRoute />} />
+            <Route path="configure-providers" element={<ConfigureProvidersRoute />} />
             <Route
               path="/"
               element={
@@ -1103,44 +1129,97 @@ export default function App() {
               <Route
                 index
                 element={
-                  <HubRouteWrapper
-                    chat={chat}
-                    setChat={setChat}
-                    setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
-                  />
+                  <ProviderGuard>
+                    <HubRouteWrapper
+                      chat={chat}
+                      setChat={setChat}
+                      setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
+                    />
+                  </ProviderGuard>
                 }
               />
               <Route
                 path="pair"
                 element={
-                  <ChatProvider chat={pairChat} setChat={setPairChat}>
-                    <PairRouteWrapper
-                      chat={pairChat}
-                      setChat={setPairChat}
-                      setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
-                    />
-                  </ChatProvider>
+                  <ProviderGuard>
+                    <ChatProvider chat={pairChat} setChat={setPairChat}>
+                      <PairRouteWrapper
+                        chat={pairChat}
+                        setChat={setPairChat}
+                        setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
+                      />
+                    </ChatProvider>
+                  </ProviderGuard>
                 }
               />
-              <Route path="settings" element={<SettingsRoute />} />
-              <Route path="extensions" element={<ExtensionsRoute />} />
-              <Route path="sessions" element={<SessionsRoute />} />
-              <Route path="schedules" element={<SchedulesRoute />} />
-              <Route path="recipes" element={<RecipesRoute />} />
-              <Route path="recipe-editor" element={<RecipeEditorRoute />} />
+              <Route
+                path="settings"
+                element={
+                  <ProviderGuard>
+                    <SettingsRoute />
+                  </ProviderGuard>
+                }
+              />
+              <Route
+                path="extensions"
+                element={
+                  <ProviderGuard>
+                    <ExtensionsRoute />
+                  </ProviderGuard>
+                }
+              />
+              <Route
+                path="sessions"
+                element={
+                  <ProviderGuard>
+                    <SessionsRoute />
+                  </ProviderGuard>
+                }
+              />
+              <Route
+                path="schedules"
+                element={
+                  <ProviderGuard>
+                    <SchedulesRoute />
+                  </ProviderGuard>
+                }
+              />
+              <Route
+                path="recipes"
+                element={
+                  <ProviderGuard>
+                    <RecipesRoute />
+                  </ProviderGuard>
+                }
+              />
+              <Route
+                path="recipe-editor"
+                element={
+                  <ProviderGuard>
+                    <RecipeEditorRoute />
+                  </ProviderGuard>
+                }
+              />
               <Route
                 path="shared-session"
                 element={
-                  <SharedSessionRouteWrapper
-                    isLoadingSharedSession={isLoadingSharedSession}
-                    setIsLoadingSharedSession={setIsLoadingSharedSession}
-                    sharedSessionError={sharedSessionError}
-                  />
+                  <ProviderGuard>
+                    <SharedSessionRouteWrapper
+                      isLoadingSharedSession={isLoadingSharedSession}
+                      setIsLoadingSharedSession={setIsLoadingSharedSession}
+                      sharedSessionError={sharedSessionError}
+                    />
+                  </ProviderGuard>
                 }
               />
-              <Route path="permission" element={<PermissionRoute />} />
-              <Route path="configure-providers" element={<ConfigureProvidersRoute />} />
-              <Route path="welcome" element={<WelcomeRoute />} />
+              <Route
+                path="permission"
+                element={
+                  <ProviderGuard>
+                    <PermissionRoute />
+                  </ProviderGuard>
+                }
+              />
               {/*<Route*/}
               {/*  path="projects"*/}
               {/*  element={*/}

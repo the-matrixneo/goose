@@ -18,6 +18,7 @@ import OllamaForm from './subcomponents/forms/OllamaForm';
 import { useConfig } from '../../../ConfigContext';
 import { useModelAndProvider } from '../../../ModelAndProviderContext';
 import { AlertTriangle } from 'lucide-react';
+import { ConfigKey } from '../../../../api';
 
 interface FormValues {
   [key: string]: string | number | boolean | null;
@@ -39,10 +40,15 @@ export default function ProviderConfigurationModal() {
   const [configValues, setConfigValues] = useState<Record<string, string>>({});
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [isActiveProvider, setIsActiveProvider] = useState(false); // New state for tracking active provider
+  const [requiredParameters, setRequiredParameters] = useState<ConfigKey[]>([]); // New state for tracking active provider
 
   useEffect(() => {
     if (isOpen && currentProvider) {
       // Reset form state when the modal opens with a new provider
+      const requiredParameters = currentProvider.metadata.config_keys.filter(
+        (param) => param.required === true
+      );
+      setRequiredParameters(requiredParameters);
       setConfigValues({});
       setValidationErrors({});
       setShowDeleteConfirmation(false);
@@ -222,7 +228,8 @@ export default function ProviderConfigurationModal() {
                 {...(modalProps.formProps || {})} // Spread any custom form props
               />
 
-              {currentProvider.metadata.config_keys &&
+              {requiredParameters.length > 0 &&
+                currentProvider.metadata.config_keys &&
                 currentProvider.metadata.config_keys.length > 0 && <SecureStorageNotice />}
             </>
           ) : null}
@@ -230,6 +237,7 @@ export default function ProviderConfigurationModal() {
 
         <DialogFooter>
           <ProviderSetupActions
+            requiredParameters={requiredParameters}
             onCancel={handleCancel}
             onSubmit={handleSubmitForm}
             onDelete={handleDelete}
