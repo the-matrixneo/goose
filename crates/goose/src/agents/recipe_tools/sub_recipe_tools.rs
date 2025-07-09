@@ -77,7 +77,7 @@ fn get_execution_mode(sub_recipe: &SubRecipe) -> &'static str {
         .as_ref()
         .map(|e| e.parallel)
         .unwrap_or(false);
-    
+
     if is_parallel {
         EXECUTION_MODE_PARALLEL
     } else {

@@ -15,7 +15,9 @@ pub async fn process_task(
     task: &Task,
     task_execution_tracker: Arc<TaskExecutionTracker>,
 ) -> TaskResult {
-    let timeout_in_seconds = task.timeout_in_seconds.unwrap_or(DEFAULT_TASK_TIMEOUT_SECONDS);
+    let timeout_in_seconds = task
+        .timeout_in_seconds
+        .unwrap_or(DEFAULT_TASK_TIMEOUT_SECONDS);
     let task_clone = task.clone();
     let timeout_duration = Duration::from_secs(timeout_in_seconds);
 
@@ -78,7 +80,7 @@ async fn get_task_result(
 
 fn build_command(task: &Task) -> Result<(Command, String), String> {
     let task_error = |field: &str| format!("Task {}: Missing {}", task.id, field);
-    
+
     let mut output_identifier = task.id.clone();
     let mut command = if task.task_type == "sub_recipe" {
         let sub_recipe_name = task
@@ -186,11 +188,11 @@ fn spawn_output_reader(
 fn extract_json_from_line(line: &str) -> Option<String> {
     let start = line.find('{')?;
     let end = line.rfind('}')?;
-    
+
     if start >= end {
         return None;
     }
-    
+
     let potential_json = &line[start..=end];
     if serde_json::from_str::<Value>(potential_json).is_ok() {
         Some(potential_json.to_string())

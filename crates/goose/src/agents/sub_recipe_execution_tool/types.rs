@@ -6,6 +6,14 @@ use tokio::sync::mpsc;
 
 use crate::agents::sub_recipe_execution_tool::task_execution_tracker::TaskExecutionTracker;
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum ExecutionMode {
+    #[default]
+    Sequential,
+    Parallel,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Task {
     pub id: String,
@@ -66,6 +74,17 @@ pub enum TaskStatus {
     Running,
     Completed,
     Failed,
+}
+
+impl std::fmt::Display for TaskStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TaskStatus::Pending => write!(f, "Pending"),
+            TaskStatus::Running => write!(f, "Running"),
+            TaskStatus::Completed => write!(f, "Completed"),
+            TaskStatus::Failed => write!(f, "Failed"),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

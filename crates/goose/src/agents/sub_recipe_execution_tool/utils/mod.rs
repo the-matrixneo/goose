@@ -9,7 +9,6 @@ pub fn get_task_name(task_info: &TaskInfo) -> &str {
         .unwrap_or(&task_info.task.id)
 }
 
-
 pub fn count_by_status(tasks: &HashMap<String, TaskInfo>) -> (usize, usize, usize, usize, usize) {
     let total = tasks.len();
     let (pending, running, completed, failed) = tasks.values().fold(

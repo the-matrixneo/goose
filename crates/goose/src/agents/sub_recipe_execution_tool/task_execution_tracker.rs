@@ -5,6 +5,10 @@ use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
 use tokio::time::{sleep, Duration, Instant};
 
+use crate::agents::sub_recipe_execution_tool::notification_events::{
+    FailedTaskInfo, TaskCompletionStats, TaskExecutionNotificationEvent, TaskExecutionStats,
+    TaskInfo as EventTaskInfo,
+};
 use crate::agents::sub_recipe_execution_tool::types::{Task, TaskInfo, TaskResult, TaskStatus};
 use crate::agents::sub_recipe_execution_tool::utils::{count_by_status, get_task_name};
 use serde_json::Value;
@@ -110,21 +114,21 @@ impl TaskExecutionTracker {
     pub async fn send_live_output(&self, task_id: &str, line: &str) {
         match self.display_mode {
             DisplayMode::SingleTaskOutput => {
-                // Send raw output data - let subscriber format it
-                if let Err(e) = self
-                    .notifier
-                    .try_send(JsonRpcMessage::Notification(JsonRpcNotification {
-                        jsonrpc: "2.0".to_string(),
-                        method: "notifications/message".to_string(),
-                        params: Some(json!({
-                            "data": {
-                                "type": "task_execution",
-                                "subtype": "line_output",
-                                "task_id": task_id,
-                                "output": line
-                            }
-                        })),
-                    })) {
+                let event = TaskExecutionNotificationEvent::line_output(
+                    task_id.to_string(),
+                    line.to_string(),
+                );
+
+                if let Err(e) =
+                    self.notifier
+                        .try_send(JsonRpcMessage::Notification(JsonRpcNotification {
+                            jsonrpc: "2.0".to_string(),
+                            method: "notifications/message".to_string(),
+                            params: Some(json!({
+                                "data": event.to_notification_data()
+                            })),
+                        }))
+                {
                     tracing::warn!("Failed to send live output notification: {}", e);
                 }
             }
@@ -160,45 +164,44 @@ impl TaskExecutionTracker {
         let task_list: Vec<_> = tasks.values().collect();
         let (total, pending, running, completed, failed) = count_by_status(&tasks);
 
+        let stats = TaskExecutionStats::new(total, pending, running, completed, failed);
+
+        let event_tasks: Vec<EventTaskInfo> = task_list
+            .iter()
+            .map(|task_info| {
+                let now = Instant::now();
+                EventTaskInfo {
+                    id: task_info.task.id.clone(),
+                    status: task_info.status.clone(),
+                    duration_secs: task_info.start_time.map(|start| {
+                        if let Some(end) = task_info.end_time {
+                            end.duration_since(start).as_secs_f64()
+                        } else {
+                            now.duration_since(start).as_secs_f64()
+                        }
+                    }),
+                    current_output: task_info.current_output.clone(),
+                    task_type: task_info.task.task_type.clone(),
+                    task_name: get_task_name(task_info).to_string(),
+                    task_metadata: format_task_metadata(task_info),
+                    error: task_info.error().cloned(),
+                    result_data: task_info.data().cloned(),
+                }
+            })
+            .collect();
+
+        let event = TaskExecutionNotificationEvent::tasks_update(stats, event_tasks);
+
         if let Err(e) = self
             .notifier
             .try_send(JsonRpcMessage::Notification(JsonRpcNotification {
                 jsonrpc: "2.0".to_string(),
                 method: "notifications/message".to_string(),
                 params: Some(json!({
-                    "data": {
-                        "type": "task_execution",
-                        "subtype": "tasks_update",
-                        "stats": {
-                            "total": total,
-                            "pending": pending,
-                            "running": running,
-                            "completed": completed,
-                            "failed": failed
-                        },
-                        "tasks": task_list.iter().map(|task_info| {
-                            let now = Instant::now();
-                            json!({
-                                "id": task_info.task.id,
-                                "status": task_info.status,
-                                "duration_secs": task_info.start_time.map(|start| {
-                                    if let Some(end) = task_info.end_time {
-                                        end.duration_since(start).as_secs_f64()
-                                    } else {
-                                        now.duration_since(start).as_secs_f64()
-                                    }
-                                }),
-                                "current_output": task_info.current_output,
-                                "task_type": task_info.task.task_type,
-                                "task_name": get_task_name(task_info),
-                                "task_metadata": format_task_metadata(task_info),
-                                "error": task_info.error(),
-                                "result_data": task_info.data()
-                            })
-                        }).collect::<Vec<_>>()
-                    }
+                    "data": event.to_notification_data()
                 })),
-            })) {
+            }))
+        {
             tracing::warn!("Failed to send tasks update notification: {}", e);
         }
     }
@@ -236,18 +239,19 @@ impl TaskExecutionTracker {
         let tasks = self.tasks.read().await;
         let (total, _, _, completed, failed) = count_by_status(&tasks);
 
-        // Send structured summary data only
-        let failed_tasks: Vec<_> = tasks
+        let stats = TaskCompletionStats::new(total, completed, failed);
+
+        let failed_tasks: Vec<FailedTaskInfo> = tasks
             .values()
             .filter(|task_info| matches!(task_info.status, TaskStatus::Failed))
-            .map(|task_info| {
-                json!({
-                    "id": task_info.task.id,
-                    "name": get_task_name(task_info),
-                    "error": task_info.error()
-                })
+            .map(|task_info| FailedTaskInfo {
+                id: task_info.task.id.clone(),
+                name: get_task_name(task_info).to_string(),
+                error: task_info.error().cloned(),
             })
             .collect();
+
+        let event = TaskExecutionNotificationEvent::tasks_complete(stats, failed_tasks);
 
         if let Err(e) = self
             .notifier
@@ -255,19 +259,10 @@ impl TaskExecutionTracker {
                 jsonrpc: "2.0".to_string(),
                 method: "notifications/message".to_string(),
                 params: Some(json!({
-                    "data": {
-                        "type": "task_execution",
-                        "subtype": "tasks_complete",
-                        "stats": {
-                            "total": total,
-                            "completed": completed,
-                            "failed": failed,
-                            "success_rate": (completed as f64 / total as f64) * 100.0
-                        },
-                        "failed_tasks": failed_tasks
-                    }
+                    "data": event.to_notification_data()
                 })),
-            })) {
+            }))
+        {
             tracing::warn!("Failed to send tasks complete notification: {}", e);
         }
 

@@ -1,3 +1,7 @@
+use goose::agents::sub_recipe_execution_tool::lib::TaskStatus;
+use goose::agents::sub_recipe_execution_tool::notification_events::{
+    TaskExecutionNotificationEvent, TaskInfo,
+};
 use serde_json::Value;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -9,130 +13,13 @@ pub const TASK_EXECUTION_NOTIFICATION_TYPE: &str = "task_execution";
 
 static INITIAL_SHOWN: AtomicBool = AtomicBool::new(false);
 
-pub fn format_tasks_update(data: &Value) -> String {
-    let mut display = String::new();
-
-    if !INITIAL_SHOWN.swap(true, Ordering::SeqCst) {
-        display.push_str(CLEAR_SCREEN);
-        display.push_str("🎯 Task Execution Dashboard\n");
-        display.push_str("═══════════════════════════\n\n");
-    } else {
-        display.push_str(MOVE_TO_PROGRESS_LINE);
-    }
-
-    if let Some(stats) = data.get("stats") {
-        let total = stats.get("total").and_then(|v| v.as_u64()).unwrap_or(0);
-        let pending = stats.get("pending").and_then(|v| v.as_u64()).unwrap_or(0);
-        let running = stats.get("running").and_then(|v| v.as_u64()).unwrap_or(0);
-        let completed = stats.get("completed").and_then(|v| v.as_u64()).unwrap_or(0);
-        let failed = stats.get("failed").and_then(|v| v.as_u64()).unwrap_or(0);
-
-        display.push_str(&format!(
-            "📊 Progress: {} total | ⏳ {} pending | 🏃 {} running | ✅ {} completed | ❌ {} failed", 
-            total, pending, running, completed, failed
-        ));
-        display.push_str(&format!("{}\n\n", CLEAR_TO_EOL));
-    }
-
-    if let Some(tasks) = data.get("tasks").and_then(|t| t.as_array()) {
-        let mut sorted_tasks: Vec<_> = tasks.iter().collect();
-        sorted_tasks.sort_by_key(|task| task.get("id").and_then(|v| v.as_str()).unwrap_or(""));
-
-        for task in sorted_tasks {
-            display.push_str(&format_task_from_json(task));
-        }
-    }
-
-    display.push_str(CLEAR_BELOW);
-    display
-}
-
-fn format_task_from_json(task: &Value) -> String {
-    let mut task_display = String::new();
-
-    let id = task.get("id").and_then(|v| v.as_str()).unwrap_or("unknown");
-    let status = task
-        .get("status")
-        .and_then(|v| v.as_str())
-        .unwrap_or("unknown");
-    let task_type = task
-        .get("task_type")
-        .and_then(|v| v.as_str())
-        .unwrap_or("task");
-    let task_name = task.get("task_name").and_then(|v| v.as_str()).unwrap_or(id);
-    let task_metadata = task
-        .get("task_metadata")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
-
-    let status_icon = match status {
-        "Pending" => "⏳",
-        "Running" => "🏃",
-        "Completed" => "✅",
-        "Failed" => "❌",
-        _ => "◯",
-    };
-
-    task_display.push_str(&format!(
-        "{} {} ({}){}\n",
-        status_icon, task_name, task_type, CLEAR_TO_EOL
-    ));
-
-    if !task_metadata.is_empty() {
-        task_display.push_str(&format!(
-            "   📋 Parameters: {}{}\n",
-            task_metadata, CLEAR_TO_EOL
-        ));
-    }
-
-    if let Some(duration_secs) = task.get("duration_secs").and_then(|v| v.as_f64()) {
-        task_display.push_str(&format!("   ⏱️  {:.1}s{}\n", duration_secs, CLEAR_TO_EOL));
-    }
-
-    if status == "Running" {
-        if let Some(current_output) = task.get("current_output").and_then(|v| v.as_str()) {
-            if !current_output.trim().is_empty() {
-                let processed_output = process_output_for_display(current_output);
-                if !processed_output.is_empty() {
-                    task_display.push_str(&format!("   💬 {}{}\n", processed_output, CLEAR_TO_EOL));
-                }
-            }
-        }
-    }
-
-    if status == "Completed" {
-        if let Some(result_data) = task.get("result_data") {
-            let result_preview = format_result_data_for_display(result_data);
-            if !result_preview.is_empty() {
-                task_display.push_str(&format!("   📄 {}{}\n", result_preview, CLEAR_TO_EOL));
-            }
-        }
-    }
-
-    if status == "Failed" {
-        if let Some(error) = task.get("error").and_then(|v| v.as_str()) {
-            let error_preview = truncate_with_ellipsis(error, 80);
-            task_display.push_str(&format!(
-                "   ⚠️  {}{}\n",
-                error_preview.replace('\n', " "),
-                CLEAR_TO_EOL
-            ));
-        }
-    }
-
-    task_display.push_str(&format!("{}\n", CLEAR_TO_EOL));
-    task_display
-}
-
 fn format_result_data_for_display(result_data: &Value) -> String {
     match result_data {
         Value::String(s) => strip_ansi_codes(s),
         Value::Object(obj) => {
-            // Handle specific result formats
             if let Some(partial_output) = obj.get("partial_output").and_then(|v| v.as_str()) {
                 format!("Partial output: {}", partial_output)
             } else {
-                // Generic object display
                 serde_json::to_string_pretty(obj).unwrap_or_default()
             }
         }
@@ -190,84 +77,154 @@ fn strip_ansi_codes(text: &str) -> String {
     result
 }
 
-pub fn format_tasks_complete(data: &Value) -> String {
-    let mut summary = String::new();
-    summary.push_str("Execution Complete!\n");
-    summary.push_str("═══════════════════════\n");
-
-    if let Some(stats) = data.get("stats") {
-        let total = stats.get("total").and_then(|v| v.as_u64()).unwrap_or(0);
-        let completed = stats.get("completed").and_then(|v| v.as_u64()).unwrap_or(0);
-        let failed = stats.get("failed").and_then(|v| v.as_u64()).unwrap_or(0);
-        let success_rate = stats
-            .get("success_rate")
-            .and_then(|v| v.as_f64())
-            .unwrap_or(0.0);
-
-        summary.push_str(&format!("Total Tasks: {}\n", total));
-        summary.push_str(&format!("✅ Completed: {}\n", completed));
-        summary.push_str(&format!("❌ Failed: {}\n", failed));
-        summary.push_str(&format!("📈 Success Rate: {:.1}%\n", success_rate));
+pub fn format_task_execution_notification(
+    data: &Value,
+) -> Option<(String, Option<String>, Option<String>)> {
+    if let Ok(event) = serde_json::from_value::<TaskExecutionNotificationEvent>(data.clone()) {
+        return Some(match event {
+            TaskExecutionNotificationEvent::LineOutput { output, .. } => (
+                format!("{}\n", output),
+                None,
+                Some(TASK_EXECUTION_NOTIFICATION_TYPE.to_string()),
+            ),
+            TaskExecutionNotificationEvent::TasksUpdate { .. } => {
+                let formatted_display = format_tasks_update_from_event(&event);
+                (
+                    formatted_display,
+                    None,
+                    Some(TASK_EXECUTION_NOTIFICATION_TYPE.to_string()),
+                )
+            }
+            TaskExecutionNotificationEvent::TasksComplete { .. } => {
+                let formatted_summary = format_tasks_complete_from_event(&event);
+                (
+                    formatted_summary,
+                    None,
+                    Some(TASK_EXECUTION_NOTIFICATION_TYPE.to_string()),
+                )
+            }
+        });
     }
+    None
+}
 
-    if let Some(failed_tasks) = data.get("failed_tasks").and_then(|t| t.as_array()) {
+fn format_tasks_update_from_event(event: &TaskExecutionNotificationEvent) -> String {
+    if let TaskExecutionNotificationEvent::TasksUpdate { stats, tasks } = event {
+        let mut display = String::new();
+
+        if !INITIAL_SHOWN.swap(true, Ordering::SeqCst) {
+            display.push_str(CLEAR_SCREEN);
+            display.push_str("🎯 Task Execution Dashboard\n");
+            display.push_str("═══════════════════════════\n\n");
+        } else {
+            display.push_str(MOVE_TO_PROGRESS_LINE);
+        }
+
+        display.push_str(&format!(
+            "📊 Progress: {} total | ⏳ {} pending | 🏃 {} running | ✅ {} completed | ❌ {} failed", 
+            stats.total, stats.pending, stats.running, stats.completed, stats.failed
+        ));
+        display.push_str(&format!("{}\n\n", CLEAR_TO_EOL));
+
+        let mut sorted_tasks = tasks.clone();
+        sorted_tasks.sort_by(|a, b| a.id.cmp(&b.id));
+
+        for task in sorted_tasks {
+            display.push_str(&format_task_from_struct(&task));
+        }
+
+        display.push_str(CLEAR_BELOW);
+        display
+    } else {
+        String::new()
+    }
+}
+
+fn format_tasks_complete_from_event(event: &TaskExecutionNotificationEvent) -> String {
+    if let TaskExecutionNotificationEvent::TasksComplete {
+        stats,
+        failed_tasks,
+    } = event
+    {
+        let mut summary = String::new();
+        summary.push_str("Execution Complete!\n");
+        summary.push_str("═══════════════════════\n");
+
+        summary.push_str(&format!("Total Tasks: {}\n", stats.total));
+        summary.push_str(&format!("✅ Completed: {}\n", stats.completed));
+        summary.push_str(&format!("❌ Failed: {}\n", stats.failed));
+        summary.push_str(&format!("📈 Success Rate: {:.1}%\n", stats.success_rate));
+
         if !failed_tasks.is_empty() {
             summary.push_str("\n❌ Failed Tasks:\n");
             for task in failed_tasks {
-                let name = task
-                    .get("name")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("Unknown");
-                summary.push_str(&format!("   • {}\n", name));
-                if let Some(error) = task.get("error").and_then(|v| v.as_str()) {
+                summary.push_str(&format!("   • {}\n", task.name));
+                if let Some(error) = &task.error {
                     summary.push_str(&format!("     Error: {}\n", error));
                 }
             }
         }
-    }
 
-    summary.push_str("\n📝 Generating summary...\n");
-    summary
+        summary.push_str("\n📝 Generating summary...\n");
+        summary
+    } else {
+        String::new()
+    }
 }
 
-pub fn format_task_execution_notification(
-    data: &Value,
-) -> Option<(String, Option<String>, Option<String>)> {
-    if let Value::Object(o) = data {
-        if o.get("type").and_then(|t| t.as_str()) == Some(TASK_EXECUTION_NOTIFICATION_TYPE) {
-            return Some(match o.get("subtype").and_then(|t| t.as_str()) {
-                Some("line_output") => {
-                    if let Some(Value::String(line_output)) = o.get("output") {
-                        (
-                            format!("{}\n", line_output),
-                            None,
-                            Some(TASK_EXECUTION_NOTIFICATION_TYPE.to_string()),
-                        )
-                    } else {
-                        (data.to_string(), None, None)
-                    }
-                }
-                Some("tasks_update") => {
-                    let data_value = Value::Object(o.clone());
-                    let formatted_display = format_tasks_update(&data_value);
-                    (
-                        formatted_display,
-                        None,
-                        Some(TASK_EXECUTION_NOTIFICATION_TYPE.to_string()),
-                    )
-                }
-                Some("tasks_complete") => {
-                    let data_value = Value::Object(o.clone());
-                    let formatted_summary = format_tasks_complete(&data_value);
-                    (
-                        formatted_summary,
-                        None,
-                        Some(TASK_EXECUTION_NOTIFICATION_TYPE.to_string()),
-                    )
-                }
-                _ => (data.to_string(), None, None),
-            });
+fn format_task_from_struct(task: &TaskInfo) -> String {
+    let mut task_display = String::new();
+
+    let status_icon = match task.status {
+        TaskStatus::Pending => "⏳",
+        TaskStatus::Running => "🏃",
+        TaskStatus::Completed => "✅",
+        TaskStatus::Failed => "❌",
+    };
+
+    task_display.push_str(&format!(
+        "{} {} ({}){}\n",
+        status_icon, task.task_name, task.task_type, CLEAR_TO_EOL
+    ));
+
+    if !task.task_metadata.is_empty() {
+        task_display.push_str(&format!(
+            "   📋 Parameters: {}{}\n",
+            task.task_metadata, CLEAR_TO_EOL
+        ));
+    }
+
+    if let Some(duration_secs) = task.duration_secs {
+        task_display.push_str(&format!("   ⏱️  {:.1}s{}\n", duration_secs, CLEAR_TO_EOL));
+    }
+
+    if matches!(task.status, TaskStatus::Running) && !task.current_output.trim().is_empty() {
+        let processed_output = process_output_for_display(&task.current_output);
+        if !processed_output.is_empty() {
+            task_display.push_str(&format!("   💬 {}{}\n", processed_output, CLEAR_TO_EOL));
         }
     }
-    None
+
+    if matches!(task.status, TaskStatus::Completed) {
+        if let Some(result_data) = &task.result_data {
+            let result_preview = format_result_data_for_display(result_data);
+            if !result_preview.is_empty() {
+                task_display.push_str(&format!("   📄 {}{}\n", result_preview, CLEAR_TO_EOL));
+            }
+        }
+    }
+
+    if matches!(task.status, TaskStatus::Failed) {
+        if let Some(error) = &task.error {
+            let error_preview = truncate_with_ellipsis(error, 80);
+            task_display.push_str(&format!(
+                "   ⚠️  {}{}\n",
+                error_preview.replace('\n', " "),
+                CLEAR_TO_EOL
+            ));
+        }
+    }
+
+    task_display.push_str(&format!("{}\n", CLEAR_TO_EOL));
+    task_display
 }

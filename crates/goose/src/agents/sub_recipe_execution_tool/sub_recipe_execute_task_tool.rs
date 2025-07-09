@@ -2,7 +2,8 @@ use mcp_core::{tool::ToolAnnotations, Content, Tool, ToolError};
 use serde_json::Value;
 
 use crate::agents::{
-    sub_recipe_execution_tool::lib::execute_tasks, tool_execution::ToolCallResult,
+    sub_recipe_execution_tool::lib::execute_tasks, sub_recipe_execution_tool::types::ExecutionMode,
+    tool_execution::ToolCallResult,
 };
 use mcp_core::protocol::JsonRpcMessage;
 use tokio::sync::mpsc;
@@ -128,8 +129,8 @@ pub async fn run_tasks(execute_data: Value) -> ToolCallResult {
         let execute_data_clone = execute_data.clone();
         let execution_mode = execute_data_clone
             .get("execution_mode")
-            .and_then(|v| v.as_str())
-            .unwrap_or("sequential");
+            .and_then(|v| serde_json::from_value::<ExecutionMode>(v.clone()).ok())
+            .unwrap_or_default();
 
         match execute_tasks(execute_data, execution_mode, notification_tx).await {
             Ok(result) => {

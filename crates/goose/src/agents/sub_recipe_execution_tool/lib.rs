@@ -2,7 +2,8 @@ use crate::agents::sub_recipe_execution_tool::executor::{
     execute_single_task, execute_tasks_in_parallel,
 };
 pub use crate::agents::sub_recipe_execution_tool::types::{
-    Config, ExecutionResponse, ExecutionStats, SharedState, Task, TaskResult, TaskStatus,
+    Config, ExecutionMode, ExecutionResponse, ExecutionStats, SharedState, Task, TaskResult,
+    TaskStatus,
 };
 
 use mcp_core::protocol::JsonRpcMessage;
@@ -11,7 +12,7 @@ use tokio::sync::mpsc;
 
 pub async fn execute_tasks(
     input: Value,
-    execution_mode: &str,
+    execution_mode: ExecutionMode,
     notifier: mpsc::Sender<JsonRpcMessage>,
 ) -> Result<Value, String> {
     let tasks: Vec<Task> =
@@ -27,7 +28,7 @@ pub async fn execute_tasks(
 
     let task_count = tasks.len();
     match execution_mode {
-        "sequential" => {
+        ExecutionMode::Sequential => {
             if task_count == 1 {
                 let response = execute_single_task(&tasks[0], notifier).await;
                 handle_response(response)
@@ -35,12 +36,11 @@ pub async fn execute_tasks(
                 Err("Sequential execution mode requires exactly one task".to_string())
             }
         }
-        "parallel" => {
+        ExecutionMode::Parallel => {
             let response: ExecutionResponse =
                 execute_tasks_in_parallel(tasks, config, notifier).await;
             handle_response(response)
         }
-        _ => Err("Invalid execution mode".to_string()),
     }
 }
 
@@ -48,7 +48,7 @@ fn extract_failed_tasks(results: &[TaskResult]) -> Vec<String> {
     results
         .iter()
         .filter(|r| matches!(r.status, TaskStatus::Failed))
-        .map(|r| format_failed_task_error(r))
+        .map(format_failed_task_error)
         .collect()
 }
 
@@ -71,7 +71,11 @@ fn format_failed_task_error(result: &TaskResult) -> String {
     )
 }
 
-fn format_error_summary(failed_count: usize, total_count: usize, failed_tasks: Vec<String>) -> String {
+fn format_error_summary(
+    failed_count: usize,
+    total_count: usize,
+    failed_tasks: Vec<String>,
+) -> String {
     format!(
         "{}/{} tasks failed:\n{}",
         failed_count,
