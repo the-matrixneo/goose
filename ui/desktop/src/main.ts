@@ -1479,8 +1479,8 @@ app.whenReady().then(async () => {
           "default-src 'self';" +
           // Allow inline styles since we use them in our React components
           "style-src 'self' 'unsafe-inline';" +
-          // Scripts only from our app
-          "script-src 'self';" +
+          // Scripts from our app and inline scripts (for theme initialization)
+          "script-src 'self' 'unsafe-inline';" +
           // Images from our app and data: URLs (for base64 images)
           "img-src 'self' data: https:;" +
           // Connect to our local API and specific external services
@@ -1489,8 +1489,8 @@ app.whenReady().then(async () => {
           "object-src 'none';" +
           // Don't allow any frames
           "frame-src 'none';" +
-          // Font sources
-          "font-src 'self';" +
+          // Font sources - allow self, data URLs, and external fonts
+          "font-src 'self' data: https:;" +
           // Media sources - allow microphone
           "media-src 'self' mediastream:;" +
           // Form actions

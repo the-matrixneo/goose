@@ -92,7 +92,7 @@ export default function Hub({
           <>
             {setIsGoosehintsModalOpen && (
               <Tooltip delayDuration={500}>
-                <TooltipTrigger className="w-full">
+                <TooltipTrigger asChild className="w-full">
                   <Button
                     onClick={() => setIsGoosehintsModalOpen(true)}
                     className="px-3"
@@ -114,7 +114,7 @@ export default function Hub({
             {recipeConfig ? (
               <>
                 <Tooltip delayDuration={500}>
-                  <TooltipTrigger className="w-full">
+                  <TooltipTrigger asChild className="w-full">
                     <Button
                       onClick={() => {
                         window.electron.createChatWindow(
@@ -141,7 +141,7 @@ export default function Hub({
                 </Tooltip>
 
                 <Tooltip delayDuration={500}>
-                  <TooltipTrigger className="w-full">
+                  <TooltipTrigger asChild className="w-full">
                     <Button className="px-3" variant="ghost" size="sm" shape="round">
                       <div className="flex gap-2 items-center text-text-default">
                         <Save className="w-4 h-4" />
@@ -156,7 +156,7 @@ export default function Hub({
               </>
             ) : (
               <Tooltip delayDuration={500}>
-                <TooltipTrigger className="w-full">
+                <TooltipTrigger asChild className="w-full">
                   <Button
                     onClick={() => {
                       window.electron.logInfo('Make Agent button clicked');

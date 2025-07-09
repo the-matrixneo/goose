@@ -147,11 +147,9 @@ export class TextAnimator {
   }
 
   animate() {
-    console.log('Starting text animation');
     this.reset();
 
     const chars = this.splitter.getChars();
-    console.log('Split characters:', chars.length);
 
     chars.forEach((char, position) => {
       const initialHTML = char.innerHTML;
