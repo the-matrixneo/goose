@@ -42,7 +42,7 @@
  * while remaining flexible enough to support different UI contexts (Hub vs Pair).
  */
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useContext, createContext } from 'react';
 import { useLocation } from 'react-router-dom';
 import GooseMessage from './GooseMessage';
 import UserMessage from './UserMessage';
@@ -65,6 +65,10 @@ import { useSessionContinuation } from '../hooks/useSessionContinuation';
 import { useFileDrop } from '../hooks/useFileDrop';
 import { useCostTracking } from '../hooks/useCostTracking';
 import { Message } from '../types/message';
+
+// Context for sharing current model info
+const CurrentModelContext = createContext<{ model: string; mode: string } | null>(null);
+export const useCurrentModelInfo = () => useContext(CurrentModelContext);
 
 export interface ChatType {
   id: string;

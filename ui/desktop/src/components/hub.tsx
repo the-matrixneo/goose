@@ -18,7 +18,7 @@
  * and input behavior to create a welcoming onboarding experience.
  */
 
-import { useState, useEffect, useContext, createContext } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import FlappyGoose from './FlappyGoose';
 import { type View, ViewOptions } from '../App';
@@ -33,10 +33,6 @@ import BaseChat from './BaseChat';
 import { SearchView } from './conversation/SearchView';
 import { Recipe } from '../recipe';
 import 'react-toastify/dist/ReactToastify.css';
-
-// Context for sharing current model info
-const CurrentModelContext = createContext<{ model: string; mode: string } | null>(null);
-export const useCurrentModelInfo = () => useContext(CurrentModelContext);
 
 export interface ChatType {
   id: string;

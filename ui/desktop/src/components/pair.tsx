@@ -24,16 +24,12 @@
  * maintaining conversation flow rather than onboarding new users.
  */
 
-import { useEffect, useState, useContext, createContext } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { type View, ViewOptions } from '../App';
 import { Message } from '../types/message';
 import BaseChat from './BaseChat';
 import 'react-toastify/dist/ReactToastify.css';
-
-// Context for sharing current model info
-const CurrentModelContext = createContext<{ model: string; mode: string } | null>(null);
-export const useCurrentModelInfo = () => useContext(CurrentModelContext);
 
 export interface ChatType {
   id: string;
