@@ -124,7 +124,6 @@ impl SharedState {
     }
 }
 
-
 #[derive(Debug, Serialize)]
 pub struct ExecutionStats {
     pub total_tasks: usize,

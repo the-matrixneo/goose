@@ -2,8 +2,7 @@ use crate::agents::sub_recipe_execution_tool::executor::{
     execute_single_task, execute_tasks_in_parallel,
 };
 pub use crate::agents::sub_recipe_execution_tool::types::{
-    ExecutionMode, ExecutionResponse, ExecutionStats, SharedState, Task, TaskResult,
-    TaskStatus,
+    ExecutionMode, ExecutionResponse, ExecutionStats, SharedState, Task, TaskResult, TaskStatus,
 };
 
 #[cfg(test)]
@@ -33,8 +32,7 @@ pub async fn execute_tasks(
             }
         }
         ExecutionMode::Parallel => {
-            let response: ExecutionResponse =
-                execute_tasks_in_parallel(tasks, notifier).await;
+            let response: ExecutionResponse = execute_tasks_in_parallel(tasks, notifier).await;
             handle_response(response)
         }
     }
