@@ -103,9 +103,6 @@ Pre-created Task Based:
                     "properties": {
                         "max_workers": {
                             "type": "number"
-                        },
-                        "initial_workers": {
-                            "type": "number"
                         }
                     }
                 }

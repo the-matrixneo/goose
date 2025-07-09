@@ -128,28 +128,20 @@ impl SharedState {
 pub struct Config {
     #[serde(default = "default_max_workers")]
     pub max_workers: usize,
-    #[serde(default = "default_initial_workers")]
-    pub initial_workers: usize,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
             max_workers: default_max_workers(),
-            initial_workers: default_initial_workers(),
         }
     }
 }
 
 const DEFAULT_MAX_WORKERS: usize = 10;
-const DEFAULT_INITIAL_WORKERS: usize = 2;
 
 fn default_max_workers() -> usize {
     DEFAULT_MAX_WORKERS
-}
-
-fn default_initial_workers() -> usize {
-    DEFAULT_INITIAL_WORKERS
 }
 
 #[derive(Debug, Serialize)]
