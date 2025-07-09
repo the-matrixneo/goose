@@ -4,7 +4,6 @@ mod tests {
 
     use crate::recipe::{Execution, ExecutionRun, SubRecipe};
     use serde_json::json;
-    use serde_json::Value;
 
     use crate::agents::recipe_tools::param_utils::prepare_command_params;
 

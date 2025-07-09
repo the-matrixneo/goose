@@ -1,7 +1,5 @@
 use crate::agents::sub_recipe_execution_tool::types::{Task, TaskInfo, TaskStatus};
-use crate::agents::sub_recipe_execution_tool::utils::{
-    count_by_status, format_task_timing, get_status_icon, get_task_name,
-};
+use crate::agents::sub_recipe_execution_tool::utils::{count_by_status, get_task_name};
 use serde_json::json;
 use std::collections::HashMap;
 
