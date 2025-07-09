@@ -143,13 +143,13 @@ export const SearchBar: React.FC<SearchBarProps> = ({
 
   return (
     <div
-      className={`sticky top-0 bg-background-defaultInverse text-textProminentInverse z-50 ${
+      className={`sticky top-0 bg-background-inverse text-text-inverse z-50 mb-4 ${
         isExiting ? 'search-bar-exit' : 'search-bar-enter'
       }`}
     >
-      <div className="flex w-full max-w-5xl mx-auto">
-        <div className="relative flex flex-1 items-center h-full">
-          <SearchIcon className="h-4 w-4 text-textSubtleInverse absolute left-3" />
+      <div className="flex w-full items-center">
+        <div className="relative flex flex-1 items-center h-full min-w-0">
+          <SearchIcon className="h-4 w-4 text-text-inverse/70 absolute left-3" />
           <div className="w-full">
             <input
               ref={inputRef}
@@ -159,15 +159,15 @@ export const SearchBar: React.FC<SearchBarProps> = ({
               onChange={handleSearch}
               onKeyDown={handleKeyDown}
               placeholder="Search conversation..."
-              className="w-full text-sm pl-9 pr-24 py-3 bg-background-defaultInverse
-                      placeholder:text-textSubtleInverse focus:outline-none 
-                       active:border-borderProminent"
+              className="w-full text-sm pl-9 pr-24 py-3 bg-background-inverse text-text-inverse
+                      placeholder:text-text-inverse/50 focus:outline-none 
+                       active:border-border-strong"
             />
           </div>
 
           <div className="absolute right-3 flex h-full items-center justify-end">
             <div className="flex items-center gap-1">
-              <div className="w-16 text-right text-sm text-textStandardInverse flex items-center justify-end">
+              <div className="w-16 text-right text-sm text-text-inverse/80 flex items-center justify-end">
                 {(() => {
                   return localSearchResults?.count && localSearchResults.count > 0 && searchTerm
                     ? `${localSearchResults.currentIndex}/${localSearchResults.count}`
@@ -178,13 +178,13 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center justify-center h-auto px-4 gap-2">
+        <div className="flex items-center justify-center h-auto px-4 gap-2 flex-shrink-0">
           <Button
             onClick={toggleCaseSensitive}
             className={`flex items-center justify-center min-w-[32px] h-[28px] rounded transition-all duration-150 ${
               caseSensitive
-                ? 'bg-white/20 shadow-[inset_0_1px_2px_rgba(0,0,0,0.2)]'
-                : 'text-textSubtleInverse hover:text-textStandardInverse hover:bg-white/5'
+                ? 'bg-white/20 shadow-[inset_0_1px_2px_rgba(0,0,0,0.2)] text-text-inverse'
+                : 'text-text-inverse/70 hover:text-text-inverse hover:bg-white/10'
             }`}
             title="Case Sensitive"
           >
@@ -192,32 +192,32 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           </Button>
 
           <div className="flex items-center gap-2">
-            <Button onClick={(e) => handleNavigate('prev', e)} className="p-1" title="Previous (↑)">
+            <Button
+              onClick={(e) => handleNavigate('prev', e)}
+              className="flex items-center justify-center min-w-[32px] h-[28px] rounded transition-all duration-150 text-text-inverse/70 hover:text-text-inverse hover:bg-white/10"
+              title="Previous (↑)"
+            >
               <ArrowUp
-                className={`h-5 w-5 transition-opacity ${
-                  !hasResults
-                    ? 'opacity-30'
-                    : 'text-textSubtleInverse hover:text-textStandardInverse'
-                }`}
+                className={`h-5 w-5 transition-opacity ${!hasResults ? 'opacity-30' : ''}`}
               />
             </Button>
             <Button
               onClick={(e) => handleNavigate('next', e)}
-              className="p-1"
+              className="flex items-center justify-center min-w-[32px] h-[28px] rounded transition-all duration-150 text-text-inverse/70 hover:text-text-inverse hover:bg-white/10"
               title="Next (↓ or Enter)"
             >
               <ArrowDown
-                className={`h-5 w-5 transition-opacity ${
-                  !hasResults
-                    ? 'opacity-30'
-                    : 'text-textSubtleInverse hover:text-textStandardInverse'
-                }`}
+                className={`h-5 w-5 transition-opacity ${!hasResults ? 'opacity-30' : ''}`}
               />
             </Button>
           </div>
 
-          <Button onClick={handleClose} className="p-1" title="Close (Esc)">
-            <Close className="h-5 w-5 text-textSubtleInverse hover:text-textStandardInverse" />
+          <Button
+            onClick={handleClose}
+            className="flex items-center justify-center min-w-[32px] h-[28px] rounded transition-all duration-150 text-text-inverse/70 hover:text-text-inverse hover:bg-white/10"
+            title="Close (Esc)"
+          >
+            <Close className="h-5 w-5" />
           </Button>
         </div>
       </div>
