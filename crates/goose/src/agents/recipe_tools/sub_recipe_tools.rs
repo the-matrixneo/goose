@@ -39,12 +39,12 @@ pub fn create_sub_recipe_task_tool(sub_recipe: &SubRecipe) -> Tool {
     )
 }
 
-fn extract_task_parameters(params: &Value) -> &Vec<Value> {
-    let empty_vec = vec![];
+fn extract_task_parameters(params: &Value) -> Vec<Value> {
     params
         .get("task_parameters")
         .and_then(|v| v.as_array())
-        .unwrap_or(&empty_vec)
+        .cloned()
+        .unwrap_or_default()
 }
 
 fn create_tasks_from_params(
