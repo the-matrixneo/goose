@@ -135,14 +135,11 @@ impl SubAgent {
             recipe_extensions = existing_extensions;
         }
 
-        // Create a namespace manager for this subagent
-        let subagent_namespace_manager = Arc::new(Mutex::new(NamespaceManager::new()));
-        
         // Grant access to namespaces based on subagent configuration
         // For now, grant access to a namespace named after the subagent ID
         let subagent_namespace = format!("subagent_{}", config.id);
         if !recipe_extensions.is_empty() {
-            subagent_namespace_manager.lock().await.grant_access(&subagent_namespace, recipe_extensions.clone());
+            namespace_manager.grant_access(&subagent_namespace, recipe_extensions.clone());
         }
 
         let subagent = Arc::new(SubAgent {
@@ -155,7 +152,7 @@ impl SubAgent {
             recipe_extensions: Arc::new(Mutex::new(recipe_extensions)),
             missing_extensions: Arc::new(Mutex::new(missing_extensions)),
             mcp_notification_tx,
-            namespace_access: subagent_namespace_manager,
+            namespace_access: Arc::new(Mutex::new(namespace_manager.as_ref().clone())),
         });
 
         // Send initial MCP notification
