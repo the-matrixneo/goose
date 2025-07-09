@@ -13,6 +13,7 @@ use goose::{
     agents::{AgentEvent, SessionConfig},
     message::{push_message, Message},
     permission::permission_confirmation::PrincipalType,
+    telemetry::{global_telemetry, SessionExecution, SessionResult, SessionType, RecipeResult},
 };
 use goose::{
     permission::{Permission, PermissionConfirmation},
@@ -29,7 +30,7 @@ use std::{
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
-    time::Duration,
+    time::{Duration, Instant},
 };
 use tokio::sync::mpsc;
 use tokio::time::timeout;
@@ -43,6 +44,8 @@ struct ChatRequest {
     session_id: Option<String>,
     session_working_dir: String,
     scheduled_job_id: Option<String>,
+    recipe_name: Option<String>,
+    recipe_version: Option<String>,
 }
 
 pub struct SseResponse {
@@ -136,8 +139,74 @@ async fn reply_handler(
     let task_tx = tx.clone();
 
     std::mem::drop(tokio::spawn(async move {
+        let start_time = Instant::now();
+        let mut session_execution = SessionExecution::new(&session_id, SessionType::Interactive)
+            .with_metadata("execution_mode", "server")
+            .with_metadata("session_type", "streaming")
+            .with_metadata("interface", "ui");
+
+        // Add recipe metadata if available
+        if let Some(recipe_name) = &request.recipe_name {
+            session_execution = session_execution
+                .with_metadata("recipe_name", recipe_name)
+                .with_metadata("session_mode", "recipe");
+        }
+        if let Some(recipe_version) = &request.recipe_version {
+            session_execution = session_execution.with_metadata("recipe_version", recipe_version);
+        }
+
+        // If no recipe, mark as regular chat
+        if request.recipe_name.is_none() {
+            session_execution = session_execution.with_metadata("session_mode", "chat");
+        }
+
         let agent = match state.get_agent().await {
-            Ok(agent) => agent,
+            Ok(agent) =>  {
+                let provider = agent.provider().await;
+                match provider {
+                    Ok(_) => agent,
+                    Err(_) => {
+                        let _ = stream_event(
+                            MessageEvent::Error {
+                                error: "No provider configured".to_string(),
+                            },
+                            &tx,
+                        )
+                            .await;
+                        let _ = stream_event(
+                            MessageEvent::Finish {
+                                reason: "error".to_string(),
+                            },
+                            &tx,
+                        )
+                            .await;
+
+                        // Track failed session
+                        if let Some(manager) = global_telemetry() {
+                            let failed_execution = session_execution
+                                .clone()
+                                .with_result(SessionResult::Error(
+                                    "No provider configured".to_string(),
+                                ))
+                                .with_duration(start_time.elapsed());
+                            let _ = manager.track_session_execution(failed_execution).await;
+
+                            // Also track as failed recipe execution if this is a recipe session
+                            if let (Some(recipe_name), Some(recipe_version)) = (&request.recipe_name, &request.recipe_version) {
+                                let recipe_execution = manager
+                                    .recipe_execution(recipe_name, recipe_version)
+                                    .with_result(RecipeResult::Error("No provider configured".to_string()))
+                                    .with_duration(start_time.elapsed())
+                                    .with_metadata("interface", "ui")
+                                    .with_metadata("execution_mode", "server")
+                                    .with_metadata("session_type", "streaming");
+                                let _ = manager.track_recipe_execution(recipe_execution.build()).await;
+                            }
+                        }
+                        return;
+                    }
+                }
+            },
             Err(_) => {
                 let _ = stream_event(
                     MessageEvent::Error {
@@ -146,6 +215,15 @@ async fn reply_handler(
                     &task_tx,
                 )
                 .await;
+
+                // Track failed session
+                if let Some(manager) = global_telemetry() {
+                    let failed_execution = session_execution
+                        .clone()
+                        .with_result(SessionResult::Error("No agent configured".to_string()))
+                        .with_duration(start_time.elapsed());
+                    let _ = manager.track_session_execution(failed_execution).await;
+                }
                 return;
             }
         };
@@ -173,11 +251,23 @@ async fn reply_handler(
                     &task_tx,
                 )
                 .await;
+
+                // Track failed session
+                if let Some(manager) = global_telemetry() {
+                    let failed_execution = session_execution
+                        .clone()
+                        .with_result(SessionResult::Error(e.to_string()))
+                        .with_duration(start_time.elapsed());
+                    let _ = manager.track_session_execution(failed_execution).await;
+                }
                 return;
             }
         };
 
         let mut all_messages = messages.clone();
+        let mut message_count = messages.len();
+        let mut turn_count = 0;
+
         let session_path = match session::get_path(session::Identifier::Name(session_id.clone())) {
             Ok(path) => path,
             Err(e) => {
@@ -189,6 +279,18 @@ async fn reply_handler(
                     &task_tx,
                 )
                 .await;
+
+                // Track failed session
+                if let Some(manager) = global_telemetry() {
+                    let failed_execution = session_execution
+                        .clone()
+                        .with_result(SessionResult::Error(format!(
+                            "Failed to get session path: {}",
+                            e
+                        )))
+                        .with_duration(start_time.elapsed());
+                    let _ = manager.track_session_execution(failed_execution).await;
+                }
                 return;
             }
         };
@@ -204,57 +306,73 @@ async fn reply_handler(
                                 match response {
                                     Ok(Some(Ok(AgentEvent::Message(message)))) => {
                                         push_message(&mut all_messages, message.clone());
-                                        if let Err(e) = stream_event(MessageEvent::Message { message }, &tx).await {
-                                            tracing::error!("Error sending message through channel: {}", e);
-                                            let _ = stream_event(
-                                                MessageEvent::Error {
-                                                    error: e.to_string(),
-                                                },
-                                                &tx,
-                                            ).await;
-                                            break;
-                                        }
-                                    }
-                                    Ok(Some(Ok(AgentEvent::ModelChange { model, mode }))) => {
-                                        if let Err(e) = stream_event(MessageEvent::ModelChange { model, mode }, &tx).await {
-                                            tracing::error!("Error sending model change through channel: {}", e);
-                                            let _ = stream_event(
-                                                MessageEvent::Error {
-                                                    error: e.to_string(),
-                                                },
-                                                &tx,
-                                            ).await;
-                                        }
-                                    }
-                                    Ok(Some(Ok(AgentEvent::McpNotification((request_id, n))))) => {
-                                        if let Err(e) = stream_event(MessageEvent::Notification{
-                                            request_id: request_id.clone(),
-                                            message: n,
-                                        }, &tx).await {
-                                            tracing::error!("Error sending message through channel: {}", e);
-                                            let _ = stream_event(
-                                                MessageEvent::Error {
-                                                    error: e.to_string(),
-                                                },
-                                                &tx,
-                                            ).await;
-                                        }
-                                    }
+                                        message_count += 1;
+                            if message.role == Role::Assistant {
+                                turn_count += 1;
+                            }
+                            if let Err(e) = stream_event(MessageEvent::Message { message }, &tx).await {
+                                tracing::error!("Error sending message through channel: {}", e);
+                                let _ = stream_event(
+                                    MessageEvent::Error {
+                                        error: e.to_string(),
+                                    },
+                                    &tx,
+                                ).await;
+                                break;
+                            }
+                        }
+                        Ok(Some(Ok(AgentEvent::ModelChange { model, mode }))) => {
+                            session_execution = session_execution.with_metadata("model", &model);
 
-                                    Ok(Some(Err(e))) => {
-                                        tracing::error!("Error processing message: {}", e);
-                                        let _ = stream_event(
-                                            MessageEvent::Error {
-                                                error: e.to_string(),
-                                            },
-                                            &tx,
-                                        ).await;
-                                        break;
-                                    }
-                                    Ok(None) => {
-                                        break;
-                                    }
-                                    Err(_) => {
+                            if let Err(e) = stream_event(MessageEvent::ModelChange { model, mode }, &tx).await {
+                                tracing::error!("Error sending model change through channel: {}", e);
+                                let _ = stream_event(
+                                    MessageEvent::Error {
+                                        error: e.to_string(),
+                                    },
+                                    &tx,
+                                ).await;
+                            }
+                        }
+                        Ok(Some(Ok(AgentEvent::McpNotification((request_id, n))))) => {
+                            if let Err(e) = stream_event(MessageEvent::Notification{
+                                request_id: request_id.clone(),
+                                message: n,
+                            }, &tx).await {
+                                tracing::error!("Error sending message through channel: {}", e);
+                                let _ = stream_event(
+                                    MessageEvent::Error {
+                                        error: e.to_string(),
+                                    },
+                                    &tx,
+                                ).await;
+                            }
+                        }
+
+                        Ok(Some(Err(e))) => {
+                            tracing::error!("Error processing message: {}", e);
+                            let _ = stream_event(
+                                MessageEvent::Error {
+                                    error: e.to_string(),
+                                },
+                                &tx,
+                            ).await;
+
+                            // Track failed session
+                            if let Some(manager) = global_telemetry() {
+                                let failed_execution = session_execution.clone()
+                                    .with_result(SessionResult::Error(e.to_string()))
+                                    .with_message_count(message_count as u64)
+                                    .with_turn_count(turn_count as u64)
+                                    .with_duration(start_time.elapsed());
+                                let _ = manager.track_session_execution(failed_execution).await;
+                            }
+                            break;
+                        }
+                        Ok(None) => {
+                            break;
+                        }
+                        Err(_) => {
                                         if tx.is_closed() {
                                             break;
                                         }
@@ -290,7 +408,35 @@ async fn reply_handler(
             &task_tx,
         )
         .await;
-    }));
+
+        // Track successful session
+        if let Some(manager) = global_telemetry() {
+            let successful_execution = session_execution
+                .with_result(SessionResult::Success)
+                .with_message_count(message_count as u64)
+                .with_turn_count(turn_count as u64)
+                .with_duration(start_time.elapsed());
+            let _ = manager.track_session_execution(successful_execution).await;
+
+            // Also track as recipe execution if this is a recipe session
+            if let (Some(recipe_name), Some(recipe_version)) = (&request.recipe_name, &request.recipe_version) {
+                let recipe_execution = manager
+                    .recipe_execution(recipe_name, recipe_version)
+                    .with_result(RecipeResult::Success)
+                    .with_duration(start_time.elapsed())
+                    .with_metadata("interface", "ui")
+                    .with_metadata("execution_mode", "server")
+                    .with_metadata("session_type", "streaming");
+
+                // Add tool usage and token usage if available from session
+                // Note: For UI recipe sessions, we track the session but recipe metrics
+                // focus on the recipe completion rather than individual tool calls
+
+                let _ = manager.track_recipe_execution(recipe_execution.build()).await;
+            }
+        }
+    });
+
     Ok(SseResponse::new(stream))
 }
 
