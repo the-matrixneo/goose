@@ -1015,6 +1015,9 @@ impl Session {
                                                         }
                                                     };
                                                     (formatted, Some(subagent_id.to_string()), Some(notification_type.to_string()))
+                                                } else if let Some(Value::String(output)) = o.get("output") {
+                                                    // Fallback for other MCP notification types
+                                                    (output.to_owned(), None, None)
                                                 } else if let Some(result) = format_task_execution_notification(data) {
                                                     result
                                                 } else {
