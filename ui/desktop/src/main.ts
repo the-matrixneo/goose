@@ -640,6 +640,23 @@ const createChat = async (
     return { action: 'allow' };
   });
 
+  // If this is a recipe execution, check if we've seen it before
+  if (recipeConfig) {
+    try {
+      const { checkAndRecordRecipe } = require('./utils/recipeHash');
+      const hasSeenBefore = await checkAndRecordRecipe(recipeConfig);
+      
+      if (!hasSeenBefore) {
+        // Send event to renderer to show warning
+        mainWindow.webContents.send('new-recipe-warning', recipeConfig);
+        return mainWindow;
+      }
+    } catch (error) {
+      console.error('Error checking recipe hash:', error);
+      // Continue with execution on error
+    }
+  }
+
   // Load the index.html of the app.
   let queryParams = '';
   if (query) {

@@ -6,6 +6,7 @@ import { initializeSystem } from './utils/providerUtils';
 import { initializeCostDatabase } from './utils/costDatabase';
 import { ErrorUI } from './components/ErrorBoundary';
 import { ConfirmationModal } from './components/ui/ConfirmationModal';
+import { RecipeWarningModal } from './components/ui/RecipeWarningModal';
 import { ToastContainer } from 'react-toastify';
 import { toastService } from './toasts';
 import { extractExtensionName } from './components/settings/extensions/utils';
@@ -115,7 +116,43 @@ const getInitialView = (): ViewConfig => {
 export default function App() {
   const [fatalError, setFatalError] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
-  const [pendingLink, setPendingLink] = useState<string | null>(null);
+  const [pendingRecipe, setPendingRecipe] = useState<Recipe | null>(null);
+  const [recipeWarningVisible, setRecipeWarningVisible] = useState(false);
+
+  useEffect(() => {
+    console.log('Setting up new recipe warning handler');
+    const handleNewRecipeWarning = (_event: IpcRendererEvent, ...args: unknown[]) => {
+      const recipe = args[0] as Recipe;
+      console.log('Received new recipe warning:', recipe);
+      setPendingRecipe(recipe);
+      setRecipeWarningVisible(true);
+    };
+    window.electron.on('new-recipe-warning', handleNewRecipeWarning);
+    return () => {
+      window.electron.off('new-recipe-warning', handleNewRecipeWarning);
+    };
+  }, []);
+
+  const handleRecipeConfirm = () => {
+    if (pendingRecipe) {
+      console.log('Executing new recipe:', pendingRecipe);
+      window.electron.createChatWindow(
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        pendingRecipe
+      );
+    }
+    setRecipeWarningVisible(false);
+    setPendingRecipe(null);
+  };
+
+  const handleRecipeCancel = () => {
+    console.log('Cancelled recipe execution');
+    setRecipeWarningVisible(false);
+    setPendingRecipe(null);
+  };
   const [modalMessage, setModalMessage] = useState<string>('');
   const [extensionConfirmLabel, setExtensionConfirmLabel] = useState<string>('');
   const [extensionConfirmTitle, setExtensionConfirmTitle] = useState<string>('');
@@ -525,6 +562,14 @@ export default function App() {
         closeOnClick
         pauseOnHover
       />
+      {recipeWarningVisible && pendingRecipe && (
+        <RecipeWarningModal
+          isOpen={recipeWarningVisible}
+          onConfirm={handleRecipeConfirm}
+          onCancel={handleRecipeCancel}
+          recipeDetails={pendingRecipe}
+        />
+      )}
       {modalVisible && (
         <ConfirmationModal
           isOpen={modalVisible}
