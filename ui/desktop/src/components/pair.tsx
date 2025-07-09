@@ -45,17 +45,12 @@ export default function Pair({
     }
   }, [location.state, hasProcessedInitialInput, chat.messages.length]);
 
-  // Custom content before messages for loading state
+  // Custom content before messages
   const renderBeforeMessages = () => (
-    <div className="px-6">
-      {/* Loading indicator will be handled by BaseChat's isLoading state */}
+    <div>
+      {/* Any Pair-specific content before messages can go here */}
     </div>
   );
-
-  // Custom main layout props for Pair-specific styling
-  const customMainLayoutProps = {
-    className: 'pl-6 px-4 pb-16 pt-2',
-  };
 
   // Custom chat input props for Pair-specific behavior
   const customChatInputProps = {
@@ -70,8 +65,8 @@ export default function Pair({
       setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
       enableLocalStorage={true} // Enable local storage for Pair mode
       renderBeforeMessages={renderBeforeMessages}
-      customMainLayoutProps={customMainLayoutProps}
       customChatInputProps={customChatInputProps}
+      contentClassName="pl-6 px-4 pb-16 pt-2" // Add Pair-specific padding
     />
   );
 }

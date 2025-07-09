@@ -5,6 +5,7 @@ import UserMessage from './UserMessage';
 import { SearchView } from './conversation/SearchView';
 import { AgentHeader } from './AgentHeader';
 import LayingEggLoader from './LayingEggLoader';
+import LoadingGoose from './LoadingGoose';
 import { SessionSummaryModal } from './context_management/SessionSummaryModal';
 import {
   ChatContextManagerProvider,
@@ -40,6 +41,7 @@ interface BaseChatProps {
   renderAfterMessages?: () => React.ReactNode;
   customChatInputProps?: Record<string, unknown>;
   customMainLayoutProps?: Record<string, unknown>;
+  contentClassName?: string; // Add custom class for content area
 }
 
 function BaseChatContent({
@@ -53,6 +55,7 @@ function BaseChatContent({
   renderAfterMessages,
   customChatInputProps = {},
   customMainLayoutProps = {},
+  contentClassName = "",
 }: BaseChatProps) {
   const location = useLocation();
 
@@ -163,7 +166,7 @@ function BaseChatContent({
         {renderHeader && renderHeader()}
 
         <div
-          className="flex flex-col min-w-0 flex-1 overflow-y-scroll relative"
+          className={`flex flex-col min-w-0 flex-1 overflow-y-scroll relative ${contentClassName}`}
           onDrop={handleDrop}
           onDragOver={handleDragOver}
         >
@@ -275,6 +278,7 @@ function BaseChatContent({
         <div
           className={`relative z-10 ${disableAnimation ? '' : 'animate-[fadein_400ms_ease-in_forwards]'}`}
         >
+          <div className="px-6">{isLoading && <LoadingGoose />}</div>
           <ChatInput
             handleSubmit={handleSubmit}
             isLoading={isLoading}
