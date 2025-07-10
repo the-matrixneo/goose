@@ -151,6 +151,17 @@ function Sidebar({
 }) {
   const { isMobile, state, openMobile, setOpenMobile } = useSidebar();
 
+  const handleSheetOpenChange = React.useCallback(
+    (open: boolean) => {
+      // Only allow opening if it's not currently open
+      // This prevents the sheet from reopening when we explicitly close it
+      if (open || !openMobile) {
+        setOpenMobile(open);
+      }
+    },
+    [openMobile, setOpenMobile]
+  );
+
   if (collapsible === 'none') {
     return (
       <div
@@ -168,7 +179,7 @@ function Sidebar({
 
   if (isMobile) {
     return (
-      <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
+      <Sheet open={openMobile} onOpenChange={handleSheetOpenChange} {...props}>
         <SheetContent
           data-sidebar="sidebar"
           data-slot="sidebar"
@@ -243,7 +254,25 @@ function Sidebar({
 }
 
 function SidebarTrigger({ className, onClick, ...props }: React.ComponentProps<typeof Button>) {
-  const { toggleSidebar } = useSidebar();
+  const { toggleSidebar, isMobile, openMobile, setOpenMobile } = useSidebar();
+
+  const handleClick = React.useCallback(
+    (event: React.MouseEvent<HTMLButtonElement>) => {
+      // Prevent event from bubbling to avoid conflicts
+      event.stopPropagation();
+
+      // Call the original onClick handler if provided
+      onClick?.(event);
+
+      // If mobile sidebar is open, just close it instead of toggling
+      if (isMobile && openMobile) {
+        setOpenMobile(false);
+      } else {
+        toggleSidebar();
+      }
+    },
+    [onClick, toggleSidebar, isMobile, openMobile, setOpenMobile]
+  );
 
   return (
     <Button
@@ -252,10 +281,7 @@ function SidebarTrigger({ className, onClick, ...props }: React.ComponentProps<t
       variant="ghost"
       size="xs"
       className={cn(className)}
-      onClick={(event) => {
-        onClick?.(event);
-        toggleSidebar();
-      }}
+      onClick={handleClick}
       {...props}
     >
       <PanelLeftIcon />
