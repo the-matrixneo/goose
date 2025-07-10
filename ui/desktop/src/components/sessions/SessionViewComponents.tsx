@@ -61,7 +61,7 @@ export const SessionHeaderCard: React.FC<SessionHeaderCardProps> = ({ onBack, ch
       <BackButton
         showText={false}
         onClick={onBack}
-        iconSize="w-7 h-7"
+        size="lg"
         className="!text-textProminentInverse dark:!text-textStandardInverse"
       />
       {children}

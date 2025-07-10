@@ -169,25 +169,23 @@ const AppSidebar: React.FC<SidebarProps> = ({ currentPath }) => {
                 </SidebarMenuItem>
               </motion.div>
 
-              {process.env.ALPHA && (
-                <motion.div
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.3 }}
-                >
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      onClick={() => navigate('/schedules')}
-                      isActive={isActivePath('/schedules')}
-                      tooltip="Manage scheduled runs"
-                      className="w-full justify-start px-3 rounded-lg h-fit hover:bg-background-medium/50 transition-all duration-200 data-[active=true]:bg-background-medium"
-                    >
-                      <Clock className="w-4 h-4" />
-                      <span>Scheduler</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                </motion.div>
-              )}
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.5 }}
+              >
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    onClick={() => navigate('/schedules')}
+                    isActive={isActivePath('/schedules')}
+                    tooltip="Manage scheduled runs"
+                    className="w-full justify-start px-3 rounded-lg h-fit hover:bg-background-medium/50 transition-all duration-200 data-[active=true]:bg-background-medium"
+                  >
+                    <Clock className="w-4 h-4" />
+                    <span>Scheduler</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </motion.div>
             </SidebarGroupContent>
           </SidebarGroup>
 
