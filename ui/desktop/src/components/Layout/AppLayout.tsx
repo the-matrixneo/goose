@@ -78,14 +78,13 @@ const AppLayoutContent: React.FC<AppLayoutProps> = ({ setIsGoosehintsModalOpen }
 
   return (
     <div className="flex flex-1 w-full relative animate-fade-in">
-      {/* Header buttons - positioned outside sidebar hierarchy with high z-index so clickable when mobile sheet is showing */}
-      <div className={`${headerPadding} fixed top-3 z-[200] flex items-center pointer-events-none`}>
+      <div className={`${headerPadding} absolute top-3 z-100 flex items-center`}>
         <SidebarTrigger
-          className={`no-drag hover:border-border-strong hover:text-text-default hover:!bg-background-medium hover:scale-105 pointer-events-auto`}
+          className={`no-drag hover:border-border-strong hover:text-text-default hover:!bg-background-medium hover:scale-105`}
         />
         <Button
           onClick={handleNewWindow}
-          className="no-drag hover:!bg-background-medium pointer-events-auto"
+          className="no-drag hover:!bg-background-medium"
           variant="ghost"
           size="xs"
           title="Start a new session in a new window"
