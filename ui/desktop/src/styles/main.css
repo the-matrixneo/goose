@@ -748,3 +748,39 @@ p > code.bg-inline-code {
 .virtualized-list * {
   contain: layout style paint;
 }
+
+/* Sidebar transition optimizations */
+[data-slot='sidebar-container'] {
+  /* Promote to composite layer for smoother animations */
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  /* Optimize for transform animations */
+  will-change: transform;
+}
+
+[data-slot='sidebar-gap'] {
+  /* Optimize for width animations */
+  will-change: width;
+}
+
+/* Remove will-change when not transitioning to save memory */
+[data-state='expanded'] [data-slot='sidebar-container'],
+[data-state='collapsed'] [data-slot='sidebar-container'] {
+  will-change: auto;
+}
+
+[data-state='expanded'] [data-slot='sidebar-gap'],
+[data-state='collapsed'] [data-slot='sidebar-gap'] {
+  will-change: auto;
+}
+
+/* Ensure smooth transitions during state changes */
+[data-state='expanded'] [data-slot='sidebar-container'],
+[data-state='collapsed'] [data-slot='sidebar-container'] {
+  will-change: transform;
+}
+
+[data-state='expanded'] [data-slot='sidebar-gap'],
+[data-state='collapsed'] [data-slot='sidebar-gap'] {
+  will-change: width;
+}
