@@ -2,7 +2,7 @@
 
 # codename goose
 
-_a local, extensible, open source AI agent that automates engineering tasks_
+_a local, extensible, open source AI agent that automates engineering tasks_ 
 
 <p align="center">
   <a href="https://opensource.org/licenses/Apache-2.0">
