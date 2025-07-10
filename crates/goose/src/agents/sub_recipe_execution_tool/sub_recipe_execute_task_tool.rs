@@ -5,11 +5,11 @@ use crate::agents::{
     sub_recipe_execution_tool::lib::execute_tasks, tool_execution::ToolCallResult,
 };
 
-pub const SUB_RECIPE_EXECUTE_TASK_TOOL_NAME: &str = "sub_recipe__execute_task";
+pub const SUB_RECIPE_EXECUTE_TASK_TOOL_NAME: &str = "sub_agent__execute_task";
 pub fn create_sub_recipe_execute_task_tool() -> Tool {
     Tool::new(
         SUB_RECIPE_EXECUTE_TASK_TOOL_NAME,
-        "Only use this tool when you execute sub recipe task.
+        "Only use this tool when you execute sub agent task.
 EXECUTION STRATEGY:
 - DEFAULT: Execute tasks sequentially (one at a time) unless user explicitly requests parallel execution
 - PARALLEL: Only when user explicitly uses keywords like 'parallel', 'simultaneously', 'at the same time', 'concurrently'
@@ -17,6 +17,10 @@ EXECUTION STRATEGY:
 IMPLEMENTATION:
 - Sequential execution: Call this tool multiple times, passing exactly ONE task per call
 - Parallel execution: Call this tool once, passing an ARRAY of all tasks
+
+TASK TYPES:
+- sub_recipe: Requires payload.sub_recipe with name, recipe_path, and command_parameters
+- text_instruction: Requires payload.text_instruction with the instruction string
 
 EXAMPLES:
 - User: 'get weather and tell me a joke' → Sequential (2 separate tool calls, 1 task each)
@@ -48,31 +52,45 @@ EXAMPLES:
                                 "description": "the type of task to execute, can be one of: sub_recipe, text_instruction"
                             },
                             "payload": {
-                                "type": "object",
-                                "properties": {
-                                    "sub_recipe": {
+                                "oneOf": [
+                                    {
                                         "type": "object",
-                                        "description": "sub recipe to execute",
                                         "properties": {
-                                            "name": {
-                                                "type": "string",
-                                                "description": "name of the sub recipe to execute"
-                                            },
-                                            "recipe_path": {
-                                                "type": "string",
-                                                "description": "path of the sub recipe file"
-                                            },
-                                            "command_parameters": {
+                                            "sub_recipe": {
                                                 "type": "object",
-                                                "description": "parameters to pass to run recipe command with sub recipe file"
+                                                "description": "sub recipe to execute",
+                                                "properties": {
+                                                    "name": {
+                                                        "type": "string",
+                                                        "description": "name of the sub recipe to execute"
+                                                    },
+                                                    "recipe_path": {
+                                                        "type": "string",
+                                                        "description": "path of the sub recipe file"
+                                                    },
+                                                    "command_parameters": {
+                                                        "type": "object",
+                                                        "description": "parameters to pass to run recipe command with sub recipe file"
+                                                    }
+                                                },
+                                                "required": ["name", "recipe_path", "command_parameters"]
                                             }
-                                        }
+                                        },
+                                        "required": ["sub_recipe"],
+                                        "additionalProperties": false
                                     },
-                                    "text_instruction": {
-                                        "type": "string",
-                                        "description": "text instruction to execute"
+                                    {
+                                        "type": "object",
+                                        "properties": {
+                                            "text_instruction": {
+                                                "type": "string",
+                                                "description": "text instruction to execute"
+                                            }
+                                        },
+                                        "required": ["text_instruction"],
+                                        "additionalProperties": false
                                     }
-                                }
+                                ]
                             }
                         },
                         "required": ["id", "payload"]

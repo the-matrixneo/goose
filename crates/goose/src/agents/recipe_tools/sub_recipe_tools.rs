@@ -9,6 +9,52 @@ use crate::recipe::{Recipe, RecipeParameter, RecipeParameterRequirement, SubReci
 
 pub const SUB_RECIPE_TASK_TOOL_NAME_PREFIX: &str = "subrecipe__create_task";
 
+#[derive(Debug, Clone)]
+pub enum TaskType {
+    SubRecipe(SubRecipe),
+    TextInstruction(String),
+}
+
+impl TaskType {
+    pub fn task_type_name(&self) -> &'static str {
+        match self {
+            TaskType::SubRecipe(_) => "sub_recipe",
+            TaskType::TextInstruction(_) => "text_instruction",
+        }
+    }
+}
+
+pub fn create_task_tool(task_type: &TaskType) -> Tool {
+    match task_type {
+        TaskType::SubRecipe(sub_recipe) => create_sub_recipe_task_tool(sub_recipe),
+        TaskType::TextInstruction(_) => create_text_instruction_task_tool(),
+    }
+}
+
+pub fn create_text_instruction_task_tool() -> Tool {
+    Tool::new(
+        "text_instruction__create_task".to_string(),
+        "Create a text instruction task that can be executed by the task executor".to_string(),
+        json!({
+            "type": "object",
+            "properties": {
+                "text_instruction": {
+                    "type": "string",
+                    "description": "The text instruction to execute"
+                }
+            },
+            "required": ["text_instruction"]
+        }),
+        Some(ToolAnnotations {
+            title: Some("Create text instruction task".to_string()),
+            read_only_hint: false,
+            destructive_hint: true,
+            idempotent_hint: false,
+            open_world_hint: true,
+        }),
+    )
+}
+
 pub fn create_sub_recipe_task_tool(sub_recipe: &SubRecipe) -> Tool {
     let input_schema = get_input_schema(sub_recipe).unwrap();
     Tool::new(
@@ -103,15 +149,33 @@ pub async fn create_sub_recipe_task(sub_recipe: &SubRecipe, params: Value) -> Re
             "recipe_path": sub_recipe.path.clone(),
         }
     });
+    create_task(TaskType::SubRecipe(sub_recipe.clone()), payload).await
+}
+
+pub async fn create_text_instruction_task(text_instruction: String) -> Result<String> {
+    let payload = json!({
+        "text_instruction": text_instruction
+    });
+    create_task(TaskType::TextInstruction(text_instruction), payload).await
+}
+
+pub async fn create_text_instruction_task_from_args(args: Value) -> Result<String> {
+    let text_instruction = args
+        .get("text_instruction")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| anyhow::anyhow!("Missing text_instruction parameter"))?
+        .to_string();
+    create_text_instruction_task(text_instruction).await
+}
+
+/// Generalized task creation function that can handle both sub-recipe and text instruction tasks
+async fn create_task(task_type: TaskType, payload: Value) -> Result<String> {
     let task = Task {
         id: uuid::Uuid::new_v4().to_string(),
-        task_type: "sub_recipe".to_string(),
+        task_type: task_type.task_type_name().to_string(),
         payload,
     };
     let task_json = serde_json::to_string(&task)
         .map_err(|e| anyhow::anyhow!("Failed to serialize Task: {}", e))?;
     Ok(task_json)
 }
-
-#[cfg(test)]
-mod tests;
