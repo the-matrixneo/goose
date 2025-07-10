@@ -5,7 +5,7 @@ export const MainPanelLayout: React.FC<{
 }> = ({ children }) => {
   return (
     <div className={`h-dvh`}>
-      {/* Padding top matches the app toolbar drag area */}
+      {/* Padding top matches the app toolbar drag area height */}
       <div className={`flex flex-col bg-background-default flex-1 min-w-0 h-full pt-[32px]`}>
         {children}
       </div>
