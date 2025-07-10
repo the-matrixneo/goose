@@ -1,0 +1,29 @@
+version: 1.0.0
+title: Joke of the day
+author:
+  contact: douwe
+description: Will tell you a joke
+instructions: Your job is to tell a joke of a theme
+extensions:
+- type: builtin
+  name: developer
+  display_name: Developer
+  timeout: 300
+  bundled: true
+- args:
+  - mcp-server-fetch
+  bundled: null
+  cmd: uvx
+  description: ''
+  enabled: false
+  env_keys: []
+  envs: {}
+  name: fetch
+  timeout: 300
+  type: stdio
+prompt: "with provided theme {{theme}} generate a joke. Mention the theme on the first line then an empty line and then the joke."
+parameters:
+- key: theme
+  input_type: string
+  requirement: required
+  description: theme provided by the user

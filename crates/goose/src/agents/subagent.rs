@@ -255,7 +255,7 @@ impl SubAgent {
         }
     }
 
-    /// Process a message and generate a response using the subagent's provider
+    /// Process a message and generate a response using the provider
     #[instrument(skip(self, message, provider, extension_manager))]
     pub async fn reply_subagent(
         &self,
@@ -264,8 +264,15 @@ impl SubAgent {
         extension_manager: Arc<tokio::sync::RwLockReadGuard<'_, ExtensionManager>>,
     ) -> Result<Message, anyhow::Error> {
         debug!("Processing message for subagent {}", self.id);
-        self.send_mcp_notification("message_processing", &format!("Processing: {}", message))
-            .await;
+        self.send_mcp_notification(
+            "message_processing",
+            &format!(
+                "Processing: {} (via {})",
+                message,
+                provider.get_model_config().model_name
+            ),
+        )
+        .await;
 
         // Check if we've exceeded max turns
         {
