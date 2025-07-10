@@ -512,10 +512,14 @@ impl SubAgent {
                         .with_text("Rate limit exceeded. Please try again later."));
                 }
                 Err(e) => {
+                    let model_name = provider.get_model_config().model_name;
                     self.set_status(SubAgentStatus::Completed(format!("Error: {}", e)))
                         .await;
-                    error!("Error: {}", e);
-                    break Ok(Message::assistant().with_text(format!("Ran into this error: {e}.\n\nPlease retry if you think this is a transient or recoverable error.")));
+                    error!("Error with model '{}': {}", model_name, e);
+                    break Ok(Message::assistant().with_text(format!(
+                        "Ran into this error with model '{}': {}\n\nPlease check that the model name is valid for the provider. If you think this is a transient or recoverable error, please retry.",
+                        model_name, e
+                    )));
                 }
             }
         }

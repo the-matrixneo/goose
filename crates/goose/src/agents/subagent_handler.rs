@@ -5,8 +5,8 @@ use std::sync::Arc;
 
 use crate::agents::subagent_types::SpawnSubAgentArgs;
 use crate::agents::Agent;
-use crate::providers::create;
 use crate::model::ModelConfig;
+use crate::providers::create;
 
 impl Agent {
     /// Handle running a complete subagent task (replaces the individual spawn/send/check tools)
@@ -71,45 +71,60 @@ impl Agent {
                                 // Use the agent's provider's model if not specified in recipe
                                 self.provider()
                                     .await
-                                    .map_err(|e| ToolError::ExecutionError(format!("Failed to get provider: {}", e)))?
+                                    .map_err(|e| {
+                                        ToolError::ExecutionError(format!(
+                                            "Failed to get provider: {}",
+                                            e
+                                        ))
+                                    })?
                                     .get_model_config()
                                     .model_name
                             };
-                            let model_config = ModelConfig::new(model_name)
-                                .with_temperature(settings.temperature);
-                            
+                            let model_config =
+                                ModelConfig::new(model_name).with_temperature(settings.temperature);
+
                             match create(&recipe_provider_name, model_config) {
                                 Ok(recipe_provider) => {
-                                    tracing::info!("Using recipe-specified provider: {}", recipe_provider_name);
+                                    tracing::info!(
+                                        "Using recipe-specified provider: {}",
+                                        recipe_provider_name
+                                    );
                                     recipe_provider
                                 }
                                 Err(e) => {
                                     tracing::warn!("Failed to create recipe provider '{}': {}. Falling back to agent provider.", recipe_provider_name, e);
                                     // Fall back to agent's provider
-                                    self.provider()
-                                        .await
-                                        .map_err(|e| ToolError::ExecutionError(format!("Failed to get provider: {}", e)))?
+                                    self.provider().await.map_err(|e| {
+                                        ToolError::ExecutionError(format!(
+                                            "Failed to get provider: {}",
+                                            e
+                                        ))
+                                    })?
                                 }
                             }
                         } else {
                             // Recipe doesn't specify a provider, use agent's provider
-                            self.provider()
-                                .await
-                                .map_err(|e| ToolError::ExecutionError(format!("Failed to get provider: {}", e)))?
+                            self.provider().await.map_err(|e| {
+                                ToolError::ExecutionError(format!("Failed to get provider: {}", e))
+                            })?
                         }
                     } else {
                         // Recipe doesn't have settings, use agent's provider
-                        self.provider()
-                            .await
-                            .map_err(|e| ToolError::ExecutionError(format!("Failed to get provider: {}", e)))?
+                        self.provider().await.map_err(|e| {
+                            ToolError::ExecutionError(format!("Failed to get provider: {}", e))
+                        })?
                     }
                 }
                 Err(e) => {
-                    tracing::warn!("Failed to load recipe '{}': {}. Using agent provider.", recipe_name, e);
+                    tracing::warn!(
+                        "Failed to load recipe '{}': {}. Using agent provider.",
+                        recipe_name,
+                        e
+                    );
                     // Fall back to agent's provider if recipe loading fails
-                    self.provider()
-                        .await
-                        .map_err(|e| ToolError::ExecutionError(format!("Failed to get provider: {}", e)))?
+                    self.provider().await.map_err(|e| {
+                        ToolError::ExecutionError(format!("Failed to get provider: {}", e))
+                    })?
                 }
             }
         } else {
