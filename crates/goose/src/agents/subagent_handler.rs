@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use crate::agents::subagent_types::SpawnSubAgentArgs;
 use crate::agents::Agent;
-use crate::providers::{create, Provider};
+use crate::providers::create;
 use crate::model::ModelConfig;
 
 impl Agent {
@@ -65,12 +65,16 @@ impl Agent {
                     if let Some(settings) = recipe.settings {
                         if let Some(recipe_provider_name) = settings.goose_provider {
                             // Recipe specifies a provider, create it
-                            let model_name = settings.goose_model.unwrap_or_else(|| {
-                                // Use default model if not specified in recipe
-                                crate::config::Config::global()
-                                    .get_param("GOOSE_MODEL")
-                                    .unwrap_or_else(|_| "gpt-4o".to_string())
-                            });
+                            let model_name = if let Some(recipe_model) = settings.goose_model {
+                                recipe_model
+                            } else {
+                                // Use the agent's provider's model if not specified in recipe
+                                self.provider()
+                                    .await
+                                    .map_err(|e| ToolError::ExecutionError(format!("Failed to get provider: {}", e)))?
+                                    .get_model_config()
+                                    .model_name
+                            };
                             let model_config = ModelConfig::new(model_name)
                                 .with_temperature(settings.temperature);
                             
