@@ -104,7 +104,7 @@ impl SubAgent {
     pub async fn new(
         config: SubAgentConfig,
         _provider: Arc<dyn Provider>,
-        extension_manager: Arc<tokio::sync::RwLockReadGuard<'_, ExtensionManager>>,
+        extension_manager: Arc<RwLock<ExtensionManager>>,
         mcp_notification_tx: mpsc::Sender<JsonRpcMessage>,
     ) -> Result<(Arc<Self>, tokio::task::JoinHandle<()>), anyhow::Error> {
         debug!("Creating new subagent with id: {}", config.id);
@@ -117,7 +117,7 @@ impl SubAgent {
             if let Some(extensions) = &recipe.extensions {
                 for extension in extensions {
                     let extension_name = extension.name();
-                    let existing_extensions = extension_manager.list_extensions().await?;
+                    let existing_extensions = extension_manager.read().await.list_extensions().await?;
 
                     if !existing_extensions.contains(&extension_name) {
                         missing_extensions.push(extension_name);
@@ -128,7 +128,7 @@ impl SubAgent {
             }
         } else {
             // If no recipe, inherit all extensions from the parent agent
-            let existing_extensions = extension_manager.list_extensions().await?;
+            let existing_extensions = extension_manager.read().await.list_extensions().await?;
             recipe_extensions = existing_extensions;
         }
 
@@ -140,9 +140,18 @@ impl SubAgent {
             turn_count: Arc::new(Mutex::new(0)),
             created_at: Utc::now(),
             recipe_extensions: Arc::new(Mutex::new(recipe_extensions)),
-            missing_extensions: Arc::new(Mutex::new(missing_extensions)),
+            missing_extensions: Arc::new(Mutex::new(missing_extensions.clone())),
             mcp_notification_tx,
         });
+
+        // Attempt to add missing extensions
+        for extension_name in missing_extensions {
+            debug!("Attempting to add missing extension '{}' for subagent {}", extension_name, subagent.id);
+            if let Err(e) = subagent.add_missing_extension(Arc::clone(&extension_manager), extension_name).await {
+                debug!("Failed to add missing extension for subagent {}: {}", subagent.id, e);
+                // Continue with other extensions even if one fails
+            }
+        }
 
         // Send initial MCP notification
         let subagent_clone = Arc::clone(&subagent);
@@ -577,6 +586,67 @@ impl SubAgent {
     /// Get the list of extensions that weren't enabled
     pub async fn get_missing_extensions(&self) -> Vec<String> {
         self.missing_extensions.lock().await.clone()
+    }
+
+    /// Attempt to add an extension using a write lock on the extension manager
+    pub async fn add_missing_extension(
+        &self,
+        extension_manager: Arc<RwLock<ExtensionManager>>,
+        extension_name: String,
+    ) -> Result<bool, anyhow::Error> {
+        debug!("Attempting to add extension '{}' for subagent {}", extension_name, self.id);
+        
+        // First, get the extension config by name
+        let config = match crate::config::ExtensionConfigManager::get_config_by_name(&extension_name)? {
+            Some(config) => config,
+            None => {
+                let error_msg = format!("Extension '{}' not found in configuration", extension_name);
+                error!("{}", error_msg);
+                self.send_mcp_notification("extension_add_failed", &error_msg).await;
+                return Err(anyhow!(error_msg));
+            }
+        };
+        
+        // Use write lock to attempt adding the extension
+        let mut manager = extension_manager.write().await;
+        let result = manager.add_extension(config).await;
+        
+        match result {
+            Ok(_) => {
+                debug!("Successfully added extension '{}' for subagent {}", extension_name, self.id);
+                
+                // Update our recipe extensions list if this was a missing extension
+                let mut missing_extensions = self.missing_extensions.lock().await;
+                if let Some(index) = missing_extensions.iter().position(|name| name == &extension_name) {
+                    missing_extensions.remove(index);
+                    
+                    // Add to recipe extensions
+                    let mut recipe_extensions = self.recipe_extensions.lock().await;
+                    recipe_extensions.push(extension_name.clone());
+                    
+                    debug!("Updated extension lists for subagent {}", self.id);
+                }
+                
+                // Send notification about successful extension addition
+                self.send_mcp_notification(
+                    "extension_added",
+                    &format!("Successfully added extension: {}", extension_name)
+                ).await;
+                
+                Ok(true)
+            }
+            Err(e) => {
+                error!("Failed to add extension '{}' for subagent {}: {}", extension_name, self.id, e);
+                
+                // Send notification about failed extension addition
+                self.send_mcp_notification(
+                    "extension_add_failed",
+                    &format!("Failed to add extension {}: {}", extension_name, e)
+                ).await;
+                
+                Err(anyhow!("Failed to add extension '{}': {}", extension_name, e))
+            }
+        }
     }
 
     /// Filter out subagent spawning tools to prevent infinite recursion
