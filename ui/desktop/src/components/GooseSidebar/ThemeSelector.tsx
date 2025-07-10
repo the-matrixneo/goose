@@ -78,8 +78,8 @@ const ThemeSelector: React.FC<ThemeSelectorProps> = ({
           onClick={() => handleThemeChange('light')}
           className={`flex items-center justify-center gap-1 p-2 rounded-md border transition-colors text-xs ${
             themeMode === 'light'
-              ? 'border-borderStandard'
-              : 'border-borderSubtle hover:border-borderStandard text-textSubtle hover:text-textStandard'
+              ? 'bg-background-accent text-text-on-accent border-border-accent hover:!bg-background-accent hover:!text-text-on-accent'
+              : 'border-border-default hover:!bg-background-muted text-text-muted hover:text-text-default'
           }`}
           variant="ghost"
           size="sm"
@@ -93,8 +93,8 @@ const ThemeSelector: React.FC<ThemeSelectorProps> = ({
           onClick={() => handleThemeChange('dark')}
           className={`flex items-center justify-center gap-1 p-2 rounded-md border transition-colors text-xs ${
             themeMode === 'dark'
-              ? 'border-borderStandard'
-              : 'border-borderSubtle hover:border-borderStandard text-textSubtle hover:text-textStandard'
+              ? 'bg-background-accent text-text-on-accent border-border-accent hover:!bg-background-accent hover:!text-text-on-accent'
+              : 'border-border-default hover:!bg-background-muted text-text-muted hover:text-text-default'
           }`}
           variant="ghost"
           size="sm"
@@ -108,8 +108,8 @@ const ThemeSelector: React.FC<ThemeSelectorProps> = ({
           onClick={() => handleThemeChange('system')}
           className={`flex items-center justify-center gap-1 p-2 rounded-md border transition-colors text-xs ${
             themeMode === 'system'
-              ? 'border-borderStandard'
-              : 'border-borderSubtle hover:border-borderStandard text-textSubtle hover:text-textStandard'
+              ? 'bg-background-accent text-text-on-accent border-border-accent hover:!bg-background-accent hover:!text-text-on-accent'
+              : 'border-border-default hover:!bg-background-muted text-text-muted hover:text-text-default'
           }`}
           variant="ghost"
           size="sm"

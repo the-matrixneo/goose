@@ -75,8 +75,8 @@ export const ModeSection = ({ setView }: ModeSectionProps) => {
         />
       ))}
 
-      <div className="mt-6 pt-6">
-        <h3 className="text-textStandard mb-4">Conversation Limits</h3>
+      <div className="pt-6">
+        <h3 className="text-textStandard mb-4 pl-2">Conversation Limits</h3>
         <div className="flex items-center justify-between py-2 px-4">
           <div>
             <h4 className="text-textStandard">Max Turns</h4>
