@@ -96,24 +96,26 @@ export const GoosehintsModal = ({ directory, setIsGoosehintsModalOpen }: Goosehi
 
   return (
     <Dialog open={true} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[80%] sm:max-h-[80%] min-h-[80%]">
+      <DialogContent className="sm:max-w-[80%] sm:max-h-[80%] overflow-auto">
         <DialogHeader>
           <DialogTitle>Configure .goosehints</DialogTitle>
           <DialogDescription>
-            <ModalHelpText />
+            Configure your project's .goosehints file to provide additional context to Goose.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-col flex-1 py-4">
+        <ModalHelpText />
+
+        <div className="py-4">
           {goosehintsFileReadError ? (
             <ModalError error={new Error(goosehintsFileReadError)} />
           ) : (
-            <div className="flex flex-col flex-1 space-y-2 h-full">
+            <div className="space-y-2">
               <ModalFileInfo filePath={goosehintsFilePath} found={goosehintsFileFound} />
               <textarea
                 defaultValue={goosehintsFile}
                 autoFocus
-                className="w-full flex-1 border rounded-md min-h-20 p-2 text-sm resize-none bg-background-default text-textStandard border-borderStandard focus:outline-none"
+                className="w-full h-80 border rounded-md p-2 text-sm resize-none bg-background-default text-textStandard border-borderStandard focus:outline-none"
                 onChange={(event) => setGoosehintsFile(event.target.value)}
               />
             </div>
