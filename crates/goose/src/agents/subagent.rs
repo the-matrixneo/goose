@@ -117,7 +117,8 @@ impl SubAgent {
             if let Some(extensions) = &recipe.extensions {
                 for extension in extensions {
                     let extension_name = extension.name();
-                    let existing_extensions = extension_manager.read().await.list_extensions().await?;
+                    let existing_extensions =
+                        extension_manager.read().await.list_extensions().await?;
 
                     if !existing_extensions.contains(&extension_name) {
                         missing_extensions.push(extension_name);
@@ -144,21 +145,24 @@ impl SubAgent {
             mcp_notification_tx,
         });
 
-        debug!("Missing extensions for subagent {}: {:?}", subagent.id, missing_extensions);
+        debug!(
+            "Missing extensions for subagent {}: {:?}",
+            subagent.id, missing_extensions
+        );
 
         // Send initial MCP notifications
         let subagent_clone = Arc::clone(&subagent);
-        
+
         // Notify about missing extensions if any
         if !missing_extensions.is_empty() {
             subagent_clone
                 .send_mcp_notification(
                     "missing_extensions",
-                    &format!("Missing required extensions: {:?}", missing_extensions)
+                    &format!("Missing required extensions: {:?}", missing_extensions),
                 )
                 .await;
         }
-        
+
         // Send created notification
         subagent_clone
             .send_mcp_notification("subagent_created", "Subagent created and ready")
@@ -733,7 +737,7 @@ impl SubAgent {
                     ),
                 );
             }
-            
+
             // Add missing extensions information
             let missing_extensions: Vec<String> = self.missing_extensions.lock().await.clone();
             if !missing_extensions.is_empty() {

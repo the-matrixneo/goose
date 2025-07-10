@@ -30,7 +30,6 @@ impl SubAgentManager {
         }
     }
 
-
     /// Get a subagent by ID
     pub async fn get_subagent(&self, id: &str) -> Option<Arc<SubAgent>> {
         let subagents = self.subagents.read().await;
