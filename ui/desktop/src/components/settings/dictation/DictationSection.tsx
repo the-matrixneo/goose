@@ -172,7 +172,7 @@ export default function DictationSection() {
             <div className="relative">
               <button
                 onClick={() => setShowProviderDropdown(!showProviderDropdown)}
-                className="flex items-center gap-2 px-3 py-1.5 text-sm border border-borderSubtle rounded-md hover:border-borderStandard transition-colors text-textStandard bg-bgApp"
+                className="flex items-center gap-2 px-3 py-1.5 text-sm border border-borderSubtle rounded-md hover:border-borderStandard transition-colors text-textStandard bg-background-default"
               >
                 {getProviderLabel(settings.provider)}
                 <ChevronDown className="w-4 h-4" />

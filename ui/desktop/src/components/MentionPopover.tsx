@@ -454,7 +454,7 @@ const MentionPopover = forwardRef<
   return (
     <div
       ref={popoverRef}
-      className="fixed z-50 bg-bgApp border border-borderStandard rounded-lg shadow-lg min-w-96 max-w-lg"
+      className="fixed z-50 bg-background-default border border-borderStandard rounded-lg shadow-lg min-w-96 max-w-lg"
       style={{
         left: position.x,
         top: position.y - 10, // Position above the chat input

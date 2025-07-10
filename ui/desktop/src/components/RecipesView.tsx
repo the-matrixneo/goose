@@ -445,7 +445,7 @@ export default function RecipesView() {
       {/* Import Recipe Dialog */}
       {showImportDialog && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-bgApp border border-borderSubtle rounded-lg p-6 w-[500px] max-w-[90vw]">
+          <div className="bg-background-default border border-borderSubtle rounded-lg p-6 w-[500px] max-w-[90vw]">
             <h3 className="text-lg font-medium text-textProminent mb-4">Import Recipe</h3>
 
             <div className="space-y-4">
@@ -460,7 +460,7 @@ export default function RecipesView() {
                   id="import-deeplink"
                   value={importDeeplink}
                   onChange={(e) => handleDeeplinkChange(e.target.value)}
-                  className="w-full p-3 border border-borderSubtle rounded-lg bg-bgApp text-textStandard focus:outline-none focus:ring-2 focus:ring-borderProminent resize-none"
+                  className="w-full p-3 border border-borderSubtle rounded-lg bg-background-default text-textStandard focus:outline-none focus:ring-2 focus:ring-borderProminent resize-none"
                   placeholder="Paste your goose://recipe?config=... deeplink here"
                   rows={3}
                   autoFocus
@@ -482,7 +482,7 @@ export default function RecipesView() {
                   type="text"
                   value={importRecipeName}
                   onChange={(e) => setImportRecipeName(e.target.value)}
-                  className="w-full p-3 border border-borderSubtle rounded-lg bg-bgApp text-textStandard focus:outline-none focus:ring-2 focus:ring-borderProminent"
+                  className="w-full p-3 border border-borderSubtle rounded-lg bg-background-default text-textStandard focus:outline-none focus:ring-2 focus:ring-borderProminent"
                   placeholder="Enter a name for the imported recipe"
                 />
               </div>

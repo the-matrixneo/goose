@@ -829,7 +829,7 @@ export default function ChatInput({
         isFocused
           ? 'border-borderProminent hover:border-borderProminent'
           : 'border-borderSubtle hover:border-borderStandard'
-      } bg-bgApp z-10`}
+      } bg-background-default z-10`}
       data-drop-zone="true"
       onDrop={handleLocalDrop}
       onDragOver={handleLocalDragOver}
@@ -987,7 +987,7 @@ export default function ChatInput({
 
             {/* Recording/transcribing status indicator - positioned above the button row */}
             {(isRecording || isTranscribing) && (
-              <div className="absolute right-0 -top-8 bg-bgApp px-2 py-1 rounded text-xs whitespace-nowrap shadow-md border border-borderSubtle">
+              <div className="absolute right-0 -top-8 bg-background-default px-2 py-1 rounded text-xs whitespace-nowrap shadow-md border border-borderSubtle">
                 {isTranscribing ? (
                   <span className="text-blue-500 flex items-center gap-1">
                     <span className="inline-block w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
@@ -1088,7 +1088,7 @@ export default function ChatInput({
                 ) : (
                   // File box preview
                   <div className="flex items-center gap-2 px-3 py-2 bg-bgSubtle border border-borderStandard rounded-lg min-w-[120px] max-w-[200px]">
-                    <div className="flex-shrink-0 w-8 h-8 bg-bgApp border border-borderSubtle rounded flex items-center justify-center text-xs font-mono text-textSubtle">
+                    <div className="flex-shrink-0 w-8 h-8 bg-background-default border border-borderSubtle rounded flex items-center justify-center text-xs font-mono text-textSubtle">
                       {file.name.split('.').pop()?.toUpperCase() || 'FILE'}
                     </div>
                     <div className="flex-1 min-w-0">

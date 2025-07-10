@@ -524,7 +524,7 @@ export default function RecipeEditor({ config }: RecipeEditorProps) {
       {/* Save Recipe Dialog */}
       {showSaveDialog && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-bgApp border border-borderSubtle rounded-lg p-6 w-96 max-w-[90vw]">
+          <div className="bg-background-default border border-borderSubtle rounded-lg p-6 w-96 max-w-[90vw]">
             <h3 className="text-lg font-medium text-textProminent mb-4">Save Recipe</h3>
 
             <div className="space-y-4">
@@ -540,7 +540,7 @@ export default function RecipeEditor({ config }: RecipeEditorProps) {
                   type="text"
                   value={saveRecipeName}
                   onChange={(e) => setSaveRecipeName(e.target.value)}
-                  className="w-full p-3 border border-borderSubtle rounded-lg bg-bgApp text-textStandard focus:outline-none focus:ring-2 focus:ring-borderProminent"
+                  className="w-full p-3 border border-borderSubtle rounded-lg bg-background-default text-textStandard focus:outline-none focus:ring-2 focus:ring-borderProminent"
                   placeholder="Enter recipe name"
                   autoFocus
                 />
