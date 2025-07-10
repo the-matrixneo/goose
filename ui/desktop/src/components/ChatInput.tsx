@@ -20,6 +20,7 @@ import { useWhisper } from '../hooks/useWhisper';
 import { WaveformVisualizer } from './WaveformVisualizer';
 import { toastError } from '../toasts';
 import MentionPopover, { FileItemWithMatch } from './MentionPopover';
+import { useDictationSettings } from '../hooks/useDictationSettings';
 import { useChatContextManager } from './context_management/ChatContextManager';
 import { COST_TRACKING_ENABLED } from '../updates';
 import { CostTracker } from './bottom_menu/CostTracker';
@@ -152,6 +153,9 @@ export default function ChatInput({
       });
     },
   });
+
+  // Get dictation settings to check configuration status
+  const { settings: dictationSettings } = useDictationSettings();
 
   // Update internal value when initialValue changes
   useEffect(() => {
@@ -980,7 +984,7 @@ export default function ChatInput({
         )}
 
         {/* Actions and model/mode/alerts row below input */}
-        <div className="flex flex-row items-center gap-1 p-2">
+        <div className="flex flex-row items-center gap-1 p-2 relative">
           {/* Send/Attach/Stop actions */}
           <Button
             type="button"
@@ -991,6 +995,60 @@ export default function ChatInput({
           >
             <Attach />
           </Button>
+
+          {/* Microphone button - show if dictation is enabled, disable if not configured */}
+          {dictationSettings?.enabled && (
+            <>
+              {!canUseDictation ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="inline-flex">
+                      <Button
+                        type="button"
+                        size="xs"
+                        variant="outline"
+                        onClick={() => {}}
+                        disabled={true}
+                        className="text-textSubtle cursor-not-allowed opacity-50"
+                      >
+                        <Microphone />
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {dictationSettings.provider === 'openai'
+                      ? 'OpenAI API key is not configured. Set it up in Settings > Models.'
+                      : dictationSettings.provider === 'elevenlabs'
+                        ? 'ElevenLabs API key is not configured. Set it up in Settings > Chat > Voice Dictation.'
+                        : 'Dictation provider is not properly configured.'}
+                  </TooltipContent>
+                </Tooltip>
+              ) : (
+                <Button
+                  type="button"
+                  size="xs"
+                  variant="outline"
+                  onClick={() => {
+                    if (isRecording) {
+                      stopRecording();
+                    } else {
+                      startRecording();
+                    }
+                  }}
+                  disabled={isTranscribing}
+                  className={`${
+                    isRecording
+                      ? 'bg-red-500 text-white hover:bg-red-600 border-red-500'
+                      : isTranscribing
+                        ? 'text-textSubtle cursor-not-allowed animate-pulse'
+                        : 'text-text-muted'
+                  }`}
+                >
+                  <Microphone />
+                </Button>
+              )}
+            </>
+          )}
 
           {isLoading ? (
             <Button
@@ -1003,99 +1061,64 @@ export default function ChatInput({
               <Stop />
             </Button>
           ) : (
-            <>
-              {/* Microphone button - only show if dictation is enabled and configured */}
-              {canUseDictation && (
-                <>
-                  <Button
-                    type="button"
-                    size="xs"
-                    variant="ghost"
-                    onClick={() => {
-                      if (isRecording) {
-                        stopRecording();
-                      } else {
-                        startRecording();
-                      }
-                    }}
-                    disabled={isTranscribing}
-                    className={`absolute right-12 top-2 transition-colors rounded-full w-7 h-7 [&_svg]:size-4 ${
-                      isRecording
-                        ? 'bg-red-500 text-white hover:bg-red-600'
-                        : isTranscribing
-                          ? 'text-textSubtle cursor-not-allowed animate-pulse'
-                          : 'text-textSubtle hover:text-textStandard'
-                    }`}
-                    title={
-                      isRecording
-                        ? `Stop recording (${Math.floor(recordingDuration)}s, ~${estimatedSize.toFixed(1)}MB)`
+            <Button
+              type="submit"
+              size="xs"
+              variant="outline"
+              disabled={
+                !hasSubmittableContent ||
+                isAnyImageLoading ||
+                isAnyDroppedFileLoading ||
+                isRecording ||
+                isTranscribing ||
+                isLoadingSummary
+              }
+              className={`text-text-muted ${
+                !hasSubmittableContent ||
+                isAnyImageLoading ||
+                isAnyDroppedFileLoading ||
+                isRecording ||
+                isTranscribing ||
+                isLoadingSummary
+                  ? 'text-textSubtle cursor-not-allowed'
+                  : 'bg-bgAppInverse text-textProminentInverse hover:cursor-pointer'
+              }`}
+              title={
+                isLoadingSummary
+                  ? 'Summarizing conversation...'
+                  : isAnyImageLoading
+                    ? 'Waiting for images to save...'
+                    : isAnyDroppedFileLoading
+                      ? 'Processing dropped files...'
+                      : isRecording
+                        ? 'Recording...'
                         : isTranscribing
                           ? 'Transcribing...'
-                          : 'Start dictation'
-                    }
-                  >
-                    <Microphone />
-                  </Button>
-                  {/* Recording/transcribing status indicator - positioned above the input */}
-                  {(isRecording || isTranscribing) && (
-                    <div className="absolute right-0 -top-8 bg-bgApp px-2 py-1 rounded text-xs whitespace-nowrap shadow-md border border-borderSubtle">
-                      {isTranscribing ? (
-                        <span className="text-blue-500 flex items-center gap-1">
-                          <span className="inline-block w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
-                          Transcribing...
-                        </span>
-                      ) : (
-                        <span
-                          className={`flex items-center gap-2 ${estimatedSize > 20 ? 'text-orange-500' : 'text-textSubtle'}`}
-                        >
-                          <span className="inline-block w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                          {Math.floor(recordingDuration)}s • ~{estimatedSize.toFixed(1)}MB
-                          {estimatedSize > 20 && <span className="text-xs">(near 25MB limit)</span>}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </>
+                          : 'Send'
+              }
+            >
+              <Send />
+            </Button>
+          )}
+
+          {/* Recording/transcribing status indicator - positioned above the button row */}
+          {(isRecording || isTranscribing) && (
+            <div className="absolute right-0 -top-8 bg-bgApp px-2 py-1 rounded text-xs whitespace-nowrap shadow-md border border-borderSubtle">
+              {isTranscribing ? (
+                <span className="text-blue-500 flex items-center gap-1">
+                  <span className="inline-block w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+                  Transcribing...
+                </span>
+              ) : (
+                <span
+                  className={`flex items-center gap-2 ${estimatedSize > 20 ? 'text-orange-500' : 'text-textSubtle'}`}
+                >
+                  <span className="inline-block w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                  {Math.floor(recordingDuration)}s • ~{estimatedSize.toFixed(1)}MB
+                  {estimatedSize > 20 && <span className="text-xs">(near 25MB limit)</span>}
+                </span>
               )}
-              <Button
-                type="submit"
-                size="xs"
-                variant="outline"
-                disabled={
-                  !hasSubmittableContent ||
-                  isAnyImageLoading ||
-                  isAnyDroppedFileLoading ||
-                  isRecording ||
-                  isTranscribing ||
-                  isLoadingSummary
-                }
-                className={`text-text-muted ${
-                  !hasSubmittableContent ||
-                  isAnyImageLoading ||
-                  isAnyDroppedFileLoading ||
-                  isRecording ||
-                  isTranscribing ||
-                  isLoadingSummary
-                    ? 'text-textSubtle cursor-not-allowed'
-                    : 'bg-bgAppInverse text-textProminentInverse hover:cursor-pointer'
-                }`}
-                title={
-                  isLoadingSummary
-                    ? 'Summarizing conversation...'
-                    : isAnyImageLoading
-                      ? 'Waiting for images to save...'
-                      : isAnyDroppedFileLoading
-                        ? 'Processing dropped files...'
-                        : isRecording
-                          ? 'Recording...'
-                          : isTranscribing
-                            ? 'Transcribing...'
-                            : 'Send'
-                }
-              >
-                <Send />
-              </Button>
-            </>
+            </div>
           )}
 
           {/* Model selector, mode selector, alerts, summarize button */}
