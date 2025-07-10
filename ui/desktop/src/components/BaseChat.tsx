@@ -99,6 +99,7 @@ function BaseChatContent({
   chat,
   setChat,
   setView,
+  setIsGoosehintsModalOpen,
   enableLocalStorage = false,
   onMessageStreamFinish,
   onMessageSubmit,
@@ -393,6 +394,7 @@ function BaseChatContent({
             setMessages={setMessages}
             disableAnimation={disableAnimation}
             sessionCosts={sessionCosts}
+            setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
             {...customChatInputProps}
           />
         </div>
