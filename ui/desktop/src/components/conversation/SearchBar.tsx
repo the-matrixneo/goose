@@ -181,9 +181,10 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         <div className="flex items-center justify-center h-auto px-4 gap-2 flex-shrink-0">
           <Button
             onClick={toggleCaseSensitive}
+            variant="ghost"
             className={`flex items-center justify-center min-w-[32px] h-[28px] rounded transition-all duration-150 ${
               caseSensitive
-                ? 'bg-white/20 shadow-[inset_0_1px_2px_rgba(0,0,0,0.2)] text-text-inverse'
+                ? 'bg-white/20 shadow-[inset_0_1px_2px_rgba(0,0,0,0.2)] text-text-inverse hover:bg-white/25'
                 : 'text-text-inverse/70 hover:text-text-inverse hover:bg-white/10'
             }`}
             title="Case Sensitive"
@@ -194,6 +195,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           <div className="flex items-center gap-2">
             <Button
               onClick={(e) => handleNavigate('prev', e)}
+              variant="ghost"
               className="flex items-center justify-center min-w-[32px] h-[28px] rounded transition-all duration-150 text-text-inverse/70 hover:text-text-inverse hover:bg-white/10"
               title="Previous (↑)"
             >
@@ -203,6 +205,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             </Button>
             <Button
               onClick={(e) => handleNavigate('next', e)}
+              variant="ghost"
               className="flex items-center justify-center min-w-[32px] h-[28px] rounded transition-all duration-150 text-text-inverse/70 hover:text-text-inverse hover:bg-white/10"
               title="Next (↓ or Enter)"
             >
@@ -214,6 +217,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
 
           <Button
             onClick={handleClose}
+            variant="ghost"
             className="flex items-center justify-center min-w-[32px] h-[28px] rounded transition-all duration-150 text-text-inverse/70 hover:text-text-inverse hover:bg-white/10"
             title="Close (Esc)"
           >

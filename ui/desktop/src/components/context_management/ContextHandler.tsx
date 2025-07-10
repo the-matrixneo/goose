@@ -123,10 +123,7 @@ export const ContextHandler: React.FC<ContextHandlerProps> = ({
           ? `This conversation has too much information to continue. Extension data often takes up significant space.`
           : `Summarization failed. Continue chatting or start a new session.`}
       </span>
-      <Button
-        onClick={openNewSession}
-        className="text-xs text-textStandard hover:text-textSubtle transition-colors mt-1 flex items-center"
-      >
+      <Button onClick={openNewSession} className="text-xs transition-colors mt-1 flex items-center">
         Click here to start a new session
       </Button>
     </>
@@ -139,10 +136,7 @@ export const ContextHandler: React.FC<ContextHandlerProps> = ({
           ? `Your conversation has exceeded the model's context capacity`
           : `Summarization requested`}
       </span>
-      <Button
-        onClick={handleRetry}
-        className="text-xs text-textStandard hover:text-textSubtle transition-colors mt-1 flex items-center"
-      >
+      <Button onClick={handleRetry} className="text-xs transition-colors mt-1 flex items-center">
         Retry loading summary
       </Button>
     </>
@@ -163,7 +157,7 @@ export const ContextHandler: React.FC<ContextHandlerProps> = ({
       {shouldAllowSummaryInteraction && (
         <Button
           onClick={openSummaryModal}
-          className="text-xs text-textStandard hover:text-textSubtle transition-colors mt-1 flex items-center"
+          className="text-xs transition-colors mt-1 flex items-center"
         >
           View or edit summary{' '}
           {isContextLengthExceeded
