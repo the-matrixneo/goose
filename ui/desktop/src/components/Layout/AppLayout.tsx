@@ -4,7 +4,7 @@ import AppSidebar from '../GooseSidebar/AppSidebar';
 import { View, ViewOptions } from '../../App';
 import { AppWindowMac, AppWindow } from 'lucide-react';
 import { Button } from '../ui/button';
-import { Sidebar, SidebarInset, SidebarProvider, SidebarTrigger } from '../ui/sidebar';
+import { Sidebar, SidebarInset, SidebarProvider, SidebarTrigger, useSidebar } from '../ui/sidebar';
 
 interface AppLayoutProps {
   setIsGoosehintsModalOpen?: (isOpen: boolean) => void;
@@ -15,10 +15,14 @@ const AppLayoutContent: React.FC<AppLayoutProps> = ({ setIsGoosehintsModalOpen }
   const navigate = useNavigate();
   const location = useLocation();
   const safeIsMacOS = (window?.electron?.platform || 'darwin') === 'darwin';
+  const { isMobile, openMobile } = useSidebar();
 
   // Calculate padding based on sidebar state and macOS
   const headerPadding = safeIsMacOS ? 'pl-21' : 'pl-6';
   // const headerPadding = '';
+
+  // Hide buttons when mobile sheet is showing
+  const shouldHideButtons = isMobile && openMobile;
 
   const setView = (view: View, viewOptions?: ViewOptions) => {
     // Convert view-based navigation to route-based navigation
@@ -78,20 +82,22 @@ const AppLayoutContent: React.FC<AppLayoutProps> = ({ setIsGoosehintsModalOpen }
 
   return (
     <div className="flex flex-1 w-full relative animate-fade-in">
-      <div className={`${headerPadding} absolute top-3 z-100 flex items-center`}>
-        <SidebarTrigger
-          className={`no-drag hover:border-border-strong hover:text-text-default hover:!bg-background-medium hover:scale-105`}
-        />
-        <Button
-          onClick={handleNewWindow}
-          className="no-drag hover:!bg-background-medium"
-          variant="ghost"
-          size="xs"
-          title="Start a new session in a new window"
-        >
-          {safeIsMacOS ? <AppWindowMac className="w-4 h-4" /> : <AppWindow className="w-4 h-4" />}
-        </Button>
-      </div>
+      {!shouldHideButtons && (
+        <div className={`${headerPadding} absolute top-3 z-100 flex items-center`}>
+          <SidebarTrigger
+            className={`no-drag hover:border-border-strong hover:text-text-default hover:!bg-background-medium hover:scale-105`}
+          />
+          <Button
+            onClick={handleNewWindow}
+            className="no-drag hover:!bg-background-medium"
+            variant="ghost"
+            size="xs"
+            title="Start a new session in a new window"
+          >
+            {safeIsMacOS ? <AppWindowMac className="w-4 h-4" /> : <AppWindow className="w-4 h-4" />}
+          </Button>
+        </div>
+      )}
       <Sidebar variant="inset" collapsible="offcanvas">
         <AppSidebar
           onSelectSession={handleSelectSession}
