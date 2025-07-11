@@ -119,7 +119,7 @@ export function SessionInsights() {
         <Greeting />
       </div>
 
-      <div className="grid gap-[2px] mt-0.5">
+      <div className="grid gap-[2px] pl-[2px] pr-[2px] mt-0.5">
         {/* Top row with three equal columns */}
         <div className="grid grid-cols-3 gap-[2px]">
           {/* Total Sessions Card */}
@@ -216,7 +216,7 @@ export function SessionInsights() {
           {/*</Card>*/}
 
           {/* Recent Chats Card */}
-          <Card className="w-full py-6 px-4 border-none rounded-tr-none rounded-br-none">
+          <Card className="w-full py-6 px-4 border-none rounded-none">
             <CardContent className="animate-in fade-in duration-500 px-4">
               <div className="flex justify-between items-center mb-2 px-2">
                 <CardDescription className="mb-0">
@@ -252,7 +252,7 @@ export function SessionInsights() {
                       >
                         <div className="flex items-center space-x-2">
                           <ChatSmart className="h-4 w-4 text-text-muted" />
-                          <span className="truncate max-w-[200px]">
+                          <span className="truncate max-w-[300px]">
                             {session.metadata.description || session.id}
                           </span>
                         </div>
