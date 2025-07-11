@@ -4,6 +4,7 @@ use crate::agents::sub_recipe_execution_tool::executor::{
 pub use crate::agents::sub_recipe_execution_tool::types::{
     ExecutionMode, ExecutionResponse, ExecutionStats, SharedState, Task, TaskResult, TaskStatus,
 };
+pub use crate::agents::sub_recipe_execution_tool::tasks::SubagentExecutor;
 
 #[cfg(test)]
 mod tests;
@@ -16,6 +17,7 @@ pub async fn execute_tasks(
     input: Value,
     execution_mode: ExecutionMode,
     notifier: mpsc::Sender<JsonRpcMessage>,
+    subagent_executor: Option<SubagentExecutor>,
 ) -> Result<Value, String> {
     let tasks: Vec<Task> =
         serde_json::from_value(input.get("tasks").ok_or("Missing tasks field")?.clone())
@@ -25,14 +27,14 @@ pub async fn execute_tasks(
     match execution_mode {
         ExecutionMode::Sequential => {
             if task_count == 1 {
-                let response = execute_single_task(&tasks[0], notifier).await;
+                let response = execute_single_task(&tasks[0], notifier, subagent_executor).await;
                 handle_response(response)
             } else {
                 Err("Sequential execution mode requires exactly one task".to_string())
             }
         }
         ExecutionMode::Parallel => {
-            let response: ExecutionResponse = execute_tasks_in_parallel(tasks, notifier).await;
+            let response: ExecutionResponse = execute_tasks_in_parallel(tasks, notifier, subagent_executor).await;
             handle_response(response)
         }
     }

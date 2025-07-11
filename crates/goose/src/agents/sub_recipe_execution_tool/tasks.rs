@@ -8,12 +8,17 @@ use tokio::time::timeout;
 
 use crate::agents::sub_recipe_execution_tool::task_execution_tracker::TaskExecutionTracker;
 use crate::agents::sub_recipe_execution_tool::types::{Task, TaskResult, TaskStatus};
+use crate::agents::subagent_types::SpawnSubAgentArgs;
 
 const DEFAULT_TASK_TIMEOUT_SECONDS: u64 = 300;
+
+// Type for subagent execution callback
+pub type SubagentExecutor = Box<dyn Fn(SpawnSubAgentArgs) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<String, String>> + Send>> + Send + Sync>;
 
 pub async fn process_task(
     task: &Task,
     task_execution_tracker: Arc<TaskExecutionTracker>,
+    subagent_executor: Option<SubagentExecutor>,
 ) -> TaskResult {
     let timeout_in_seconds = task
         .timeout_in_seconds
@@ -24,7 +29,7 @@ pub async fn process_task(
     let task_execution_tracker_clone = task_execution_tracker.clone();
     match timeout(
         timeout_duration,
-        get_task_result(task_clone, task_execution_tracker),
+        get_task_result(task_clone, task_execution_tracker, subagent_executor),
     )
     .await
     {
@@ -61,21 +66,73 @@ pub async fn process_task(
 async fn get_task_result(
     task: Task,
     task_execution_tracker: Arc<TaskExecutionTracker>,
+    subagent_executor: Option<SubagentExecutor>,
 ) -> Result<Value, String> {
-    let (command, output_identifier) = build_command(&task)?;
-    let (stdout_output, stderr_output, success) = run_command(
-        command,
-        &output_identifier,
-        &task.id,
-        task_execution_tracker,
-    )
-    .await?;
+    match task.task_type.as_str() {
+        "subagent" => execute_subagent_task(task, task_execution_tracker, subagent_executor).await,
+        _ => {
+            let (command, output_identifier) = build_command(&task)?;
+            let (stdout_output, stderr_output, success) = run_command(
+                command,
+                &output_identifier,
+                &task.id,
+                task_execution_tracker,
+            )
+            .await?;
 
-    if success {
-        process_output(stdout_output)
-    } else {
-        Err(format!("Command failed:\n{}", stderr_output))
+            if success {
+                process_output(stdout_output)
+            } else {
+                Err(format!("Command failed:\n{}", stderr_output))
+            }
+        }
     }
+}
+
+async fn execute_subagent_task(
+    task: Task,
+    task_execution_tracker: Arc<TaskExecutionTracker>,
+    subagent_executor: Option<SubagentExecutor>,
+) -> Result<Value, String> {
+    // Get subagent parameters
+    let message = task
+        .get_subagent_message()
+        .ok_or_else(|| "Missing subagent message".to_string())?
+        .to_string();
+
+    let recipe_name = task.get_subagent_recipe_name().map(|s| s.to_string());
+    let instructions = task.get_subagent_instructions().map(|s| s.to_string());
+
+    // Create subagent arguments
+    let mut args = if let Some(recipe_name) = recipe_name {
+        SpawnSubAgentArgs::new_with_recipe(recipe_name, message.clone())
+    } else if let Some(instructions) = instructions {
+        SpawnSubAgentArgs::new_with_instructions(instructions, message.clone())
+    } else {
+        return Err("Either recipe_name or instructions must be provided for subagent task".to_string());
+    };
+
+    // Set optional parameters
+    if let Some(max_turns) = task.get_subagent_max_turns() {
+        args = args.with_max_turns(max_turns);
+    }
+
+    if let Some(timeout) = task.get_subagent_timeout() {
+        args = args.with_timeout(timeout);
+    }
+
+    // Execute the subagent task
+    let executor = subagent_executor.ok_or_else(|| {
+        "Subagent executor not provided. Cannot execute subagent tasks.".to_string()
+    })?;
+
+    let result = executor(args).await?;
+    
+    // Return the result as JSON
+    Ok(serde_json::json!({
+        "subagent_result": result,
+        "task_id": task.id
+    }))
 }
 
 fn build_command(task: &Task) -> Result<(Command, String), String> {
@@ -104,13 +161,15 @@ fn build_command(task: &Task) -> Result<(Command, String), String> {
                 .arg(format!("{}={}", key_str, value_str));
         }
         cmd
-    } else {
+    } else if task.task_type == "text_instruction" {
         let text = task
             .get_text_instruction()
             .ok_or_else(|| task_error("text_instruction"))?;
         let mut cmd = Command::new("goose");
         cmd.arg("run").arg("--text").arg(text);
         cmd
+    } else {
+        return Err(format!("Unsupported task type: {}", task.task_type));
     };
 
     command.stdout(Stdio::piped());

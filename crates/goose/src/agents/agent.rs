@@ -12,8 +12,10 @@ use crate::agents::final_output_tool::{FINAL_OUTPUT_CONTINUATION_MESSAGE, FINAL_
 use crate::agents::sub_recipe_execution_tool::sub_recipe_execute_task_tool::{
     self, SUB_RECIPE_EXECUTE_TASK_TOOL_NAME,
 };
+use crate::agents::sub_recipe_execution_tool::lib::SubagentExecutor;
 use crate::agents::sub_recipe_manager::SubRecipeManager;
-use crate::agents::recipe_tools::dynamic_task_tools::{create_dynamic_task_tool, DYNAMIC_TASK_TOOL_NAME_PREFIX, create_dynamic_task};
+use crate::agents::recipe_tools::dynamic_task_tools::{create_dynamic_task_tool, DYNAMIC_TASK_TOOL_NAME_PREFIX};
+use crate::agents::recipe_tools::subagent_task_tools::{create_subagent_task_tool, SUBAGENT_TASK_TOOL_NAME_PREFIX, create_subagent_task};
 use crate::config::{Config, ExtensionConfigManager, PermissionManager};
 use crate::message::Message;
 use crate::permission::permission_judge::check_tool_permissions;
@@ -292,10 +294,45 @@ impl Agent {
                 .dispatch_sub_recipe_tool_call(&tool_call.name, tool_call.arguments.clone())
                 .await
         } else if tool_call.name == SUB_RECIPE_EXECUTE_TASK_TOOL_NAME {
-            sub_recipe_execute_task_tool::run_tasks(tool_call.arguments.clone()).await
+            // Create subagent executor for task execution
+            let subagent_manager = self.subagent_manager.lock().await;
+            let subagent_executor = if let Some(manager) = subagent_manager.as_ref() {
+                let manager_clone = manager.clone();
+                let provider = self.provider().await.ok();
+                let extension_manager = self.extension_manager.read().await;
+                
+                Some(Box::new(move |args: crate::agents::subagent_types::SpawnSubAgentArgs| {
+                    let manager = manager_clone.clone();
+                    let provider = provider.clone();
+                    let extension_manager = extension_manager.clone();
+                    
+                    Box::pin(async move {
+                        if let Some(provider) = provider {
+                            match manager
+                                .run_complete_subagent_task(args, provider, extension_manager)
+                                .await
+                            {
+                                Ok(result) => Ok(result),
+                                Err(e) => Err(e.to_string()),
+                            }
+                        } else {
+                            Err("Provider not available".to_string())
+                        }
+                    })
+                }) as SubagentExecutor)
+            } else {
+                None
+            };
+            
+            sub_recipe_execute_task_tool::run_tasks(tool_call.arguments.clone(), subagent_executor).await
         } else if tool_call.name == DYNAMIC_TASK_TOOL_NAME_PREFIX {
-            // Handle dynamic task creation
-            let result = create_dynamic_task(tool_call.arguments.clone()).await;
+            // Handle dynamic task creation - this should be handled by the tool itself
+            ToolCallResult::from(Err(ToolError::ExecutionError(
+                "Dynamic task creation should be handled by the tool itself".to_string(),
+            )))
+        } else if tool_call.name == SUBAGENT_TASK_TOOL_NAME_PREFIX {
+            // Handle subagent task creation
+            let result = create_subagent_task(tool_call.arguments.clone()).await;
             match result {
                 Ok(tasks_json) => ToolCallResult::from(Ok(vec![Content::text(tasks_json)])),
                 Err(e) => ToolCallResult::from(Err(ToolError::ExecutionError(e.to_string()))),
@@ -577,6 +614,9 @@ impl Agent {
 
             // Add dynamic task tool
             prefixed_tools.push(create_dynamic_task_tool());
+
+            // Add subagent task tool
+            prefixed_tools.push(create_subagent_task_tool());
 
             if let Some(final_output_tool) = self.final_output_tool.lock().await.as_ref() {
                 prefixed_tools.push(final_output_tool.tool());

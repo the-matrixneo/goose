@@ -10,7 +10,7 @@ use crate::agents::sub_recipe_execution_tool::lib::{
 use crate::agents::sub_recipe_execution_tool::task_execution_tracker::{
     DisplayMode, TaskExecutionTracker,
 };
-use crate::agents::sub_recipe_execution_tool::tasks::process_task;
+use crate::agents::sub_recipe_execution_tool::tasks::{process_task, SubagentExecutor};
 use crate::agents::sub_recipe_execution_tool::workers::spawn_worker;
 
 #[cfg(test)]
@@ -22,6 +22,7 @@ const DEFAULT_MAX_WORKERS: usize = 10;
 pub async fn execute_single_task(
     task: &Task,
     notifier: mpsc::Sender<JsonRpcMessage>,
+    subagent_executor: Option<SubagentExecutor>,
 ) -> ExecutionResponse {
     let start_time = Instant::now();
     let task_execution_tracker = Arc::new(TaskExecutionTracker::new(
@@ -29,7 +30,7 @@ pub async fn execute_single_task(
         DisplayMode::SingleTaskOutput,
         notifier,
     ));
-    let result = process_task(task, task_execution_tracker).await;
+    let result = process_task(task, task_execution_tracker, subagent_executor).await;
     let execution_time = start_time.elapsed().as_millis();
     let stats = calculate_stats(&[result.clone()], execution_time);
 
@@ -43,6 +44,7 @@ pub async fn execute_single_task(
 pub async fn execute_tasks_in_parallel(
     tasks: Vec<Task>,
     notifier: mpsc::Sender<JsonRpcMessage>,
+    subagent_executor: Option<SubagentExecutor>,
 ) -> ExecutionResponse {
     let task_execution_tracker = Arc::new(TaskExecutionTracker::new(
         tasks.clone(),
@@ -70,7 +72,7 @@ pub async fn execute_tasks_in_parallel(
     let worker_count = std::cmp::min(task_count, DEFAULT_MAX_WORKERS);
     let mut worker_handles = Vec::new();
     for i in 0..worker_count {
-        let handle = spawn_worker(shared_state.clone(), i);
+        let handle = spawn_worker(shared_state.clone(), i, subagent_executor.clone());
         worker_handles.push(handle);
     }
 

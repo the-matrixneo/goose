@@ -17,7 +17,7 @@ pub enum ExecutionMode {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Task {
     pub id: String,
-    pub task_type: String,
+    pub task_type: String, // "sub_recipe", "text_instruction", or "subagent"
     pub timeout_in_seconds: Option<u64>,
     pub payload: Value,
 }
@@ -55,6 +55,44 @@ impl Task {
         } else {
             None
         }
+    }
+
+    // New methods for subagent task type
+    pub fn get_subagent(&self) -> Option<&Map<String, Value>> {
+        (self.task_type == "subagent")
+            .then(|| self.payload.get("subagent")?.as_object())
+            .flatten()
+    }
+
+    pub fn get_subagent_recipe_name(&self) -> Option<&str> {
+        self.get_subagent()
+            .and_then(|sa| sa.get("recipe_name"))
+            .and_then(|name| name.as_str())
+    }
+
+    pub fn get_subagent_instructions(&self) -> Option<&str> {
+        self.get_subagent()
+            .and_then(|sa| sa.get("instructions"))
+            .and_then(|instructions| instructions.as_str())
+    }
+
+    pub fn get_subagent_message(&self) -> Option<&str> {
+        self.get_subagent()
+            .and_then(|sa| sa.get("message"))
+            .and_then(|message| message.as_str())
+    }
+
+    pub fn get_subagent_max_turns(&self) -> Option<usize> {
+        self.get_subagent()
+            .and_then(|sa| sa.get("max_turns"))
+            .and_then(|turns| turns.as_u64())
+            .map(|turns| turns as usize)
+    }
+
+    pub fn get_subagent_timeout(&self) -> Option<u64> {
+        self.get_subagent()
+            .and_then(|sa| sa.get("timeout_seconds"))
+            .and_then(|timeout| timeout.as_u64())
     }
 }
 

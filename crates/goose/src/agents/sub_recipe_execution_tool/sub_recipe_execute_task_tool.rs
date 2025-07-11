@@ -2,7 +2,7 @@ use mcp_core::{tool::ToolAnnotations, Content, Tool, ToolError};
 use serde_json::Value;
 
 use crate::agents::{
-    sub_recipe_execution_tool::lib::execute_tasks, sub_recipe_execution_tool::types::ExecutionMode,
+    sub_recipe_execution_tool::lib::{execute_tasks, SubagentExecutor}, sub_recipe_execution_tool::types::ExecutionMode,
     tool_execution::ToolCallResult,
 };
 use mcp_core::protocol::JsonRpcMessage;
@@ -58,9 +58,9 @@ Pre-created Task Based:
                             },
                             "task_type": {
                                 "type": "string",
-                                "enum": ["sub_recipe", "text_instruction"],
+                                "enum": ["sub_recipe", "text_instruction", "subagent"],
                                 "default": "sub_recipe",
-                                "description": "the type of task to execute, can be one of: sub_recipe, text_instruction"
+                                "description": "the type of task to execute, can be one of: sub_recipe, text_instruction, subagent"
                             },
                             "timeout_in_seconds": {
                                 "type": "number",
@@ -68,41 +68,18 @@ Pre-created Task Based:
                             },
                             "payload": {
                                 "type": "object",
-                                "properties": {
-                                    "sub_recipe": {
-                                        "type": "object",
-                                        "description": "sub recipe to execute",
-                                        "properties": {
-                                            "name": {
-                                                "type": "string",
-                                                "description": "name of the sub recipe to execute"
-                                            },
-                                            "recipe_path": {
-                                                "type": "string",
-                                                "description": "path of the sub recipe file"
-                                            },
-                                            "command_parameters": {
-                                                "type": "object",
-                                                "description": "parameters to pass to run recipe command with sub recipe file"
-                                            }
-                                        }
-                                    },
-                                    "text_instruction": {
-                                        "type": "string",
-                                        "description": "text instruction to execute"
-                                    }
-                                }
+                                "description": "the payload for the task, structure depends on task_type"
                             }
                         },
-                        "required": ["id", "payload"]
+                        "required": ["id", "task_type", "payload"]
                     },
-                    "description": "The tasks to run in parallel"
+                    "description": "Array of tasks to execute"
                 }
             },
             "required": ["tasks"]
         }),
         Some(ToolAnnotations {
-            title: Some("Run tasks in parallel".to_string()),
+            title: Some("Execute Tasks".to_string()),
             read_only_hint: false,
             destructive_hint: true,
             idempotent_hint: false,
@@ -111,30 +88,31 @@ Pre-created Task Based:
     )
 }
 
-pub async fn run_tasks(execute_data: Value) -> ToolCallResult {
-    let (notification_tx, notification_rx) = mpsc::channel::<JsonRpcMessage>(100);
+pub async fn run_tasks(
+    arguments: Value,
+    subagent_executor: Option<SubagentExecutor>,
+) -> ToolCallResult {
+    let execution_mode = arguments
+        .get("execution_mode")
+        .and_then(|v| v.as_str())
+        .unwrap_or("sequential");
 
-    let result_future = async move {
-        let execute_data_clone = execute_data.clone();
-        let execution_mode = execute_data_clone
-            .get("execution_mode")
-            .and_then(|v| serde_json::from_value::<ExecutionMode>(v.clone()).ok())
-            .unwrap_or_default();
-
-        match execute_tasks(execute_data, execution_mode, notification_tx).await {
-            Ok(result) => {
-                let output = serde_json::to_string(&result).unwrap();
-                Ok(vec![Content::text(output)])
-            }
-            Err(e) => Err(ToolError::ExecutionError(e.to_string())),
-        }
+    let mode = match execution_mode {
+        "parallel" => ExecutionMode::Parallel,
+        "sequential" => ExecutionMode::Sequential,
+        _ => ExecutionMode::Sequential,
     };
 
-    // Convert receiver to stream
-    let notification_stream = tokio_stream::wrappers::ReceiverStream::new(notification_rx);
+    let (tx, mut rx) = mpsc::channel(100);
+    let notifier = tx;
 
-    ToolCallResult {
-        result: Box::new(Box::pin(result_future)),
-        notification_stream: Some(Box::new(notification_stream)),
+    let result = execute_tasks(arguments, mode, notifier, subagent_executor).await;
+
+    match result {
+        Ok(value) => {
+            let content = Content::text(serde_json::to_string(&value).unwrap_or_default());
+            ToolCallResult::from(Ok(vec![content]))
+        }
+        Err(e) => ToolCallResult::from(Err(ToolError::ExecutionError(e))),
     }
 }
