@@ -67,6 +67,7 @@ import { useSessionContinuation } from '../hooks/useSessionContinuation';
 import { useFileDrop } from '../hooks/useFileDrop';
 import { useCostTracking } from '../hooks/useCostTracking';
 import { Message } from '../types/message';
+import { Recipe } from '../recipe';
 
 // Context for sharing current model info
 const CurrentModelContext = createContext<{ model: string; mode: string } | null>(null);
@@ -77,6 +78,7 @@ export interface ChatType {
   title: string;
   messageHistoryIndex: number;
   messages: Message[];
+  recipeConfig?: Recipe | null; // Add recipe configuration to chat state
 }
 
 interface BaseChatProps {

@@ -609,6 +609,7 @@ export default function App() {
     title: 'Pair Chat',
     messages: [],
     messageHistoryIndex: 0,
+    recipeConfig: null, // Initialize with no recipe
   });
 
   const { getExtensions, addExtension, read } = useConfig();

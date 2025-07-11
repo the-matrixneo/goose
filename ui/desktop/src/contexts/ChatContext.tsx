@@ -1,12 +1,15 @@
 import React, { createContext, useContext, ReactNode } from 'react';
 import { ChatType } from '../components/BaseChat';
 import { generateSessionId } from '../sessions';
+import { Recipe } from '../recipe';
 
 interface ChatContextType {
   chat: ChatType;
   setChat: (chat: ChatType) => void;
   resetChat: () => void;
   hasActiveSession: boolean;
+  setRecipeConfig: (recipe: Recipe | null) => void;
+  clearRecipeConfig: () => void;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -25,6 +28,21 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children, chat, setC
       title: 'New Chat',
       messages: [],
       messageHistoryIndex: 0,
+      recipeConfig: null, // Clear recipe when resetting chat
+    });
+  };
+
+  const setRecipeConfig = (recipe: Recipe | null) => {
+    setChat({
+      ...chat,
+      recipeConfig: recipe,
+    });
+  };
+
+  const clearRecipeConfig = () => {
+    setChat({
+      ...chat,
+      recipeConfig: null,
     });
   };
 
@@ -35,6 +53,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children, chat, setC
     setChat,
     resetChat,
     hasActiveSession,
+    setRecipeConfig,
+    clearRecipeConfig,
   };
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

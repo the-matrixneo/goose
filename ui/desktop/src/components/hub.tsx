@@ -27,6 +27,7 @@ import { SessionInsights } from './sessions/SessionsInsights';
 import ChatInput from './ChatInput';
 import { generateSessionId } from '../sessions';
 import { ChatContextManagerProvider } from './context_management/ChatContextManager';
+import { Recipe } from '../recipe';
 import 'react-toastify/dist/ReactToastify.css';
 
 export interface ChatType {
@@ -34,6 +35,7 @@ export interface ChatType {
   title: string;
   messageHistoryIndex: number;
   messages: Message[];
+  recipeConfig?: Recipe | null; // Add recipe configuration to chat state
 }
 
 export default function Hub({
@@ -65,6 +67,7 @@ export default function Hub({
         title: 'New Chat',
         messages: [], // Always start with empty messages
         messageHistoryIndex: 0,
+        recipeConfig: null, // Clear recipe for new chats from Hub
       };
 
       // Update the PAIR chat state (not the hub chat state)

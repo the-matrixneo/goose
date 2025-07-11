@@ -31,6 +31,7 @@ import { Message } from '../types/message';
 import BaseChat from './BaseChat';
 import ParameterInputModal from './ParameterInputModal';
 import { useRecipeManager } from '../hooks/useRecipeManager';
+import { Recipe } from '../recipe';
 import 'react-toastify/dist/ReactToastify.css';
 
 export interface ChatType {
@@ -38,6 +39,7 @@ export interface ChatType {
   title: string;
   messageHistoryIndex: number;
   messages: Message[];
+  recipeConfig?: Recipe | null; // Add recipe configuration to chat state
 }
 
 export default function Pair({
@@ -74,6 +76,7 @@ export default function Pair({
         title: location.state.recipeConfig.title || 'Recipe Chat',
         messages: [], // Clear messages to start fresh
         messageHistoryIndex: 0,
+        recipeConfig: location.state.recipeConfig, // Set the recipe config in chat state
       };
       setChat(newChat);
 

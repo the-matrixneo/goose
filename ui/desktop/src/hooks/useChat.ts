@@ -14,6 +14,7 @@ export const useChat = ({ setIsLoadingSession, setView, setPairChat }: UseChatAr
     title: 'New Chat',
     messages: [],
     messageHistoryIndex: 0,
+    recipeConfig: null, // Initialize with no recipe
   });
 
   // Check for resumeSessionId in URL parameters
@@ -37,6 +38,7 @@ export const useChat = ({ setIsLoadingSession, setView, setPairChat }: UseChatAr
             title: sessionDetails.metadata?.description || `ID: ${sessionDetails.session_id}`,
             messages: sessionDetails.messages,
             messageHistoryIndex: sessionDetails.messages.length,
+            recipeConfig: null, // Sessions don't have recipes by default
           };
 
           setChat(sessionChat);

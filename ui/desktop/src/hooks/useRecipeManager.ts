@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { createRecipe, Recipe } from '../recipe';
 import { Message, createUserMessage } from '../types/message';
 import { updateSystemPromptWithParameters } from '../utils/providerUtils';
+import { useChatContext } from '../contexts/ChatContext';
 
 interface LocationState {
   recipeConfig?: Recipe;
@@ -15,18 +16,36 @@ export const useRecipeManager = (messages: Message[], locationState?: LocationSt
   const [recipeParameters, setRecipeParameters] = useState<Record<string, string> | null>(null);
   const [readyForAutoUserPrompt, setReadyForAutoUserPrompt] = useState(false);
 
+  // Get chat context to access persisted recipe
+  const { chat, setRecipeConfig } = useChatContext();
+
   // Get recipeConfig from multiple sources with priority:
-  // 1. Navigation state (from recipes view)
-  // 2. App config (from deeplinks)
+  // 1. Chat context (persisted recipe)
+  // 2. Navigation state (from recipes view)
+  // 3. App config (from deeplinks)
   const recipeConfig = useMemo(() => {
-    // First check if recipe config is passed via navigation state
+    // First check if we have a persisted recipe in chat context
+    if (chat.recipeConfig) {
+      return chat.recipeConfig;
+    }
+
+    // Then check if recipe config is passed via navigation state
     if (locationState?.recipeConfig) {
+      // Persist the recipe to chat context for future use
+      setRecipeConfig(locationState.recipeConfig);
       return locationState.recipeConfig as Recipe;
     }
 
     // Fallback to app config (from deeplinks)
-    return window.appConfig.get('recipeConfig') as Recipe | null;
-  }, [locationState]);
+    const appRecipeConfig = window.appConfig.get('recipeConfig') as Recipe | null;
+    if (appRecipeConfig) {
+      // Persist the recipe to chat context for future use
+      setRecipeConfig(appRecipeConfig);
+      return appRecipeConfig;
+    }
+
+    return null;
+  }, [chat.recipeConfig, locationState, setRecipeConfig]);
 
   // Show parameter modal if recipe has parameters and they haven't been set yet
   useEffect(() => {
