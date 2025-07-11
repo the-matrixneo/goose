@@ -1,19 +1,116 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createRecipe, Recipe } from '../recipe';
-import { Message } from '../types/message';
+import { Message, createUserMessage } from '../types/message';
+import { updateSystemPromptWithParameters } from '../utils/providerUtils';
 
-export const useRecipeManager = (messages: Message[]) => {
+interface LocationState {
+  recipeConfig?: Recipe;
+  disableAnimation?: boolean;
+  reset?: boolean;
+}
+
+export const useRecipeManager = (messages: Message[], locationState?: LocationState) => {
   const [isGeneratingRecipe, setIsGeneratingRecipe] = useState(false);
+  const [isParameterModalOpen, setIsParameterModalOpen] = useState(false);
+  const [recipeParameters, setRecipeParameters] = useState<Record<string, string> | null>(null);
+  const [readyForAutoUserPrompt, setReadyForAutoUserPrompt] = useState(false);
 
-  // Get recipeConfig directly from appConfig
+  // Get recipeConfig from multiple sources with priority:
+  // 1. Navigation state (from recipes view)
+  // 2. App config (from deeplinks)
   const recipeConfig = useMemo(() => {
+    // First check if recipe config is passed via navigation state
+    if (locationState?.recipeConfig) {
+      return locationState.recipeConfig as Recipe;
+    }
+
+    // Fallback to app config (from deeplinks)
     return window.appConfig.get('recipeConfig') as Recipe | null;
+  }, [locationState]);
+
+  // Show parameter modal if recipe has parameters and they haven't been set yet
+  useEffect(() => {
+    if (recipeConfig?.parameters && recipeConfig.parameters.length > 0) {
+      // If we have parameters and they haven't been set yet, open the modal.
+      if (!recipeParameters) {
+        setIsParameterModalOpen(true);
+      }
+    }
+  }, [recipeConfig, recipeParameters]);
+
+  // Set ready for auto user prompt after component initialization
+  useEffect(() => {
+    setReadyForAutoUserPrompt(true);
   }, []);
+
+  // Substitute parameters in prompt
+  const substituteParameters = (prompt: string, params: Record<string, string>): string => {
+    let substitutedPrompt = prompt;
+
+    for (const key in params) {
+      // Escape special characters in the key (parameter) and match optional whitespace
+      const regex = new RegExp(`{{\\s*${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*}}`, 'g');
+      substitutedPrompt = substitutedPrompt.replace(regex, params[key]);
+    }
+    return substitutedPrompt;
+  };
 
   // Pre-fill input with recipe prompt instead of auto-sending it
   const initialPrompt = useMemo(() => {
-    return recipeConfig?.prompt || '';
-  }, [recipeConfig?.prompt]);
+    if (!recipeConfig?.prompt) return '';
+
+    const hasRequiredParams = recipeConfig.parameters && recipeConfig.parameters.length > 0;
+
+    // If params are required and have been collected, substitute them into the prompt.
+    if (hasRequiredParams && recipeParameters) {
+      return substituteParameters(recipeConfig.prompt, recipeParameters);
+    }
+
+    // If there are no parameters, return the original prompt.
+    if (!hasRequiredParams) {
+      return recipeConfig.prompt;
+    }
+
+    // Otherwise, we are waiting for parameters, so the input should be empty.
+    return '';
+  }, [recipeConfig, recipeParameters]);
+
+  // Handle parameter submission
+  const handleParameterSubmit = async (inputValues: Record<string, string>) => {
+    setRecipeParameters(inputValues);
+    setIsParameterModalOpen(false);
+
+    // Update the system prompt with parameter-substituted instructions
+    try {
+      await updateSystemPromptWithParameters(inputValues);
+    } catch (error) {
+      console.error('Failed to update system prompt with parameters:', error);
+    }
+  };
+
+  // Auto-execution handler for scheduled recipes
+  const handleAutoExecution = (append: (message: Message) => void, isLoading: boolean) => {
+    const hasRequiredParams = recipeConfig?.parameters && recipeConfig.parameters.length > 0;
+
+    if (
+      recipeConfig?.isScheduledExecution &&
+      recipeConfig?.prompt &&
+      (!hasRequiredParams || recipeParameters) &&
+      messages.length === 0 &&
+      !isLoading &&
+      readyForAutoUserPrompt
+    ) {
+      // Substitute parameters if they exist
+      const finalPrompt = recipeParameters
+        ? substituteParameters(recipeConfig.prompt, recipeParameters)
+        : recipeConfig.prompt;
+
+      console.log('Auto-sending substituted prompt for scheduled execution:', finalPrompt);
+
+      const userMessage = createUserMessage(finalPrompt);
+      append(userMessage);
+    }
+  };
 
   // Listen for make-agent-from-chat event
   useEffect(() => {
@@ -83,5 +180,10 @@ export const useRecipeManager = (messages: Message[]) => {
     recipeConfig,
     initialPrompt,
     isGeneratingRecipe,
+    isParameterModalOpen,
+    setIsParameterModalOpen,
+    recipeParameters,
+    handleParameterSubmit,
+    handleAutoExecution,
   };
 };

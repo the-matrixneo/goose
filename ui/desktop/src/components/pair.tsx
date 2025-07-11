@@ -29,6 +29,8 @@ import { useLocation } from 'react-router-dom';
 import { type View, ViewOptions } from '../App';
 import { Message } from '../types/message';
 import BaseChat from './BaseChat';
+import ParameterInputModal from './ParameterInputModal';
+import { useRecipeManager } from '../hooks/useRecipeManager';
 import 'react-toastify/dist/ReactToastify.css';
 
 export interface ChatType {
@@ -44,7 +46,6 @@ export default function Pair({
   setView,
   setIsGoosehintsModalOpen,
 }: {
-  readyForAutoUserPrompt: boolean;
   chat: ChatType;
   setChat: (chat: ChatType) => void;
   setView: (view: View, viewOptions?: ViewOptions) => void;
@@ -54,6 +55,32 @@ export default function Pair({
   const [hasProcessedInitialInput, setHasProcessedInitialInput] = useState(false);
   const [shouldAutoSubmit, setShouldAutoSubmit] = useState(false);
   const [initialMessage, setInitialMessage] = useState<string | null>(null);
+
+  // Get recipe configuration and parameter handling
+  const {
+    recipeConfig,
+    initialPrompt: recipeInitialPrompt,
+    isParameterModalOpen,
+    setIsParameterModalOpen,
+    handleParameterSubmit,
+  } = useRecipeManager(chat.messages, location.state);
+
+  // Handle recipe loading from recipes view - reset chat if needed
+  useEffect(() => {
+    if (location.state?.resetChat && location.state?.recipeConfig) {
+      // Reset the chat to start fresh with the recipe
+      const newChat = {
+        id: chat.id, // Keep the same ID to maintain the session
+        title: location.state.recipeConfig.title || 'Recipe Chat',
+        messages: [], // Clear messages to start fresh
+        messageHistoryIndex: 0,
+      };
+      setChat(newChat);
+
+      // Clear the location state to prevent re-processing
+      window.history.replaceState({}, '', '/pair');
+    }
+  }, [location.state, chat.id, setChat]);
 
   // Handle initial message from hub page
   useEffect(() => {
@@ -126,10 +153,20 @@ export default function Pair({
     console.log('Message submitted:', message);
   };
 
+  // Custom message stream finish handler to handle recipe auto-execution
+  const handleMessageStreamFinish = () => {
+    // This will be called with the proper append function from BaseChat
+    // For now, we'll handle auto-execution in the BaseChat component
+  };
+
+  // Determine the initial value for the chat input
+  // Priority: Hub message > Recipe prompt > empty
+  const initialValue = initialMessage || recipeInitialPrompt || undefined;
+
   // Custom chat input props for Pair-specific behavior
   const customChatInputProps = {
-    // Pass initial message from Hub if available
-    initialValue: initialMessage || undefined,
+    // Pass initial message from Hub or recipe prompt
+    initialValue,
   };
 
   // Custom content before messages
@@ -138,16 +175,28 @@ export default function Pair({
   };
 
   return (
-    <BaseChat
-      chat={chat}
-      setChat={setChat}
-      setView={setView}
-      setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
-      enableLocalStorage={true} // Enable local storage for Pair mode
-      onMessageSubmit={handleMessageSubmit}
-      renderBeforeMessages={renderBeforeMessages}
-      customChatInputProps={customChatInputProps}
-      contentClassName="pl-6 px-4 pb-16 pt-2" // Add Pair-specific padding
-    />
+    <>
+      <BaseChat
+        chat={chat}
+        setChat={setChat}
+        setView={setView}
+        setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
+        enableLocalStorage={true} // Enable local storage for Pair mode
+        onMessageSubmit={handleMessageSubmit}
+        onMessageStreamFinish={handleMessageStreamFinish}
+        renderBeforeMessages={renderBeforeMessages}
+        customChatInputProps={customChatInputProps}
+        contentClassName="pl-6 px-4 pb-16 pt-2" // Add Pair-specific padding
+      />
+
+      {/* Recipe Parameter Modal */}
+      {isParameterModalOpen && recipeConfig?.parameters && (
+        <ParameterInputModal
+          parameters={recipeConfig.parameters}
+          onSubmit={handleParameterSubmit}
+          onClose={() => setIsParameterModalOpen(false)}
+        />
+      )}
+    </>
   );
 }

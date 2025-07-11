@@ -171,7 +171,6 @@ const PairRouteWrapper = ({
 
   return (
     <Pair
-      readyForAutoUserPrompt={true}
       chat={chat}
       setChat={setChat}
       setView={(view: View, options?: ViewOptions) => {
@@ -326,7 +325,22 @@ const SchedulesRoute = () => {
 };
 
 const RecipesRoute = () => {
-  return <RecipesView />;
+  const navigate = useNavigate();
+
+  return (
+    <RecipesView
+      onLoadRecipe={(recipe) => {
+        // Navigate to pair view with the recipe configuration in state
+        navigate('/pair', {
+          state: {
+            recipeConfig: recipe,
+            // Reset the pair chat to start fresh with the recipe
+            resetChat: true,
+          },
+        });
+      }}
+    />
+  );
 };
 
 const RecipeEditorRoute = () => {

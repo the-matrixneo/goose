@@ -50,6 +50,7 @@ import { SearchView } from './conversation/SearchView';
 import { AgentHeader } from './AgentHeader';
 import LayingEggLoader from './LayingEggLoader';
 import LoadingGoose from './LoadingGoose';
+import Splash from './Splash';
 import { SessionSummaryModal } from './context_management/SessionSummaryModal';
 import {
   ChatContextManagerProvider,
@@ -171,7 +172,15 @@ function BaseChatContent({
   });
 
   // Use shared recipe manager
-  const { recipeConfig, initialPrompt, isGeneratingRecipe } = useRecipeManager(messages);
+  const { recipeConfig, initialPrompt, isGeneratingRecipe, handleAutoExecution } = useRecipeManager(
+    messages,
+    location.state
+  );
+
+  // Handle recipe auto-execution
+  useEffect(() => {
+    handleAutoExecution(append, isLoading);
+  }, [handleAutoExecution, append, isLoading]);
 
   // Use shared session continuation
   useSessionContinuation({
@@ -306,6 +315,22 @@ function BaseChatContent({
         {/* Custom header */}
         {renderHeader && renderHeader()}
 
+        {/* Recipe agent header - fixed at top when recipe is active */}
+        {recipeConfig?.title && (
+          <AgentHeader
+            title={recipeConfig.title}
+            profileInfo={
+              recipeConfig.profile
+                ? `${recipeConfig.profile} - ${recipeConfig.mcps || 12} MCPs`
+                : undefined
+            }
+            onChangeProfile={() => {
+              console.log('Change profile clicked');
+            }}
+            showBorder={messages.length > 0}
+          />
+        )}
+
         <ScrollArea
           ref={scrollRef}
           className={`flex-1 ${contentClassName}`}
@@ -319,23 +344,17 @@ function BaseChatContent({
           {/* Custom content before messages */}
           {renderBeforeMessages && renderBeforeMessages()}
 
-          {/* Recipe agent header */}
-          {recipeConfig?.title && messages.length > 0 && (
-            <AgentHeader
-              title={recipeConfig.title}
-              profileInfo={
-                recipeConfig.profile
-                  ? `${recipeConfig.profile} - ${recipeConfig.mcps || 12} MCPs`
-                  : undefined
-              }
-              onChangeProfile={() => {
-                console.log('Change profile clicked');
-              }}
-            />
-          )}
-
-          {/* Messages */}
-          {messages.length > 0 && (
+          {/* Messages or Splash */}
+          {messages.length === 0 ? (
+            /* Show Splash when no messages and we have a recipe config */
+            recipeConfig && (
+              <Splash
+                append={(text: string) => append(text)}
+                activities={Array.isArray(recipeConfig.activities) ? recipeConfig.activities : null}
+                title={recipeConfig.title}
+              />
+            )
+          ) : (
             <>
               {disableSearch ? (
                 // Render messages without SearchView wrapper when search is disabled

@@ -25,7 +25,11 @@ import { Recipe } from '../recipe';
 import { Buffer } from 'buffer';
 import { toastSuccess, toastError } from '../toasts';
 
-export default function RecipesView() {
+interface RecipesViewProps {
+  onLoadRecipe?: (recipe: Recipe) => void;
+}
+
+export default function RecipesView({ onLoadRecipe }: RecipesViewProps = {}) {
   const [savedRecipes, setSavedRecipes] = useState<SavedRecipe[]>([]);
   const [loading, setLoading] = useState(true);
   const [showSkeleton, setShowSkeleton] = useState(true);
@@ -78,15 +82,20 @@ export default function RecipesView() {
 
   const handleLoadRecipe = async (savedRecipe: SavedRecipe) => {
     try {
-      // Use the recipe directly - no need for manual mapping
-      window.electron.createChatWindow(
-        undefined, // query
-        undefined, // dir
-        undefined, // version
-        undefined, // resumeSessionId
-        savedRecipe.recipe, // recipe config
-        undefined // view type
-      );
+      if (onLoadRecipe) {
+        // Use the callback to navigate within the same window
+        onLoadRecipe(savedRecipe.recipe);
+      } else {
+        // Fallback to creating a new window (for backwards compatibility)
+        window.electron.createChatWindow(
+          undefined, // query
+          undefined, // dir
+          undefined, // version
+          undefined, // resumeSessionId
+          savedRecipe.recipe, // recipe config
+          undefined // view type
+        );
+      }
     } catch (err) {
       console.error('Failed to load recipe:', err);
       setError(err instanceof Error ? err.message : 'Failed to load recipe');
