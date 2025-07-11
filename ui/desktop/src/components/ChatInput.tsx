@@ -25,6 +25,7 @@ import { useChatContextManager } from './context_management/ChatContextManager';
 import { COST_TRACKING_ENABLED } from '../updates';
 import { CostTracker } from './bottom_menu/CostTracker';
 import { DroppedFile, useFileDrop } from '../hooks/useFileDrop';
+import { Recipe } from '../recipe';
 
 interface PastedImage {
   id: string;
@@ -71,6 +72,7 @@ interface ChatInputProps {
   };
   setIsGoosehintsModalOpen?: (isOpen: boolean) => void;
   disableAnimation?: boolean;
+  recipeConfig?: Recipe | null;
 }
 
 export default function ChatInput({
@@ -90,6 +92,7 @@ export default function ChatInput({
   disableAnimation = false,
   sessionCosts,
   setIsGoosehintsModalOpen,
+  recipeConfig,
 }: ChatInputProps) {
   const [_value, setValue] = useState(initialValue);
   const [displayValue, setDisplayValue] = useState(initialValue); // For immediate visual feedback
@@ -1154,7 +1157,12 @@ export default function ChatInput({
             )}
             <Tooltip>
               <div>
-                <ModelsBottomBar dropdownRef={dropdownRef} setView={setView} alerts={alerts} />
+                <ModelsBottomBar
+                  dropdownRef={dropdownRef}
+                  setView={setView}
+                  alerts={alerts}
+                  recipeConfig={recipeConfig}
+                />
               </div>
             </Tooltip>
             <div className="w-px h-4 bg-border-default mx-2" />

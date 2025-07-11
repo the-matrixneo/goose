@@ -419,6 +419,7 @@ function BaseChatContent({
             disableAnimation={disableAnimation}
             sessionCosts={sessionCosts}
             setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
+            recipeConfig={recipeConfig}
             {...customChatInputProps}
           />
         </div>

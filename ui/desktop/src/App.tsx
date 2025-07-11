@@ -345,7 +345,29 @@ const RecipesRoute = () => {
 
 const RecipeEditorRoute = () => {
   const location = useLocation();
-  const config = location.state?.config || window.electron.getConfig().recipeConfig;
+
+  // Check for config from multiple sources:
+  // 1. Location state (from navigation)
+  // 2. localStorage (from "View Recipe" button)
+  // 3. Window electron config (from deeplinks)
+  let config = location.state?.config;
+
+  if (!config) {
+    const storedConfig = localStorage.getItem('viewRecipeConfig');
+    if (storedConfig) {
+      try {
+        config = JSON.parse(storedConfig);
+        // Clear the stored config after using it
+        localStorage.removeItem('viewRecipeConfig');
+      } catch (error) {
+        console.error('Failed to parse stored recipe config:', error);
+      }
+    }
+  }
+
+  if (!config) {
+    config = window.electron.getConfig().recipeConfig;
+  }
 
   return <RecipeEditor config={config} />;
 };
