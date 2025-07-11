@@ -1,7 +1,7 @@
 use crate::agents::sub_recipe_execution_tool::executor::{
     execute_single_task, execute_tasks_in_parallel,
 };
-pub use crate::agents::sub_recipe_execution_tool::types::{
+pub use crate::agents::sub_recipe_execution_tool::task_types::{
     ExecutionMode, ExecutionResponse, ExecutionStats, SharedState, Task, TaskResult, TaskStatus,
 };
 

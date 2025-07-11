@@ -7,7 +7,7 @@ use tokio::process::Command;
 use tokio::time::timeout;
 
 use crate::agents::sub_recipe_execution_tool::task_execution_tracker::TaskExecutionTracker;
-use crate::agents::sub_recipe_execution_tool::types::{Task, TaskResult, TaskStatus};
+use crate::agents::sub_recipe_execution_tool::task_types::{Task, TaskResult, TaskStatus};
 
 const DEFAULT_TASK_TIMEOUT_SECONDS: u64 = 300;
 

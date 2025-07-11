@@ -2,8 +2,8 @@ use mcp_core::{tool::ToolAnnotations, Content, Tool, ToolError};
 use serde_json::Value;
 
 use crate::agents::{
-    sub_recipe_execution_tool::lib::execute_tasks, sub_recipe_execution_tool::types::ExecutionMode,
-    tool_execution::ToolCallResult,
+    sub_recipe_execution_tool::lib::execute_tasks,
+    sub_recipe_execution_tool::task_types::ExecutionMode, tool_execution::ToolCallResult,
 };
 use mcp_core::protocol::JsonRpcMessage;
 use tokio::sync::mpsc;

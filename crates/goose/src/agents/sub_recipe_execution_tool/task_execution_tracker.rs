@@ -9,7 +9,9 @@ use crate::agents::sub_recipe_execution_tool::notification_events::{
     FailedTaskInfo, TaskCompletionStats, TaskExecutionNotificationEvent, TaskExecutionStats,
     TaskInfo as EventTaskInfo,
 };
-use crate::agents::sub_recipe_execution_tool::types::{Task, TaskInfo, TaskResult, TaskStatus};
+use crate::agents::sub_recipe_execution_tool::task_types::{
+    Task, TaskInfo, TaskResult, TaskStatus,
+};
 use crate::agents::sub_recipe_execution_tool::utils::{count_by_status, get_task_name};
 use serde_json::Value;
 
