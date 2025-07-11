@@ -42,7 +42,7 @@
  * while remaining flexible enough to support different UI contexts (Hub vs Pair).
  */
 
-import React, { useEffect, useContext, createContext, useRef, useState } from 'react';
+import React, { useEffect, useContext, createContext, useRef, useState, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import GooseMessage from './GooseMessage';
 import UserMessage from './UserMessage';
@@ -69,7 +69,9 @@ import { useRecipeManager } from '../hooks/useRecipeManager';
 import { useSessionContinuation } from '../hooks/useSessionContinuation';
 import { useFileDrop } from '../hooks/useFileDrop';
 import { useCostTracking } from '../hooks/useCostTracking';
-import { Message } from '../types/message';
+import { useSidecar } from './SidecarLayout';
+import { hasDiffContent } from './ToolCallWithResponse';
+import { getToolRequests, getToolResponses, Message } from '../types/message';
 import { Recipe } from '../recipe';
 
 // Context for sharing current model info
@@ -216,6 +218,34 @@ function BaseChatContent({
     sessionMetadata,
   });
 
+  // Get sidecar context to check for collapsed panel
+  const sidecar = useSidecar();
+
+  // Check if there are any messages with diff content
+  const hasDiffActions = useMemo(() => {
+    return filteredMessages.some((message) => {
+      const toolRequests = getToolRequests(message);
+      if (toolRequests.length === 0) return false;
+
+      // Look for tool responses in subsequent messages
+      const messageIndex = messages.findIndex((msg) => msg.id === message.id);
+      if (messageIndex === -1) return false;
+
+      for (let i = messageIndex + 1; i < messages.length; i++) {
+        const responses = getToolResponses(messages[i]);
+        for (const response of responses) {
+          const matchingRequest = toolRequests.find((req) => req.id === response.id);
+          if (matchingRequest && hasDiffContent(response)) {
+            return true;
+          }
+        }
+      }
+      return false;
+    });
+  }, [filteredMessages, messages]);
+
+  const showCollapsedSidecar = hasDiffActions && sidecar;
+
   useEffect(() => {
     // Log all messages when the component first mounts
     window.electron.logInfo(
@@ -267,7 +297,7 @@ function BaseChatContent({
 
   // Helper function to render messages
   const renderMessages = () => {
-    return filteredMessages.map((message, index) => {
+    const messagesContent = filteredMessages.map((message, index) => {
       const isUser = isUserMessage(message);
 
       return (
@@ -287,8 +317,8 @@ function BaseChatContent({
                   contextType={getContextHandlerType(message)}
                 />
               ) : (
-                <UserMessage 
-                  message={message} 
+                <UserMessage
+                  message={message}
                   messages={messages}
                   onRestore={(files) => {
                     // Show the restore modal first
@@ -325,6 +355,13 @@ function BaseChatContent({
         </div>
       );
     });
+
+    // Add collapsed sidecar panel if needed
+    if (showCollapsedSidecar) {
+      return <div className="relative pl-6 pr-18">{messagesContent}</div>;
+    }
+
+    return messagesContent;
   };
 
   return (
@@ -349,7 +386,7 @@ function BaseChatContent({
             onDrop={handleDrop}
             onDragOver={handleDragOver}
             data-drop-zone="true"
-            paddingX={6}
+            paddingX={showCollapsedSidecar ? 0 : 6}
             paddingY={0}
           >
             {/* Recipe agent header - now inside the messages container */}
@@ -484,12 +521,12 @@ function BaseChatContent({
           files={restoreModalFiles}
           onConfirm={async (files) => {
             // Create a restore message to send to the chat
-            const fileList = files.map(f => `• ${f.path} (from ${f.timestamp})`).join('\n');
+            const fileList = files.map((f) => `• ${f.path} (from ${f.timestamp})`).join('\n');
             const restoreMessage = `Please restore the following files to their earlier versions:\n\n${fileList}`;
-            
+
             // Send the restore message to the chat
             engineHandleSubmit(restoreMessage);
-            
+
             // Close the modal
             setRestoreModalFiles(null);
           }}
