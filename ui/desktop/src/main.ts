@@ -533,7 +533,7 @@ const createChat = async (
 
   // Load and manage window state
   const mainWindowState = windowStateKeeper({
-    defaultWidth: 1050,
+    defaultWidth: 800,
     defaultHeight: 800,
   });
 
@@ -546,7 +546,7 @@ const createChat = async (
     y: mainWindowState.y,
     width: mainWindowState.width,
     height: mainWindowState.height,
-    minWidth: 650,
+    minWidth: 750,
     resizable: true,
     useContentSize: true,
     icon: path.join(__dirname, '../images/icon'),

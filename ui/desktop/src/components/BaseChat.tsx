@@ -354,7 +354,9 @@ function BaseChatContent({
               recipeConfig && (
                 <Splash
                   append={(text: string) => append(text)}
-                  activities={Array.isArray(recipeConfig.activities) ? recipeConfig.activities : null}
+                  activities={
+                    Array.isArray(recipeConfig.activities) ? recipeConfig.activities : null
+                  }
                   title={recipeConfig.title}
                 />
               )
@@ -397,7 +399,9 @@ function BaseChatContent({
             {/* Loading indicator at bottom of messages container */}
             {isLoading && (
               <div className="px-0 -mx-6">
-                <LoadingGoose message={isLoadingSummary ? 'summarizing conversation…' : undefined} />
+                <LoadingGoose
+                  message={isLoadingSummary ? 'summarizing conversation…' : undefined}
+                />
               </div>
             )}
 

@@ -2,6 +2,10 @@
 @import 'tw-animate-css';
 @plugin '@tailwindcss/typography';
 
+@theme {
+  --breakpoint-md: 930px;
+}
+
 /* Cash Sans */
 
 @custom-variant dark (&:where(.dark, .dark *));
