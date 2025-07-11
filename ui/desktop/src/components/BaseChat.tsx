@@ -309,8 +309,12 @@ function BaseChatContent({
   };
 
   return (
-    <div className="bg-background-muted h-full flex flex-col min-h-0">
-      <MainPanelLayout removeTopPadding={true} {...customMainLayoutProps}>
+    <div className="h-full flex flex-col min-h-0">
+      <MainPanelLayout
+        backgroundColor={'bg-background-muted'}
+        removeTopPadding={true}
+        {...customMainLayoutProps}
+      >
         {/* Loader when generating recipe */}
         {isGeneratingRecipe && <LayingEggLoader />}
 
