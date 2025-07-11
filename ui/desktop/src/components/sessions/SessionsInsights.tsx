@@ -106,7 +106,7 @@ export function SessionInsights() {
   }
 
   return (
-    <div className="bg-background-muted">
+    <div className="bg-background-muted ml-8 mr-8">
       <div className="px-8 pb-12 pt-19 bg-background-default space-y-4">
         <motion.div
           initial={{ opacity: 0, scale: 0.25, x: -5, y: 5, rotate: -20 }}

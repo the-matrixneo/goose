@@ -97,10 +97,12 @@ export type ViewConfig = {
 const HubRouteWrapper = ({
   chat,
   setChat,
+  setPairChat,
   setIsGoosehintsModalOpen,
 }: {
   chat: ChatType;
   setChat: (chat: ChatType) => void;
+  setPairChat: (chat: ChatType) => void;
   setIsGoosehintsModalOpen: (isOpen: boolean) => void;
 }) => {
   const navigate = useNavigate();
@@ -110,6 +112,7 @@ const HubRouteWrapper = ({
       readyForAutoUserPrompt={true}
       chat={chat}
       setChat={setChat}
+      setPairChat={setPairChat}
       setView={(view: View, options?: ViewOptions) => {
         // Convert view to route navigation
         switch (view) {
@@ -1133,6 +1136,7 @@ export default function App() {
                     <HubRouteWrapper
                       chat={chat}
                       setChat={setChat}
+                      setPairChat={setPairChat}
                       setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
                     />
                   </ProviderGuard>

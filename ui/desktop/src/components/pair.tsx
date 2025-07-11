@@ -52,29 +52,89 @@ export default function Pair({
 }) {
   const location = useLocation();
   const [hasProcessedInitialInput, setHasProcessedInitialInput] = useState(false);
+  const [shouldAutoSubmit, setShouldAutoSubmit] = useState(false);
+  const [initialMessage, setInitialMessage] = useState<string | null>(null);
 
-  // Handle initial input from hub page
+  // Handle initial message from hub page
   useEffect(() => {
-    const initialInput = location.state?.initialInput;
-    const fromHub = location.state?.fromHub;
+    const messageFromHub = location.state?.initialMessage;
 
-    if (fromHub && initialInput && !hasProcessedInitialInput && chat.messages.length === 0) {
-      // Auto-submit the initial input - this would need to be handled by BaseChat
-      setHasProcessedInitialInput(true);
+    // Reset processing state when we have a new message from hub
+    if (messageFromHub) {
+      // If this is a different message than what we processed before, reset the flag
+      if (messageFromHub !== initialMessage) {
+        setHasProcessedInitialInput(false);
+      }
 
-      // Clear the location state to prevent re-processing
-      window.history.replaceState({}, '', '/pair');
+      if (!hasProcessedInitialInput) {
+        setHasProcessedInitialInput(true);
+        setInitialMessage(messageFromHub);
+        setShouldAutoSubmit(true);
+
+        // Clear the location state to prevent re-processing
+        window.history.replaceState({}, '', '/pair');
+      }
     }
-  }, [location.state, hasProcessedInitialInput, chat.messages.length]);
+  }, [location.state, hasProcessedInitialInput, initialMessage, chat]);
 
-  // Custom content before messages
-  const renderBeforeMessages = () => (
-    <div>{/* Any Pair-specific content before messages can go here */}</div>
-  );
+  // Auto-submit the initial message after it's been set and component is ready
+  useEffect(() => {
+    if (shouldAutoSubmit && initialMessage) {
+      // Wait for the component to be fully rendered
+      const timer = setTimeout(() => {
+        // Try to trigger form submission programmatically
+        const textarea = document.querySelector(
+          'textarea[data-testid="chat-input"]'
+        ) as HTMLTextAreaElement;
+        const form = textarea?.closest('form');
+
+        if (textarea && form) {
+          // Set the textarea value
+          textarea.value = initialMessage;
+          // eslint-disable-next-line no-undef
+          textarea.dispatchEvent(new Event('input', { bubbles: true }));
+
+          // Focus the textarea
+          textarea.focus();
+
+          // Simulate Enter key press to trigger submission
+          const enterEvent = new KeyboardEvent('keydown', {
+            key: 'Enter',
+            code: 'Enter',
+            keyCode: 13,
+            which: 13,
+            bubbles: true,
+          });
+          textarea.dispatchEvent(enterEvent);
+
+          setShouldAutoSubmit(false);
+        }
+      }, 500); // Give more time for the component to fully mount
+
+      // eslint-disable-next-line no-undef
+      return () => clearTimeout(timer);
+    }
+
+    // Return undefined when condition is not met
+    return undefined;
+  }, [shouldAutoSubmit, initialMessage]);
+
+  // Custom message submit handler
+  const handleMessageSubmit = (message: string) => {
+    // This is called after a message is submitted
+    setShouldAutoSubmit(false);
+    console.log('Message submitted:', message);
+  };
 
   // Custom chat input props for Pair-specific behavior
   const customChatInputProps = {
-    // Any Pair-specific chat input customizations can go here
+    // Pass initial message from Hub if available
+    initialValue: initialMessage || undefined,
+  };
+
+  // Custom content before messages
+  const renderBeforeMessages = () => {
+    return <div>{/* Any Pair-specific content before messages can go here */}</div>;
   };
 
   return (
@@ -84,6 +144,7 @@ export default function Pair({
       setView={setView}
       setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
       enableLocalStorage={true} // Enable local storage for Pair mode
+      onMessageSubmit={handleMessageSubmit}
       renderBeforeMessages={renderBeforeMessages}
       customChatInputProps={customChatInputProps}
       contentClassName="pl-6 px-4 pb-16 pt-2" // Add Pair-specific padding
