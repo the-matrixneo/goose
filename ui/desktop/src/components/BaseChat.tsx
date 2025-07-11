@@ -54,6 +54,7 @@ import Splash from './Splash';
 import PopularChatTopics from './PopularChatTopics';
 import { SessionSummaryModal } from './context_management/SessionSummaryModal';
 import RestoreModal from './RestoreModal';
+import { SidecarProvider } from './SidecarLayout';
 import {
   ChatContextManagerProvider,
   useChatContextManager,
@@ -502,7 +503,9 @@ function BaseChatContent({
 export default function BaseChat(props: BaseChatProps) {
   return (
     <ChatContextManagerProvider>
-      <BaseChatContent {...props} />
+      <SidecarProvider>
+        <BaseChatContent {...props} />
+      </SidecarProvider>
     </ChatContextManagerProvider>
   );
 }
