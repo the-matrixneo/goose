@@ -17,7 +17,7 @@ export const useRecipeManager = (messages: Message[], locationState?: LocationSt
   const [readyForAutoUserPrompt, setReadyForAutoUserPrompt] = useState(false);
 
   // Get chat context to access persisted recipe
-  const { chat, setRecipeConfig } = useChatContext();
+  const chatContext = useChatContext();
 
   // Get recipeConfig from multiple sources with priority:
   // 1. Chat context (persisted recipe)
@@ -25,14 +25,16 @@ export const useRecipeManager = (messages: Message[], locationState?: LocationSt
   // 3. App config (from deeplinks)
   const recipeConfig = useMemo(() => {
     // First check if we have a persisted recipe in chat context
-    if (chat.recipeConfig) {
-      return chat.recipeConfig;
+    if (chatContext?.chat.recipeConfig) {
+      return chatContext.chat.recipeConfig;
     }
 
     // Then check if recipe config is passed via navigation state
     if (locationState?.recipeConfig) {
       // Persist the recipe to chat context for future use
-      setRecipeConfig(locationState.recipeConfig);
+      if (chatContext?.setRecipeConfig) {
+        chatContext.setRecipeConfig(locationState.recipeConfig);
+      }
       return locationState.recipeConfig as Recipe;
     }
 
@@ -40,12 +42,14 @@ export const useRecipeManager = (messages: Message[], locationState?: LocationSt
     const appRecipeConfig = window.appConfig.get('recipeConfig') as Recipe | null;
     if (appRecipeConfig) {
       // Persist the recipe to chat context for future use
-      setRecipeConfig(appRecipeConfig);
+      if (chatContext?.setRecipeConfig) {
+        chatContext.setRecipeConfig(appRecipeConfig);
+      }
       return appRecipeConfig;
     }
 
     return null;
-  }, [chat.recipeConfig, locationState, setRecipeConfig]);
+  }, [chatContext, locationState]);
 
   // Show parameter modal if recipe has parameters and they haven't been set yet
   useEffect(() => {

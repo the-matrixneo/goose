@@ -14,7 +14,6 @@ import {
 } from '../ui/sidebar';
 import { ChatSmart, Gear } from '../icons';
 import { ViewOptions, View } from '../../App';
-import { useChatContext } from '../../contexts/ChatContext';
 
 interface SidebarProps {
   onSelectSession: (sessionId: string) => void;
@@ -28,7 +27,6 @@ interface SidebarProps {
 // Main Sidebar Component
 const AppSidebar: React.FC<SidebarProps> = ({ currentPath }) => {
   const navigate = useNavigate();
-  const { resetChat } = useChatContext();
 
   useEffect(() => {
     // Trigger animation after a small delay
@@ -60,9 +58,6 @@ const AppSidebar: React.FC<SidebarProps> = ({ currentPath }) => {
                 <SidebarMenuItem>
                   <SidebarMenuButton
                     onClick={() => {
-                      // Always reset chat and navigate to home when clicking Home button
-                      // This ensures insights are displayed regardless of active session
-                      resetChat();
                       navigate('/');
                     }}
                     isActive={isActivePath('/')}

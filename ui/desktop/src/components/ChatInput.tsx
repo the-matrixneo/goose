@@ -22,6 +22,7 @@ import { toastError } from '../toasts';
 import MentionPopover, { FileItemWithMatch } from './MentionPopover';
 import { useDictationSettings } from '../hooks/useDictationSettings';
 import { useChatContextManager } from './context_management/ChatContextManager';
+import { useChatContext } from '../contexts/ChatContext';
 import { COST_TRACKING_ENABLED } from '../updates';
 import { CostTracker } from './bottom_menu/CostTracker';
 import { DroppedFile, useFileDrop } from '../hooks/useFileDrop';
@@ -106,6 +107,16 @@ export default function ChatInput({
   const { getCurrentModelAndProvider, currentModel, currentProvider } = useModelAndProvider();
   const [tokenLimit, setTokenLimit] = useState<number>(TOKEN_LIMIT_DEFAULT);
   const [isTokenLimitLoaded, setIsTokenLimitLoaded] = useState(false);
+
+  // Draft functionality - get chat context and global draft context
+  // We need to handle the case where ChatInput is used without ChatProvider (e.g., in Hub)
+  const chatContext = useChatContext(); // This should always be available now
+  const draftLoadedRef = useRef(false);
+
+  // Debug logging for draft context
+  useEffect(() => {
+    // Debug logging removed - draft functionality is working correctly
+  }, [chatContext?.contextKey, chatContext?.draft, chatContext]);
   const [mentionPopover, setMentionPopover] = useState<{
     isOpen: boolean;
     position: { x: number; y: number };
@@ -165,6 +176,9 @@ export default function ChatInput({
     setValue(initialValue);
     setDisplayValue(initialValue);
 
+    // Reset draft loaded flag when initialValue changes
+    draftLoadedRef.current = false;
+
     // Use a functional update to get the current pastedImages
     // and perform cleanup. This avoids needing pastedImages in the deps.
     setPastedImages((currentPastedImages) => {
@@ -181,6 +195,38 @@ export default function ChatInput({
     setIsInGlobalHistory(false);
     setHasUserTyped(false);
   }, [initialValue]); // Keep only initialValue as a dependency
+
+  // Draft functionality - load draft if no initial value or recipe
+  useEffect(() => {
+    // Reset draft loaded flag when context changes
+    draftLoadedRef.current = false;
+  }, [chatContext?.contextKey]);
+
+  useEffect(() => {
+    // Only load draft once and if conditions are met
+    if (!initialValue && !recipeConfig && !draftLoadedRef.current && chatContext) {
+      const draftText = chatContext.draft || '';
+
+      if (draftText) {
+        setDisplayValue(draftText);
+        setValue(draftText);
+      }
+
+      // Always mark as loaded after checking, regardless of whether we found a draft
+      draftLoadedRef.current = true;
+    }
+  }, [chatContext, initialValue, recipeConfig]);
+
+  // Save draft when user types (debounced)
+  const debouncedSaveDraft = useMemo(
+    () =>
+      debounce((value: string) => {
+        if (chatContext && chatContext.setDraft) {
+          chatContext.setDraft(value);
+        }
+      }, 500), // Save draft after 500ms of no typing
+    [chatContext]
+  );
 
   // State to track if the IME is composing (i.e., in the middle of Japanese IME input)
   const [isComposing, setIsComposing] = useState(false);
@@ -416,6 +462,7 @@ export default function ChatInput({
 
     setDisplayValue(val); // Update display immediately
     debouncedSetValue(val); // Debounce the actual state update
+    debouncedSaveDraft(val); // Save draft with debounce
     // Mark that the user has typed something
     setHasUserTyped(true);
 
@@ -571,8 +618,9 @@ export default function ChatInput({
     return () => {
       debouncedSetValue.cancel?.();
       debouncedAutosize.cancel?.();
+      debouncedSaveDraft.cancel?.();
     };
-  }, [debouncedSetValue, debouncedAutosize]);
+  }, [debouncedSetValue, debouncedAutosize, debouncedSaveDraft]);
 
   // Handlers for composition events, which are crucial for proper IME behavior
   const handleCompositionStart = () => {
@@ -698,6 +746,11 @@ export default function ChatInput({
       setSavedInput('');
       setIsInGlobalHistory(false);
       setHasUserTyped(false);
+
+      // Clear draft when message is sent
+      if (chatContext && chatContext.clearDraft) {
+        chatContext.clearDraft();
+      }
 
       // Clear both parent and local dropped files after processing
       if (onFilesProcessed && droppedFiles.length > 0) {

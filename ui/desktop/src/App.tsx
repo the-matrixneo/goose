@@ -25,6 +25,7 @@ import ProviderSettings from './components/settings/providers/ProviderSettingsPa
 import { useChat } from './hooks/useChat';
 import { AppLayout } from './components/Layout/AppLayout';
 import { ChatProvider } from './contexts/ChatContext';
+import { DraftProvider } from './contexts/DraftContext';
 
 import 'react-toastify/dist/ReactToastify.css';
 import { useConfig, MalformedConfigError } from './components/ConfigContext';
@@ -1126,162 +1127,168 @@ export default function App() {
     );
 
   return (
-    <ModelAndProviderProvider>
-      <HashRouter>
-        <ToastContainer
-          aria-label="Toast notifications"
-          toastClassName={() =>
-            `relative min-h-16 mb-4 p-2 rounded-lg
-             flex justify-between overflow-hidden cursor-pointer
-             text-text-on-accent bg-background-inverse
-            `
-          }
-          style={{ width: '380px' }}
-          className="mt-6"
-          position="top-right"
-          autoClose={3000}
-          closeOnClick
-          pauseOnHover
-        />
-        {modalVisible && (
-          <ConfirmationModal
-            isOpen={modalVisible}
-            message={modalMessage}
-            confirmLabel={extensionConfirmLabel}
-            title={extensionConfirmTitle}
-            onConfirm={handleConfirm}
-            onCancel={handleCancel}
+    <DraftProvider>
+      <ModelAndProviderProvider>
+        <HashRouter>
+          <ToastContainer
+            aria-label="Toast notifications"
+            toastClassName={() =>
+              `relative min-h-16 mb-4 p-2 rounded-lg
+               flex justify-between overflow-hidden cursor-pointer
+               text-text-on-accent bg-background-inverse
+              `
+            }
+            style={{ width: '380px' }}
+            className="mt-6"
+            position="top-right"
+            autoClose={3000}
+            closeOnClick
+            pauseOnHover
           />
-        )}
-        <div className="relative w-screen h-screen overflow-hidden bg-background-muted flex flex-col">
-          <div className="titlebar-drag-region" />
-          <Routes>
-            <Route path="welcome" element={<WelcomeRoute />} />
-            <Route path="configure-providers" element={<ConfigureProvidersRoute />} />
-            <Route
-              path="/"
-              element={
-                <ChatProvider chat={chat} setChat={setChat}>
-                  <AppLayout setIsGoosehintsModalOpen={setIsGoosehintsModalOpen} />
-                </ChatProvider>
-              }
-            >
+          {modalVisible && (
+            <ConfirmationModal
+              isOpen={modalVisible}
+              message={modalMessage}
+              confirmLabel={extensionConfirmLabel}
+              title={extensionConfirmTitle}
+              onConfirm={handleConfirm}
+              onCancel={handleCancel}
+            />
+          )}
+          <div className="relative w-screen h-screen overflow-hidden bg-background-muted flex flex-col">
+            <div className="titlebar-drag-region" />
+            <Routes>
+              <Route path="welcome" element={<WelcomeRoute />} />
+              <Route path="configure-providers" element={<ConfigureProvidersRoute />} />
               <Route
-                index
+                path="/"
                 element={
-                  <ProviderGuard>
-                    <HubRouteWrapper
-                      chat={chat}
-                      setChat={setChat}
-                      setPairChat={setPairChat}
-                      setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
-                    />
-                  </ProviderGuard>
+                  <ChatProvider chat={chat} setChat={setChat} contextKey="hub">
+                    <AppLayout setIsGoosehintsModalOpen={setIsGoosehintsModalOpen} />
+                  </ChatProvider>
                 }
-              />
-              <Route
-                path="pair"
-                element={
-                  <ProviderGuard>
-                    <ChatProvider chat={pairChat} setChat={setPairChat}>
-                      <PairRouteWrapper
-                        chat={pairChat}
-                        setChat={setPairChat}
+              >
+                <Route
+                  index
+                  element={
+                    <ProviderGuard>
+                      <HubRouteWrapper
+                        chat={chat}
+                        setChat={setChat}
+                        setPairChat={setPairChat}
                         setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
                       />
-                    </ChatProvider>
-                  </ProviderGuard>
-                }
-              />
-              <Route
-                path="settings"
-                element={
-                  <ProviderGuard>
-                    <SettingsRoute />
-                  </ProviderGuard>
-                }
-              />
-              <Route
-                path="extensions"
-                element={
-                  <ProviderGuard>
-                    <ExtensionsRoute />
-                  </ProviderGuard>
-                }
-              />
-              <Route
-                path="sessions"
-                element={
-                  <ProviderGuard>
-                    <SessionsRoute />
-                  </ProviderGuard>
-                }
-              />
-              <Route
-                path="schedules"
-                element={
-                  <ProviderGuard>
-                    <SchedulesRoute />
-                  </ProviderGuard>
-                }
-              />
-              <Route
-                path="recipes"
-                element={
-                  <ProviderGuard>
-                    <RecipesRoute />
-                  </ProviderGuard>
-                }
-              />
-              <Route
-                path="recipe-editor"
-                element={
-                  <ProviderGuard>
-                    <RecipeEditorRoute />
-                  </ProviderGuard>
-                }
-              />
-              <Route
-                path="shared-session"
-                element={
-                  <ProviderGuard>
-                    <SharedSessionRouteWrapper
-                      isLoadingSharedSession={isLoadingSharedSession}
-                      setIsLoadingSharedSession={setIsLoadingSharedSession}
-                      sharedSessionError={sharedSessionError}
-                    />
-                  </ProviderGuard>
-                }
-              />
-              <Route
-                path="permission"
-                element={
-                  <ProviderGuard>
-                    <PermissionRoute />
-                  </ProviderGuard>
-                }
-              />
-              {/*<Route*/}
-              {/*  path="projects"*/}
-              {/*  element={*/}
-              {/*    <ProviderGuard>*/}
-              {/*      <ChatProvider chat={chat} setChat={setChat}>*/}
-              {/*        <ProjectsRoute />*/}
-              {/*      </ChatProvider>*/}
-              {/*    </ProviderGuard>  */}
-              {/*  }*/}
-              {/*/>*/}
-            </Route>
-          </Routes>
-        </div>
-        {isGoosehintsModalOpen && (
-          <GoosehintsModal
-            directory={window.appConfig.get('GOOSE_WORKING_DIR') as string}
-            setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
-          />
-        )}
-      </HashRouter>
-      <AnnouncementModal />
-    </ModelAndProviderProvider>
+                    </ProviderGuard>
+                  }
+                />
+                <Route
+                  path="pair"
+                  element={
+                    <ProviderGuard>
+                      <ChatProvider
+                        chat={pairChat}
+                        setChat={setPairChat}
+                        contextKey={`pair-${pairChat.id}`}
+                      >
+                        <PairRouteWrapper
+                          chat={pairChat}
+                          setChat={setPairChat}
+                          setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
+                        />
+                      </ChatProvider>
+                    </ProviderGuard>
+                  }
+                />
+                <Route
+                  path="settings"
+                  element={
+                    <ProviderGuard>
+                      <SettingsRoute />
+                    </ProviderGuard>
+                  }
+                />
+                <Route
+                  path="extensions"
+                  element={
+                    <ProviderGuard>
+                      <ExtensionsRoute />
+                    </ProviderGuard>
+                  }
+                />
+                <Route
+                  path="sessions"
+                  element={
+                    <ProviderGuard>
+                      <SessionsRoute />
+                    </ProviderGuard>
+                  }
+                />
+                <Route
+                  path="schedules"
+                  element={
+                    <ProviderGuard>
+                      <SchedulesRoute />
+                    </ProviderGuard>
+                  }
+                />
+                <Route
+                  path="recipes"
+                  element={
+                    <ProviderGuard>
+                      <RecipesRoute />
+                    </ProviderGuard>
+                  }
+                />
+                <Route
+                  path="recipe-editor"
+                  element={
+                    <ProviderGuard>
+                      <RecipeEditorRoute />
+                    </ProviderGuard>
+                  }
+                />
+                <Route
+                  path="shared-session"
+                  element={
+                    <ProviderGuard>
+                      <SharedSessionRouteWrapper
+                        isLoadingSharedSession={isLoadingSharedSession}
+                        setIsLoadingSharedSession={setIsLoadingSharedSession}
+                        sharedSessionError={sharedSessionError}
+                      />
+                    </ProviderGuard>
+                  }
+                />
+                <Route
+                  path="permission"
+                  element={
+                    <ProviderGuard>
+                      <PermissionRoute />
+                    </ProviderGuard>
+                  }
+                />
+                {/*<Route*/}
+                {/*  path="projects"*/}
+                {/*  element={*/}
+                {/*    <ProviderGuard>*/}
+                {/*      <ChatProvider chat={chat} setChat={setChat}>*/}
+                {/*        <ProjectsRoute />*/}
+                {/*      </ChatProvider>*/}
+                {/*    </ProviderGuard>  */}
+                {/*  }*/}
+                {/*/>*/}
+              </Route>
+            </Routes>
+          </div>
+          {isGoosehintsModalOpen && (
+            <GoosehintsModal
+              directory={window.appConfig.get('GOOSE_WORKING_DIR') as string}
+              setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
+            />
+          )}
+        </HashRouter>
+        <AnnouncementModal />
+      </ModelAndProviderProvider>
+    </DraftProvider>
   );
 }
