@@ -6,7 +6,16 @@ import {
   saveRecipe,
   generateRecipeFilename,
 } from '../recipe/recipeStorage';
-import { FileText, Trash2, Bot, Calendar, Globe, Folder, AlertCircle } from 'lucide-react';
+import {
+  FileText,
+  Trash2,
+  Bot,
+  Calendar,
+  Globe,
+  Folder,
+  AlertCircle,
+  Download,
+} from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
@@ -185,6 +194,13 @@ export default function RecipesView() {
     }
   };
 
+  const handleImportClick = () => {
+    setImportDeeplink('');
+    setImportRecipeName('');
+    setImportGlobal(true);
+    setShowImportDialog(true);
+  };
+
   // Auto-generate recipe name when deeplink changes
   const handleDeeplinkChange = (value: string) => {
     setImportDeeplink(value);
@@ -336,6 +352,15 @@ export default function RecipesView() {
             <div className="flex flex-col animate-in fade-in duration-500">
               <div className="flex justify-between items-center mb-1">
                 <h1 className="text-4xl font-light">Recipes</h1>
+                <Button
+                  onClick={handleImportClick}
+                  variant="default"
+                  size="sm"
+                  className="flex items-center gap-2"
+                >
+                  <Download className="w-4 h-4" />
+                  Import Recipe
+                </Button>
               </div>
               <p className="text-sm text-text-muted mb-1">
                 View and manage your saved recipes to quickly start new sessions with predefined
@@ -360,7 +385,7 @@ export default function RecipesView() {
 
       {/* Preview Modal */}
       {showPreview && selectedRecipe && (
-        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black bg-opacity-50">
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/50">
           <div className="bg-background-default border border-border-subtle rounded-lg p-6 w-[600px] max-w-[90vw] max-h-[80vh] overflow-y-auto">
             <div className="flex items-start justify-between mb-4">
               <div>
@@ -444,15 +469,15 @@ export default function RecipesView() {
 
       {/* Import Recipe Dialog */}
       {showImportDialog && (
-        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-background-default border border-borderSubtle rounded-lg p-6 w-[500px] max-w-[90vw]">
-            <h3 className="text-lg font-medium text-textProminent mb-4">Import Recipe</h3>
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/50">
+          <div className="bg-background-default border border-border-subtle rounded-lg p-6 w-[500px] max-w-[90vw]">
+            <h3 className="text-lg font-medium text-text-standard mb-4">Import Recipe</h3>
 
             <div className="space-y-4">
               <div>
                 <label
                   htmlFor="import-deeplink"
-                  className="block text-sm font-medium text-textStandard mb-2"
+                  className="block text-sm font-medium text-text-standard mb-2"
                 >
                   Recipe Deeplink
                 </label>
@@ -460,12 +485,12 @@ export default function RecipesView() {
                   id="import-deeplink"
                   value={importDeeplink}
                   onChange={(e) => handleDeeplinkChange(e.target.value)}
-                  className="w-full p-3 border border-borderSubtle rounded-lg bg-background-default text-textStandard focus:outline-none focus:ring-2 focus:ring-borderProminent resize-none"
+                  className="w-full p-3 border border-border-subtle rounded-lg bg-background-default text-text-standard focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                   placeholder="Paste your goose://recipe?config=... deeplink here"
                   rows={3}
                   autoFocus
                 />
-                <p className="text-xs text-textSubtle mt-1">
+                <p className="text-xs text-text-muted mt-1">
                   Paste a recipe deeplink starting with "goose://recipe?config="
                 </p>
               </div>
@@ -473,7 +498,7 @@ export default function RecipesView() {
               <div>
                 <label
                   htmlFor="import-recipe-name"
-                  className="block text-sm font-medium text-textStandard mb-2"
+                  className="block text-sm font-medium text-text-standard mb-2"
                 >
                   Recipe Name
                 </label>
@@ -482,13 +507,13 @@ export default function RecipesView() {
                   type="text"
                   value={importRecipeName}
                   onChange={(e) => setImportRecipeName(e.target.value)}
-                  className="w-full p-3 border border-borderSubtle rounded-lg bg-background-default text-textStandard focus:outline-none focus:ring-2 focus:ring-borderProminent"
+                  className="w-full p-3 border border-border-subtle rounded-lg bg-background-default text-text-standard focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Enter a name for the imported recipe"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-textStandard mb-2">
+                <label className="block text-sm font-medium text-text-standard mb-2">
                   Save Location
                 </label>
                 <div className="space-y-2">
@@ -500,7 +525,7 @@ export default function RecipesView() {
                       onChange={() => setImportGlobal(true)}
                       className="mr-2"
                     />
-                    <span className="text-sm text-textStandard">
+                    <span className="text-sm text-text-standard">
                       Global - Available across all Goose sessions
                     </span>
                   </label>
@@ -512,7 +537,7 @@ export default function RecipesView() {
                       onChange={() => setImportGlobal(false)}
                       className="mr-2"
                     />
-                    <span className="text-sm text-textStandard">
+                    <span className="text-sm text-text-standard">
                       Directory - Available in the working directory
                     </span>
                   </label>
@@ -521,24 +546,24 @@ export default function RecipesView() {
             </div>
 
             <div className="flex justify-end space-x-3 mt-6">
-              <button
+              <Button
                 onClick={() => {
                   setShowImportDialog(false);
                   setImportDeeplink('');
                   setImportRecipeName('');
                 }}
-                className="px-4 py-2 text-textSubtle hover:text-textStandard transition-colors"
+                variant="ghost"
                 disabled={importing}
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={handleImportRecipe}
                 disabled={!importDeeplink.trim() || !importRecipeName.trim() || importing}
-                className="px-4 py-2 bg-textProminent text-bgApp rounded-lg hover:bg-opacity-90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                variant="default"
               >
                 {importing ? 'Importing...' : 'Import Recipe'}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

@@ -1153,12 +1153,9 @@ export default function ChatInput({
               </>
             )}
             <Tooltip>
-              <TooltipTrigger asChild>
-                <div>
-                  <ModelsBottomBar dropdownRef={dropdownRef} setView={setView} alerts={alerts} />
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>Current model and provider settings</TooltipContent>
+              <div>
+                <ModelsBottomBar dropdownRef={dropdownRef} setView={setView} alerts={alerts} />
+              </div>
             </Tooltip>
             <div className="w-px h-4 bg-border-default mx-2" />
             <Tooltip>

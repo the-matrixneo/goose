@@ -3,7 +3,6 @@ import { Button } from '../ui/button';
 import { ScrollArea } from '../ui/scroll-area';
 import BackButton from '../ui/BackButton';
 import { Card } from '../ui/card';
-import MoreMenuLayout from '../more_menu/MoreMenuLayout';
 import { fetchSessionDetails, SessionDetails } from '../../sessions';
 import {
   getScheduleSessions,
@@ -485,7 +484,6 @@ const ScheduleDetailView: React.FC<ScheduleDetailViewProps> = ({ scheduleId, onN
   if (!scheduleId) {
     return (
       <div className="h-screen w-full flex flex-col items-center justify-center bg-white dark:bg-gray-900 text-text-default p-8">
-        <MoreMenuLayout showMenu={false} />
         <BackButton onClick={onNavigateBack} />
         <h1 className="text-2xl font-medium text-text-prominent mt-4">Schedule Not Found</h1>
         <p className="text-text-subtle mt-2">
@@ -497,7 +495,6 @@ const ScheduleDetailView: React.FC<ScheduleDetailViewProps> = ({ scheduleId, onN
 
   return (
     <div className="h-screen w-full flex flex-col bg-background-default text-text-default">
-      <MoreMenuLayout showMenu={false} />
       <div className="px-8 pt-6 pb-4 border-b border-border-subtle flex-shrink-0">
         <BackButton onClick={onNavigateBack} />
         <h1 className="text-3xl font-medium text-text-prominent mt-1">Schedule Details</h1>

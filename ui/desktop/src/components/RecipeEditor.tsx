@@ -523,7 +523,7 @@ export default function RecipeEditor({ config }: RecipeEditorProps) {
 
       {/* Save Recipe Dialog */}
       {showSaveDialog && (
-        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black bg-opacity-50">
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/50">
           <div className="bg-background-default border border-borderSubtle rounded-lg p-6 w-96 max-w-[90vw]">
             <h3 className="text-lg font-medium text-textProminent mb-4">Save Recipe</h3>
 

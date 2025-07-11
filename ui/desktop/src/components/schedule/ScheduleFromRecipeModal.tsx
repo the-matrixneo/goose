@@ -69,7 +69,7 @@ export const ScheduleFromRecipeModal: React.FC<ScheduleFromRecipeModalProps> = (
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/50 z-40 flex items-center justify-center p-4">
       <Card className="w-full max-w-md bg-background-default shadow-xl rounded-lg z-50 flex flex-col">
         <div className="px-6 pt-6 pb-4">
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
