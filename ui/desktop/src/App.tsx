@@ -1260,6 +1260,15 @@ export default function App() {
       const currentDiffContent = window.pendingDiffContent;
       const diffContentMatches = currentDiffContent === diffSidePanelContent;
 
+      console.log('Toggle diff viewer:', {
+        isDiffSidePanelOpen,
+        currentDiffContent: currentDiffContent ? `${currentDiffContent.length} characters` : 'null',
+        diffContentMatches,
+        diffSidePanelContent: diffSidePanelContent
+          ? `${diffSidePanelContent.length} characters`
+          : 'empty',
+      });
+
       setDiffSidePanelContent(currentDiffContent || '');
 
       try {
@@ -1385,8 +1394,7 @@ export default function App() {
                       <HubRouteWrapper
                         chat={chat}
                         setChat={setChat}
-                        setPairChat={setPairChat}
-                        setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
+                        setPairChat={setPairChat}setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
                       />
                     </ProviderGuard>
                   }
@@ -1395,16 +1403,12 @@ export default function App() {
                   path="pair"
                   element={
                     <ProviderGuard>
-                      <ChatProvider
-                        chat={pairChat}
-                        setChat={setPairChat}
+                      <ChatProvider chat={pairChat} setChat={setPairChat}
                         contextKey={`pair-${pairChat.id}`}
                         key={pairChat.id} // Add key prop to force re-render when chat ID changes
-                      >
-                        <PairRouteWrapper
+                      ><PairRouteWrapper
                           chat={pairChat}
-                          setChat={setPairChat}
-                          setPairChat={setPairChat}
+                          setChat={setPairChat}setPairChat={setPairChat}
                           setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
                         />
                       </ChatProvider>
@@ -1492,7 +1496,7 @@ export default function App() {
               </Route>
             </Routes>
           </div>
-      </div>
+        </div>
 
         {/* Diff Side Panel */}
         <DiffSidePanel
