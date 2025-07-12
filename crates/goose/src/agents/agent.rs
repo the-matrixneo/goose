@@ -15,7 +15,6 @@ use crate::agents::sub_recipe_execution_tool::sub_recipe_execute_task_tool::{
 use crate::agents::sub_recipe_execution_tool::lib::SubagentExecutor;
 use crate::agents::sub_recipe_manager::SubRecipeManager;
 use crate::agents::recipe_tools::dynamic_task_tools::{create_dynamic_task_tool, DYNAMIC_TASK_TOOL_NAME_PREFIX};
-use crate::agents::recipe_tools::subagent_task_tools::{create_subagent_task_tool, SUBAGENT_TASK_TOOL_NAME_PREFIX, create_subagent_task};
 use crate::config::{Config, ExtensionConfigManager, PermissionManager};
 use crate::message::Message;
 use crate::permission::permission_judge::check_tool_permissions;
@@ -61,7 +60,7 @@ const DEFAULT_MAX_TURNS: u32 = 1000;
 /// The main goose Agent
 pub struct Agent {
     pub(super) provider: Mutex<Option<Arc<dyn Provider>>>,
-    pub(super) extension_manager: RwLock<ExtensionManager>,
+    pub(super) extension_manager: Arc<RwLock<ExtensionManager>>,
     pub(super) sub_recipe_manager: Mutex<SubRecipeManager>,
     pub(super) final_output_tool: Mutex<Option<FinalOutputTool>>,
     pub(super) frontend_tools: Mutex<HashMap<String, FrontendTool>>,
@@ -135,7 +134,7 @@ impl Agent {
 
         Self {
             provider: Mutex::new(None),
-            extension_manager: RwLock::new(ExtensionManager::new()),
+            extension_manager: Arc::new(RwLock::new(ExtensionManager::new())),
             sub_recipe_manager: Mutex::new(SubRecipeManager::new()),
             final_output_tool: Mutex::new(None),
             frontend_tools: Mutex::new(HashMap::new()),
@@ -295,16 +294,20 @@ impl Agent {
                 .await
         } else if tool_call.name == SUB_RECIPE_EXECUTE_TASK_TOOL_NAME {
             // Create subagent executor for task execution
-            let subagent_manager = self.subagent_manager.lock().await;
-            let subagent_executor = if let Some(manager) = subagent_manager.as_ref() {
+            let manager_opt = {
+                let subagent_manager = self.subagent_manager.lock().await;
+                subagent_manager.as_ref().cloned()
+            };
+            
+            let subagent_executor = if let Some(manager) = manager_opt {
                 let manager_clone = manager.clone();
+                let extension_manager = self.extension_manager.clone();
                 let provider = self.provider().await.ok();
-                let extension_manager = self.extension_manager.read().await;
                 
-                Some(Box::new(move |args: crate::agents::subagent_types::SpawnSubAgentArgs| {
+                Some(Arc::new(move |args: crate::agents::subagent_types::SpawnSubAgentArgs| {
                     let manager = manager_clone.clone();
-                    let provider = provider.clone();
                     let extension_manager = extension_manager.clone();
+                    let provider = provider.clone();
                     
                     Box::pin(async move {
                         if let Some(provider) = provider {
@@ -318,7 +321,7 @@ impl Agent {
                         } else {
                             Err("Provider not available".to_string())
                         }
-                    })
+                    }) as Pin<Box<dyn Future<Output = Result<String, String>> + Send>>
                 }) as SubagentExecutor)
             } else {
                 None
@@ -330,13 +333,6 @@ impl Agent {
             ToolCallResult::from(Err(ToolError::ExecutionError(
                 "Dynamic task creation should be handled by the tool itself".to_string(),
             )))
-        } else if tool_call.name == SUBAGENT_TASK_TOOL_NAME_PREFIX {
-            // Handle subagent task creation
-            let result = create_subagent_task(tool_call.arguments.clone()).await;
-            match result {
-                Ok(tasks_json) => ToolCallResult::from(Ok(vec![Content::text(tasks_json)])),
-                Err(e) => ToolCallResult::from(Err(ToolError::ExecutionError(e.to_string()))),
-            }
         } else if tool_call.name == PLATFORM_READ_RESOURCE_TOOL_NAME {
             // Check if the tool is read_resource and handle it separately
             ToolCallResult::from(
@@ -593,12 +589,6 @@ impl Agent {
                 platform_tools::manage_schedule_tool(),
             ]);
 
-            // Add subagent tool (only if ALPHA_FEATURES is enabled)
-            let config = Config::global();
-            if config.get_param::<bool>("ALPHA_FEATURES").unwrap_or(false) {
-                prefixed_tools.push(subagent_tools::run_task_subagent_tool());
-            }
-
             // Add resource tools if supported
             if extension_manager.supports_resources() {
                 prefixed_tools.extend([
@@ -614,9 +604,6 @@ impl Agent {
 
             // Add dynamic task tool
             prefixed_tools.push(create_dynamic_task_tool());
-
-            // Add subagent task tool
-            prefixed_tools.push(create_subagent_task_tool());
 
             if let Some(final_output_tool) = self.final_output_tool.lock().await.as_ref() {
                 prefixed_tools.push(final_output_tool.tool());

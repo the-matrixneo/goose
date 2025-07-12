@@ -103,7 +103,7 @@ impl SubAgent {
     pub async fn new(
         config: SubAgentConfig,
         _provider: Arc<dyn Provider>,
-        extension_manager: Arc<tokio::sync::RwLockReadGuard<'_, ExtensionManager>>,
+        extension_manager: Arc<RwLock<ExtensionManager>>,
         mcp_notification_tx: mpsc::Sender<JsonRpcMessage>,
     ) -> Result<(Arc<Self>, tokio::task::JoinHandle<()>), anyhow::Error> {
         debug!("Creating new subagent with id: {}", config.id);
@@ -116,7 +116,7 @@ impl SubAgent {
             if let Some(extensions) = &recipe.extensions {
                 for extension in extensions {
                     let extension_name = extension.name();
-                    let existing_extensions = extension_manager.list_extensions().await?;
+                    let existing_extensions = extension_manager.read().await.list_extensions().await?;
 
                     if !existing_extensions.contains(&extension_name) {
                         missing_extensions.push(extension_name);
@@ -127,7 +127,7 @@ impl SubAgent {
             }
         } else {
             // If no recipe, inherit all extensions from the parent agent
-            let existing_extensions = extension_manager.list_extensions().await?;
+            let existing_extensions = extension_manager.read().await.list_extensions().await?;
             recipe_extensions = existing_extensions;
         }
 

@@ -13,7 +13,7 @@ use crate::agents::subagent_types::SpawnSubAgentArgs;
 const DEFAULT_TASK_TIMEOUT_SECONDS: u64 = 300;
 
 // Type for subagent execution callback
-pub type SubagentExecutor = Box<dyn Fn(SpawnSubAgentArgs) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<String, String>> + Send>> + Send + Sync>;
+pub type SubagentExecutor = Arc<dyn Fn(SpawnSubAgentArgs) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<String, String>> + Send>> + Send + Sync>;
 
 pub async fn process_task(
     task: &Task,
