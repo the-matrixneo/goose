@@ -293,16 +293,18 @@ impl Agent {
                 .dispatch_sub_recipe_tool_call(&tool_call.name, tool_call.arguments.clone())
                 .await
         } else if tool_call.name == SUB_RECIPE_EXECUTE_TASK_TOOL_NAME {
-            // Create subagent executor for task execution
-            let manager_opt = {
-                let subagent_manager = self.subagent_manager.lock().await;
-                subagent_manager.as_ref().cloned()
+            // Use the standalone handle_run_subagent_task function
+            let subagent_manager = {
+                let manager = self.subagent_manager.lock().await;
+                manager.as_ref().cloned()
             };
+            let extension_manager = self.extension_manager.clone();
+            let provider = self.provider().await.ok();
             
-            let subagent_executor = if let Some(manager) = manager_opt {
+            let subagent_executor = if let Some(manager) = subagent_manager {
                 let manager_clone = manager.clone();
-                let extension_manager = self.extension_manager.clone();
-                let provider = self.provider().await.ok();
+                let extension_manager = extension_manager.clone();
+                let provider = provider.clone();
                 
                 Some(Arc::new(move |args: crate::agents::subagent_types::SpawnSubAgentArgs| {
                     let manager = manager_clone.clone();
@@ -311,22 +313,39 @@ impl Agent {
                     
                     Box::pin(async move {
                         if let Some(provider) = provider {
-                            match manager
-                                .run_complete_subagent_task(args, provider, extension_manager)
-                                .await
-                            {
-                                Ok(result) => Ok(result),
+                            // Convert SpawnSubAgentArgs to Value
+                            let mut map = serde_json::Map::new();
+                            map.insert("task".to_string(), serde_json::Value::String(args.message));
+                            if let Some(recipe_name) = args.recipe_name {
+                                map.insert("recipe_name".to_string(), serde_json::Value::String(recipe_name));
+                            }
+                            if let Some(instructions) = args.instructions {
+                                map.insert("instructions".to_string(), serde_json::Value::String(instructions));
+                            }
+                            if let Some(max_turns) = args.max_turns {
+                                map.insert("max_turns".to_string(), serde_json::Value::Number(serde_json::Number::from(max_turns as u64)));
+                            }
+                            if let Some(timeout_seconds) = args.timeout_seconds {
+                                map.insert("timeout_seconds".to_string(), serde_json::Value::Number(serde_json::Number::from(timeout_seconds)));
+                            }
+                            let arguments = serde_json::Value::Object(map);
+                            
+                            // Call the standalone function
+                            match crate::agents::subagent_handler::handle_run_subagent_task(
+                                &manager, provider, extension_manager, arguments
+                            ).await {
+                                Ok(contents) => Ok(contents.into_iter().filter_map(|c| c.as_text().map(|s| s.to_string())).collect::<Vec<_>>().join("\n")),
                                 Err(e) => Err(e.to_string()),
                             }
                         } else {
                             Err("Provider not available".to_string())
                         }
                     }) as Pin<Box<dyn Future<Output = Result<String, String>> + Send>>
-                }) as SubagentExecutor)
+                }) as crate::agents::sub_recipe_execution_tool::lib::SubagentExecutor)
             } else {
                 None
             };
-            
+
             sub_recipe_execute_task_tool::run_tasks(tool_call.arguments.clone(), subagent_executor).await
         } else if tool_call.name == DYNAMIC_TASK_TOOL_NAME_PREFIX {
             // Handle dynamic task creation - this should be handled by the tool itself
