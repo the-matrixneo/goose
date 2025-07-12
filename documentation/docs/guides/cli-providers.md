@@ -137,6 +137,7 @@ goose session start
 | Environment Variable | Description | Default |
 |---------------------|-------------|---------|
 | `GOOSE_PROVIDER` | Set to `gemini-cli` to use this provider | None |
+| `GEMINI_CLI_COMMAND` | Path to the Gemini CLI command | `gemini` |
 
 ## How It Works
 

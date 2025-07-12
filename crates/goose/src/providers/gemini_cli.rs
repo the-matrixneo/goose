@@ -15,8 +15,8 @@ use mcp_core::content::TextContent;
 use mcp_core::tool::Tool;
 use mcp_core::Role;
 
-pub const GEMINI_CLI_DEFAULT_MODEL: &str = "default";
-pub const GEMINI_CLI_KNOWN_MODELS: &[&str] = &["default"];
+pub const GEMINI_CLI_DEFAULT_MODEL: &str = "gemini-2.5-pro";
+pub const GEMINI_CLI_KNOWN_MODELS: &[&str] = &["gemini-2.5-pro"];
 
 pub const GEMINI_CLI_DOC_URL: &str = "https://ai.google.dev/gemini-api/docs";
 
@@ -35,11 +35,16 @@ impl Default for GeminiCliProvider {
 
 impl GeminiCliProvider {
     pub fn from_env(model: ModelConfig) -> Result<Self> {
-        let command_name = "gemini";
+        let config = crate::config::Config::global();
+        let command: String = config
+            .get_param("GEMINI_CLI_COMMAND")
+            .unwrap_or_else(|_| "gemini".to_string());
 
-        // Search for gemini executable in common locations
-        let resolved_command =
-            Self::find_gemini_executable(command_name).unwrap_or_else(|| command_name.to_string());
+        let resolved_command = if !command.contains('/') {
+            Self::find_gemini_executable(&command).unwrap_or(command)
+        } else {
+            command
+        };
 
         Ok(Self {
             command: resolved_command,
@@ -166,7 +171,11 @@ impl GeminiCliProvider {
         }
 
         let mut cmd = Command::new(&self.command);
-        cmd.arg("-p").arg(&full_prompt).arg("--yolo");
+        cmd.arg("-m")
+            .arg(&self.model.model_name)
+            .arg("-p")
+            .arg(&full_prompt)
+            .arg("--yolo");
 
         cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
 
@@ -189,7 +198,7 @@ impl GeminiCliProvider {
                 Ok(0) => break, // EOF
                 Ok(_) => {
                     let trimmed = line.trim();
-                    if !trimmed.is_empty() {
+                    if !trimmed.is_empty() && !trimmed.starts_with("Loaded cached credentials") {
                         lines.push(trimmed.to_string());
                     }
                 }
@@ -310,8 +319,8 @@ impl Provider for GeminiCliProvider {
     }
 
     fn get_model_config(&self) -> ModelConfig {
-        // Return a custom config with 1M token limit for Gemini CLI
-        ModelConfig::new("gemini-1.5-pro".to_string()).with_context_limit(Some(1_000_000))
+        // Return the model config with appropriate context limit for Gemini models
+        self.model.clone()
     }
 
     #[tracing::instrument(
@@ -364,7 +373,8 @@ mod tests {
         let provider = GeminiCliProvider::default();
         let config = provider.get_model_config();
 
-        assert_eq!(config.model_name, "gemini-1.5-pro");
-        assert_eq!(config.context_limit(), 1_000_000);
+        assert_eq!(config.model_name, "gemini-2.5-pro");
+        // Context limit should be set by the ModelConfig
+        assert!(config.context_limit() > 0);
     }
 }

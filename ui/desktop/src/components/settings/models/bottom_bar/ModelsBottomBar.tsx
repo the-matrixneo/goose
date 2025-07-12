@@ -8,6 +8,7 @@ import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '../../
 import Modal from '../../../Modal';
 import { useCurrentModelInfo } from '../../../ChatView';
 import { useConfig } from '../../../ConfigContext';
+import { getProviderMetadata } from '../modelInterface';
 
 interface ModelsBottomBarProps {
   dropdownRef: React.RefObject<HTMLDivElement>;
@@ -17,7 +18,7 @@ export default function ModelsBottomBar({ dropdownRef, setView }: ModelsBottomBa
   const { currentModel, currentProvider, getCurrentModelAndProviderForDisplay } =
     useModelAndProvider();
   const currentModelInfo = useCurrentModelInfo();
-  const { read } = useConfig();
+  const { read, getProviders } = useConfig();
   const [isModelMenuOpen, setIsModelMenuOpen] = useState(false);
   const [displayProvider, setDisplayProvider] = useState<string | null>(null);
   const [isAddModelModalOpen, setIsAddModelModalOpen] = useState(false);
@@ -25,6 +26,7 @@ export default function ModelsBottomBar({ dropdownRef, setView }: ModelsBottomBa
   const [isLeadWorkerActive, setIsLeadWorkerActive] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const [isModelTruncated, setIsModelTruncated] = useState(false);
+  const [providerDefaultModel, setProviderDefaultModel] = useState<string | null>(null);
   // eslint-disable-next-line no-undef
   const modelRef = useRef<HTMLSpanElement>(null);
   const [isTooltipOpen, setIsTooltipOpen] = useState(false);
@@ -46,7 +48,7 @@ export default function ModelsBottomBar({ dropdownRef, setView }: ModelsBottomBa
   const displayModel =
     isLeadWorkerActive && currentModelInfo?.model
       ? currentModelInfo.model
-      : currentModel || 'Select Model';
+      : currentModel || providerDefaultModel || 'Select Model';
   const modelMode = currentModelInfo?.mode;
 
   // Update display provider when current provider changes
@@ -58,6 +60,24 @@ export default function ModelsBottomBar({ dropdownRef, setView }: ModelsBottomBa
       })();
     }
   }, [currentProvider, getCurrentModelAndProviderForDisplay]);
+
+  // Fetch provider default model when provider changes and no current model
+  useEffect(() => {
+    if (currentProvider && !currentModel) {
+      (async () => {
+        try {
+          const metadata = await getProviderMetadata(currentProvider, getProviders);
+          setProviderDefaultModel(metadata.default_model);
+        } catch (error) {
+          console.error('Failed to get provider default model:', error);
+          setProviderDefaultModel(null);
+        }
+      })();
+    } else if (currentModel) {
+      // Clear provider default when we have a current model
+      setProviderDefaultModel(null);
+    }
+  }, [currentProvider, currentModel, getProviders]);
 
   useEffect(() => {
     const checkTruncation = () => {

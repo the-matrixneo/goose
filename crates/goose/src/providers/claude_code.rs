@@ -15,8 +15,8 @@ use mcp_core::content::TextContent;
 use mcp_core::tool::Tool;
 use mcp_core::Role;
 
-pub const CLAUDE_CODE_DEFAULT_MODEL: &str = "default";
-pub const CLAUDE_CODE_KNOWN_MODELS: &[&str] = &["default"];
+pub const CLAUDE_CODE_DEFAULT_MODEL: &str = "claude-3-5-sonnet-latest";
+pub const CLAUDE_CODE_KNOWN_MODELS: &[&str] = &["sonnet", "opus", "claude-3-5-sonnet-latest"];
 
 pub const CLAUDE_CODE_DOC_URL: &str = "https://claude.ai/cli";
 
@@ -330,6 +330,8 @@ impl ClaudeCodeProvider {
             .arg(messages_json.to_string())
             .arg("--system-prompt")
             .arg(&filtered_system)
+            .arg("--model")
+            .arg(&self.model.model_name)
             .arg("--verbose")
             .arg("--output-format")
             .arg("json");
@@ -456,8 +458,8 @@ impl Provider for ClaudeCodeProvider {
     }
 
     fn get_model_config(&self) -> ModelConfig {
-        // Return a custom config with 200K token limit for Claude Code
-        ModelConfig::new("claude-3-5-sonnet-latest".to_string()).with_context_limit(Some(200_000))
+        // Return the model config with appropriate context limit for Claude models
+        self.model.clone()
     }
 
     #[tracing::instrument(
@@ -511,6 +513,7 @@ mod tests {
         let config = provider.get_model_config();
 
         assert_eq!(config.model_name, "claude-3-5-sonnet-latest");
-        assert_eq!(config.context_limit(), 200_000);
+        // Context limit should be set by the ModelConfig
+        assert!(config.context_limit() > 0);
     }
 }
