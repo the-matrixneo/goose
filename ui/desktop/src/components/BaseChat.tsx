@@ -338,7 +338,7 @@ function BaseChatContent({
           >
             {/* Recipe agent header - now inside the messages container */}
             {recipeConfig?.title && (
-              <div className="px-0 -mx-6">
+              <div className="px-0 -mx-6 mb-6">
                 <AgentHeader
                   title={recipeConfig.title}
                   profileInfo={
@@ -349,7 +349,7 @@ function BaseChatContent({
                   onChangeProfile={() => {
                     console.log('Change profile clicked');
                   }}
-                  showBorder={messages.length > 0}
+                  showBorder={true}
                 />
               </div>
             )}
