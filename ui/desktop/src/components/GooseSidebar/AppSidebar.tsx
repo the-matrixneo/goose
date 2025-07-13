@@ -108,7 +108,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ currentPath }) => {
                     className="w-full justify-start px-3 rounded-lg h-fit hover:bg-background-medium/50 transition-all duration-200 data-[active=true]:bg-background-medium"
                   >
                     <History className="w-4 h-4" />
-                    <span>Sessions</span>
+                    <span>History</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </motion.div>
