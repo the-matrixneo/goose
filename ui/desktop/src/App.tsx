@@ -43,6 +43,7 @@ import PermissionSettingsView from './components/settings/permission/PermissionS
 import { type SessionDetails } from './sessions';
 import ExtensionsView, { ExtensionsViewOptions } from './components/extensions/ExtensionsView';
 // import ProjectsContainer from './components/projects/ProjectsContainer';
+import { Recipe } from './recipe';
 import RecipesView from './components/RecipesView';
 import RecipeEditor from './components/RecipeEditor';
 
@@ -779,23 +780,46 @@ export default function App() {
           }
         }
 
-        if (recipeConfig === null) {
-          setFatalError('Cannot read recipe config. Please check the deeplink and try again.');
-          return;
-        }
-
         const config = window.electron.getConfig();
         const provider = (await read('GOOSE_PROVIDER', false)) ?? config.GOOSE_DEFAULT_PROVIDER;
         const model = (await read('GOOSE_MODEL', false)) ?? config.GOOSE_DEFAULT_MODEL;
 
         if (provider && model) {
-          // Navigate to chat route
-          window.history.replaceState({}, '', '/');
           try {
             await initializeSystem(provider as string, model as string, {
               getExtensions,
               addExtension,
             });
+
+            // Check if we have a recipe config from a deeplink
+            if (recipeConfig && typeof recipeConfig === 'object') {
+              console.log(
+                'Recipe deeplink detected, navigating to pair view with config:',
+                recipeConfig
+              );
+              // Set the recipe config in the pair chat state
+              setPairChat((prevChat) => ({
+                ...prevChat,
+                recipeConfig: recipeConfig as Recipe,
+                title: (recipeConfig as Recipe).title || 'Recipe Chat',
+                messages: [], // Start fresh for recipe
+                messageHistoryIndex: 0,
+              }));
+              // Navigate to pair view with recipe config using hash routing
+              window.location.hash = '#/pair';
+              window.history.replaceState(
+                {
+                  recipeConfig: recipeConfig,
+                  resetChat: true,
+                },
+                '',
+                '#/pair'
+              );
+            } else {
+              // Navigate to chat route (hub)
+              window.location.hash = '#/';
+              window.history.replaceState({}, '', '#/');
+            }
           } catch (error) {
             console.error('Error in initialization:', error);
             if (error instanceof MalformedConfigError) {
@@ -815,7 +839,7 @@ export default function App() {
     };
 
     initializeApp();
-  }, [getExtensions, addExtension, read]);
+  }, [getExtensions, addExtension, read, setPairChat]);
 
   useEffect(() => {
     console.log('Sending reactReady signal to Electron');
@@ -826,6 +850,18 @@ export default function App() {
       setFatalError(
         `React ready notification failed: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
+    }
+  }, []);
+
+  // Handle navigation to pair view for recipe deeplinks after router is ready
+  useEffect(() => {
+    const recipeConfig = window.appConfig.get('recipeConfig');
+    if (recipeConfig && typeof recipeConfig === 'object' && window.location.hash === '#/') {
+      console.log('Router ready - navigating to pair view for recipe deeplink:', recipeConfig);
+      // Small delay to ensure router is fully initialized
+      setTimeout(() => {
+        window.location.hash = '#/pair';
+      }, 100);
     }
   }, []);
 
