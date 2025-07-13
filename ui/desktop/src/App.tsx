@@ -846,9 +846,29 @@ export default function App() {
                 '#/pair'
               );
             } else {
-              // Navigate to chat route (hub)
-              window.location.hash = '#/';
-              window.history.replaceState({}, '', '#/');
+              // Only navigate to chat route if we're not already on a valid route
+              const currentHash = window.location.hash;
+              const validRoutes = [
+                '#/',
+                '#/pair',
+                '#/settings',
+                '#/sessions',
+                '#/schedules',
+                '#/recipes',
+                '#/permission',
+                '#/configure-providers',
+                '#/shared-session',
+                '#/recipe-editor',
+                '#/extensions',
+              ];
+
+              if (!validRoutes.includes(currentHash)) {
+                console.log('No valid route detected, navigating to chat route (hub)');
+                window.location.hash = '#/';
+                window.history.replaceState({}, '', '#/');
+              } else {
+                console.log('Already on valid route:', currentHash);
+              }
             }
           } catch (error) {
             console.error('Error in initialization:', error);
