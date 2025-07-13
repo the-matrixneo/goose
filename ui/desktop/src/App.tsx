@@ -223,6 +223,9 @@ const SettingsRoute = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
+  // Get viewOptions from location.state or history.state
+  const viewOptions =
+    (location.state as SettingsViewOptions) || (window.history.state as SettingsViewOptions) || {};
   return (
     <SettingsView
       onClose={() => navigate('/')}
@@ -266,7 +269,7 @@ const SettingsRoute = () => {
             navigate('/');
         }
       }}
-      viewOptions={(location.state as SettingsViewOptions) || {}}
+      viewOptions={viewOptions}
     />
   );
 };
@@ -516,7 +519,12 @@ const SharedSessionRouteWrapper = ({
 const ExtensionsRoute = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const viewOptions = location.state as ExtensionsViewOptions;
+
+  // Get viewOptions from location.state or history.state (for deep link extensions)
+  const viewOptions =
+    (location.state as ExtensionsViewOptions) ||
+    (window.history.state as ExtensionsViewOptions) ||
+    {};
 
   return (
     <ExtensionsView
@@ -536,7 +544,7 @@ const ExtensionsRoute = () => {
             navigate('/');
         }
       }}
-      viewOptions={viewOptions || {}}
+      viewOptions={viewOptions}
     />
   );
 };
@@ -1094,8 +1102,17 @@ export default function App() {
       console.log(`Confirming installation of extension from: ${pendingLink}`);
       setModalVisible(false);
       try {
-        await addExtensionFromDeepLinkV2(pendingLink, addExtension, (view: string, _options) => {
-          window.history.replaceState({}, '', `/${view}`);
+        await addExtensionFromDeepLinkV2(pendingLink, addExtension, (view: string, options) => {
+          console.log('Extension deep link handler called with view:', view, 'options:', options);
+          switch (view) {
+            case 'settings':
+              window.location.hash = '#/extensions';
+              // Store the config for the extensions route
+              window.history.replaceState(options, '', '#/extensions');
+              break;
+            default:
+              window.location.hash = `#/${view}`;
+          }
         });
         console.log('Extension installation successful');
       } catch (error) {

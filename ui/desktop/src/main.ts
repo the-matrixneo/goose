@@ -133,7 +133,28 @@ async function ensureTempDirExists(): Promise<string> {
 
 if (started) app.quit();
 
-app.setAsDefaultProtocolClient('goose');
+// In development mode, force registration as the default protocol client
+// In production, register normally
+if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
+  // Development mode - force registration
+  console.log('[Main] Development mode: Forcing protocol registration for goose://');
+  app.setAsDefaultProtocolClient('goose');
+
+  if (process.platform === 'darwin') {
+    try {
+      // Reset the default handler to ensure dev version takes precedence
+      spawn('open', ['-a', process.execPath, '--args', '--reset-protocol-handler', 'goose'], {
+        detached: true,
+        stdio: 'ignore',
+      });
+    } catch (error) {
+      console.warn('[Main] Could not reset protocol handler:', error);
+    }
+  }
+} else {
+  // Production mode - normal registration
+  app.setAsDefaultProtocolClient('goose');
+}
 
 // Only apply single instance lock on Windows where it's needed for deep links
 let gotTheLock = true;
