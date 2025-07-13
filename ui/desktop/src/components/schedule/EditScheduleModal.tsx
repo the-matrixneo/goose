@@ -538,9 +538,9 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
           <Button
             type="submit"
             form="edit-schedule-form"
-            variant="default"
+            variant="ghost"
             disabled={isLoadingExternally}
-            className="w-full h-[60px] rounded-none border-t dark:border-gray-600 text-lg dark:text-white dark:border-gray-600 font-regular"
+            className="w-full h-[60px] rounded-none border-t text-gray-900 dark:text-white hover:bg-gray-50 dark:border-gray-600 text-lg font-medium"
           >
             {isLoadingExternally ? 'Updating...' : 'Update Schedule'}
           </Button>
