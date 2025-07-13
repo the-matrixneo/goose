@@ -1,6 +1,5 @@
-import React, { useEffect, useState, useRef, useMemo } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { MessageSquareText, Target, AlertCircle, Calendar, Folder } from 'lucide-react';
-import { VariableSizeList as List } from 'react-window';
 import { fetchSessions, type Session } from '../../sessions';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
@@ -22,13 +21,6 @@ interface SessionListViewProps {
   onSelectSession: (sessionId: string) => void;
 }
 
-// Flattened item structure for virtualization
-interface FlattenedItem {
-  type: 'header' | 'session';
-  data: DateGroup | Session;
-  index: number;
-}
-
 const SessionListView: React.FC<SessionListViewProps> = ({ onSelectSession }) => {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [filteredSessions, setFilteredSessions] = useState<Session[]>([]);
@@ -43,37 +35,29 @@ const SessionListView: React.FC<SessionListViewProps> = ({ onSelectSession }) =>
     currentIndex: number;
   } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const listRef = useRef<List>(null);
 
-  // Flatten date groups into a single array for virtualization
-  const flattenedItems = useMemo((): FlattenedItem[] => {
-    const items: FlattenedItem[] = [];
-    let index = 0;
-
-    dateGroups.forEach((group) => {
-      // Add header
-      items.push({
-        type: 'header',
-        data: group,
-        index: index++,
-      });
-
-      // Add sessions
-      group.sessions.forEach((session) => {
-        items.push({
-          type: 'session',
-          data: session,
-          index: index++,
-        });
-      });
-    });
-
-    return items;
-  }, [dateGroups]);
+  const loadSessions = useCallback(async () => {
+    setIsLoading(true);
+    setShowSkeleton(true);
+    setShowContent(false);
+    setError(null);
+    try {
+      const sessions = await fetchSessions();
+      setSessions(sessions);
+      setFilteredSessions(sessions);
+    } catch (err) {
+      console.error('Failed to load sessions:', err);
+      setError('Failed to load sessions. Please try again later.');
+      setSessions([]);
+      setFilteredSessions([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     loadSessions();
-  }, []);
+  }, [loadSessions]);
 
   // Timing logic to prevent flicker between skeleton and content on initial load
   useEffect(() => {
@@ -99,13 +83,6 @@ const SessionListView: React.FC<SessionListViewProps> = ({ onSelectSession }) =>
       setDateGroups([]);
     }
   }, [filteredSessions]);
-
-  // Reset list cache when items change
-  useEffect(() => {
-    if (listRef.current) {
-      listRef.current.resetAfterIndex(0);
-    }
-  }, [flattenedItems]);
 
   // Filter sessions when search term or case sensitivity changes
   const handleSearch = (term: string, caseSensitive: boolean) => {
@@ -138,25 +115,6 @@ const SessionListView: React.FC<SessionListViewProps> = ({ onSelectSession }) =>
 
     setFilteredSessions(filtered);
     setSearchResults(filtered.length > 0 ? { count: filtered.length, currentIndex: 1 } : null);
-  };
-
-  const loadSessions = async () => {
-    setIsLoading(true);
-    setShowSkeleton(true);
-    setShowContent(false);
-    setError(null);
-    try {
-      const sessions = await fetchSessions();
-      setSessions(sessions);
-      setFilteredSessions(sessions);
-    } catch (err) {
-      console.error('Failed to load sessions:', err);
-      setError('Failed to load sessions. Please try again later.');
-      setSessions([]);
-      setFilteredSessions([]);
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   // Handle search result navigation
@@ -325,71 +283,68 @@ const SessionListView: React.FC<SessionListViewProps> = ({ onSelectSession }) =>
         </div>
 
         <div className="flex-1 min-h-0 relative px-8">
-          <ScrollArea className="h-full">
-            {/* Skeleton layer - always rendered but conditionally visible */}
-            <div
-              className={`absolute inset-0 transition-opacity duration-300 ${
-                isLoading || showSkeleton ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'
-              }`}
-            >
+          <ScrollArea className="h-full" data-search-scroll-area>
+            <div ref={containerRef} className="h-full relative">
               <SearchView
                 onSearch={handleSearch}
                 onNavigate={handleSearchNavigation}
                 searchResults={searchResults}
                 className="relative"
               >
-                <div className="space-y-8">
-                  {/* Today section */}
-                  <div className="space-y-4">
-                    <Skeleton className="h-6 w-16" />
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
-                      <SessionSkeleton variant={0} />
-                      <SessionSkeleton variant={1} />
-                      <SessionSkeleton variant={2} />
-                      <SessionSkeleton variant={3} />
-                      <SessionSkeleton variant={0} />
+                {/* Skeleton layer - always rendered but conditionally visible */}
+                <div
+                  className={`absolute inset-0 transition-opacity duration-300 ${
+                    isLoading || showSkeleton
+                      ? 'opacity-100 z-10'
+                      : 'opacity-0 z-0 pointer-events-none'
+                  }`}
+                >
+                  <div className="space-y-8">
+                    {/* Today section */}
+                    <div className="space-y-4">
+                      <Skeleton className="h-6 w-16" />
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+                        <SessionSkeleton variant={0} />
+                        <SessionSkeleton variant={1} />
+                        <SessionSkeleton variant={2} />
+                        <SessionSkeleton variant={3} />
+                        <SessionSkeleton variant={0} />
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Yesterday section */}
-                  <div className="space-y-4">
-                    <Skeleton className="h-6 w-20" />
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
-                      <SessionSkeleton variant={1} />
-                      <SessionSkeleton variant={2} />
-                      <SessionSkeleton variant={3} />
-                      <SessionSkeleton variant={0} />
-                      <SessionSkeleton variant={1} />
-                      <SessionSkeleton variant={2} />
+                    {/* Yesterday section */}
+                    <div className="space-y-4">
+                      <Skeleton className="h-6 w-20" />
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+                        <SessionSkeleton variant={1} />
+                        <SessionSkeleton variant={2} />
+                        <SessionSkeleton variant={3} />
+                        <SessionSkeleton variant={0} />
+                        <SessionSkeleton variant={1} />
+                        <SessionSkeleton variant={2} />
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Additional section */}
-                  <div className="space-y-4">
-                    <Skeleton className="h-6 w-24" />
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
-                      <SessionSkeleton variant={3} />
-                      <SessionSkeleton variant={0} />
-                      <SessionSkeleton variant={1} />
+                    {/* Additional section */}
+                    <div className="space-y-4">
+                      <Skeleton className="h-6 w-24" />
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+                        <SessionSkeleton variant={3} />
+                        <SessionSkeleton variant={0} />
+                        <SessionSkeleton variant={1} />
+                      </div>
                     </div>
                   </div>
                 </div>
-              </SearchView>
-            </div>
 
-            {/* Content layer - always rendered but conditionally visible */}
-            <div
-              className={`relative transition-opacity duration-300 ${
-                showContent ? 'opacity-100 z-10' : 'opacity-0 z-0'
-              }`}
-            >
-              <SearchView
-                onSearch={handleSearch}
-                onNavigate={handleSearchNavigation}
-                searchResults={searchResults}
-                className="relative"
-              >
-                {renderActualContent()}
+                {/* Content layer - always rendered but conditionally visible */}
+                <div
+                  className={`relative transition-opacity duration-300 ${
+                    showContent ? 'opacity-100 z-10' : 'opacity-0 z-0'
+                  }`}
+                >
+                  {renderActualContent()}
+                </div>
               </SearchView>
             </div>
           </ScrollArea>
