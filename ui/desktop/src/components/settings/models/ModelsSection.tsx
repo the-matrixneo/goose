@@ -16,12 +16,14 @@ interface ModelsSectionProps {
 export default function ModelsSection({ setView }: ModelsSectionProps) {
   const [provider, setProvider] = useState<string | null>(null);
   const [displayModelName, setDisplayModelName] = useState<string>('');
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const { read, getProviders } = useConfig();
   const { getCurrentModelDisplayName, getCurrentProviderDisplayName } = useModelAndProvider();
 
   // Function to load model data
   const loadModelData = useCallback(async () => {
     try {
+      setIsLoading(true);
       const gooseProvider = (await read('GOOSE_PROVIDER', false)) as string;
       const providers = await getProviders(true);
 
@@ -50,6 +52,8 @@ export default function ModelsSection({ setView }: ModelsSectionProps) {
       }
     } catch (error) {
       console.error('Error loading model data:', error);
+    } finally {
+      setIsLoading(false);
     }
   }, [read, getProviders, getCurrentModelDisplayName, getCurrentProviderDisplayName]);
 
@@ -62,8 +66,17 @@ export default function ModelsSection({ setView }: ModelsSectionProps) {
     <section id="models" className="space-y-4 pr-4">
       <Card className="p-2 pb-4">
         <CardContent className="px-2">
-          <h3 className="text-text-default">{displayModelName}</h3>
-          <h4 className="text-xs text-text-muted">{provider}</h4>
+          {isLoading ? (
+            <>
+              <div className="h-[20px] mb-1"></div>
+              <div className="h-[16px]"></div>
+            </>
+          ) : (
+            <div className="animate-in fade-in duration-100">
+              <h3 className="text-text-default">{displayModelName}</h3>
+              <h4 className="text-xs text-text-muted">{provider}</h4>
+            </div>
+          )}
           <ModelSettingsButtons setView={setView} />
         </CardContent>
       </Card>

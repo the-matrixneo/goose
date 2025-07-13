@@ -10,6 +10,7 @@ import { Button } from '../ui/button';
 import { ChatSmart } from '../icons/';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Goose } from '../icons/Goose';
+import { Skeleton } from '../ui/skeleton';
 
 interface SessionInsightsType {
   totalSessions: number;
@@ -114,8 +115,113 @@ export function SessionInsights() {
       .replace(/\//g, '/');
   };
 
+  // Render skeleton loader while data is loading
+  const renderSkeleton = () => (
+    <div className="bg-background-muted flex flex-col h-full">
+      {/* Header container with rounded bottom */}
+      <div className="bg-background-default rounded-b-2xl mb-0.5">
+        <div className="px-8 pb-12 pt-19 space-y-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.25, x: -5, y: 5, rotate: -20 }}
+            animate={{ opacity: 1, scale: 1, x: 0, y: 0, rotate: 0 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+            className="origin-bottom-left"
+          >
+            <Goose className="size-8" />
+          </motion.div>
+          <Greeting />
+        </div>
+      </div>
+
+      {/* Stats containers - full bleed with 2px gaps */}
+      <div className="flex flex-col flex-1 space-y-0.5">
+        {/* Top row with three equal columns */}
+        <div className="grid grid-cols-3 gap-0.5">
+          {/* Total Sessions Card Skeleton */}
+          <Card className="w-full py-6 px-6 border-none rounded-2xl bg-background-default">
+            <CardContent className="flex flex-col justify-end h-full p-0">
+              <div className="flex flex-col justify-end">
+                <Skeleton className="h-10 w-16 mb-1" />
+                <span className="text-xs text-text-muted">Total sessions</span>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Average Duration Card Skeleton */}
+          <Card className="w-full py-6 px-6 border-none rounded-2xl bg-background-default">
+            <CardContent className="flex flex-col justify-end h-full p-0">
+              <div className="flex flex-col justify-end">
+                <Skeleton className="h-10 w-20 mb-1" />
+                <span className="text-xs text-text-muted">Avg. chat length</span>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Total Tokens Card Skeleton */}
+          <Card className="w-full py-6 px-6 border-none rounded-2xl bg-background-default">
+            <CardContent className="flex flex-col justify-end h-full p-0">
+              <div className="flex flex-col justify-end">
+                <Skeleton className="h-10 w-24 mb-1" />
+                <span className="text-xs text-text-muted">Total tokens</span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Recent Chats Card Skeleton */}
+        <div className="grid grid-cols-1 gap-0.5">
+          <Card className="w-full py-6 px-6 border-none rounded-2xl bg-background-default">
+            <CardContent className="p-0">
+              <div className="flex justify-between items-center mb-4">
+                <CardDescription className="mb-0">
+                  <span className="text-lg text-text-default">Recent chats</span>
+                </CardDescription>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs text-text-muted flex items-center gap-1 !px-0 hover:bg-transparent hover:underline hover:text-text-default"
+                  onClick={navigateToSessionHistory}
+                >
+                  See all
+                </Button>
+              </div>
+              <div className="space-y-3 min-h-[96px]">
+                {/* Skeleton chat items */}
+                <div className="flex items-center justify-between py-1 px-2">
+                  <div className="flex items-center space-x-2">
+                    <Skeleton className="h-4 w-4 rounded-sm" />
+                    <Skeleton className="h-4 w-48" />
+                  </div>
+                  <Skeleton className="h-4 w-16" />
+                </div>
+                <div className="flex items-center justify-between py-1 px-2">
+                  <div className="flex items-center space-x-2">
+                    <Skeleton className="h-4 w-4 rounded-sm" />
+                    <Skeleton className="h-4 w-40" />
+                  </div>
+                  <Skeleton className="h-4 w-16" />
+                </div>
+                <div className="flex items-center justify-between py-1 px-2">
+                  <div className="flex items-center space-x-2">
+                    <Skeleton className="h-4 w-4 rounded-sm" />
+                    <Skeleton className="h-4 w-52" />
+                  </div>
+                  <Skeleton className="h-4 w-16" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Filler container - extends to fill remaining space */}
+        <div className="bg-background-default rounded-2xl flex-1"></div>
+      </div>
+    </div>
+  );
+
+  // Show skeleton while loading, then show actual content
   if (!insights) {
-    return <></>;
+    return renderSkeleton();
   }
 
   return (
