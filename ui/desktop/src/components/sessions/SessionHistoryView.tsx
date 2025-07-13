@@ -136,6 +136,7 @@ const SessionHistoryView: React.FC<SessionHistoryViewProps> = ({
   isLoading,
   error,
   onBack,
+  onResume,
   onRetry,
   showActionButtons = true,
 }) => {
@@ -207,35 +208,6 @@ const SessionHistoryView: React.FC<SessionHistoryViewProps> = ({
       });
   };
 
-  const handleResumeSession = () => {
-    if (session) {
-      console.log('Resuming session with ID:', session.session_id);
-      console.log('Session details:', session);
-
-      // Get the working directory from the session metadata
-      const workingDir = session.metadata?.working_dir;
-
-      if (workingDir) {
-        console.log(
-          `Opening new window with session ID: ${session.session_id}, in working dir: ${workingDir}`
-        );
-
-        // Create a new chat window with the working directory and session ID
-        window.electron.createChatWindow(
-          undefined, // query
-          workingDir, // dir
-          undefined, // version
-          session.session_id // resumeSessionId
-        );
-
-        console.log('createChatWindow called successfully');
-      } else {
-        console.error('No working directory found in session metadata');
-        toast.error('Could not resume session: Missing working directory');
-      }
-    }
-  };
-
   // Define action buttons
   const actionButtons = showActionButtons ? (
     <>
@@ -258,7 +230,7 @@ const SessionHistoryView: React.FC<SessionHistoryViewProps> = ({
           </>
         )}
       </Button>
-      <Button onClick={handleResumeSession} size="sm" variant="outline">
+      <Button onClick={onResume} size="sm" variant="outline">
         <Sparkles className="w-4 h-4" />
         Resume
       </Button>

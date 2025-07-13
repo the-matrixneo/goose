@@ -170,6 +170,29 @@ const PairRouteWrapper = ({
   setIsGoosehintsModalOpen: (isOpen: boolean) => void;
 }) => {
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Check if we have a resumed session from navigation state
+  useEffect(() => {
+    const resumedSession = location.state?.resumedSession as SessionDetails | undefined;
+    if (resumedSession) {
+      console.log('Loading resumed session in pair view:', resumedSession.session_id);
+
+      // Convert session to chat format
+      const sessionChat: ChatType = {
+        id: resumedSession.session_id,
+        title: resumedSession.metadata?.description || `ID: ${resumedSession.session_id}`,
+        messages: resumedSession.messages,
+        messageHistoryIndex: resumedSession.messages.length,
+        recipeConfig: null, // Sessions don't have recipes by default
+      };
+
+      setChat(sessionChat);
+
+      // Clear the navigation state to prevent reloading on navigation
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state, setChat]);
 
   return (
     <Pair
@@ -696,7 +719,14 @@ export default function App() {
 
     const urlParams = new URLSearchParams(window.location.search);
     const viewType = urlParams.get('view');
+    const resumeSessionId = urlParams.get('resumeSessionId');
     const recipeConfig = window.appConfig.get('recipeConfig');
+
+    // Check for session resume first - this takes priority over other navigation
+    if (resumeSessionId) {
+      console.log('Session resume detected, letting useChat hook handle navigation');
+      return;
+    }
 
     if (viewType) {
       if (viewType === 'recipeEditor' && recipeConfig) {

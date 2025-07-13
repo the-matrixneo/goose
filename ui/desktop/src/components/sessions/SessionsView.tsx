@@ -65,28 +65,12 @@ const SessionsView: React.FC<SessionsViewProps> = ({ setView }) => {
 
   const handleResumeSession = () => {
     if (selectedSession) {
-      console.log('Selected session object:', JSON.stringify(selectedSession, null, 2));
+      console.log('Resuming session in current window:', selectedSession.session_id);
 
-      // Get the working directory from the session metadata
-      const workingDir = selectedSession.metadata.working_dir;
-
-      if (workingDir) {
-        console.log(
-          `Resuming session with ID: ${selectedSession.session_id}, in working dir: ${workingDir}`
-        );
-
-        // Create a new chat window with the working directory and session ID
-        window.electron.createChatWindow(
-          undefined,
-          workingDir,
-          undefined,
-          selectedSession.session_id
-        );
-      } else {
-        // Fallback if no working directory is found
-        console.error('No working directory found in session metadata');
-        // We could show a toast or alert here
-      }
+      // Navigate to pair view with the session data
+      setView('pair', {
+        resumedSession: selectedSession,
+      });
     }
   };
 
