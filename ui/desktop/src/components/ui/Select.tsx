@@ -9,17 +9,14 @@ export const Select = (props: React.ComponentProps<typeof ReactSelect>) => {
       isSearchable={props.isSearchable !== false}
       closeMenuOnSelect={props.closeMenuOnSelect !== false}
       blurInputOnSelect={props.blurInputOnSelect !== false}
-      menuPortalTarget={document.body}
-      menuPosition="fixed"
-      menuPlacement="auto"
       classNames={{
         container: () => 'w-full cursor-pointer relative',
         indicatorSeparator: () => 'h-0',
         control: ({ isFocused }) =>
           `border ${isFocused ? 'border-borderStandard' : 'border-borderSubtle'} focus:border-borderStandard hover:border-borderStandard rounded-md w-full px-4 py-2 text-sm text-textSubtle hover:cursor-pointer`,
         menu: () =>
-          'mt-1 bg-background-default border border-borderStandard rounded-md text-textSubtle overflow-hidden shadow-lg select__menu',
-        menuPortal: () => 'z-[9999]',
+          'mt-1 bg-background-default border border-borderStandard rounded-md text-textSubtle shadow-lg select__menu z-[9999] absolute',
+        menuList: () => 'max-h-60 overflow-y-auto py-1',
         option: ({ isFocused, isSelected, isDisabled }) => {
           let classes = 'py-2 px-4 text-sm cursor-pointer';
 
@@ -37,18 +34,19 @@ export const Select = (props: React.ComponentProps<typeof ReactSelect>) => {
         },
       }}
       menuShouldBlockScroll={false}
-      menuShouldScrollIntoView={true}
+      menuShouldScrollIntoView={false}
       tabSelectsValue={true}
       openMenuOnFocus={false}
-      captureMenuScroll={false}
       styles={{
-        menuPortal: (base) => ({
-          ...base,
-          zIndex: 9999,
-          pointerEvents: 'auto',
-        }),
         menu: (base) => ({
           ...base,
+          pointerEvents: 'auto',
+          zIndex: 9999,
+        }),
+        menuList: (base) => ({
+          ...base,
+          maxHeight: '240px',
+          overflowY: 'auto',
           pointerEvents: 'auto',
         }),
         option: (base) => ({

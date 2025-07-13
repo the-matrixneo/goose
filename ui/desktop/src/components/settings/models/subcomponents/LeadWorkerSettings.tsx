@@ -5,7 +5,7 @@ import { Button } from '../../../ui/button';
 import { Select } from '../../../ui/Select';
 import { Input } from '../../../ui/input';
 import { Info } from 'lucide-react';
-import { Dialog, DialogContent } from '../../../ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../../ui/dialog';
 
 interface LeadWorkerSettingsProps {
   isOpen: boolean;
@@ -30,6 +30,8 @@ export function LeadWorkerSettings({ isOpen, onClose }: LeadWorkerSettingsProps)
 
   // Load current configuration
   useEffect(() => {
+    if (!isOpen) return; // Only load when modal is open
+
     const loadConfig = async () => {
       try {
         setIsLoading(true);
@@ -50,11 +52,18 @@ export function LeadWorkerSettings({ isOpen, onClose }: LeadWorkerSettingsProps)
         if (leadModelConfig) {
           setLeadModel(leadModelConfig as string);
           setIsEnabled(true);
+        } else {
+          setLeadModel('');
+          setIsEnabled(false);
         }
         if (leadProviderConfig) setLeadProvider(leadProviderConfig as string);
+        else setLeadProvider('');
         if (leadTurnsConfig) setLeadTurns(Number(leadTurnsConfig));
+        else setLeadTurns(3);
         if (failureThresholdConfig) setFailureThreshold(Number(failureThresholdConfig));
+        else setFailureThreshold(2);
         if (fallbackTurnsConfig) setFallbackTurns(Number(fallbackTurnsConfig));
+        else setFallbackTurns(2);
 
         // Set worker model to current model or from config
         const workerModelConfig = await read('GOOSE_MODEL', false);
@@ -62,11 +71,15 @@ export function LeadWorkerSettings({ isOpen, onClose }: LeadWorkerSettingsProps)
           setWorkerModel(workerModelConfig as string);
         } else if (currentModel) {
           setWorkerModel(currentModel as string);
+        } else {
+          setWorkerModel('');
         }
 
         const workerProviderConfig = await read('GOOSE_PROVIDER', false);
         if (workerProviderConfig) {
           setWorkerProvider(workerProviderConfig as string);
+        } else {
+          setWorkerProvider('');
         }
 
         // Load available models
@@ -95,7 +108,7 @@ export function LeadWorkerSettings({ isOpen, onClose }: LeadWorkerSettingsProps)
     };
 
     loadConfig();
-  }, [read, getProviders, currentModel]);
+  }, [read, getProviders, currentModel, isOpen]);
 
   const handleSave = async () => {
     try {
@@ -130,6 +143,9 @@ export function LeadWorkerSettings({ isOpen, onClose }: LeadWorkerSettingsProps)
     return (
       <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
         <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Lead/Worker Mode</DialogTitle>
+          </DialogHeader>
           <div className="p-4">Loading...</div>
         </DialogContent>
       </Dialog>
@@ -139,9 +155,11 @@ export function LeadWorkerSettings({ isOpen, onClose }: LeadWorkerSettingsProps)
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle>Lead/Worker Mode</DialogTitle>
+        </DialogHeader>
         <div className="p-4 space-y-4">
           <div className="space-y-2">
-            <h3 className="text-lg font-medium text-textProminent">Lead/Worker Mode</h3>
             <p className="text-sm text-textSubtle">
               Configure a lead model for planning and a worker model for execution
             </p>

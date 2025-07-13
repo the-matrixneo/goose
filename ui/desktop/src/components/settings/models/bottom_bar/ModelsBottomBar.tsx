@@ -63,16 +63,62 @@ export default function ModelsBottomBar({
         const leadModel = await read('GOOSE_LEAD_MODEL', false);
         setIsLeadWorkerActive(!!leadModel);
       } catch (error) {
+        console.error('Error checking lead model:', error);
         setIsLeadWorkerActive(false);
       }
     };
     checkLeadWorker();
   }, [read]);
 
+  // Refresh lead/worker status when modal closes
+  const handleLeadWorkerModalClose = () => {
+    setIsLeadWorkerModalOpen(false);
+    // Refresh the lead/worker status after modal closes
+    const checkLeadWorker = async () => {
+      try {
+        const leadModel = await read('GOOSE_LEAD_MODEL', false);
+        const currentModel = await read('GOOSE_MODEL', false);
+        setIsLeadWorkerActive(!!leadModel);
+        setLeadModelName((leadModel as string) || '');
+        setCurrentActiveModel((currentModel as string) || '');
+      } catch (error) {
+        console.error('Error checking lead model after modal close:', error);
+        setIsLeadWorkerActive(false);
+      }
+    };
+    checkLeadWorker();
+  };
+
   // Determine which model to display - activeModel takes priority when lead/worker is active
   const displayModel =
     isLeadWorkerActive && currentModelInfo?.model ? currentModelInfo.model : displayModelName;
-  const modelMode = currentModelInfo?.mode;
+
+  // Since currentModelInfo.mode is not working, let's determine mode differently
+  // We'll need to get the lead model and compare it with the current model
+  const [leadModelName, setLeadModelName] = useState<string>('');
+  const [currentActiveModel, setCurrentActiveModel] = useState<string>('');
+
+  // Get lead model name and current model for comparison
+  useEffect(() => {
+    const getModelInfo = async () => {
+      try {
+        const leadModel = await read('GOOSE_LEAD_MODEL', false);
+        const currentModel = await read('GOOSE_MODEL', false);
+        setLeadModelName((leadModel as string) || '');
+        setCurrentActiveModel((currentModel as string) || '');
+      } catch (error) {
+        console.error('Error getting model info:', error);
+      }
+    };
+    getModelInfo();
+  }, [read]);
+
+  // Determine the mode based on which model is currently active
+  const modelMode = isLeadWorkerActive
+    ? currentActiveModel === leadModelName
+      ? 'lead'
+      : 'worker'
+    : undefined;
 
   // Update display provider when current provider changes
   useEffect(() => {
@@ -209,10 +255,7 @@ export default function ModelsBottomBar({
       ) : null}
 
       {isLeadWorkerModalOpen ? (
-        <LeadWorkerSettings
-          isOpen={isLeadWorkerModalOpen}
-          onClose={() => setIsLeadWorkerModalOpen(false)}
-        />
+        <LeadWorkerSettings isOpen={isLeadWorkerModalOpen} onClose={handleLeadWorkerModalClose} />
       ) : null}
 
       {/* Save Recipe Dialog - copied from RecipeEditor.tsx */}
