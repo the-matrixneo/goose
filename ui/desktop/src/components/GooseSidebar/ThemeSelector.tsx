@@ -23,20 +23,21 @@ const ThemeSelector: React.FC<ThemeSelectorProps> = ({
   });
 
   const [isDarkMode, setDarkMode] = useState(() => {
-    // Always check the actual DOM state first to ensure consistency
-    const currentlyDark = document.documentElement.classList.contains('dark');
-    if (currentlyDark !== undefined) {
-      return currentlyDark;
-    }
-
-    // Fallback to calculating from theme mode
-    const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    // First check localStorage to determine the intended theme
     const savedUseSystemTheme = localStorage.getItem('use_system_theme') === 'true';
-    if (savedUseSystemTheme) {
-      return systemPrefersDark;
-    }
     const savedTheme = localStorage.getItem('theme');
-    return savedTheme === 'dark';
+
+    if (savedUseSystemTheme) {
+      // Use system preference
+      const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      return systemPrefersDark;
+    } else if (savedTheme) {
+      // Use saved theme preference
+      return savedTheme === 'dark';
+    } else {
+      // Fallback: check current DOM state to maintain consistency
+      return document.documentElement.classList.contains('dark');
+    }
   });
 
   useEffect(() => {
