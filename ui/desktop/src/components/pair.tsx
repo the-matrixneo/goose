@@ -31,6 +31,7 @@ import { Message } from '../types/message';
 import BaseChat from './BaseChat';
 import ParameterInputModal from './ParameterInputModal';
 import { useRecipeManager } from '../hooks/useRecipeManager';
+import { useIsMobile } from '../hooks/use-mobile';
 import { Recipe } from '../recipe';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -54,6 +55,7 @@ export default function Pair({
   setIsGoosehintsModalOpen: (isOpen: boolean) => void;
 }) {
   const location = useLocation();
+  const isMobile = useIsMobile();
   const [hasProcessedInitialInput, setHasProcessedInitialInput] = useState(false);
   const [shouldAutoSubmit, setShouldAutoSubmit] = useState(false);
   const [initialMessage, setInitialMessage] = useState<string | null>(null);
@@ -177,6 +179,10 @@ export default function Pair({
     return <div>{/* Any Pair-specific content before messages can go here */}</div>;
   };
 
+  // Add mobile-specific padding so the content doesnt scroll under the window controls
+  const mobilePaddingClass = isMobile ? 'pt-[42px]' : '';
+  const contentClassName = `pl-6 px-4 pb-16 pt-2 ${mobilePaddingClass}`.trim();
+
   return (
     <>
       <BaseChat
@@ -189,7 +195,7 @@ export default function Pair({
         onMessageStreamFinish={handleMessageStreamFinish}
         renderBeforeMessages={renderBeforeMessages}
         customChatInputProps={customChatInputProps}
-        contentClassName="pl-6 px-4 pb-16 pt-2" // Add Pair-specific padding
+        contentClassName={contentClassName} // Use dynamic content class with mobile margin
       />
 
       {/* Recipe Parameter Modal */}
