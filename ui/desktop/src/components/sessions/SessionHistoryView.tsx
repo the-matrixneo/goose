@@ -11,6 +11,7 @@ import {
   LoaderCircle,
   AlertCircle,
   ChevronLeft,
+  ExternalLink,
 } from 'lucide-react';
 import { type SessionDetails } from '../../sessions';
 import { Button } from '../ui/button';
@@ -208,6 +209,35 @@ const SessionHistoryView: React.FC<SessionHistoryViewProps> = ({
       });
   };
 
+  const handleLaunchInNewWindow = () => {
+    if (session) {
+      console.log('Launching session in new window:', session.session_id);
+      console.log('Session details:', session);
+
+      // Get the working directory from the session metadata
+      const workingDir = session.metadata?.working_dir;
+
+      if (workingDir) {
+        console.log(
+          `Opening new window with session ID: ${session.session_id}, in working dir: ${workingDir}`
+        );
+
+        // Create a new chat window with the working directory and session ID
+        window.electron.createChatWindow(
+          undefined, // query
+          workingDir, // dir
+          undefined, // version
+          session.session_id // resumeSessionId
+        );
+
+        console.log('createChatWindow called successfully');
+      } else {
+        console.error('No working directory found in session metadata');
+        toast.error('Could not launch session: Missing working directory');
+      }
+    }
+  };
+
   // Define action buttons
   const actionButtons = showActionButtons ? (
     <>
@@ -233,6 +263,10 @@ const SessionHistoryView: React.FC<SessionHistoryViewProps> = ({
       <Button onClick={onResume} size="sm" variant="outline">
         <Sparkles className="w-4 h-4" />
         Resume
+      </Button>
+      <Button onClick={handleLaunchInNewWindow} size="sm" variant="outline">
+        <ExternalLink className="w-4 h-4" />
+        New Window
       </Button>
     </>
   ) : null;
