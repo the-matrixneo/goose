@@ -36,6 +36,7 @@ const SessionListView: React.FC<SessionListViewProps> = ({ onSelectSession }) =>
   const [isLoading, setIsLoading] = useState(true);
   const [showSkeleton, setShowSkeleton] = useState(true);
   const [showContent, setShowContent] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchResults, setSearchResults] = useState<{
     count: number;
@@ -74,22 +75,27 @@ const SessionListView: React.FC<SessionListViewProps> = ({ onSelectSession }) =>
     loadSessions();
   }, []);
 
-  // Minimum loading time to prevent skeleton flash
+  // Improved loading time logic to prevent flash on initial load
   useEffect(() => {
     if (!isLoading && showSkeleton) {
+      // Ultra-fast timing - halved values for maximum responsiveness
+      const delay = isInitialLoad ? 150 : 75;
       const timer = setTimeout(() => {
         setShowSkeleton(false);
-        // Add a small delay before showing content for fade-in effect
+        // Virtually instant content show
         setTimeout(() => {
           setShowContent(true);
-        }, 50);
-      }, 300); // Show skeleton for at least 300ms
+          if (isInitialLoad) {
+            setIsInitialLoad(false);
+          }
+        }, 10);
+      }, delay);
 
       // eslint-disable-next-line no-undef
       return () => clearTimeout(timer);
     }
     return () => void 0;
-  }, [isLoading, showSkeleton]);
+  }, [isLoading, showSkeleton, isInitialLoad]);
 
   // Update date groups when filtered sessions change
   useEffect(() => {
@@ -220,41 +226,45 @@ const SessionListView: React.FC<SessionListViewProps> = ({ onSelectSession }) =>
     );
   });
 
-  // Render skeleton loader for session items
-  const SessionSkeleton = () => (
-    <Card className="h-full p-3 bg-background-default flex flex-col justify-between">
-      <div className="flex-1">
-        <Skeleton className="h-5 w-3/4 mb-2" />
-        <Skeleton className="h-4 w-24 mb-2" />
-        <Skeleton className="h-4 w-32 mb-2" />
-        <Skeleton className="h-4 w-20" />
-      </div>
-      <div className="flex items-center justify-between mt-3 pt-2 border-t border-border-subtle">
-        <div className="flex items-center space-x-3">
-          <Skeleton className="h-4 w-8" />
-          <Skeleton className="h-4 w-12" />
-        </div>
-      </div>
-    </Card>
-  );
+  // Render skeleton loader for session items with variations
+  const SessionSkeleton = React.memo(({ variant = 0 }: { variant?: number }) => {
+    const titleWidths = ['w-3/4', 'w-2/3', 'w-4/5', 'w-1/2'];
+    const pathWidths = ['w-32', 'w-28', 'w-36', 'w-24'];
+    const tokenWidths = ['w-12', 'w-10', 'w-14', 'w-8'];
 
-  const renderContent = () => {
-    if (isLoading || showSkeleton) {
-      return (
-        <div className="space-y-6">
-          <div className="space-y-3">
-            <Skeleton className="h-6 w-24" />
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
-              <SessionSkeleton />
-              <SessionSkeleton />
-              <SessionSkeleton />
-              <SessionSkeleton />
+    return (
+      <Card className="h-full py-3 px-4 flex flex-col justify-between">
+        <div className="flex-1">
+          <Skeleton className={`h-5 ${titleWidths[variant % titleWidths.length]} mb-2`} />
+          <div className="flex items-center mb-1">
+            <Skeleton className="h-3 w-3 mr-1 rounded-sm" />
+            <Skeleton className="h-4 w-20" />
+          </div>
+          <div className="flex items-center mb-1">
+            <Skeleton className="h-3 w-3 mr-1 rounded-sm" />
+            <Skeleton className={`h-4 ${pathWidths[variant % pathWidths.length]}`} />
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between mt-1 pt-2">
+          <div className="flex items-center space-x-3">
+            <div className="flex items-center">
+              <Skeleton className="h-3 w-3 mr-1 rounded-sm" />
+              <Skeleton className="h-4 w-8" />
+            </div>
+            <div className="flex items-center">
+              <Skeleton className="h-3 w-3 mr-1 rounded-sm" />
+              <Skeleton className={`h-4 ${tokenWidths[variant % tokenWidths.length]}`} />
             </div>
           </div>
         </div>
-      );
-    }
+      </Card>
+    );
+  });
 
+  SessionSkeleton.displayName = 'SessionSkeleton';
+
+  const renderActualContent = () => {
     if (error) {
       return (
         <div className="flex flex-col items-center justify-center h-full text-text-muted">
@@ -323,9 +333,10 @@ const SessionListView: React.FC<SessionListViewProps> = ({ onSelectSession }) =>
 
         <div className="flex-1 min-h-0 relative px-8">
           <ScrollArea className="h-full">
+            {/* Skeleton layer - always rendered but conditionally visible */}
             <div
-              className={`h-full relative transition-all duration-300 ${
-                showContent ? 'opacity-100 animate-in fade-in' : 'opacity-0'
+              className={`absolute inset-0 transition-opacity duration-300 ${
+                isLoading || showSkeleton ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'
               }`}
             >
               <SearchView
@@ -334,7 +345,58 @@ const SessionListView: React.FC<SessionListViewProps> = ({ onSelectSession }) =>
                 searchResults={searchResults}
                 className="relative"
               >
-                {renderContent()}
+                <div className="space-y-8">
+                  {/* Today section */}
+                  <div className="space-y-4">
+                    <Skeleton className="h-6 w-16" />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+                      <SessionSkeleton variant={0} />
+                      <SessionSkeleton variant={1} />
+                      <SessionSkeleton variant={2} />
+                      <SessionSkeleton variant={3} />
+                      <SessionSkeleton variant={0} />
+                    </div>
+                  </div>
+
+                  {/* Yesterday section */}
+                  <div className="space-y-4">
+                    <Skeleton className="h-6 w-20" />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+                      <SessionSkeleton variant={1} />
+                      <SessionSkeleton variant={2} />
+                      <SessionSkeleton variant={3} />
+                      <SessionSkeleton variant={0} />
+                      <SessionSkeleton variant={1} />
+                      <SessionSkeleton variant={2} />
+                    </div>
+                  </div>
+
+                  {/* Additional section */}
+                  <div className="space-y-4">
+                    <Skeleton className="h-6 w-24" />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+                      <SessionSkeleton variant={3} />
+                      <SessionSkeleton variant={0} />
+                      <SessionSkeleton variant={1} />
+                    </div>
+                  </div>
+                </div>
+              </SearchView>
+            </div>
+
+            {/* Content layer - always rendered but conditionally visible */}
+            <div
+              className={`relative transition-opacity duration-300 ${
+                showContent ? 'opacity-100 z-10' : 'opacity-0 z-0'
+              }`}
+            >
+              <SearchView
+                onSearch={handleSearch}
+                onNavigate={handleSearchNavigation}
+                searchResults={searchResults}
+                className="relative"
+              >
+                {renderActualContent()}
               </SearchView>
             </div>
           </ScrollArea>
