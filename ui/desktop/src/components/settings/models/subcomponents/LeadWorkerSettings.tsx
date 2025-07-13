@@ -4,7 +4,6 @@ import { useModelAndProvider } from '../../../ModelAndProviderContext';
 import { Button } from '../../../ui/button';
 import { Select } from '../../../ui/Select';
 import { Input } from '../../../ui/input';
-import { Info } from 'lucide-react';
 import { getPredefinedModelsFromEnv, shouldShowPredefinedModels } from '../predefinedModelsUtils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../../ui/dialog';
 
@@ -195,7 +194,9 @@ export function LeadWorkerSettings({ isOpen, onClose }: LeadWorkerSettingsProps)
 
           <div className="space-y-4">
             <div className="space-y-2">
-              <label className="text-sm text-textSubtle">Lead Model</label>
+              <label className={`text-sm ${!isEnabled ? 'text-text-muted' : 'text-textSubtle'}`}>
+                Lead Model
+              </label>
               <Select
                 options={modelOptions}
                 value={modelOptions.find((opt) => opt.value === leadModel) || null}
@@ -208,14 +209,17 @@ export function LeadWorkerSettings({ isOpen, onClose }: LeadWorkerSettingsProps)
                 }}
                 placeholder="Select lead model..."
                 isDisabled={!isEnabled}
+                className={!isEnabled ? 'opacity-50' : ''}
               />
-              <p className="text-xs text-textSubtle">
+              <p className={`text-xs ${!isEnabled ? 'text-text-muted' : 'text-textSubtle'}`}>
                 Strong model for initial planning and fallback recovery
               </p>
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm text-textSubtle">Worker Model</label>
+              <label className={`text-sm ${!isEnabled ? 'text-text-muted' : 'text-textSubtle'}`}>
+                Worker Model
+              </label>
               <Select
                 options={modelOptions}
                 value={modelOptions.find((opt) => opt.value === workerModel) || null}
@@ -228,15 +232,21 @@ export function LeadWorkerSettings({ isOpen, onClose }: LeadWorkerSettingsProps)
                 }}
                 placeholder="Select worker model..."
                 isDisabled={!isEnabled}
+                className={!isEnabled ? 'opacity-50' : ''}
               />
-              <p className="text-xs text-textSubtle">Fast model for routine execution tasks</p>
+              <p className={`text-xs ${!isEnabled ? 'text-text-muted' : 'text-textSubtle'}`}>
+                Fast model for routine execution tasks
+              </p>
             </div>
 
-            <div className="space-y-4 pt-4 border-t border-borderSubtle">
+            <div
+              className={`space-y-4 pt-4 border-t border-borderSubtle ${!isEnabled ? 'opacity-50' : ''}`}
+            >
               <div className="space-y-2">
-                <label className="text-sm text-textSubtle flex items-center gap-1">
+                <label
+                  className={`text-sm flex items-center gap-1 ${!isEnabled ? 'text-text-muted' : 'text-textSubtle'}`}
+                >
                   Initial Lead Turns
-                  <Info size={14} className="text-textSubtle" />
                 </label>
                 <Input
                   type="number"
@@ -244,18 +254,19 @@ export function LeadWorkerSettings({ isOpen, onClose }: LeadWorkerSettingsProps)
                   max={10}
                   value={leadTurns}
                   onChange={(e) => setLeadTurns(Number(e.target.value))}
-                  className="w-20"
+                  className={`w-20 ${!isEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                   disabled={!isEnabled}
                 />
-                <p className="text-xs text-textSubtle">
+                <p className={`text-xs ${!isEnabled ? 'text-text-muted' : 'text-textSubtle'}`}>
                   Number of turns to use the lead model at the start
                 </p>
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm text-textSubtle flex items-center gap-1">
+                <label
+                  className={`text-sm flex items-center gap-1 ${!isEnabled ? 'text-text-muted' : 'text-textSubtle'}`}
+                >
                   Failure Threshold
-                  <Info size={14} className="text-textSubtle" />
                 </label>
                 <Input
                   type="number"
@@ -263,18 +274,19 @@ export function LeadWorkerSettings({ isOpen, onClose }: LeadWorkerSettingsProps)
                   max={5}
                   value={failureThreshold}
                   onChange={(e) => setFailureThreshold(Number(e.target.value))}
-                  className="w-20"
+                  className={`w-20 ${!isEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                   disabled={!isEnabled}
                 />
-                <p className="text-xs text-textSubtle">
+                <p className={`text-xs ${!isEnabled ? 'text-text-muted' : 'text-textSubtle'}`}>
                   Consecutive failures before switching back to lead
                 </p>
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm text-textSubtle flex items-center gap-1">
+                <label
+                  className={`text-sm flex items-center gap-1 ${!isEnabled ? 'text-text-muted' : 'text-textSubtle'}`}
+                >
                   Fallback Turns
-                  <Info size={14} className="text-textSubtle" />
                 </label>
                 <Input
                   type="number"
@@ -282,10 +294,12 @@ export function LeadWorkerSettings({ isOpen, onClose }: LeadWorkerSettingsProps)
                   max={5}
                   value={fallbackTurns}
                   onChange={(e) => setFallbackTurns(Number(e.target.value))}
-                  className="w-20"
+                  className={`w-20 ${!isEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                   disabled={!isEnabled}
                 />
-                <p className="text-xs text-textSubtle">Turns to use lead model during fallback</p>
+                <p className={`text-xs ${!isEnabled ? 'text-text-muted' : 'text-textSubtle'}`}>
+                  Turns to use lead model during fallback
+                </p>
               </div>
             </div>
           </div>
