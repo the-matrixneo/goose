@@ -75,24 +75,17 @@ const SessionListView: React.FC<SessionListViewProps> = ({ onSelectSession }) =>
     loadSessions();
   }, []);
 
-  // Improved loading time logic to prevent flash on initial load
+  // Timing logic to prevent flicker between skeleton and content on initial load
   useEffect(() => {
     if (!isLoading && showSkeleton) {
-      // Ultra-fast timing - halved values for maximum responsiveness
-      const delay = isInitialLoad ? 150 : 75;
-      const timer = setTimeout(() => {
-        setShowSkeleton(false);
-        // Virtually instant content show
-        setTimeout(() => {
-          setShowContent(true);
-          if (isInitialLoad) {
-            setIsInitialLoad(false);
-          }
-        }, 10);
-      }, delay);
-
-      // eslint-disable-next-line no-undef
-      return () => clearTimeout(timer);
+      setShowSkeleton(false);
+      // Virtually instant content show
+      setTimeout(() => {
+        setShowContent(true);
+        if (isInitialLoad) {
+          setIsInitialLoad(false);
+        }
+      }, 10);
     }
     return () => void 0;
   }, [isLoading, showSkeleton, isInitialLoad]);
