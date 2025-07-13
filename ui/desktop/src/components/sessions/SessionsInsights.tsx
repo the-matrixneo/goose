@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription } from '../ui/card';
 // import { Folder } from 'lucide-react';
 import { getApiUrl, getSecretKey } from '../../config';
 import { Greeting } from '../common/Greeting';
-import { fetchSessions, type Session } from '../../sessions';
+import { fetchSessions, fetchSessionDetails, type Session } from '../../sessions';
 // import { fetchProjects, type ProjectMetadata } from '../../projects';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../ui/button';
@@ -71,11 +71,24 @@ export function SessionInsights() {
     // loadRecentProjects();
   }, []);
 
-  const handleSessionClick = (sessionId: string) => {
-    navigate('/sessions', {
-      state: { selectedSessionId: sessionId },
-      replace: true,
-    });
+  const handleSessionClick = async (sessionId: string) => {
+    try {
+      // Fetch the session details
+      const sessionDetails = await fetchSessionDetails(sessionId);
+
+      // Navigate to pair view with the resumed session
+      navigate('/pair', {
+        state: { resumedSession: sessionDetails },
+        replace: true,
+      });
+    } catch (error) {
+      console.error('Failed to load session:', error);
+      // Fallback to the sessions view if loading fails
+      navigate('/sessions', {
+        state: { selectedSessionId: sessionId },
+        replace: true,
+      });
+    }
   };
 
   const navigateToSessionHistory = () => {
@@ -248,9 +261,9 @@ export function SessionInsights() {
                         initial={{ opacity: 0, y: 5 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.3, delay: index * 0.1 }}
-                        onKeyDown={(e) => {
+                        onKeyDown={async (e) => {
                           if (e.key === 'Enter' || e.key === ' ') {
-                            handleSessionClick(session.id);
+                            await handleSessionClick(session.id);
                           }
                         }}
                       >
