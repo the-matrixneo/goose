@@ -51,6 +51,7 @@ import { AgentHeader } from './AgentHeader';
 import LayingEggLoader from './LayingEggLoader';
 import LoadingGoose from './LoadingGoose';
 import Splash from './Splash';
+import PopularChatTopics from './PopularChatTopics';
 import { SessionSummaryModal } from './context_management/SessionSummaryModal';
 import {
   ChatContextManagerProvider,
@@ -96,6 +97,7 @@ interface BaseChatProps {
   customMainLayoutProps?: Record<string, unknown>;
   contentClassName?: string; // Add custom class for content area
   disableSearch?: boolean; // Disable search functionality (for Hub)
+  showPopularTopics?: boolean; // Show popular chat topics in empty state (for Pair)
 }
 
 function BaseChatContent({
@@ -113,6 +115,7 @@ function BaseChatContent({
   customMainLayoutProps = {},
   contentClassName = '',
   disableSearch = false,
+  showPopularTopics = false,
 }: BaseChatProps) {
   const location = useLocation();
   const scrollRef = useRef<ScrollAreaHandle>(null);
@@ -325,7 +328,7 @@ function BaseChatContent({
         <div className="flex flex-col flex-1 mb-0.5 min-h-0">
           <ScrollArea
             ref={scrollRef}
-            className={`flex-1 bg-background-default rounded-b-2xl min-h-0 ${contentClassName}`}
+            className={`flex-1 bg-background-default rounded-b-2xl min-h-0 relative ${contentClassName}`}
             autoScroll
             onDrop={handleDrop}
             onDragOver={handleDragOver}
@@ -354,18 +357,23 @@ function BaseChatContent({
             {/* Custom content before messages */}
             {renderBeforeMessages && renderBeforeMessages()}
 
-            {/* Messages or Splash */}
+            {/* Messages or Splash or Popular Topics */}
             {messages.length === 0 ? (
-              /* Show Splash when no messages and we have a recipe config */
-              recipeConfig && (
-                <Splash
-                  append={(text: string) => append(text)}
-                  activities={
-                    Array.isArray(recipeConfig.activities) ? recipeConfig.activities : null
-                  }
-                  title={recipeConfig.title}
-                />
-              )
+              <>
+                {/* Show Splash when no messages and we have a recipe config */}
+                {recipeConfig ? (
+                  <Splash
+                    append={(text: string) => append(text)}
+                    activities={
+                      Array.isArray(recipeConfig.activities) ? recipeConfig.activities : null
+                    }
+                    title={recipeConfig.title}
+                  />
+                ) : showPopularTopics ? (
+                  /* Show PopularChatTopics when no messages, no recipe, and showPopularTopics is true (Pair view) */
+                  <PopularChatTopics append={(text: string) => append(text)} />
+                ) : null}
+              </>
             ) : (
               <>
                 {disableSearch ? (

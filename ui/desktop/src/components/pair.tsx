@@ -196,6 +196,7 @@ export default function Pair({
         renderBeforeMessages={renderBeforeMessages}
         customChatInputProps={customChatInputProps}
         contentClassName={contentClassName} // Use dynamic content class with mobile margin
+        showPopularTopics={true} // Show popular topics in Pair view when empty
       />
 
       {/* Recipe Parameter Modal */}
