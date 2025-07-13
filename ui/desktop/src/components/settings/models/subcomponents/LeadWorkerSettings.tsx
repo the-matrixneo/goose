@@ -5,12 +5,14 @@ import { Button } from '../../../ui/button';
 import { Select } from '../../../ui/Select';
 import { Input } from '../../../ui/input';
 import { Info } from 'lucide-react';
+import { Dialog, DialogContent } from '../../../ui/dialog';
 
 interface LeadWorkerSettingsProps {
+  isOpen: boolean;
   onClose: () => void;
 }
 
-export function LeadWorkerSettings({ onClose }: LeadWorkerSettingsProps) {
+export function LeadWorkerSettings({ isOpen, onClose }: LeadWorkerSettingsProps) {
   const { read, upsert, getProviders, remove } = useConfig();
   const { currentModel } = useModelAndProvider();
   const [leadModel, setLeadModel] = useState<string>('');
@@ -125,136 +127,146 @@ export function LeadWorkerSettings({ onClose }: LeadWorkerSettingsProps) {
   };
 
   if (isLoading) {
-    return <div className="p-4">Loading...</div>;
+    return (
+      <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+        <DialogContent className="sm:max-w-[500px]">
+          <div className="p-4">Loading...</div>
+        </DialogContent>
+      </Dialog>
+    );
   }
 
   return (
-    <div className="p-4 space-y-4">
-      <div className="space-y-2">
-        <h3 className="text-lg font-medium text-textProminent">Lead/Worker Mode</h3>
-        <p className="text-sm text-textSubtle">
-          Configure a lead model for planning and a worker model for execution
-        </p>
-      </div>
-
-      <div className="flex items-center space-x-2">
-        <input
-          type="checkbox"
-          id="enable-lead-worker"
-          checked={isEnabled}
-          onChange={(e) => setIsEnabled(e.target.checked)}
-          className="rounded border-borderStandard"
-        />
-        <label htmlFor="enable-lead-worker" className="text-sm text-textStandard">
-          Enable lead/worker mode
-        </label>
-      </div>
-
-      <div className="space-y-4">
-        <div className="space-y-2">
-          <label className="text-sm text-textSubtle">Lead Model</label>
-          <Select
-            options={modelOptions}
-            value={modelOptions.find((opt) => opt.value === leadModel) || null}
-            onChange={(newValue: unknown) => {
-              const option = newValue as { value: string; provider: string } | null;
-              if (option) {
-                setLeadModel(option.value);
-                setLeadProvider(option.provider);
-              }
-            }}
-            placeholder="Select lead model..."
-            isDisabled={!isEnabled}
-          />
-          <p className="text-xs text-textSubtle">
-            Strong model for initial planning and fallback recovery
-          </p>
-        </div>
-
-        <div className="space-y-2">
-          <label className="text-sm text-textSubtle">Worker Model</label>
-          <Select
-            options={modelOptions}
-            value={modelOptions.find((opt) => opt.value === workerModel) || null}
-            onChange={(newValue: unknown) => {
-              const option = newValue as { value: string; provider: string } | null;
-              if (option) {
-                setWorkerModel(option.value);
-                setWorkerProvider(option.provider);
-              }
-            }}
-            placeholder="Select worker model..."
-            isDisabled={!isEnabled}
-          />
-          <p className="text-xs text-textSubtle">Fast model for routine execution tasks</p>
-        </div>
-
-        <div className="space-y-4 pt-4 border-t border-borderSubtle">
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-[500px]">
+        <div className="p-4 space-y-4">
           <div className="space-y-2">
-            <label className="text-sm text-textSubtle flex items-center gap-1">
-              Initial Lead Turns
-              <Info size={14} className="text-textSubtle" />
-            </label>
-            <Input
-              type="number"
-              min={1}
-              max={10}
-              value={leadTurns}
-              onChange={(e) => setLeadTurns(Number(e.target.value))}
-              className="w-20"
-              disabled={!isEnabled}
-            />
-            <p className="text-xs text-textSubtle">
-              Number of turns to use the lead model at the start
+            <h3 className="text-lg font-medium text-textProminent">Lead/Worker Mode</h3>
+            <p className="text-sm text-textSubtle">
+              Configure a lead model for planning and a worker model for execution
             </p>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm text-textSubtle flex items-center gap-1">
-              Failure Threshold
-              <Info size={14} className="text-textSubtle" />
-            </label>
-            <Input
-              type="number"
-              min={1}
-              max={5}
-              value={failureThreshold}
-              onChange={(e) => setFailureThreshold(Number(e.target.value))}
-              className="w-20"
-              disabled={!isEnabled}
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              id="enable-lead-worker"
+              checked={isEnabled}
+              onChange={(e) => setIsEnabled(e.target.checked)}
+              className="rounded border-borderStandard"
             />
-            <p className="text-xs text-textSubtle">
-              Consecutive failures before switching back to lead
-            </p>
+            <label htmlFor="enable-lead-worker" className="text-sm text-textStandard">
+              Enable lead/worker mode
+            </label>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm text-textSubtle flex items-center gap-1">
-              Fallback Turns
-              <Info size={14} className="text-textSubtle" />
-            </label>
-            <Input
-              type="number"
-              min={1}
-              max={5}
-              value={fallbackTurns}
-              onChange={(e) => setFallbackTurns(Number(e.target.value))}
-              className="w-20"
-              disabled={!isEnabled}
-            />
-            <p className="text-xs text-textSubtle">Turns to use lead model during fallback</p>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm text-textSubtle">Lead Model</label>
+              <Select
+                options={modelOptions}
+                value={modelOptions.find((opt) => opt.value === leadModel) || null}
+                onChange={(newValue: unknown) => {
+                  const option = newValue as { value: string; provider: string } | null;
+                  if (option) {
+                    setLeadModel(option.value);
+                    setLeadProvider(option.provider);
+                  }
+                }}
+                placeholder="Select lead model..."
+                isDisabled={!isEnabled}
+              />
+              <p className="text-xs text-textSubtle">
+                Strong model for initial planning and fallback recovery
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm text-textSubtle">Worker Model</label>
+              <Select
+                options={modelOptions}
+                value={modelOptions.find((opt) => opt.value === workerModel) || null}
+                onChange={(newValue: unknown) => {
+                  const option = newValue as { value: string; provider: string } | null;
+                  if (option) {
+                    setWorkerModel(option.value);
+                    setWorkerProvider(option.provider);
+                  }
+                }}
+                placeholder="Select worker model..."
+                isDisabled={!isEnabled}
+              />
+              <p className="text-xs text-textSubtle">Fast model for routine execution tasks</p>
+            </div>
+
+            <div className="space-y-4 pt-4 border-t border-borderSubtle">
+              <div className="space-y-2">
+                <label className="text-sm text-textSubtle flex items-center gap-1">
+                  Initial Lead Turns
+                  <Info size={14} className="text-textSubtle" />
+                </label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={leadTurns}
+                  onChange={(e) => setLeadTurns(Number(e.target.value))}
+                  className="w-20"
+                  disabled={!isEnabled}
+                />
+                <p className="text-xs text-textSubtle">
+                  Number of turns to use the lead model at the start
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm text-textSubtle flex items-center gap-1">
+                  Failure Threshold
+                  <Info size={14} className="text-textSubtle" />
+                </label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={5}
+                  value={failureThreshold}
+                  onChange={(e) => setFailureThreshold(Number(e.target.value))}
+                  className="w-20"
+                  disabled={!isEnabled}
+                />
+                <p className="text-xs text-textSubtle">
+                  Consecutive failures before switching back to lead
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm text-textSubtle flex items-center gap-1">
+                  Fallback Turns
+                  <Info size={14} className="text-textSubtle" />
+                </label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={5}
+                  value={fallbackTurns}
+                  onChange={(e) => setFallbackTurns(Number(e.target.value))}
+                  className="w-20"
+                  disabled={!isEnabled}
+                />
+                <p className="text-xs text-textSubtle">Turns to use lead model during fallback</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end space-x-2 pt-4 border-t border-borderSubtle">
+            <Button variant="ghost" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button onClick={handleSave} disabled={isEnabled && (!leadModel || !workerModel)}>
+              Save Settings
+            </Button>
           </div>
         </div>
-      </div>
-
-      <div className="flex justify-end space-x-2 pt-4 border-t border-borderSubtle">
-        <Button variant="ghost" onClick={onClose}>
-          Cancel
-        </Button>
-        <Button onClick={handleSave} disabled={isEnabled && (!leadModel || !workerModel)}>
-          Save Settings
-        </Button>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

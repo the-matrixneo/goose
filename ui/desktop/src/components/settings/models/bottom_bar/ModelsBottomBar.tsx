@@ -4,7 +4,6 @@ import { useModelAndProvider } from '../../../ModelAndProviderContext';
 import { AddModelModal } from '../subcomponents/AddModelModal';
 import { LeadWorkerSettings } from '../subcomponents/LeadWorkerSettings';
 import { View } from '../../../../App';
-import { Dialog, DialogContent } from '../../../ui/dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -210,14 +209,10 @@ export default function ModelsBottomBar({
       ) : null}
 
       {isLeadWorkerModalOpen ? (
-        <Dialog
-          open={isLeadWorkerModalOpen}
-          onOpenChange={(open) => !open && setIsLeadWorkerModalOpen(false)}
-        >
-          <DialogContent className="sm:max-w-[500px]">
-            <LeadWorkerSettings onClose={() => setIsLeadWorkerModalOpen(false)} />
-          </DialogContent>
-        </Dialog>
+        <LeadWorkerSettings
+          isOpen={isLeadWorkerModalOpen}
+          onClose={() => setIsLeadWorkerModalOpen(false)}
+        />
       ) : null}
 
       {/* Save Recipe Dialog - copied from RecipeEditor.tsx */}

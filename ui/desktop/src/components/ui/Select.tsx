@@ -9,24 +9,28 @@ export const Select = (props: React.ComponentProps<typeof ReactSelect>) => {
       isSearchable={props.isSearchable !== false}
       closeMenuOnSelect={props.closeMenuOnSelect !== false}
       blurInputOnSelect={props.blurInputOnSelect !== false}
+      menuPortalTarget={document.body}
+      menuPosition="fixed"
+      menuPlacement="auto"
       classNames={{
-        container: () => 'w-full cursor-pointer relative z-[99999]',
+        container: () => 'w-full cursor-pointer relative',
         indicatorSeparator: () => 'h-0',
         control: ({ isFocused }) =>
           `border ${isFocused ? 'border-borderStandard' : 'border-borderSubtle'} focus:border-borderStandard hover:border-borderStandard rounded-md w-full px-4 py-2 text-sm text-textSubtle hover:cursor-pointer`,
         menu: () =>
-          'mt-1 bg-background-default border border-borderStandard rounded-md text-textSubtle overflow-hidden absolute z-[99999] select__menu',
+          'mt-1 bg-background-default border border-borderStandard rounded-md text-textSubtle overflow-hidden shadow-lg select__menu',
+        menuPortal: () => 'z-[9999]',
         option: ({ isFocused, isSelected, isDisabled }) => {
           let classes = 'py-2 px-4 text-sm cursor-pointer';
 
           if (isDisabled) {
-            classes += ' opacity-50 cursor-not-allowed';
+            classes += ' opacity-50 cursor-not-allowed pointer-events-none';
           } else if (isSelected) {
-            classes += ' bg-background-accent text-text-on-accent';
+            classes += ' bg-background-accent text-text-on-accent pointer-events-auto';
           } else if (isFocused) {
-            classes += ' bg-background-muted text-textStandard';
+            classes += ' bg-background-muted text-textStandard pointer-events-auto';
           } else {
-            classes += ' text-textStandard hover:bg-background-muted';
+            classes += ' text-textStandard hover:bg-background-muted pointer-events-auto';
           }
 
           return classes;
@@ -36,6 +40,23 @@ export const Select = (props: React.ComponentProps<typeof ReactSelect>) => {
       menuShouldScrollIntoView={true}
       tabSelectsValue={true}
       openMenuOnFocus={false}
+      captureMenuScroll={false}
+      styles={{
+        menuPortal: (base) => ({
+          ...base,
+          zIndex: 9999,
+          pointerEvents: 'auto',
+        }),
+        menu: (base) => ({
+          ...base,
+          pointerEvents: 'auto',
+        }),
+        option: (base) => ({
+          ...base,
+          pointerEvents: 'auto',
+          cursor: 'pointer',
+        }),
+      }}
     />
   );
 };
