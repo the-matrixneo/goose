@@ -70,17 +70,15 @@ export default function Hub({
         recipeConfig: null, // Clear recipe for new chats from Hub
       };
 
-      // Update the PAIR chat state (not the hub chat state)
+      // Update the PAIR chat state immediately to prevent flashing
       setPairChat(newPairChat);
 
-      // Navigate to pair page with the message to be submitted
-      // Use a small delay to ensure the chat state has been updated
-      setTimeout(() => {
-        setView('pair', {
-          disableAnimation: true,
-          initialMessage: combinedTextFromInput,
-        });
-      }, 50); // Reduced delay since we're just ensuring state update
+      // Navigate to pair page with the message to be submitted immediately
+      // No delay needed since we're updating state synchronously
+      setView('pair', {
+        disableAnimation: true,
+        initialMessage: combinedTextFromInput,
+      });
     }
 
     // Prevent default form submission

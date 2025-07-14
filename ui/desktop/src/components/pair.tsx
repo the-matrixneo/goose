@@ -59,6 +59,7 @@ export default function Pair({
   const [hasProcessedInitialInput, setHasProcessedInitialInput] = useState(false);
   const [shouldAutoSubmit, setShouldAutoSubmit] = useState(false);
   const [initialMessage, setInitialMessage] = useState<string | null>(null);
+  const [isTransitioningFromHub, setIsTransitioningFromHub] = useState(false);
 
   // Get recipe configuration and parameter handling
   const {
@@ -93,6 +94,9 @@ export default function Pair({
 
     // Reset processing state when we have a new message from hub
     if (messageFromHub) {
+      // Set transitioning state to prevent showing popular topics
+      setIsTransitioningFromHub(true);
+
       // If this is a different message than what we processed before, reset the flag
       if (messageFromHub !== initialMessage) {
         setHasProcessedInitialInput(false);
@@ -155,6 +159,7 @@ export default function Pair({
   const handleMessageSubmit = (message: string) => {
     // This is called after a message is submitted
     setShouldAutoSubmit(false);
+    setIsTransitioningFromHub(false); // Clear transitioning state once message is submitted
     console.log('Message submitted:', message);
   };
 
@@ -196,7 +201,8 @@ export default function Pair({
         renderBeforeMessages={renderBeforeMessages}
         customChatInputProps={customChatInputProps}
         contentClassName={contentClassName} // Use dynamic content class with mobile margin
-        showPopularTopics={true} // Show popular topics in Pair view when empty
+        showPopularTopics={!isTransitioningFromHub} // Don't show popular topics while transitioning from Hub
+        suppressEmptyState={isTransitioningFromHub} // Suppress all empty state content while transitioning from Hub
       />
 
       {/* Recipe Parameter Modal */}

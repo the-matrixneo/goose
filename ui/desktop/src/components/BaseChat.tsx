@@ -98,6 +98,7 @@ interface BaseChatProps {
   contentClassName?: string; // Add custom class for content area
   disableSearch?: boolean; // Disable search functionality (for Hub)
   showPopularTopics?: boolean; // Show popular chat topics in empty state (for Pair)
+  suppressEmptyState?: boolean; // Suppress empty state content (for transitions)
 }
 
 function BaseChatContent({
@@ -116,6 +117,7 @@ function BaseChatContent({
   contentClassName = '',
   disableSearch = false,
   showPopularTopics = false,
+  suppressEmptyState = false,
 }: BaseChatProps) {
   const location = useLocation();
   const scrollRef = useRef<ScrollAreaHandle>(null);
@@ -358,57 +360,59 @@ function BaseChatContent({
             {renderBeforeMessages && renderBeforeMessages()}
 
             {/* Messages or Splash or Popular Topics */}
-            {messages.length === 0 ? (
-              <>
-                {/* Show Splash when no messages and we have a recipe config */}
-                {recipeConfig ? (
-                  <Splash
-                    append={(text: string) => append(text)}
-                    activities={
-                      Array.isArray(recipeConfig.activities) ? recipeConfig.activities : null
-                    }
-                    title={recipeConfig.title}
-                  />
-                ) : showPopularTopics ? (
-                  /* Show PopularChatTopics when no messages, no recipe, and showPopularTopics is true (Pair view) */
-                  <PopularChatTopics append={(text: string) => append(text)} />
-                ) : null}
-              </>
-            ) : (
-              <>
-                {disableSearch ? (
-                  // Render messages without SearchView wrapper when search is disabled
-                  renderMessages()
-                ) : (
-                  // Render messages with SearchView wrapper when search is enabled
-                  <SearchView>{renderMessages()}</SearchView>
-                )}
+            {
+              messages.length === 0 && !suppressEmptyState ? (
+                <>
+                  {/* Show Splash when no messages and we have a recipe config */}
+                  {recipeConfig ? (
+                    <Splash
+                      append={(text: string) => append(text)}
+                      activities={
+                        Array.isArray(recipeConfig.activities) ? recipeConfig.activities : null
+                      }
+                      title={recipeConfig.title}
+                    />
+                  ) : showPopularTopics ? (
+                    /* Show PopularChatTopics when no messages, no recipe, and showPopularTopics is true (Pair view) */
+                    <PopularChatTopics append={(text: string) => append(text)} />
+                  ) : null}
+                </>
+              ) : messages.length > 0 ? (
+                <>
+                  {disableSearch ? (
+                    // Render messages without SearchView wrapper when search is disabled
+                    renderMessages()
+                  ) : (
+                    // Render messages with SearchView wrapper when search is enabled
+                    <SearchView>{renderMessages()}</SearchView>
+                  )}
 
-                {error && (
-                  <div className="flex flex-col items-center justify-center p-4">
-                    <div className="text-red-700 dark:text-red-300 bg-red-400/50 p-3 rounded-lg mb-2">
-                      {error.message || 'Honk! Goose experienced an error while responding'}
+                  {error && (
+                    <div className="flex flex-col items-center justify-center p-4">
+                      <div className="text-red-700 dark:text-red-300 bg-red-400/50 p-3 rounded-lg mb-2">
+                        {error.message || 'Honk! Goose experienced an error while responding'}
+                      </div>
+                      <div
+                        className="px-3 py-2 mt-2 text-center whitespace-nowrap cursor-pointer text-textStandard border border-borderSubtle hover:bg-bgSubtle rounded-full inline-block transition-all duration-150"
+                        onClick={async () => {
+                          // Find the last user message
+                          const lastUserMessage = messages.reduceRight(
+                            (found, m) => found || (m.role === 'user' ? m : null),
+                            null as Message | null
+                          );
+                          if (lastUserMessage) {
+                            append(lastUserMessage);
+                          }
+                        }}
+                      >
+                        Retry Last Message
+                      </div>
                     </div>
-                    <div
-                      className="px-3 py-2 mt-2 text-center whitespace-nowrap cursor-pointer text-textStandard border border-borderSubtle hover:bg-bgSubtle rounded-full inline-block transition-all duration-150"
-                      onClick={async () => {
-                        // Find the last user message
-                        const lastUserMessage = messages.reduceRight(
-                          (found, m) => found || (m.role === 'user' ? m : null),
-                          null as Message | null
-                        );
-                        if (lastUserMessage) {
-                          append(lastUserMessage);
-                        }
-                      }}
-                    >
-                      Retry Last Message
-                    </div>
-                  </div>
-                )}
-                <div className="block h-8" />
-              </>
-            )}
+                  )}
+                  <div className="block h-8" />
+                </>
+              ) : null /* Show nothing when messages.length === 0 && suppressEmptyState === true */
+            }
 
             {/* Loading indicator at bottom of messages container */}
             {isLoading && (
