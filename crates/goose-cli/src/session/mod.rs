@@ -32,6 +32,7 @@ use mcp_core::protocol::JsonRpcMessage;
 use mcp_core::protocol::JsonRpcNotification;
 
 use rand::{distributions::Alphanumeric, Rng};
+use rustyline::EditMode;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -54,6 +55,7 @@ pub struct Session {
     run_mode: RunMode,
     scheduled_job_id: Option<String>, // ID of the scheduled job that triggered this session
     max_turns: Option<u32>,
+    edit_mode: Option<EditMode>,
 }
 
 // Cache structure for completion data
@@ -116,6 +118,7 @@ impl Session {
         debug: bool,
         scheduled_job_id: Option<String>,
         max_turns: Option<u32>,
+        edit_mode: Option<EditMode>,
     ) -> Self {
         let messages = if let Some(session_file) = &session_file {
             match session::read_messages(session_file) {
@@ -139,6 +142,7 @@ impl Session {
             run_mode: RunMode::Normal,
             scheduled_job_id,
             max_turns,
+            edit_mode,
         }
     }
 
@@ -227,6 +231,40 @@ impl Session {
             uri: extension_url,
             envs: Envs::new(HashMap::new()),
             env_keys: Vec::new(),
+            description: Some(goose::config::DEFAULT_EXTENSION_DESCRIPTION.to_string()),
+            // TODO: should set timeout
+            timeout: Some(goose::config::DEFAULT_EXTENSION_TIMEOUT),
+            bundled: None,
+        };
+
+        self.agent
+            .add_extension(config)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to start extension: {}", e))?;
+
+        // Invalidate the completion cache when a new extension is added
+        self.invalidate_completion_cache().await;
+
+        Ok(())
+    }
+
+    /// Add a streamable HTTP extension to the session
+    ///
+    /// # Arguments
+    /// * `extension_url` - URL of the server
+    pub async fn add_streamable_http_extension(&mut self, extension_url: String) -> Result<()> {
+        let name: String = rand::thread_rng()
+            .sample_iter(&Alphanumeric)
+            .take(8)
+            .map(char::from)
+            .collect();
+
+        let config = ExtensionConfig::StreamableHttp {
+            name,
+            uri: extension_url,
+            envs: Envs::new(HashMap::new()),
+            env_keys: Vec::new(),
+            headers: HashMap::new(),
             description: Some(goose::config::DEFAULT_EXTENSION_DESCRIPTION.to_string()),
             // TODO: should set timeout
             timeout: Some(goose::config::DEFAULT_EXTENSION_TIMEOUT),
@@ -365,9 +403,15 @@ impl Session {
         self.update_completion_cache().await?;
 
         // Create a new editor with our custom completer
-        let config = rustyline::Config::builder()
-            .completion_type(rustyline::CompletionType::Circular)
-            .build();
+        let builder =
+            rustyline::Config::builder().completion_type(rustyline::CompletionType::Circular);
+        let builder = if let Some(edit_mode) = self.edit_mode {
+            builder.edit_mode(edit_mode)
+        } else {
+            // Default to Emacs mode if no edit mode is set
+            builder.edit_mode(EditMode::Emacs)
+        };
+        let config = builder.build();
         let mut editor =
             rustyline::Editor::<GooseCompleter, rustyline::history::DefaultHistory>::with_config(
                 config,
