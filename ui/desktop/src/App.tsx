@@ -163,36 +163,73 @@ const HubRouteWrapper = ({
 const PairRouteWrapper = ({
   chat,
   setChat,
+  setPairChat,
   setIsGoosehintsModalOpen,
 }: {
   chat: ChatType;
   setChat: (chat: ChatType) => void;
+  setPairChat: (chat: ChatType) => void;
   setIsGoosehintsModalOpen: (isOpen: boolean) => void;
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const chatRef = useRef(chat);
 
-  // Check if we have a resumed session from navigation state
+  // Keep the ref updated with the current chat state
+  useEffect(() => {
+    chatRef.current = chat;
+  }, [chat]);
+
+  // Check if we have a resumed session or recipe config from navigation state
   useEffect(() => {
     const resumedSession = location.state?.resumedSession as SessionDetails | undefined;
+    const recipeConfig = location.state?.recipeConfig as Recipe | undefined;
+    const resetChat = location.state?.resetChat as boolean | undefined;
+
     if (resumedSession) {
       console.log('Loading resumed session in pair view:', resumedSession.session_id);
+      console.log('Current chat before resume:', chatRef.current);
 
-      // Convert session to chat format
+      // Convert session to chat format - this clears any existing recipe config
       const sessionChat: ChatType = {
         id: resumedSession.session_id,
         title: resumedSession.metadata?.description || `ID: ${resumedSession.session_id}`,
         messages: resumedSession.messages,
         messageHistoryIndex: resumedSession.messages.length,
-        recipeConfig: null, // Sessions don't have recipes by default
+        recipeConfig: null, // Clear recipe config when resuming a session
       };
 
+      // Update both the local chat state and the app-level pairChat state
       setChat(sessionChat);
+      setPairChat(sessionChat);
+
+      // Clear the navigation state to prevent reloading on navigation
+      window.history.replaceState({}, document.title);
+    } else if (recipeConfig) {
+      console.log('Loading recipe config in pair view:', recipeConfig.title);
+
+      // Load recipe config and optionally reset chat
+      // Use the ref to get the current chat state without adding it as a dependency
+      const currentChat = chatRef.current;
+      const updatedChat: ChatType = {
+        ...currentChat,
+        recipeConfig: recipeConfig,
+        title: recipeConfig.title || 'Recipe Chat',
+      };
+
+      if (resetChat) {
+        updatedChat.messages = [];
+        updatedChat.messageHistoryIndex = 0;
+      }
+
+      // Update both the local chat state and the app-level pairChat state
+      setChat(updatedChat);
+      setPairChat(updatedChat);
 
       // Clear the navigation state to prevent reloading on navigation
       window.history.replaceState({}, document.title);
     }
-  }, [location.state, setChat]);
+  }, [location.state, setChat, setPairChat]);
 
   return (
     <Pair
@@ -1292,10 +1329,12 @@ export default function App() {
                         chat={pairChat}
                         setChat={setPairChat}
                         contextKey={`pair-${pairChat.id}`}
+                        key={pairChat.id} // Add key prop to force re-render when chat ID changes
                       >
                         <PairRouteWrapper
                           chat={pairChat}
                           setChat={setPairChat}
+                          setPairChat={setPairChat}
                           setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
                         />
                       </ChatProvider>

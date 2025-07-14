@@ -25,30 +25,42 @@ export const useRecipeManager = (messages: Message[], locationState?: LocationSt
   // 3. App config (from deeplinks)
   const recipeConfig = useMemo(() => {
     // First check if we have a persisted recipe in chat context
-    if (chatContext?.chat.recipeConfig) {
-      return chatContext.chat.recipeConfig;
+    // We need to distinguish between null (explicitly cleared) and undefined (not set)
+    if (chatContext?.chat.recipeConfig !== undefined) {
+      return chatContext.chat.recipeConfig; // This could be null or a Recipe
     }
 
     // Then check if recipe config is passed via navigation state
     if (locationState?.recipeConfig) {
-      // Persist the recipe to chat context for future use
-      if (chatContext?.setRecipeConfig) {
-        chatContext.setRecipeConfig(locationState.recipeConfig);
-      }
       return locationState.recipeConfig as Recipe;
     }
 
     // Fallback to app config (from deeplinks)
     const appRecipeConfig = window.appConfig.get('recipeConfig') as Recipe | null;
     if (appRecipeConfig) {
-      // Persist the recipe to chat context for future use
-      if (chatContext?.setRecipeConfig) {
-        chatContext.setRecipeConfig(appRecipeConfig);
-      }
       return appRecipeConfig;
     }
 
     return null;
+  }, [chatContext, locationState]);
+
+  // Effect to persist recipe config to chat context when it changes
+  useEffect(() => {
+    if (!chatContext?.setRecipeConfig) return;
+
+    // If we have a recipe from navigation state, persist it
+    if (locationState?.recipeConfig && !chatContext.chat.recipeConfig) {
+      chatContext.setRecipeConfig(locationState.recipeConfig);
+      return;
+    }
+
+    // If we have a recipe from app config (deeplink), persist it
+    // But only if the chat context doesn't explicitly have null (which indicates it was cleared)
+    const appRecipeConfig = window.appConfig.get('recipeConfig') as Recipe | null;
+    if (appRecipeConfig && chatContext.chat.recipeConfig === undefined) {
+      // Only set if recipeConfig is undefined, not if it's explicitly null
+      chatContext.setRecipeConfig(appRecipeConfig);
+    }
   }, [chatContext, locationState]);
 
   // Show parameter modal if recipe has parameters and they haven't been set yet
