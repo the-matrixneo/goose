@@ -63,16 +63,17 @@ The official SDK provides:
 
 ## Migration Plan
 
-### Phase 1: Foundation Setup ✅ (CURRENT)
+### Phase 1: Foundation Setup ✅ (COMPLETED)
 **Goal**: Add RMCP dependency and create compatibility layer
 
 **Tasks**:
 - [x] Add rmcp dependency to workspace Cargo.toml
 - [x] Create compatibility shim modules to maintain existing API surface
 - [x] Update mcp-core to re-export RMCP types with compatibility wrappers
+- [x] Add feature flag system for controlled migration
 - [x] Ensure all existing code still compiles
 
-**Deliverable**: Working build with RMCP as dependency, no functionality changes
+**Deliverable**: Working build with RMCP as dependency, feature flag for controlled rollout, no functionality changes
 
 ### Phase 2: Core Type Migration
 **Goal**: Replace internal protocol types with RMCP equivalents
@@ -168,6 +169,12 @@ The official SDK provides:
    - Public API surface
    - Type exports and re-exports
 
+5. **Added feature flag system** for controlled migration:
+   - `USE_RMCP` constant (default: false) controls implementation choice
+   - Helper functions `use_rmcp()` and `use_legacy()` for easy checking
+   - Comprehensive tests to verify flag behavior
+   - Example demonstrating usage pattern for future phases
+
 ### Files Modified
 
 - `Cargo.toml`: Added workspace RMCP dependency
@@ -212,6 +219,40 @@ pub mod rmcp_compat {
 ```
 
 This allows gradual migration while maintaining existing functionality.
+
+### Feature Flag System
+
+The feature flag system allows controlled rollout of RMCP integration:
+
+```rust
+// In mcp-core/src/lib.rs
+pub mod config {
+    /// Feature flag to control whether RMCP or legacy implementation is used.
+    pub const USE_RMCP: bool = false;  // Default: use legacy implementation
+    
+    pub fn use_rmcp() -> bool { USE_RMCP }
+    pub fn use_legacy() -> bool { !USE_RMCP }
+}
+```
+
+**Usage in future phases:**
+```rust
+use mcp_core::config;
+
+if config::use_rmcp() {
+    // Use RMCP implementation
+    let content = rmcp::model::Content::text("Hello");
+} else {
+    // Use legacy implementation  
+    let content = mcp_core::Content::text("Hello");
+}
+```
+
+**Benefits:**
+- Safe incremental rollout: Keep `USE_RMCP = false` during development
+- Easy testing: Flip flag to test RMCP integration
+- Quick rollback: Change one constant to revert to legacy
+- Continuous deployment: Ship branch with flag disabled, enable when ready
 
 ### Next Steps for Phase 2
 
