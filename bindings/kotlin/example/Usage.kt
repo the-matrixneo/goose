@@ -218,6 +218,7 @@ fun main() = runBlocking {
     println("Config  : $providerConfig\n")
 
     /* --- run demos for each model --- */
+    // NOTE: `claude-3-5-haiku` does NOT support images 
     val modelNames = listOf("goose-claude-4-sonnet", "goose-gpt-4-1")
 
     for (name in modelNames) {
