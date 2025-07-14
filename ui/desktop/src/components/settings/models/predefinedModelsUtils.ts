@@ -6,8 +6,6 @@ export function getPredefinedModelsFromEnv(): Model[] {
     const envModels = window.appConfig.get('GOOSE_PREDEFINED_MODELS'); // process.env.GOOSE_PREDEFINED_MODELS
     if (envModels && typeof envModels === 'string') {
       return JSON.parse(envModels) as Model[];
-    } else {
-      console.log('GOOSE_PREDEFINED_MODELS is not a string or is empty');
     }
   } catch (error) {
     console.warn('Failed to parse GOOSE_PREDEFINED_MODELS environment variable:', error);
