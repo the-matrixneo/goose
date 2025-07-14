@@ -16,7 +16,7 @@ function RuleItem({ title, description }: { title: string; description: string }
   return (
     <>
       <Button
-        className="flex items-center gap-2 w-full justify-between"
+        className="flex items-center text-left gap-2 w-full justify-between"
         onClick={() => setIsModalOpen(true)}
         variant="secondary"
         size="lg"

@@ -104,7 +104,6 @@ export const ModeSelectionItem = forwardRef<HTMLDivElement, ModeSelectionItemPro
           </div>
         </div>
 
-        {/* Permission Rules Modal */}
         <PermissionRulesModal
           isOpen={isPermissionModalOpen}
           onClose={() => setIsPermissionModalOpen(false)}
