@@ -1,13 +1,19 @@
 use mcp_core::{tool::ToolAnnotations, Content, Tool, ToolError};
 use serde_json::Value;
 
+use crate::agents::extension_manager::ExtensionManager;
 use crate::agents::{
     sub_recipe_execution_tool::lib::execute_tasks,
     sub_recipe_execution_tool::task_types::ExecutionMode, tool_execution::ToolCallResult,
 };
+use crate::providers::base::Provider;
 use mcp_core::protocol::JsonRpcMessage;
+use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio_stream;
+use std::future::Future;
+use std::pin::Pin;
+use tokio::sync::RwLock;
 
 pub const SUB_RECIPE_EXECUTE_TASK_TOOL_NAME: &str = "sub_recipe__execute_task";
 pub fn create_sub_recipe_execute_task_tool() -> Tool {
@@ -31,7 +37,7 @@ IMPLEMENTATION:
 EXAMPLES:
 User Intent Based:
 - User: 'get weather and tell me a joke' → Sequential (2 separate tool calls, 1 task each)
-- User: 'get weather and joke in parallel' → Parallel (1 tool call with array of 2 tasks)
+- User: 'get weather and joke in parallel' → Parallel (1 tool call with task array)
 - User: 'run these simultaneously' → Parallel (1 tool call with task array)
 - User: 'do task A then task B' → Sequential (2 separate tool calls)
 
@@ -111,17 +117,30 @@ Pre-created Task Based:
     )
 }
 
-pub async fn run_tasks(execute_data: Value) -> ToolCallResult {
+pub async fn run_tasks(
+    execute_data: Value,
+    mcp_tx: mpsc::Sender<JsonRpcMessage>,
+    provider: Option<Arc<dyn Provider>>,
+    extension_manager: Option<Arc<RwLock<ExtensionManager>>>,
+) -> ToolCallResult {
     let (notification_tx, notification_rx) = mpsc::channel::<JsonRpcMessage>(100);
 
-    let result_future = async move {
-        let execute_data_clone = execute_data.clone();
-        let execution_mode = execute_data_clone
-            .get("execution_mode")
-            .and_then(|v| serde_json::from_value::<ExecutionMode>(v.clone()).ok())
-            .unwrap_or_default();
+    let execution_mode = execute_data
+        .get("execution_mode")
+        .and_then(|v| serde_json::from_value::<ExecutionMode>(v.clone()).ok())
+        .unwrap_or_default();
 
-        match execute_tasks(execute_data, execution_mode, notification_tx).await {
+    let result_future = async move {
+        match execute_tasks(
+            execute_data,
+            execution_mode,
+            notification_tx,
+            mcp_tx,
+            provider,
+            extension_manager,
+        )
+        .await
+        {
             Ok(result) => {
                 let output = serde_json::to_string(&result).unwrap();
                 Ok(vec![Content::text(output)])
@@ -130,11 +149,8 @@ pub async fn run_tasks(execute_data: Value) -> ToolCallResult {
         }
     };
 
-    // Convert receiver to stream
-    let notification_stream = tokio_stream::wrappers::ReceiverStream::new(notification_rx);
-
     ToolCallResult {
         result: Box::new(Box::pin(result_future)),
-        notification_stream: Some(Box::new(notification_stream)),
+        notification_stream: Some(Box::new(tokio_stream::wrappers::ReceiverStream::new(notification_rx))),
     }
 }

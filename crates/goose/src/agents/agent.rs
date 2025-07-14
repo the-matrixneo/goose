@@ -50,12 +50,9 @@ use mcp_core::{
     prompt::Prompt, protocol::GetPromptResult, tool::Tool, Content, ToolError, ToolResult,
 };
 
-use crate::agents::subagent_tools::SUBAGENT_RUN_TASK_TOOL_NAME;
-
 use super::final_output_tool::FinalOutputTool;
 use super::platform_tools;
 use super::router_tools;
-use super::subagent_manager::SubAgentManager;
 use super::tool_execution::{ToolCallResult, CHAT_MODE_TOOL_SKIPPED_RESPONSE, DECLINED_RESPONSE};
 
 const DEFAULT_MAX_TURNS: u32 = 1000;
@@ -63,7 +60,7 @@ const DEFAULT_MAX_TURNS: u32 = 1000;
 /// The main goose Agent
 pub struct Agent {
     pub(super) provider: Mutex<Option<Arc<dyn Provider>>>,
-    pub(super) extension_manager: RwLock<ExtensionManager>,
+    pub(super) extension_manager: Arc<RwLock<ExtensionManager>>,
     pub(super) sub_recipe_manager: Mutex<SubRecipeManager>,
     pub(super) final_output_tool: Mutex<Option<FinalOutputTool>>,
     pub(super) frontend_tools: Mutex<HashMap<String, FrontendTool>>,
@@ -76,7 +73,7 @@ pub struct Agent {
     pub(super) tool_monitor: Mutex<Option<ToolMonitor>>,
     pub(super) router_tool_selector: Mutex<Option<Arc<Box<dyn RouterToolSelector>>>>,
     pub(super) scheduler_service: Mutex<Option<Arc<dyn SchedulerTrait>>>,
-    pub(super) subagent_manager: Mutex<Option<SubAgentManager>>,
+    pub(super) mcp_tx: Mutex<mpsc::Sender<JsonRpcMessage>>,
     pub(super) mcp_notification_rx: Arc<Mutex<mpsc::Receiver<JsonRpcMessage>>>,
 }
 
@@ -137,7 +134,7 @@ impl Agent {
 
         Self {
             provider: Mutex::new(None),
-            extension_manager: RwLock::new(ExtensionManager::new()),
+            extension_manager: Arc::new(RwLock::new(ExtensionManager::new())),
             sub_recipe_manager: Mutex::new(SubRecipeManager::new()),
             final_output_tool: Mutex::new(None),
             frontend_tools: Mutex::new(HashMap::new()),
@@ -151,7 +148,7 @@ impl Agent {
             router_tool_selector: Mutex::new(None),
             scheduler_service: Mutex::new(None),
             // Initialize with MCP notification support
-            subagent_manager: Mutex::new(Some(SubAgentManager::new(mcp_tx))),
+            mcp_tx: Mutex::new(mcp_tx),
             mcp_notification_rx: Arc::new(Mutex::new(mcp_rx)),
         }
     }
@@ -296,7 +293,17 @@ impl Agent {
                 .dispatch_sub_recipe_tool_call(&tool_call.name, tool_call.arguments.clone())
                 .await
         } else if tool_call.name == SUB_RECIPE_EXECUTE_TASK_TOOL_NAME {
-            sub_recipe_execute_task_tool::run_tasks(tool_call.arguments.clone()).await
+            // Get the provider and extension manager for text instruction tasks
+            let provider = self.provider().await.ok();
+            let extension_manager = Some(Arc::clone(&self.extension_manager));
+
+            sub_recipe_execute_task_tool::run_tasks(
+                tool_call.arguments.clone(),
+                self.mcp_tx.lock().await.clone(),
+                provider,
+                extension_manager,
+            )
+            .await
         } else if tool_call.name == DYNAMIC_TASK_TOOL_NAME_PREFIX {
             create_dynamic_task(tool_call.arguments.clone()).await
         } else if tool_call.name == PLATFORM_READ_RESOURCE_TOOL_NAME {
@@ -314,11 +321,6 @@ impl Agent {
             )
         } else if tool_call.name == PLATFORM_SEARCH_AVAILABLE_EXTENSIONS_TOOL_NAME {
             ToolCallResult::from(extension_manager.search_available_extensions().await)
-        } else if tool_call.name == SUBAGENT_RUN_TASK_TOOL_NAME {
-            ToolCallResult::from(
-                self.handle_run_subagent_task(tool_call.arguments.clone())
-                    .await,
-            )
         } else if self.is_frontend_tool(&tool_call.name).await {
             // For frontend tools, return an error indicating we need frontend execution
             ToolCallResult::from(Err(ToolError::ExecutionError(
@@ -1041,15 +1043,6 @@ impl Agent {
     pub async fn update_provider(&self, provider: Arc<dyn Provider>) -> Result<()> {
         let mut current_provider = self.provider.lock().await;
         *current_provider = Some(provider.clone());
-
-        // Initialize subagent manager with MCP notification support
-        // Need to recreate the MCP channel since we're replacing the manager
-        let (mcp_tx, mcp_rx) = mpsc::channel(100);
-        {
-            let mut rx_guard = self.mcp_notification_rx.lock().await;
-            *rx_guard = mcp_rx;
-        }
-        *self.subagent_manager.lock().await = Some(SubAgentManager::new(mcp_tx));
 
         self.update_router_tool_selector(Some(provider), None)
             .await?;

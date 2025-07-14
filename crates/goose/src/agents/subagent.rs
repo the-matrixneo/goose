@@ -104,7 +104,7 @@ impl SubAgent {
     pub async fn new(
         config: SubAgentConfig,
         _provider: Arc<dyn Provider>,
-        extension_manager: Arc<tokio::sync::RwLockReadGuard<'_, ExtensionManager>>,
+        extension_manager: Option<Arc<RwLock<ExtensionManager>>>,
         mcp_notification_tx: mpsc::Sender<JsonRpcMessage>,
     ) -> Result<(Arc<Self>, tokio::task::JoinHandle<()>), anyhow::Error> {
         debug!("Creating new subagent with id: {}", config.id);
@@ -113,23 +113,25 @@ impl SubAgent {
         let mut recipe_extensions = Vec::new();
 
         // Check if extensions from recipe exist in the extension manager
-        if let Some(recipe) = &config.recipe {
-            if let Some(extensions) = &recipe.extensions {
-                for extension in extensions {
-                    let extension_name = extension.name();
-                    let existing_extensions = extension_manager.list_extensions().await?;
+        if let Some(extension_manager) = &extension_manager {
+            if let Some(recipe) = &config.recipe {
+                if let Some(extensions) = &recipe.extensions {
+                    for extension in extensions {
+                        let extension_name = extension.name();
+                        let existing_extensions = extension_manager.read().await.list_extensions().await?;
 
-                    if !existing_extensions.contains(&extension_name) {
-                        missing_extensions.push(extension_name);
-                    } else {
-                        recipe_extensions.push(extension_name);
+                        if !existing_extensions.contains(&extension_name) {
+                            missing_extensions.push(extension_name);
+                        } else {
+                            recipe_extensions.push(extension_name);
+                        }
                     }
                 }
+            } else {
+                // If no recipe, inherit all extensions from the parent agent
+                let existing_extensions = extension_manager.read().await.list_extensions().await?;
+                recipe_extensions = existing_extensions;
             }
-        } else {
-            // If no recipe, inherit all extensions from the parent agent
-            let existing_extensions = extension_manager.list_extensions().await?;
-            recipe_extensions = existing_extensions;
         }
 
         let subagent = Arc::new(SubAgent {
@@ -243,7 +245,7 @@ impl SubAgent {
         &self,
         message: String,
         provider: Arc<dyn Provider>,
-        extension_manager: Arc<tokio::sync::RwLockReadGuard<'_, ExtensionManager>>,
+        extension_manager: Option<Arc<RwLock<ExtensionManager>>>,
     ) -> Result<Message, anyhow::Error> {
         debug!("Processing message for subagent {}", self.id);
         self.send_mcp_notification("message_processing", &format!("Processing: {}", message))
@@ -299,24 +301,28 @@ impl SubAgent {
                 recipe_extensions.len()
             );
 
-            for extension_name in recipe_extensions.iter() {
-                match extension_manager
-                    .get_prefixed_tools(Some(extension_name.clone()))
-                    .await
-                {
-                    Ok(mut ext_tools) => {
-                        debug!(
-                            "Added {} tools from extension {}",
-                            ext_tools.len(),
-                            extension_name
-                        );
-                        recipe_tools.append(&mut ext_tools);
-                    }
-                    Err(e) => {
-                        debug!(
-                            "Failed to get tools for extension {}: {}",
-                            extension_name, e
-                        );
+            if let Some(extension_manager) = &extension_manager {
+                for extension_name in recipe_extensions.iter() {
+                    match extension_manager
+                        .read()
+                        .await
+                        .get_prefixed_tools(Some(extension_name.clone()))
+                        .await
+                    {
+                        Ok(mut ext_tools) => {
+                            debug!(
+                                "Added {} tools from extension {}",
+                                ext_tools.len(),
+                                extension_name
+                            );
+                            recipe_tools.append(&mut ext_tools);
+                        }
+                        Err(e) => {
+                            debug!(
+                                "Failed to get tools for extension {}: {}",
+                                extension_name, e
+                            );
+                        }
                     }
                 }
             }
@@ -330,7 +336,9 @@ impl SubAgent {
             let mut filtered_tools = Self::filter_subagent_tools(recipe_tools);
 
             // Add platform tools (except subagent tools)
-            Self::add_platform_tools(&mut filtered_tools, &extension_manager).await;
+            if let Some(extension_manager) = &extension_manager {
+                Self::add_platform_tools(&mut filtered_tools, &extension_manager.read().await).await;
+            }
 
             debug!(
                 "Subagent {} has {} tools after filtering and adding platform tools",
@@ -344,7 +352,11 @@ impl SubAgent {
                 "Subagent {} operating in inheritance mode, using all parent tools",
                 self.id
             );
-            let parent_tools = extension_manager.get_prefixed_tools(None).await?;
+            let parent_tools = if let Some(extension_manager) = &extension_manager {
+                extension_manager.read().await.get_prefixed_tools(None).await?
+            } else {
+                Vec::new()
+            };
             debug!(
                 "Subagent {} has {} parent tools before filtering",
                 self.id,
@@ -353,7 +365,9 @@ impl SubAgent {
             let mut filtered_tools = Self::filter_subagent_tools(parent_tools);
 
             // Add platform tools (except subagent tools)
-            Self::add_platform_tools(&mut filtered_tools, &extension_manager).await;
+            if let Some(extension_manager) = &extension_manager {
+                Self::add_platform_tools(&mut filtered_tools, &extension_manager.read().await).await;
+            }
 
             debug!(
                 "Subagent {} has {} tools after filtering and adding platform tools",
@@ -428,18 +442,28 @@ impl SubAgent {
 
                             // Handle platform tools or dispatch to extension manager
                             let tool_result = if self.is_platform_tool(&tool_call.name) {
-                                self.handle_platform_tool_call(
-                                    tool_call.clone(),
-                                    &extension_manager,
-                                )
-                                .await
-                            } else {
-                                match extension_manager
-                                    .dispatch_tool_call(tool_call.clone())
+                                if let Some(extension_manager) = &extension_manager {
+                                    self.handle_platform_tool_call(
+                                        tool_call.clone(),
+                                        &extension_manager.read().await,
+                                    )
                                     .await
-                                {
-                                    Ok(result) => result.result.await,
-                                    Err(e) => Err(ToolError::ExecutionError(e.to_string())),
+                                } else {
+                                    Err(ToolError::ExecutionError("No extension manager available".to_string()))
+                                }
+                            } else {
+                                if let Some(extension_manager) = &extension_manager {
+                                    match extension_manager
+                                        .read()
+                                        .await
+                                        .dispatch_tool_call(tool_call.clone())
+                                        .await
+                                    {
+                                        Ok(result) => result.result.await,
+                                        Err(e) => Err(ToolError::ExecutionError(e.to_string())),
+                                    }
+                                } else {
+                                    Err(ToolError::ExecutionError("No extension manager available".to_string()))
                                 }
                             };
 

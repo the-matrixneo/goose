@@ -8,14 +8,21 @@ pub use crate::agents::sub_recipe_execution_tool::task_types::{
 #[cfg(test)]
 mod tests;
 
+use crate::agents::extension_manager::ExtensionManager;
+use crate::providers::base::Provider;
 use mcp_core::protocol::JsonRpcMessage;
 use serde_json::Value;
+use std::sync::Arc;
 use tokio::sync::mpsc;
+use tokio::sync::RwLock;
 
 pub async fn execute_tasks(
     input: Value,
     execution_mode: ExecutionMode,
     notifier: mpsc::Sender<JsonRpcMessage>,
+    mcp_tx: mpsc::Sender<JsonRpcMessage>,
+    provider: Option<Arc<dyn Provider>>,
+    extension_manager: Option<Arc<RwLock<ExtensionManager>>>,
 ) -> Result<Value, String> {
     let tasks: Vec<Task> =
         serde_json::from_value(input.get("tasks").ok_or("Missing tasks field")?.clone())
@@ -25,14 +32,16 @@ pub async fn execute_tasks(
     match execution_mode {
         ExecutionMode::Sequential => {
             if task_count == 1 {
-                let response = execute_single_task(&tasks[0], notifier).await;
+                let response =
+                    execute_single_task(&tasks[0], notifier, mcp_tx, provider, extension_manager)
+                        .await;
                 handle_response(response)
             } else {
                 Err("Sequential execution mode requires exactly one task".to_string())
             }
         }
         ExecutionMode::Parallel => {
-            let response: ExecutionResponse = execute_tasks_in_parallel(tasks, notifier).await;
+            let response: ExecutionResponse = execute_tasks_in_parallel(tasks, notifier, mcp_tx).await;
             handle_response(response)
         }
     }
