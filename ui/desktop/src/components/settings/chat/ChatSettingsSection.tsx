@@ -1,4 +1,3 @@
-import { View, ViewOptions } from '../../../App';
 import { ModeSection } from '../mode/ModeSection';
 import { ToolSelectionStrategySection } from '../tool_selection_strategy/ToolSelectionStrategySection';
 import SchedulerSection from '../scheduler/SchedulerSection';
@@ -6,11 +5,7 @@ import DictationSection from '../dictation/DictationSection';
 import { ResponseStylesSection } from '../response_styles/ResponseStylesSection';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../ui/card';
 
-interface ChatSettingsSectionProps {
-  setView: (view: View, viewOptions?: ViewOptions) => void;
-}
-
-export default function ChatSettingsSection({ setView }: ChatSettingsSectionProps) {
+export default function ChatSettingsSection() {
   return (
     <div className="space-y-4 pr-4 pb-8 mt-1">
       <Card className="pb-2 rounded-lg">
@@ -19,7 +14,7 @@ export default function ChatSettingsSection({ setView }: ChatSettingsSectionProp
           <CardDescription>Configure how Goose interacts with tools and extensions</CardDescription>
         </CardHeader>
         <CardContent className="px-2">
-          <ModeSection setView={setView} />
+          <ModeSection />
         </CardContent>
       </Card>
 
@@ -64,7 +59,7 @@ export default function ChatSettingsSection({ setView }: ChatSettingsSectionProp
           </CardDescription>
         </CardHeader>
         <CardContent className="px-2">
-          <ToolSelectionStrategySection setView={setView} />
+          <ToolSelectionStrategySection />
         </CardContent>
       </Card>
     </div>

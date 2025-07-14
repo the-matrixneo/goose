@@ -1,14 +1,9 @@
 import { useEffect, useState, useCallback } from 'react';
 import { all_goose_modes, ModeSelectionItem } from './ModeSelectionItem';
-import { View, ViewOptions } from '../../../App';
 import { useConfig } from '../../ConfigContext';
 import { Input } from '../../ui/input';
 
-interface ModeSectionProps {
-  setView: (view: View, viewOptions?: ViewOptions) => void;
-}
-
-export const ModeSection = ({ setView }: ModeSectionProps) => {
+export const ModeSection = () => {
   const [currentMode, setCurrentMode] = useState('auto');
   const [maxTurns, setMaxTurns] = useState<number>(1000);
   const { read, upsert } = useConfig();
@@ -68,9 +63,6 @@ export const ModeSection = ({ setView }: ModeSectionProps) => {
           currentMode={currentMode}
           showDescription={true}
           isApproveModeConfigure={false}
-          parentView="settings"
-          parentViewOptions={{ section: 'chat' }}
-          setView={setView}
           handleModeChange={handleModeChange}
         />
       ))}

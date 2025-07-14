@@ -1,7 +1,7 @@
 import { useEffect, useState, forwardRef } from 'react';
 import { Gear } from '../../icons';
 import { ConfigureApproveMode } from './ConfigureApproveMode';
-import { View, ViewOptions } from '../../../App';
+import PermissionRulesModal from '../permission/PermissionRulesModal';
 
 export interface GooseMode {
   key: string;
@@ -37,28 +37,14 @@ interface ModeSelectionItemProps {
   mode: GooseMode;
   showDescription: boolean;
   isApproveModeConfigure: boolean;
-  parentView: View;
-  parentViewOptions?: ViewOptions;
-  setView: (view: View, viewOptions?: ViewOptions) => void;
   handleModeChange: (newMode: string) => void;
 }
 
 export const ModeSelectionItem = forwardRef<HTMLDivElement, ModeSelectionItemProps>(
-  (
-    {
-      currentMode,
-      mode,
-      showDescription,
-      isApproveModeConfigure,
-      parentView,
-      parentViewOptions,
-      setView,
-      handleModeChange,
-    },
-    ref
-  ) => {
+  ({ currentMode, mode, showDescription, isApproveModeConfigure, handleModeChange }, ref) => {
     const [checked, setChecked] = useState(currentMode == mode.key);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [isPermissionModalOpen, setIsPermissionModalOpen] = useState(false);
 
     useEffect(() => {
       setChecked(currentMode === mode.key);
@@ -80,11 +66,9 @@ export const ModeSelectionItem = forwardRef<HTMLDivElement, ModeSelectionItemPro
           <div className="relative flex items-center gap-2">
             {!isApproveModeConfigure && (mode.key == 'approve' || mode.key == 'smart_approve') && (
               <button
-                onClick={() => {
-                  setView('permission', {
-                    parentView,
-                    parentViewOptions,
-                  });
+                onClick={(e) => {
+                  e.stopPropagation(); // Prevent triggering the mode change
+                  setIsPermissionModalOpen(true);
                 }}
               >
                 <Gear className="w-4 h-4 text-text-muted hover:text-text-default" />
@@ -119,6 +103,12 @@ export const ModeSelectionItem = forwardRef<HTMLDivElement, ModeSelectionItemPro
             ) : null}
           </div>
         </div>
+
+        {/* Permission Rules Modal */}
+        <PermissionRulesModal
+          isOpen={isPermissionModalOpen}
+          onClose={() => setIsPermissionModalOpen(false)}
+        />
       </div>
     );
   }
