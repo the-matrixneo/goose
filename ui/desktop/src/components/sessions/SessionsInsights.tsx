@@ -21,12 +21,15 @@ interface SessionInsightsType {
 
 export function SessionInsights() {
   const [insights, setInsights] = useState<SessionInsightsType | null>(null);
-  const [_error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [recentSessions, setRecentSessions] = useState<Session[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   // const [recentProjects, setRecentProjects] = useState<ProjectMetadata[]>([]);
   const navigate = useNavigate();
 
   useEffect(() => {
+    let loadingTimeout: ReturnType<typeof setTimeout>;
+
     const loadInsights = async () => {
       try {
         const response = await fetch(getApiUrl('/sessions/insights'), {
@@ -45,7 +48,17 @@ export function SessionInsights() {
         const data = await response.json();
         setInsights(data);
       } catch (error) {
+        console.error('Failed to load insights:', error);
         setError(error instanceof Error ? error.message : 'Failed to load insights');
+        // Set fallback insights data so the UI can still render
+        setInsights({
+          totalSessions: 0,
+          mostActiveDirs: [],
+          avgSessionDuration: 0,
+          totalTokens: 0,
+        });
+      } finally {
+        setIsLoading(false);
       }
     };
 
@@ -55,6 +68,7 @@ export function SessionInsights() {
         setRecentSessions(sessions.slice(0, 3));
       } catch (error) {
         console.error('Failed to load recent sessions:', error);
+        // Don't set loading to false here since insights is the primary data
       }
     };
 
@@ -67,10 +81,36 @@ export function SessionInsights() {
     //   }
     // };
 
+    // Set a maximum loading time to prevent infinite skeleton
+    loadingTimeout = setTimeout(() => {
+      // Only apply fallback if we still don't have insights data
+      setInsights((currentInsights) => {
+        if (!currentInsights) {
+          console.warn('Loading timeout reached, showing fallback content');
+          setError('Failed to load insights');
+          setIsLoading(false);
+          return {
+            totalSessions: 0,
+            mostActiveDirs: [],
+            avgSessionDuration: 0,
+            totalTokens: 0,
+          };
+        }
+        return currentInsights;
+      });
+    }, 10000); // 10 second timeout
+
     loadInsights();
     loadRecentSessions();
     // loadRecentProjects();
-  }, []);
+
+    // Cleanup timeout on unmount
+    return () => {
+      if (loadingTimeout) {
+        window.clearTimeout(loadingTimeout);
+      }
+    };
+  }, []); // Empty dependency array to run only once
 
   const handleSessionClick = async (sessionId: string) => {
     try {
@@ -220,7 +260,7 @@ export function SessionInsights() {
   );
 
   // Show skeleton while loading, then show actual content
-  if (!insights) {
+  if (isLoading) {
     return renderSkeleton();
   }
 
@@ -243,6 +283,18 @@ export function SessionInsights() {
 
       {/* Stats containers - full bleed with 2px gaps */}
       <div className="flex flex-col flex-1 space-y-0.5">
+        {/* Error notice if insights failed to load */}
+        {error && (
+          <div className="mx-0.5 px-4 py-2 bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800/30 rounded-xl">
+            <div className="flex items-center space-x-2">
+              <div className="w-2 h-2 bg-orange-400 rounded-full flex-shrink-0"></div>
+              <span className="text-xs text-orange-700 dark:text-orange-300">
+                Failed to load insights
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* Top row with three equal columns */}
         <div className="grid grid-cols-3 gap-0.5">
           {/* Total Sessions Card */}
@@ -250,7 +302,7 @@ export function SessionInsights() {
             <CardContent className="animate-in fade-in duration-500 flex flex-col justify-end h-full p-0">
               <div className="flex flex-col justify-end">
                 <p className="text-4xl font-mono font-light flex items-end">
-                  {insights?.totalSessions}
+                  {insights?.totalSessions ?? 0}
                 </p>
                 <span className="text-xs text-text-muted">Total sessions</span>
               </div>
@@ -262,7 +314,9 @@ export function SessionInsights() {
             <CardContent className="animate-in fade-in duration-500 flex flex-col justify-end h-full p-0">
               <div className="flex flex-col justify-end">
                 <p className="text-4xl font-mono font-light flex items-end">
-                  {insights?.avgSessionDuration?.toFixed(1)}m
+                  {insights?.avgSessionDuration
+                    ? `${insights.avgSessionDuration.toFixed(1)}m`
+                    : '0.0m'}
                 </p>
                 <span className="text-xs text-text-muted">Avg. chat length</span>
               </div>
@@ -274,7 +328,9 @@ export function SessionInsights() {
             <CardContent className="animate-in fade-in duration-500 flex flex-col justify-end h-full p-0">
               <div className="flex flex-col justify-end">
                 <p className="text-4xl font-mono font-light flex items-end">
-                  {insights?.totalTokens ? `${(insights.totalTokens / 1000000).toFixed(2)}M` : ''}
+                  {insights?.totalTokens
+                    ? `${(insights.totalTokens / 1000000).toFixed(2)}M`
+                    : '0.00M'}
                 </p>
                 <span className="text-xs text-text-muted">Total tokens</span>
               </div>
