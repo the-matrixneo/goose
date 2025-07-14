@@ -208,6 +208,8 @@ async fn reply_handler(
                                     .track_recipe_execution(recipe_execution.build())
                                     .await;
                             }
+                        } else {
+                            tracing::warn!("Telemetry is disabled or not initialized - failed to track session failure");
                         }
                         return;
                     }
