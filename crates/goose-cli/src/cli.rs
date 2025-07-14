@@ -341,6 +341,16 @@ enum Command {
         )]
         remote_extensions: Vec<String>,
 
+        /// Add streamable HTTP extensions with a URL
+        #[arg(
+            long = "with-streamable-http-extension",
+            value_name = "URL",
+            help = "Add streamable HTTP extensions (can be specified multiple times)",
+            long_help = "Add streamable HTTP extensions from a URL. Can be specified multiple times. Format: 'url...'",
+            action = clap::ArgAction::Append
+        )]
+        streamable_http_extensions: Vec<String>,
+
         /// Add builtin extensions by name
         #[arg(
             long = "with-builtin",
@@ -509,6 +519,16 @@ enum Command {
         )]
         remote_extensions: Vec<String>,
 
+        /// Add streamable HTTP extensions
+        #[arg(
+            long = "with-streamable-http-extension",
+            value_name = "URL",
+            help = "Add streamable HTTP extensions (can be specified multiple times)",
+            long_help = "Add streamable HTTP extensions. Can be specified multiple times. Format: 'url...'",
+            action = clap::ArgAction::Append
+        )]
+        streamable_http_extensions: Vec<String>,
+
         /// Add builtin extensions by name
         #[arg(
             long = "with-builtin",
@@ -546,6 +566,24 @@ enum Command {
             action = clap::ArgAction::Append
         )]
         additional_sub_recipes: Vec<String>,
+
+        /// Provider to use for this run (overrides environment variable)
+        #[arg(
+            long = "provider",
+            value_name = "PROVIDER",
+            help = "Specify the LLM provider to use (e.g., 'openai', 'anthropic')",
+            long_help = "Override the GOOSE_PROVIDER environment variable for this run. Available providers include openai, anthropic, ollama, databricks, gemini-cli, claude-code, and others."
+        )]
+        provider: Option<String>,
+
+        /// Model to use for this run (overrides environment variable)
+        #[arg(
+            long = "model",
+            value_name = "MODEL",
+            help = "Specify the model to use (e.g., 'gpt-4o', 'claude-3.5-sonnet')",
+            long_help = "Override the GOOSE_MODEL environment variable for this run. The model must be supported by the specified provider."
+        )]
+        model: Option<String>,
     },
 
     /// Recipe utilities for validation and deeplinking
@@ -656,6 +694,7 @@ pub async fn cli() -> Result<()> {
             max_turns,
             extensions,
             remote_extensions,
+            streamable_http_extensions,
             builtins,
         }) => {
             return match command {
@@ -696,10 +735,13 @@ pub async fn cli() -> Result<()> {
                         no_session: false,
                         extensions,
                         remote_extensions,
+                        streamable_http_extensions,
                         builtins,
                         extensions_override: None,
                         additional_system_prompt: None,
                         settings: None,
+                        provider: None,
+                        model: None,
                         debug,
                         max_tool_repetitions,
                         max_turns,
@@ -754,6 +796,7 @@ pub async fn cli() -> Result<()> {
             max_turns,
             extensions,
             remote_extensions,
+            streamable_http_extensions,
             builtins,
             params,
             explain,
@@ -761,6 +804,8 @@ pub async fn cli() -> Result<()> {
             scheduled_job_id,
             quiet,
             additional_sub_recipes,
+            provider,
+            model,
         }) => {
             let (input_config, session_settings, sub_recipes, final_output_response) = match (
                 instructions,
@@ -841,10 +886,13 @@ pub async fn cli() -> Result<()> {
                 no_session,
                 extensions,
                 remote_extensions,
+                streamable_http_extensions,
                 builtins,
                 extensions_override: input_config.extensions_override,
                 additional_system_prompt: input_config.additional_system_prompt,
                 settings: session_settings,
+                provider,
+                model,
                 debug,
                 max_tool_repetitions,
                 max_turns,
@@ -966,10 +1014,13 @@ pub async fn cli() -> Result<()> {
                     no_session: false,
                     extensions: Vec::new(),
                     remote_extensions: Vec::new(),
+                    streamable_http_extensions: Vec::new(),
                     builtins: Vec::new(),
                     extensions_override: None,
                     additional_system_prompt: None,
                     settings: None::<SessionSettings>,
+                    provider: None,
+                    model: None,
                     debug: false,
                     max_tool_repetitions: None,
                     max_turns: None,

@@ -65,6 +65,10 @@ const config: Config = {
             "./src/css/tailwind.css",
           ],
         },
+        gtag: {
+          trackingID: 'G-ZS5D6SB4ZJ',
+          anonymizeIP: true,
+        },
       } satisfies Preset.Options,
     ],
   ],
@@ -117,6 +121,22 @@ const config: Config = {
           {
             from: '/docs/guides/recipe-reference',
             to: '/docs/guides/recipes/recipe-reference'
+          },
+          {
+            from: '/docs/guides/tool-permissions',
+            to: '/docs/guides/managing-tools/tool-permissions'
+          },
+          {
+            from: '/docs/guides/adjust-tool-output',
+            to: '/docs/guides/managing-tools/adjust-tool-output'
+          },
+          {
+            from: '/docs/guides/benchmarking',
+            to: '/docs/tutorials/benchmarking'
+          },
+          {
+            from: '/docs/guides/goose-in-docker',
+            to: '/docs/tutorials/goose-in-docker'
           },
           // MCP tutorial redirects - moved from /docs/tutorials/ to /docs/mcp/
           {

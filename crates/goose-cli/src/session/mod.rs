@@ -23,6 +23,7 @@ use goose::agents::extension::{Envs, ExtensionConfig};
 use goose::agents::{Agent, SessionConfig};
 use goose::config::Config;
 use goose::message::{Message, MessageContent};
+use goose::providers::pricing::initialize_pricing_cache;
 use goose::session;
 use input::InputResult;
 use mcp_core::handler::ToolError;
@@ -31,6 +32,7 @@ use mcp_core::protocol::JsonRpcMessage;
 use mcp_core::protocol::JsonRpcNotification;
 
 use rand::{distributions::Alphanumeric, Rng};
+use rustyline::EditMode;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -53,6 +55,7 @@ pub struct Session {
     run_mode: RunMode,
     scheduled_job_id: Option<String>, // ID of the scheduled job that triggered this session
     max_turns: Option<u32>,
+    edit_mode: Option<EditMode>,
 }
 
 // Cache structure for completion data
@@ -115,6 +118,7 @@ impl Session {
         debug: bool,
         scheduled_job_id: Option<String>,
         max_turns: Option<u32>,
+        edit_mode: Option<EditMode>,
     ) -> Self {
         let messages = if let Some(session_file) = &session_file {
             match session::read_messages(session_file) {
@@ -138,6 +142,7 @@ impl Session {
             run_mode: RunMode::Normal,
             scheduled_job_id,
             max_turns,
+            edit_mode,
         }
     }
 
@@ -226,6 +231,40 @@ impl Session {
             uri: extension_url,
             envs: Envs::new(HashMap::new()),
             env_keys: Vec::new(),
+            description: Some(goose::config::DEFAULT_EXTENSION_DESCRIPTION.to_string()),
+            // TODO: should set timeout
+            timeout: Some(goose::config::DEFAULT_EXTENSION_TIMEOUT),
+            bundled: None,
+        };
+
+        self.agent
+            .add_extension(config)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to start extension: {}", e))?;
+
+        // Invalidate the completion cache when a new extension is added
+        self.invalidate_completion_cache().await;
+
+        Ok(())
+    }
+
+    /// Add a streamable HTTP extension to the session
+    ///
+    /// # Arguments
+    /// * `extension_url` - URL of the server
+    pub async fn add_streamable_http_extension(&mut self, extension_url: String) -> Result<()> {
+        let name: String = rand::thread_rng()
+            .sample_iter(&Alphanumeric)
+            .take(8)
+            .map(char::from)
+            .collect();
+
+        let config = ExtensionConfig::StreamableHttp {
+            name,
+            uri: extension_url,
+            envs: Envs::new(HashMap::new()),
+            env_keys: Vec::new(),
+            headers: HashMap::new(),
             description: Some(goose::config::DEFAULT_EXTENSION_DESCRIPTION.to_string()),
             // TODO: should set timeout
             timeout: Some(goose::config::DEFAULT_EXTENSION_TIMEOUT),
@@ -364,9 +403,15 @@ impl Session {
         self.update_completion_cache().await?;
 
         // Create a new editor with our custom completer
-        let config = rustyline::Config::builder()
-            .completion_type(rustyline::CompletionType::Circular)
-            .build();
+        let builder =
+            rustyline::Config::builder().completion_type(rustyline::CompletionType::Circular);
+        let builder = if let Some(edit_mode) = self.edit_mode {
+            builder.edit_mode(edit_mode)
+        } else {
+            // Default to Emacs mode if no edit mode is set
+            builder.edit_mode(EditMode::Emacs)
+        };
+        let config = builder.build();
         let mut editor =
             rustyline::Editor::<GooseCompleter, rustyline::history::DefaultHistory>::with_config(
                 config,
@@ -1303,13 +1348,42 @@ impl Session {
     pub async fn display_context_usage(&self) -> Result<()> {
         let provider = self.agent.provider().await?;
         let model_config = provider.get_model_config();
-        let context_limit = model_config.context_limit.unwrap_or(32000);
+        let context_limit = model_config.context_limit();
+
+        let config = Config::global();
+        let show_cost = config
+            .get_param::<bool>("GOOSE_CLI_SHOW_COST")
+            .unwrap_or(false);
+
+        let provider_name = config
+            .get_param::<String>("GOOSE_PROVIDER")
+            .unwrap_or_else(|_| "unknown".to_string());
+
+        // Initialize pricing cache on startup
+        tracing::info!("Initializing pricing cache...");
+        if let Err(e) = initialize_pricing_cache().await {
+            tracing::warn!(
+                "Failed to initialize pricing cache: {e}. Pricing data may not be available."
+            );
+        }
 
         match self.get_metadata() {
             Ok(metadata) => {
                 let total_tokens = metadata.total_tokens.unwrap_or(0) as usize;
 
                 output::display_context_usage(total_tokens, context_limit);
+
+                if show_cost {
+                    let input_tokens = metadata.input_tokens.unwrap_or(0) as usize;
+                    let output_tokens = metadata.output_tokens.unwrap_or(0) as usize;
+                    output::display_cost_usage(
+                        &provider_name,
+                        &model_config.model_name,
+                        input_tokens,
+                        output_tokens,
+                    )
+                    .await;
+                }
             }
             Err(_) => {
                 output::display_context_usage(0, context_limit);
@@ -1450,7 +1524,8 @@ fn get_reasoner() -> Result<Arc<dyn Provider>, anyhow::Error> {
             .expect("No model configured. Run 'goose configure' first")
     };
 
-    let model_config = ModelConfig::new(model);
+    let model_config =
+        ModelConfig::new_with_context_env(model, Some("GOOSE_PLANNER_CONTEXT_LIMIT"));
     let reasoner = create(&provider, model_config)?;
 
     Ok(reasoner)

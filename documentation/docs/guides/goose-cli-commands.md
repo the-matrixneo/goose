@@ -32,7 +32,7 @@ goose configure
 
 ### session [options]
 
-- Start a session and give it a name
+#### Start a session and give it a name
 
     **Options:**
 
@@ -43,8 +43,9 @@ goose configure
     ```bash
     goose session --name <n>
     ```
+---
 
-- Resume a previous session
+#### Resume a previous session
 
     **Options:**
 
@@ -59,8 +60,9 @@ goose configure
     ```bash
     goose session --resume --id <id>
     ```
+---
 
-- Start a session with the specified extension
+#### Start a session with the specified extension
 
      **Options:**
 
@@ -83,8 +85,9 @@ goose configure
     ```bash
     goose session --with-extension "GITHUB_PERSONAL_ACCESS_TOKEN=<YOUR_TOKEN> npx -y @modelcontextprotocol/server-github"
     ```
+---
 
-- Start a session with the specified remote extension over SSE
+#### Start a session with the specified remote extension over SSE
 
      **Options:**
 
@@ -102,7 +105,48 @@ goose configure
     goose session --with-remote-extension "http://localhost:8080/sse"
     ```
 
-- Start a session with the specified [built-in extension](/docs/getting-started/using-extensions#built-in-extensions) enabled (e.g. 'developer')
+---
+
+#### Start a session with the specified remote extension over Streaming HTTP
+
+     **Options:**
+
+     **`--with-streamable-http-extension <url>`**
+
+     **Usage:**
+
+    ```bash
+    goose session --with-streamable-http-extension <url>
+    ```
+
+    **Examples:**
+
+    ```bash
+    goose session --with-streamable-http-extension "https://example.com/streamable"
+    ```
+
+    **Advanced Examples:**
+
+    ```bash
+    # Start a session with a streamable HTTP extension
+    goose session --with-streamable-http-extension "http://api.example.com"
+
+    # Use multiple streamable HTTP extensions
+    goose session \
+      --with-streamable-http-extension "http://api1.example.com" \
+      --with-streamable-http-extension "http://api2.example.com"
+
+    # Mix different extension types
+    goose session \
+      --with-extension "echo hello" \
+      --with-remote-extension "http://sse.example.com/sse" \
+      --with-streamable-http-extension "http://http.example.com" \
+      --with-builtin "developer"
+    ```
+
+---
+
+#### Start a session with the specified [built-in extension](/docs/getting-started/using-extensions#built-in-extensions) enabled (e.g. 'developer')
 
     **Options:**
 
@@ -119,8 +163,9 @@ goose configure
     ```bash
     goose session --with-builtin computercontroller
     ```
+---
 
-- Enable debug mode to output complete tool responses, detailed parameter values, and full file paths
+#### Enable debug mode to output complete tool responses, detailed parameter values, and full file paths
 
     **Options:**
 
@@ -131,8 +176,9 @@ goose configure
     ```bash
     goose session --name my-session --debug
     ```
+---
 
-- Limit the maximum number of turns the agent can take before asking for user input to continue
+#### Limit the maximum number of turns the agent can take before asking for user input to continue
 
     **Options:**
 
@@ -145,6 +191,34 @@ goose configure
     ```
 
 ---
+
+#### Set the [maximum number of turns](/docs/guides/smart-context-management#maximum-turns) allowed without user input (default: 1000)
+
+    **Options:**
+
+    **`--max-turns <NUMBER>`**
+
+    **Usage:**
+
+    ```bash
+    goose session --max-turns 10
+    ```
+
+    **Examples:**
+
+    ```bash
+    # Low limit for step-by-step control
+    goose session --max-turns 3
+    
+    # Moderate limit for controlled automation
+    goose session --max-turns 25
+    
+    # Combined with other options
+    goose session --name my-project --max-turns 10 --debug
+    ```
+
+---
+
 ### session list [options]
 
 List all saved sessions.
@@ -301,8 +375,11 @@ Execute commands from an instruction file or stdin. Check out the [full guide](/
 - **`--recipe <RECIPE_FILE_NAME> <OPTIONS>`**: Load a custom recipe in current session
 - **`-p, --path <PATH>`**: Path for this run session (e.g. `./playground.jsonl`)
 - **`--with-extension <COMMAND>`**: Add stdio extensions (can be used multiple times in the same command)
+- **`--with-remote-extension <URL>`**: Add remote extensions over SSE (can be used multiple times in the same command)
+- **`--with-streamable-http-extension <URL>`**: Add remote extensions over Streaming HTTP (can be used multiple times in the same command)
 - **`--with-builtin <n>`**: Add builtin extensions by name (e.g., 'developer' or multiple: 'developer,github')
 - **`--debug`**: Output complete tool responses, detailed parameter values, and full file paths
+- **`--max-turns <NUMBER>`**: [Maximum number of turns](/docs/guides/smart-context-management#maximum-turns) allowed without user input (default: 1000)
 - **`--explain`**: Show a recipe's title, description, and parameters
 - **`--no-session`**: Run goose commands without creating or storing a session file
 - **`--max-turns <NUMBER>`**: Limit the maximum number of turns the agent can take before asking for user input to continue (default: 1000)
@@ -335,13 +412,16 @@ goose run --no-session -i instructions.txt
 
 #Run with a limit of 25 turns before asking for user input
 goose run --max-turns 25 -i plan.md
+
+#Run with limited turns before prompting user
+goose run --recipe recipe.yaml --max-turns 10
 ```
 
 ---
 
 ### bench
 
-Used to evaluate system-configuration across a range of practical tasks. See the [detailed guide](/docs/guides/benchmarking) for more information.
+Used to evaluate system-configuration across a range of practical tasks. See the [detailed guide](/docs/tutorials/benchmarking) for more information.
 
 **Usage:**
 
@@ -421,8 +501,6 @@ goose schedule remove --id daily-report
 
 Start working on your last project or create a new one.
 
-A project is a record of a working directory and recent session metadata. Note that any directory where you run `goose project` becomes a tracked project, so you might want to run the command from the directory where you want to work.
-
 **Alias**: `p`
 
 **Usage:**
@@ -430,14 +508,7 @@ A project is a record of a working directory and recent session metadata. Note t
 goose project
 ```
 
-The command provides three options:
-1. **Resume project with session**: Continue the last session in the project
-2. **Resume project with fresh session**: Start a new session in the project
-3. **Start new project in current directory**: Create a new project in the current directory
-
-:::note
-Goose stores your project history in `~/.local/share/goose/projects.json`.
-:::
+For a complete guide, see [Managing Projects Guide](/docs/guides/managing-projects).
 
 ---
 ### projects
@@ -451,23 +522,7 @@ Choose one of your projects to start working on.
 goose projects
 ```
 
-Example output:
-```bash
-┌  Goose Project Manager
-│
-◆  Select a project:
-│  ● .../Users/svera (2025-05-21 18:42:05)
-│  ○ .../Development/goose (2025-05-21 18:38:26)
-│  ○ .../Documents/goose-recipes (2025-05-21q 18:29:15)
-│  ○ .../Desktop/temp (2025-05-21 15:13:48)q
-│  ○ .../doc_projects/shared (2025-05-21 14:32:22)
-│  ○ Cancel
-└
-```
-
-After selecting a project, you'll be asked to either:
-- **Resume previous session**: Continue the last session in the selected project
-- **Start new session**: Start a new session in the selected project
+For detailed usage examples and workflows, see [Managing Projects Guide](/docs/guides/managing-projects).
 
 ---
 ### web
