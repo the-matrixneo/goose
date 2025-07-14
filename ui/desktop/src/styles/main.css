@@ -917,7 +917,7 @@ p > code.bg-inline-code {
 }
 
 .page-transition {
-  animation: page-fade-in 0.15s ease-out forwards;
+  animation: page-fade-in 0.08s ease-out forwards;
   /* Don't block interactions during animation */
   pointer-events: auto;
 }
