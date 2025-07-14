@@ -8,7 +8,6 @@ import { fetchSessions, fetchSessionDetails, type Session } from '../../sessions
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../ui/button';
 import { ChatSmart } from '../icons/';
-import { motion, AnimatePresence } from 'framer-motion';
 import { Goose } from '../icons/Goose';
 import { Skeleton } from '../ui/skeleton';
 
@@ -161,14 +160,9 @@ export function SessionInsights() {
       {/* Header container with rounded bottom */}
       <div className="bg-background-default rounded-b-2xl mb-0.5">
         <div className="px-8 pb-12 pt-19 space-y-4">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.25, x: -5, y: 5, rotate: -20 }}
-            animate={{ opacity: 1, scale: 1, x: 0, y: 0, rotate: 0 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-            className="origin-bottom-left"
-          >
+          <div className="origin-bottom-left goose-icon-animation">
             <Goose className="size-8" />
-          </motion.div>
+          </div>
           <Greeting />
         </div>
       </div>
@@ -269,14 +263,9 @@ export function SessionInsights() {
       {/* Header container with rounded bottom */}
       <div className="bg-background-default rounded-b-2xl mb-0.5">
         <div className="px-8 pb-12 pt-19 space-y-4">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.25, x: -5, y: 5, rotate: -20 }}
-            animate={{ opacity: 1, scale: 1, x: 0, y: 0, rotate: 0 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-            className="origin-bottom-left"
-          >
+          <div className="origin-bottom-left goose-icon-animation">
             <Goose className="size-8" />
-          </motion.div>
+          </div>
           <Greeting />
         </div>
       </div>
@@ -299,7 +288,7 @@ export function SessionInsights() {
         <div className="grid grid-cols-3 gap-0.5">
           {/* Total Sessions Card */}
           <Card className="w-full py-6 px-6 border-none rounded-2xl bg-background-default">
-            <CardContent className="animate-in fade-in duration-500 flex flex-col justify-end h-full p-0">
+            <CardContent className="page-transition flex flex-col justify-end h-full p-0">
               <div className="flex flex-col justify-end">
                 <p className="text-4xl font-mono font-light flex items-end">
                   {insights?.totalSessions ?? 0}
@@ -311,7 +300,7 @@ export function SessionInsights() {
 
           {/* Average Duration Card */}
           <Card className="w-full py-6 px-6 border-none rounded-2xl bg-background-default">
-            <CardContent className="animate-in fade-in duration-500 flex flex-col justify-end h-full p-0">
+            <CardContent className="page-transition flex flex-col justify-end h-full p-0">
               <div className="flex flex-col justify-end">
                 <p className="text-4xl font-mono font-light flex items-end">
                   {insights?.avgSessionDuration
@@ -325,7 +314,7 @@ export function SessionInsights() {
 
           {/* Total Tokens Card */}
           <Card className="w-full py-6 px-6 border-none rounded-2xl bg-background-default">
-            <CardContent className="animate-in fade-in duration-500 flex flex-col justify-end h-full p-0">
+            <CardContent className="page-transition flex flex-col justify-end h-full p-0">
               <div className="flex flex-col justify-end">
                 <p className="text-4xl font-mono font-light flex items-end">
                   {insights?.totalTokens
@@ -338,7 +327,7 @@ export function SessionInsights() {
           </Card>
         </div>
 
-        {/* Projects and Chats row */}
+        {/* Recent Chats Card */}
         <div className="grid grid-cols-1 gap-0.5">
           {/* Recent Projects Card */}
           {/*<Card className="w-full py-6 px-4 border-none rounded-tl-none rounded-bl-none">*/}
@@ -396,7 +385,7 @@ export function SessionInsights() {
 
           {/* Recent Chats Card */}
           <Card className="w-full py-6 px-6 border-none rounded-2xl bg-background-default">
-            <CardContent className="animate-in fade-in duration-500 p-0">
+            <CardContent className="page-transition p-0">
               <div className="flex justify-between items-center mb-4">
                 <CardDescription className="mb-0">
                   <span className="text-lg text-text-default">Recent chats</span>
@@ -411,41 +400,35 @@ export function SessionInsights() {
                 </Button>
               </div>
               <div className="space-y-1 min-h-[96px] transition-all duration-300 ease-in-out">
-                <AnimatePresence>
-                  {recentSessions.length > 0 ? (
-                    recentSessions.map((session, index) => (
-                      <motion.div
-                        key={session.id}
-                        className="flex items-center justify-between text-sm py-1 px-2 rounded-md hover:bg-background-muted cursor-pointer transition-colors"
-                        onClick={() => handleSessionClick(session.id)}
-                        role="button"
-                        tabIndex={0}
-                        initial={{ opacity: 0, y: 5 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.3, delay: index * 0.1 }}
-                        onKeyDown={async (e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            await handleSessionClick(session.id);
-                          }
-                        }}
-                      >
-                        <div className="flex items-center space-x-2">
-                          <ChatSmart className="h-4 w-4 text-text-muted" />
-                          <span className="truncate max-w-[300px]">
-                            {session.metadata.description || session.id}
-                          </span>
-                        </div>
-                        <span className="text-text-muted font-mono font-light">
-                          {formatDateOnly(session.modified)}
+                {recentSessions.length > 0 ? (
+                  recentSessions.map((session, index) => (
+                    <div
+                      key={session.id}
+                      className="flex items-center justify-between text-sm py-1 px-2 rounded-md hover:bg-background-muted cursor-pointer transition-colors session-item"
+                      onClick={() => handleSessionClick(session.id)}
+                      role="button"
+                      tabIndex={0}
+                      style={{ animationDelay: `${index * 0.1}s` }}
+                      onKeyDown={async (e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          await handleSessionClick(session.id);
+                        }
+                      }}
+                    >
+                      <div className="flex items-center space-x-2">
+                        <ChatSmart className="h-4 w-4 text-text-muted" />
+                        <span className="truncate max-w-[300px]">
+                          {session.metadata.description || session.id}
                         </span>
-                      </motion.div>
-                    ))
-                  ) : (
-                    <div className="text-text-muted text-sm py-2">
-                      No recent chat sessions found.
+                      </div>
+                      <span className="text-text-muted font-mono font-light">
+                        {formatDateOnly(session.modified)}
+                      </span>
                     </div>
-                  )}
-                </AnimatePresence>
+                  ))
+                ) : (
+                  <div className="text-text-muted text-sm py-2">No recent chat sessions found.</div>
+                )}
               </div>
             </CardContent>
           </Card>

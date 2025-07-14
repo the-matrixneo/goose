@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useMemo, startTransition } from 'react';
 import { MessageSquareText, Target, AlertCircle, Calendar, Folder } from 'lucide-react';
 import { fetchSessions, type Session } from '../../sessions';
 import { Card } from '../ui/card';
@@ -12,6 +12,23 @@ import { MainPanelLayout } from '../Layout/MainPanelLayout';
 import { groupSessionsByDate, type DateGroup } from '../../utils/dateUtils';
 import { Skeleton } from '../ui/skeleton';
 
+// Debounce hook for search
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      window.clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+}
+
 interface SearchContainerElement extends HTMLDivElement {
   _searchHighlighter: SearchHighlighter | null;
 }
@@ -21,7 +38,7 @@ interface SessionListViewProps {
   onSelectSession: (sessionId: string) => void;
 }
 
-const SessionListView: React.FC<SessionListViewProps> = ({ onSelectSession }) => {
+const SessionListView: React.FC<SessionListViewProps> = React.memo(({ onSelectSession }) => {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [filteredSessions, setFilteredSessions] = useState<Session[]>([]);
   const [dateGroups, setDateGroups] = useState<DateGroup[]>([]);
@@ -34,6 +51,12 @@ const SessionListView: React.FC<SessionListViewProps> = ({ onSelectSession }) =>
     count: number;
     currentIndex: number;
   } | null>(null);
+
+  // Search state for debouncing
+  const [searchTerm, setSearchTerm] = useState('');
+  const [caseSensitive, setCaseSensitive] = useState(false);
+  const debouncedSearchTerm = useDebounce(searchTerm, 300); // 300ms debounce
+
   const containerRef = useRef<HTMLDivElement>(null);
 
   const loadSessions = useCallback(async () => {
@@ -43,8 +66,11 @@ const SessionListView: React.FC<SessionListViewProps> = ({ onSelectSession }) =>
     setError(null);
     try {
       const sessions = await fetchSessions();
-      setSessions(sessions);
-      setFilteredSessions(sessions);
+      // Use startTransition to make state updates non-blocking
+      startTransition(() => {
+        setSessions(sessions);
+        setFilteredSessions(sessions);
+      });
     } catch (err) {
       console.error('Failed to load sessions:', err);
       setError('Failed to load sessions. Please try again later.');
@@ -63,59 +89,77 @@ const SessionListView: React.FC<SessionListViewProps> = ({ onSelectSession }) =>
   useEffect(() => {
     if (!isLoading && showSkeleton) {
       setShowSkeleton(false);
-      // Virtually instant content show
-      setTimeout(() => {
-        setShowContent(true);
-        if (isInitialLoad) {
-          setIsInitialLoad(false);
-        }
-      }, 10);
+      // Use startTransition for non-blocking content show
+      startTransition(() => {
+        setTimeout(() => {
+          setShowContent(true);
+          if (isInitialLoad) {
+            setIsInitialLoad(false);
+          }
+        }, 10);
+      });
     }
     return () => void 0;
   }, [isLoading, showSkeleton, isInitialLoad]);
 
-  // Update date groups when filtered sessions change
-  useEffect(() => {
+  // Memoize date groups calculation to prevent unnecessary recalculations
+  const memoizedDateGroups = useMemo(() => {
     if (filteredSessions.length > 0) {
-      const groups = groupSessionsByDate(filteredSessions);
-      setDateGroups(groups);
-    } else {
-      setDateGroups([]);
+      return groupSessionsByDate(filteredSessions);
     }
+    return [];
   }, [filteredSessions]);
 
-  // Filter sessions when search term or case sensitivity changes
-  const handleSearch = (term: string, caseSensitive: boolean) => {
-    if (!term) {
-      setFilteredSessions(sessions);
-      setSearchResults(null);
+  // Update date groups when filtered sessions change
+  useEffect(() => {
+    startTransition(() => {
+      setDateGroups(memoizedDateGroups);
+    });
+  }, [memoizedDateGroups]);
+
+  // Debounced search effect - performs actual filtering
+  useEffect(() => {
+    if (!debouncedSearchTerm) {
+      startTransition(() => {
+        setFilteredSessions(sessions);
+        setSearchResults(null);
+      });
       return;
     }
 
-    const searchTerm = caseSensitive ? term : term.toLowerCase();
-    const filtered = sessions.filter((session) => {
-      const description = session.metadata.description || session.id;
-      const path = session.path;
-      const workingDir = session.metadata.working_dir;
+    // Use startTransition to make search non-blocking
+    startTransition(() => {
+      const searchTerm = caseSensitive ? debouncedSearchTerm : debouncedSearchTerm.toLowerCase();
+      const filtered = sessions.filter((session) => {
+        const description = session.metadata.description || session.id;
+        const path = session.path;
+        const workingDir = session.metadata.working_dir;
 
-      if (caseSensitive) {
-        return (
-          description.includes(searchTerm) ||
-          path.includes(searchTerm) ||
-          workingDir.includes(searchTerm)
-        );
-      } else {
-        return (
-          description.toLowerCase().includes(searchTerm) ||
-          path.toLowerCase().includes(searchTerm) ||
-          workingDir.toLowerCase().includes(searchTerm)
-        );
-      }
+        if (caseSensitive) {
+          return (
+            description.includes(searchTerm) ||
+            path.includes(searchTerm) ||
+            workingDir.includes(searchTerm)
+          );
+        } else {
+          return (
+            description.toLowerCase().includes(searchTerm) ||
+            path.toLowerCase().includes(searchTerm) ||
+            workingDir.toLowerCase().includes(searchTerm)
+          );
+        }
+      });
+
+      setFilteredSessions(filtered);
+      setSearchResults(filtered.length > 0 ? { count: filtered.length, currentIndex: 1 } : null);
     });
+  }, [debouncedSearchTerm, caseSensitive, sessions]);
 
-    setFilteredSessions(filtered);
-    setSearchResults(filtered.length > 0 ? { count: filtered.length, currentIndex: 1 } : null);
-  };
+  // Handle immediate search input (updates search term for debouncing)
+  const handleSearch = useCallback((term: string, caseSensitive: boolean) => {
+    setSearchTerm(term);
+    setCaseSensitive(caseSensitive);
+  }, []);
 
   // Handle search result navigation
   const handleSearchNavigation = (direction: 'next' | 'prev') => {
@@ -145,7 +189,7 @@ const SessionListView: React.FC<SessionListViewProps> = ({ onSelectSession }) =>
     return (
       <Card
         onClick={() => onSelectSession(session.id)}
-        className="h-full py-3 px-4 hover:shadow-default cursor-pointer transition-all duration-150 flex flex-col justify-between"
+        className="session-item h-full py-3 px-4 hover:shadow-default cursor-pointer transition-all duration-150 flex flex-col justify-between"
       >
         <div className="flex-1">
           <h3 className="text-base truncate mb-1">{session.metadata.description || session.id}</h3>
@@ -184,7 +228,7 @@ const SessionListView: React.FC<SessionListViewProps> = ({ onSelectSession }) =>
     const tokenWidths = ['w-12', 'w-10', 'w-14', 'w-8'];
 
     return (
-      <Card className="h-full py-3 px-4 flex flex-col justify-between">
+      <Card className="session-skeleton h-full py-3 px-4 flex flex-col justify-between">
         <div className="flex-1">
           <Skeleton className={`h-5 ${titleWidths[variant % titleWidths.length]} mb-2`} />
           <div className="flex items-center mb-1">
@@ -272,7 +316,7 @@ const SessionListView: React.FC<SessionListViewProps> = ({ onSelectSession }) =>
     <MainPanelLayout>
       <div className="flex-1 flex flex-col min-h-0">
         <div className="bg-background-default px-8 pb-8 pt-16">
-          <div className="flex flex-col animate-in fade-in duration-500">
+          <div className="flex flex-col page-transition">
             <div className="flex justify-between items-center mb-1">
               <h1 className="text-4xl font-light">Chat history</h1>
             </div>
@@ -352,6 +396,8 @@ const SessionListView: React.FC<SessionListViewProps> = ({ onSelectSession }) =>
       </div>
     </MainPanelLayout>
   );
-};
+});
+
+SessionListView.displayName = 'SessionListView';
 
 export default SessionListView;

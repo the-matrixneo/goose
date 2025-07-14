@@ -880,7 +880,7 @@ export default function ChatInput({
   return (
     <div
       className={`flex flex-col relative h-auto p-4 transition-colors ${
-        disableAnimation ? '' : 'animate-in fade-in duration-500'
+        disableAnimation ? '' : 'page-transition'
       } ${
         isFocused
           ? 'border-borderProminent hover:border-borderProminent'

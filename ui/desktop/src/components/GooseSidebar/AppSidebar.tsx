@@ -1,7 +1,6 @@
 import React, { useEffect } from 'react';
 import { FileText, Clock, Home, Puzzle, History } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import {
   SidebarContent,
   SidebarFooter,
@@ -50,11 +49,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ currentPath }) => {
           {/* Navigation Group */}
           <SidebarGroup>
             <SidebarGroupContent className="space-y-1">
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.05 }}
-              >
+              <div className="sidebar-item">
                 <SidebarMenuItem>
                   <SidebarMenuButton
                     onClick={() => {
@@ -68,7 +63,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ currentPath }) => {
                     <span>Home</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-              </motion.div>
+              </div>
             </SidebarGroupContent>
           </SidebarGroup>
 
@@ -77,11 +72,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ currentPath }) => {
           {/* Chat & Configuration Group */}
           <SidebarGroup>
             <SidebarGroupContent className="space-y-1">
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.2 }}
-              >
+              <div className="sidebar-item">
                 <SidebarMenuItem>
                   <SidebarMenuButton
                     onClick={() => navigate('/pair')}
@@ -93,13 +84,9 @@ const AppSidebar: React.FC<SidebarProps> = ({ currentPath }) => {
                     <span>Chat</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-              </motion.div>
+              </div>
 
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.4 }}
-              >
+              <div className="sidebar-item">
                 <SidebarMenuItem>
                   <SidebarMenuButton
                     onClick={() => navigate('/sessions')}
@@ -111,7 +98,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ currentPath }) => {
                     <span>History</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-              </motion.div>
+              </div>
             </SidebarGroupContent>
           </SidebarGroup>
 
@@ -120,11 +107,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ currentPath }) => {
           {/* Content Group */}
           <SidebarGroup>
             <SidebarGroupContent className="space-y-1">
-              {/*<motion.div*/}
-              {/*  initial={{ opacity: 0, x: 20 }}*/}
-              {/*  animate={{ opacity: 1, x: 0 }}*/}
-              {/*  transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.35 }}*/}
-              {/*>*/}
+              {/*<div className="sidebar-item">*/}
               {/*  <SidebarMenuItem>*/}
               {/*    <SidebarMenuButton*/}
               {/*      onClick={() => navigate('/projects')}*/}
@@ -136,13 +119,9 @@ const AppSidebar: React.FC<SidebarProps> = ({ currentPath }) => {
               {/*      <span>Projects</span>*/}
               {/*    </SidebarMenuButton>*/}
               {/*  </SidebarMenuItem>*/}
-              {/*</motion.div>*/}
+              {/*</div>*/}
 
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.45 }}
-              >
+              <div className="sidebar-item">
                 <SidebarMenuItem>
                   <SidebarMenuButton
                     onClick={() => navigate('/recipes')}
@@ -154,13 +133,9 @@ const AppSidebar: React.FC<SidebarProps> = ({ currentPath }) => {
                     <span>Recipes</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-              </motion.div>
+              </div>
 
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.5 }}
-              >
+              <div className="sidebar-item">
                 <SidebarMenuItem>
                   <SidebarMenuButton
                     onClick={() => navigate('/schedules')}
@@ -172,13 +147,9 @@ const AppSidebar: React.FC<SidebarProps> = ({ currentPath }) => {
                     <span>Scheduler</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-              </motion.div>
+              </div>
 
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.25 }}
-              >
+              <div className="sidebar-item">
                 <SidebarMenuItem>
                   <SidebarMenuButton
                     onClick={() => navigate('/extensions')}
@@ -190,7 +161,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ currentPath }) => {
                     <span>Extensions</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-              </motion.div>
+              </div>
             </SidebarGroupContent>
           </SidebarGroup>
 
@@ -199,11 +170,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ currentPath }) => {
           {/* Settings Group */}
           <SidebarGroup>
             <SidebarGroupContent className="space-y-1">
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.5 }}
-              >
+              <div className="sidebar-item">
                 <SidebarMenuItem>
                   <SidebarMenuButton
                     onClick={() => navigate('/settings')}
@@ -215,7 +182,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ currentPath }) => {
                     <span>Settings</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-              </motion.div>
+              </div>
             </SidebarGroupContent>
           </SidebarGroup>
         </SidebarMenu>

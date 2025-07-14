@@ -562,7 +562,7 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({ onClose: _onClose }) => {
       <MainPanelLayout>
         <div className="flex-1 flex flex-col min-h-0">
           <div className="bg-background-default px-8 pb-8 pt-16">
-            <div className="flex flex-col animate-in fade-in duration-500">
+            <div className="flex flex-col page-transition">
               <div className="flex justify-between items-center mb-1">
                 <h1 className="text-4xl font-light">Scheduler</h1>
                 <div className="flex gap-2">

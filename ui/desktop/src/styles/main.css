@@ -417,6 +417,17 @@
   }
 }
 
+@keyframes sidebar-item-in {
+  from {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
 @keyframes wind {
   0% {
     transform: translate(0, 0);
@@ -426,6 +437,45 @@
   }
   100% {
     transform: translate(0, 0);
+  }
+}
+
+/* Non-blocking sidebar animations */
+.sidebar-item {
+  animation: sidebar-item-in 0.2s ease-out forwards;
+  /* Use will-change sparingly and remove after animation */
+  will-change: transform, opacity;
+}
+
+.sidebar-item:nth-child(1) {
+  animation-delay: 0.05s;
+}
+.sidebar-item:nth-child(2) {
+  animation-delay: 0.1s;
+}
+.sidebar-item:nth-child(3) {
+  animation-delay: 0.15s;
+}
+.sidebar-item:nth-child(4) {
+  animation-delay: 0.2s;
+}
+.sidebar-item:nth-child(5) {
+  animation-delay: 0.25s;
+}
+.sidebar-item:nth-child(6) {
+  animation-delay: 0.3s;
+}
+
+/* Remove will-change after animation completes */
+.sidebar-item {
+  animation-fill-mode: forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-item {
+    animation: none;
+    opacity: 1;
+    transform: none;
   }
 }
 
@@ -751,6 +801,125 @@ p > code.bg-inline-code {
 /* Optimize performance for virtualized rendering */
 .virtualized-list * {
   contain: layout style paint;
+}
+
+/* Goose icon animation to replace framer-motion */
+@keyframes goose-icon-entrance {
+  from {
+    opacity: 0;
+    transform: scale(0.25) translate(-5px, 5px) rotate(-20deg);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translate(0, 0) rotate(0deg);
+  }
+}
+
+.goose-icon-animation {
+  animation: goose-icon-entrance 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  transform-origin: bottom left;
+}
+
+/* Session item staggered entrance animation */
+@keyframes session-item-entrance {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Apply staggered animation to session items */
+.session-item[style*='animation-delay'] {
+  animation: session-item-entrance 0.3s ease-out forwards;
+  opacity: 0;
+}
+
+/* Session list optimizations */
+.session-grid {
+  /* Use CSS Grid for better performance */
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+  /* Optimize for large lists */
+  contain: layout style paint;
+}
+
+.session-item {
+  /* Optimize individual session cards */
+  contain: layout style;
+  /* Use hardware acceleration */
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  /* Ensure smooth interactions */
+  will-change: auto;
+}
+
+.session-item:hover {
+  /* Only use will-change during hover */
+  will-change: transform, box-shadow;
+}
+
+.session-item:not(:hover) {
+  will-change: auto;
+}
+
+/* Optimize session skeleton loading */
+.session-skeleton {
+  contain: layout style paint;
+  /* Prevent layout thrashing during loading */
+  min-height: 140px;
+}
+
+/* Ensure navigation is always responsive */
+[data-slot='sidebar-menu-button'] {
+  /* Ensure buttons are always clickable during transitions */
+  pointer-events: auto !important;
+  /* Optimize for interaction */
+  touch-action: manipulation;
+}
+
+/* Ensure all navigation buttons are immediately responsive */
+.sidebar-item button,
+.sidebar-item a,
+[data-slot='sidebar-menu-button'] {
+  pointer-events: auto !important;
+  /* Prevent any blocking during animations */
+  will-change: auto;
+}
+
+/* Override any blocking pointer events during animations */
+.sidebar-item,
+.sidebar-item * {
+  pointer-events: auto !important;
+}
+
+/* Optimize route transitions for better performance */
+.route-container {
+  /* Use hardware acceleration for smoother transitions */
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  /* Optimize for content changes */
+  contain: layout style paint;
+}
+
+/* Non-blocking page transitions */
+@keyframes page-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.page-transition {
+  animation: page-fade-in 0.15s ease-out forwards;
+  /* Don't block interactions during animation */
+  pointer-events: auto;
 }
 
 /* Sidebar transition optimizations */
