@@ -154,3 +154,188 @@ impl ToolCall {
         }
     }
 }
+
+// RMCP compatibility conversions
+impl Tool {
+    /// Convert to RMCP Tool when feature flag is enabled
+    pub fn to_rmcp(&self) -> crate::rmcp::model::Tool {
+        use serde_json::Value;
+        use std::sync::Arc;
+
+        // Convert Value to JsonObject (Map<String, Value>)
+        let input_schema = match &self.input_schema {
+            Value::Object(map) => Arc::new(map.clone()),
+            _ => Arc::new(serde_json::Map::new()),
+        };
+
+        crate::rmcp::model::Tool {
+            name: self.name.clone().into(),
+            description: Some(self.description.clone().into()),
+            input_schema,
+            annotations: self
+                .annotations
+                .as_ref()
+                .map(|ann| crate::rmcp::model::ToolAnnotations {
+                    title: ann.title.clone(),
+                    read_only_hint: Some(ann.read_only_hint),
+                    destructive_hint: Some(ann.destructive_hint),
+                    idempotent_hint: Some(ann.idempotent_hint),
+                    open_world_hint: Some(ann.open_world_hint),
+                }),
+        }
+    }
+
+    /// Create from RMCP Tool
+    pub fn from_rmcp(rmcp_tool: crate::rmcp::model::Tool) -> Self {
+        Tool {
+            name: rmcp_tool.name.to_string(),
+            description: rmcp_tool
+                .description
+                .map(|d| d.to_string())
+                .unwrap_or_default(),
+            input_schema: Value::Object(rmcp_tool.input_schema.as_ref().clone()),
+            annotations: rmcp_tool.annotations.map(|ann| ToolAnnotations {
+                title: ann.title,
+                read_only_hint: ann.read_only_hint.unwrap_or(false),
+                destructive_hint: ann.destructive_hint.unwrap_or(true),
+                idempotent_hint: ann.idempotent_hint.unwrap_or(false),
+                open_world_hint: ann.open_world_hint.unwrap_or(true),
+            }),
+        }
+    }
+}
+
+impl From<crate::rmcp::model::Tool> for Tool {
+    fn from(rmcp_tool: crate::rmcp::model::Tool) -> Self {
+        Tool::from_rmcp(rmcp_tool)
+    }
+}
+
+impl From<Tool> for crate::rmcp::model::Tool {
+    fn from(tool: Tool) -> Self {
+        tool.to_rmcp()
+    }
+}
+
+impl ToolCall {
+    /// Convert to RMCP CallToolRequestParam when feature flag is enabled
+    pub fn to_rmcp(&self) -> crate::rmcp::model::CallToolRequestParam {
+        crate::rmcp::model::CallToolRequestParam {
+            name: self.name.clone().into(),
+            arguments: if self.arguments.is_null() {
+                None
+            } else {
+                Some(self.arguments.as_object().cloned().unwrap_or_default())
+            },
+        }
+    }
+
+    /// Create from RMCP CallToolRequestParam
+    pub fn from_rmcp(rmcp_call: crate::rmcp::model::CallToolRequestParam) -> Self {
+        ToolCall {
+            name: rmcp_call.name.to_string(),
+            arguments: rmcp_call
+                .arguments
+                .map(Value::Object)
+                .unwrap_or(Value::Null),
+        }
+    }
+}
+
+impl From<crate::rmcp::model::CallToolRequestParam> for ToolCall {
+    fn from(rmcp_call: crate::rmcp::model::CallToolRequestParam) -> Self {
+        ToolCall::from_rmcp(rmcp_call)
+    }
+}
+
+impl From<ToolCall> for crate::rmcp::model::CallToolRequestParam {
+    fn from(tool_call: ToolCall) -> Self {
+        tool_call.to_rmcp()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_tool_rmcp_conversion() {
+        let original = Tool::new(
+            "test_tool",
+            "A test tool",
+            json!({
+                "type": "object",
+                "properties": {
+                    "param": {"type": "string"}
+                }
+            }),
+            Some(ToolAnnotations::new().with_title("Test Tool")),
+        );
+
+        let rmcp_tool = original.to_rmcp();
+        let converted_back = Tool::from_rmcp(rmcp_tool);
+
+        assert_eq!(original.name, converted_back.name);
+        assert_eq!(original.description, converted_back.description);
+        assert_eq!(original.input_schema, converted_back.input_schema);
+        assert_eq!(
+            original.annotations.as_ref().unwrap().title,
+            converted_back.annotations.as_ref().unwrap().title
+        );
+    }
+
+    #[test]
+    fn test_tool_call_rmcp_conversion() {
+        let original = ToolCall::new(
+            "test_tool",
+            json!({
+                "param": "value"
+            }),
+        );
+
+        let rmcp_call = original.to_rmcp();
+        let converted_back = ToolCall::from_rmcp(rmcp_call);
+
+        assert_eq!(original.name, converted_back.name);
+        assert_eq!(original.arguments, converted_back.arguments);
+    }
+
+    #[test]
+    fn test_tool_call_with_null_arguments() {
+        let original = ToolCall::new("test_tool", serde_json::Value::Null);
+
+        let rmcp_call = original.to_rmcp();
+        let converted_back = ToolCall::from_rmcp(rmcp_call);
+
+        assert_eq!(original.name, converted_back.name);
+        assert_eq!(converted_back.arguments, serde_json::Value::Null);
+    }
+
+    #[test]
+    fn test_tool_annotations_conversion() {
+        let annotations = ToolAnnotations::new()
+            .with_title("Test Tool")
+            .with_read_only(true)
+            .with_destructive(false)
+            .with_idempotent(true)
+            .with_open_world(false);
+
+        let tool = Tool::new(
+            "test",
+            "Test tool",
+            json!({"type": "object"}),
+            Some(annotations),
+        );
+
+        let rmcp_tool = tool.to_rmcp();
+        let converted_back = Tool::from_rmcp(rmcp_tool);
+
+        let converted_annotations = converted_back.annotations.unwrap();
+        assert_eq!(converted_annotations.title, Some("Test Tool".to_string()));
+        assert_eq!(converted_annotations.read_only_hint, true);
+        assert_eq!(converted_annotations.destructive_hint, false);
+        assert_eq!(converted_annotations.idempotent_hint, true);
+        assert_eq!(converted_annotations.open_world_hint, false);
+    }
+}

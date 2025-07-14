@@ -1,5 +1,6 @@
 /// The protocol messages exchanged between client and server
 use crate::{
+    config,
     content::Content,
     prompt::{Prompt, PromptMessage},
     resource::Resource,
@@ -133,6 +134,9 @@ pub const INVALID_PARAMS: i32 = -32602;
 pub const INTERNAL_ERROR: i32 = -32603;
 
 /// Error information for JSON-RPC error responses.
+///
+/// This type provides compatibility between the legacy implementation and RMCP.
+/// When USE_RMCP is true, it uses RMCP's ErrorData internally.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct ErrorData {
     /// The error type that occurred.
@@ -145,6 +149,86 @@ pub struct ErrorData {
     /// sender (e.g. detailed error information, nested errors etc.).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub data: Option<Value>,
+}
+
+impl ErrorData {
+    /// Create a new ErrorData instance
+    pub fn new(code: i32, message: String, data: Option<Value>) -> Self {
+        if config::use_rmcp() {
+            // Convert to RMCP ErrorData and back to maintain compatibility
+            let rmcp_error = crate::rmcp::model::ErrorData::new(
+                crate::rmcp::model::ErrorCode(code),
+                message.clone(),
+                data.clone(),
+            );
+            Self {
+                code: rmcp_error.code.0,
+                message: rmcp_error.message.to_string(),
+                data: rmcp_error.data,
+            }
+        } else {
+            Self {
+                code,
+                message,
+                data,
+            }
+        }
+    }
+
+    /// Create a resource not found error
+    pub fn resource_not_found(message: String, data: Option<Value>) -> Self {
+        Self::new(
+            crate::rmcp::model::ErrorCode::RESOURCE_NOT_FOUND.0,
+            message,
+            data,
+        )
+    }
+
+    /// Create a parse error
+    pub fn parse_error(message: String, data: Option<Value>) -> Self {
+        Self::new(PARSE_ERROR, message, data)
+    }
+
+    /// Create an invalid request error
+    pub fn invalid_request(message: String, data: Option<Value>) -> Self {
+        Self::new(INVALID_REQUEST, message, data)
+    }
+
+    /// Create a method not found error
+    pub fn method_not_found(message: String, data: Option<Value>) -> Self {
+        Self::new(METHOD_NOT_FOUND, message, data)
+    }
+
+    /// Create an invalid params error
+    pub fn invalid_params(message: String, data: Option<Value>) -> Self {
+        Self::new(INVALID_PARAMS, message, data)
+    }
+
+    /// Create an internal error
+    pub fn internal_error(message: String, data: Option<Value>) -> Self {
+        Self::new(INTERNAL_ERROR, message, data)
+    }
+}
+
+// Conversion functions for RMCP compatibility
+impl From<crate::rmcp::model::ErrorData> for ErrorData {
+    fn from(rmcp_error: crate::rmcp::model::ErrorData) -> Self {
+        Self {
+            code: rmcp_error.code.0,
+            message: rmcp_error.message.to_string(),
+            data: rmcp_error.data,
+        }
+    }
+}
+
+impl From<ErrorData> for crate::rmcp::model::ErrorData {
+    fn from(error: ErrorData) -> Self {
+        crate::rmcp::model::ErrorData::new(
+            crate::rmcp::model::ErrorCode(error.code),
+            error.message,
+            error.data,
+        )
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]

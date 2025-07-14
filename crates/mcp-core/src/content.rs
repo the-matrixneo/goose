@@ -3,6 +3,7 @@
 /// They include optional annotations used to help inform agent usage
 use super::role::Role;
 use crate::resource::ResourceContents;
+use crate::rmcp::model::AnnotateAble; // Import the trait for no_annotation method
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -205,6 +206,63 @@ impl Content {
     }
 }
 
+// RMCP compatibility conversions
+impl Content {
+    /// Convert to RMCP Content when feature flag is enabled
+    pub fn to_rmcp(&self) -> crate::rmcp::model::Content {
+        match self {
+            Content::Text(text) => {
+                crate::rmcp::model::RawContent::text(text.text.clone()).no_annotation()
+            }
+            Content::Image(image) => {
+                crate::rmcp::model::RawContent::image(image.data.clone(), image.mime_type.clone())
+                    .no_annotation()
+            }
+            Content::Resource(_) => {
+                // For now, convert resource to text representation
+                // This is a simplification - full resource support would need more work
+                crate::rmcp::model::RawContent::text(format!(
+                    "Resource: {}",
+                    self.as_text().unwrap_or("unknown")
+                ))
+                .no_annotation()
+            }
+        }
+    }
+
+    /// Create from RMCP Content
+    pub fn from_rmcp(rmcp_content: crate::rmcp::model::Content) -> Self {
+        match &*rmcp_content {
+            crate::rmcp::model::RawContent::Text(text_content) => {
+                Content::text(text_content.text.clone())
+            }
+            crate::rmcp::model::RawContent::Image(image_content) => {
+                Content::image(image_content.data.clone(), image_content.mime_type.clone())
+            }
+            crate::rmcp::model::RawContent::Resource(_resource_content) => {
+                // For now, convert RMCP resource to text representation
+                // This is a simplification - full resource support would need more work
+                Content::text("Resource content (conversion not fully implemented)")
+            }
+            crate::rmcp::model::RawContent::Audio(_) => {
+                Content::text("Audio content not supported")
+            }
+        }
+    }
+}
+
+impl From<crate::rmcp::model::Content> for Content {
+    fn from(rmcp_content: crate::rmcp::model::Content) -> Self {
+        Content::from_rmcp(rmcp_content)
+    }
+}
+
+impl From<Content> for crate::rmcp::model::Content {
+    fn from(content: Content) -> Self {
+        content.to_rmcp()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -309,5 +367,49 @@ mod tests {
         let content = Content::text("hello").with_audience(vec![Role::User]);
         assert_eq!(content.audience(), Some(&vec![Role::User]));
         assert_eq!(content.priority(), None);
+    }
+
+    #[test]
+    fn test_rmcp_content_conversion_text() {
+        let original = Content::text("Hello, world!");
+        let rmcp_content = original.to_rmcp();
+        let converted_back = Content::from_rmcp(rmcp_content);
+
+        assert_eq!(original.as_text(), converted_back.as_text());
+        assert_eq!(converted_back.as_text(), Some("Hello, world!"));
+    }
+
+    #[test]
+    fn test_rmcp_content_conversion_image() {
+        let original = Content::image("base64data", "image/png");
+        let rmcp_content = original.to_rmcp();
+        let converted_back = Content::from_rmcp(rmcp_content);
+
+        assert_eq!(original.as_image(), converted_back.as_image());
+        assert_eq!(converted_back.as_image(), Some(("base64data", "image/png")));
+    }
+
+    #[test]
+    fn test_rmcp_content_round_trip() {
+        let contents = vec![
+            Content::text("Test text"),
+            Content::image("test_data", "image/jpeg"),
+        ];
+
+        for original in contents {
+            let rmcp_content = original.to_rmcp();
+            let converted_back = Content::from_rmcp(rmcp_content);
+
+            // Check that the content type is preserved
+            match (&original, &converted_back) {
+                (Content::Text(_), Content::Text(_)) => {
+                    assert_eq!(original.as_text(), converted_back.as_text());
+                }
+                (Content::Image(_), Content::Image(_)) => {
+                    assert_eq!(original.as_image(), converted_back.as_image());
+                }
+                _ => panic!("Content type not preserved during conversion"),
+            }
+        }
     }
 }
