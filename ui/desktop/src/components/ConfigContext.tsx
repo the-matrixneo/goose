@@ -111,29 +111,6 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children }) => {
     [reloadConfig]
   );
 
-  const addExtension = useCallback(
-    async (name: string, config: ExtensionConfig, enabled: boolean) => {
-      // remove shims if present
-      if (config.type === 'stdio') {
-        config.cmd = removeShims(config.cmd);
-      }
-      const query: ExtensionQuery = { name, config, enabled };
-      await apiAddExtension({
-        body: query,
-      });
-      await reloadConfig();
-    },
-    [reloadConfig]
-  );
-
-  const removeExtension = useCallback(
-    async (name: string) => {
-      await apiRemoveExtension({ path: { name: name } });
-      await reloadConfig();
-    },
-    [reloadConfig]
-  );
-
   const getExtensions = useCallback(
     async (forceRefresh = false): Promise<FixedExtensionEntry[]> => {
       if (forceRefresh || extensionsList.length === 0) {
@@ -155,6 +132,33 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children }) => {
       return extensionsList;
     },
     [extensionsList]
+  );
+
+  const addExtension = useCallback(
+    async (name: string, config: ExtensionConfig, enabled: boolean) => {
+      // remove shims if present
+      if (config.type === 'stdio') {
+        config.cmd = removeShims(config.cmd);
+      }
+      const query: ExtensionQuery = { name, config, enabled };
+      await apiAddExtension({
+        body: query,
+      });
+      await reloadConfig();
+      // Also refresh the extensions list to trigger UI updates
+      await getExtensions(true);
+    },
+    [reloadConfig, getExtensions]
+  );
+
+  const removeExtension = useCallback(
+    async (name: string) => {
+      await apiRemoveExtension({ path: { name: name } });
+      await reloadConfig();
+      // Also refresh the extensions list to trigger UI updates
+      await getExtensions(true);
+    },
+    [reloadConfig, getExtensions]
   );
 
   const toggleExtension = useCallback(

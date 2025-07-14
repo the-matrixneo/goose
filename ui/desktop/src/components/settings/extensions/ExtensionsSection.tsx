@@ -33,7 +33,7 @@ export default function ExtensionsSection({
   customToggle,
   selectedExtensions = [],
 }: ExtensionSectionProps) {
-  const { getExtensions, addExtension, removeExtension } = useConfig();
+  const { getExtensions, addExtension, removeExtension, extensionsList } = useConfig();
   const [extensions, setExtensions] = useState<FixedExtensionEntry[]>([]);
   const [selectedExtension, setSelectedExtension] = useState<FixedExtensionEntry | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -82,6 +82,35 @@ export default function ExtensionsSection({
     fetchExtensions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Watch for changes in the context's extensionsList to auto-refresh
+  useEffect(() => {
+    if (extensionsList.length > 0) {
+      // Sort extensions by name to maintain consistent order
+      const sortedExtensions = [...extensionsList]
+        .sort((a, b) => {
+          // First sort by builtin
+          if (a.type === 'builtin' && b.type !== 'builtin') return -1;
+          if (a.type !== 'builtin' && b.type === 'builtin') return 1;
+
+          // Then sort by bundled (handle null/undefined cases)
+          const aBundled = a.bundled === true;
+          const bBundled = b.bundled === true;
+          if (aBundled && !bBundled) return -1;
+          if (!aBundled && bBundled) return 1;
+
+          // Finally sort alphabetically within each group
+          return a.name.localeCompare(b.name);
+        })
+        .map((ext) => ({
+          ...ext,
+          // Use selectedExtensions to determine enabled state in recipe editor
+          enabled: disableConfiguration ? selectedExtensions.includes(ext.name) : ext.enabled,
+        }));
+
+      setExtensions(sortedExtensions);
+    }
+  }, [extensionsList, disableConfiguration, selectedExtensions]);
 
   const handleExtensionToggle = async (extension: FixedExtensionEntry) => {
     if (customToggle) {
