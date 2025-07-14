@@ -19,6 +19,8 @@ mcp-core = { path = "../mcp-core" }
 async-trait = "0.1"
 schemars = "0.8"
 convert_case = "0.6.0"
+# RMCP for migration
+rmcp = { workspace = true }
 
 [dev-dependencies]
 tokio = { version = "1.43", features = ["full"] }
