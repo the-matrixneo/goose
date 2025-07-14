@@ -141,24 +141,6 @@ const AppSidebar: React.FC<SidebarProps> = ({ currentPath }) => {
               <motion.div
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
-                transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.25 }}
-              >
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    onClick={() => navigate('/extensions')}
-                    isActive={isActivePath('/extensions')}
-                    tooltip="Manage your extensions"
-                    className="w-full justify-start px-3 rounded-lg h-fit hover:bg-background-medium/50 transition-all duration-200 data-[active=true]:bg-background-medium"
-                  >
-                    <Puzzle className="w-4 h-4" />
-                    <span>Extensions</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </motion.div>
-
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
                 transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.45 }}
               >
                 <SidebarMenuItem>
@@ -188,6 +170,24 @@ const AppSidebar: React.FC<SidebarProps> = ({ currentPath }) => {
                   >
                     <Clock className="w-4 h-4" />
                     <span>Scheduler</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.25 }}
+              >
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    onClick={() => navigate('/extensions')}
+                    isActive={isActivePath('/extensions')}
+                    tooltip="Manage your extensions"
+                    className="w-full justify-start px-3 rounded-lg h-fit hover:bg-background-medium/50 transition-all duration-200 data-[active=true]:bg-background-medium"
+                  >
+                    <Puzzle className="w-4 h-4" />
+                    <span>Extensions</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </motion.div>
