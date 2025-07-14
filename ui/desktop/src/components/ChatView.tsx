@@ -37,6 +37,8 @@ import { LocalMessageStorage } from '../utils/localMessageStorage';
 import { useModelAndProvider } from './ModelAndProviderContext';
 import { getCostForModel } from '../utils/costDatabase';
 import { updateSystemPromptWithParameters } from '../utils/providerUtils';
+import { RecipeWarningModal } from './ui/RecipeWarningModal';
+import { hasAcceptedRecipeBefore, recordRecipeHash } from '../utils/recipeHash';
 import {
   Message,
   createUserMessage,
@@ -137,6 +139,8 @@ function ChatContent({
     };
   }>({});
   const [readyForAutoUserPrompt, setReadyForAutoUserPrompt] = useState(false);
+  const [isRecipeWarningModalOpen, setIsRecipeWarningModalOpen] = useState(false);
+  const [recipeAccepted, setRecipeAccepted] = useState(false);
 
   const scrollRef = useRef<ScrollAreaHandle>(null);
   const { currentModel, currentProvider } = useModelAndProvider();
@@ -167,15 +171,37 @@ function ChatContent({
   // Get recipeConfig directly from appConfig
   const recipeConfig = window.appConfig.get('recipeConfig') as Recipe | null;
 
+  // Check if recipe has been accepted before
+  useEffect(() => {
+    const checkRecipeAcceptance = async () => {
+      if (recipeConfig) {
+        try {
+          const hasAccepted = await hasAcceptedRecipeBefore(recipeConfig);
+          if (!hasAccepted) {
+            setIsRecipeWarningModalOpen(true);
+          } else {
+            setRecipeAccepted(true);
+          }
+        } catch (error) {
+          console.error('Error checking recipe acceptance:', error);
+          // If there's an error, assume the recipe hasn't been accepted
+          setIsRecipeWarningModalOpen(true);
+        }
+      }
+    };
+
+    checkRecipeAcceptance();
+  }, [recipeConfig]);
+
   // Show parameter modal if recipe has parameters and they haven't been set yet
   useEffect(() => {
-    if (recipeConfig?.parameters && recipeConfig.parameters.length > 0) {
+    if (recipeConfig?.parameters && recipeConfig.parameters.length > 0 && recipeAccepted) {
       // If we have parameters and they haven't been set yet, open the modal.
       if (!recipeParameters) {
         setIsParameterModalOpen(true);
       }
     }
-  }, [recipeConfig, recipeParameters]);
+  }, [recipeConfig, recipeParameters, recipeAccepted]);
 
   // Store message in global history when it's added
   const storeMessageInHistory = useCallback((message: Message) => {
@@ -352,7 +378,7 @@ function ChatContent({
 
   // Pre-fill input with recipe prompt instead of auto-sending it
   const initialPrompt = useMemo(() => {
-    if (!recipeConfig?.prompt) return '';
+    if (!recipeConfig?.prompt || !recipeAccepted) return '';
 
     const hasRequiredParams = recipeConfig.parameters && recipeConfig.parameters.length > 0;
 
@@ -368,7 +394,7 @@ function ChatContent({
 
     // Otherwise, we are waiting for parameters, so the input should be empty.
     return '';
-  }, [recipeConfig, recipeParameters]);
+  }, [recipeConfig, recipeParameters, recipeAccepted]);
 
   // Auto-send the prompt for scheduled executions
   useEffect(() => {
@@ -380,7 +406,8 @@ function ChatContent({
       (!hasRequiredParams || recipeParameters) &&
       messages.length === 0 &&
       !isLoading &&
-      readyForAutoUserPrompt
+      readyForAutoUserPrompt &&
+      recipeAccepted
     ) {
       // Substitute parameters if they exist
       const finalPrompt = recipeParameters
@@ -408,6 +435,7 @@ function ChatContent({
     messages.length,
     isLoading,
     readyForAutoUserPrompt,
+    recipeAccepted,
     append,
     setLastInteractionTime,
   ]);
@@ -422,6 +450,27 @@ function ChatContent({
     } catch (error) {
       console.error('Failed to update system prompt with parameters:', error);
     }
+  };
+
+  const handleRecipeAccept = async () => {
+    try {
+      if (recipeConfig) {
+        await recordRecipeHash(recipeConfig);
+        setRecipeAccepted(true);
+        setIsRecipeWarningModalOpen(false);
+      }
+    } catch (error) {
+      console.error('Error recording recipe hash:', error);
+      // Even if recording fails, we should still allow the user to proceed
+      setRecipeAccepted(true);
+      setIsRecipeWarningModalOpen(false);
+    }
+  };
+
+  const handleRecipeCancel = () => {
+    setIsRecipeWarningModalOpen(false);
+    // Navigate back or close the window
+    setView('welcome');
   };
 
   // Handle submit
@@ -899,6 +948,16 @@ function ChatContent({
             onClose={() => setIsParameterModalOpen(false)}
           />
         )}
+        <RecipeWarningModal
+          isOpen={isRecipeWarningModalOpen}
+          onConfirm={handleRecipeAccept}
+          onCancel={handleRecipeCancel}
+          recipeDetails={{
+            title: recipeConfig?.title,
+            description: recipeConfig?.description,
+            instructions: recipeConfig?.instructions,
+          }}
+        />
       </div>
     </CurrentModelContext.Provider>
   );
