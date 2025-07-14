@@ -270,132 +270,6 @@
   font-style: normal;
 }
 
-/* :root {
-  --spring-easing: linear(
-    0,
-    0.009,
-    0.035 2.1%,
-    0.141,
-    0.281 6.7%,
-    0.723 12.9%,
-    0.938 16.7%,
-    1.017,
-    1.077,
-    1.121,
-    1.149 24.3%,
-    1.159,
-    1.163,
-    1.161,
-    1.154 29.9%,
-    1.129 32.8%,
-    1.051 39.6%,
-    1.017 43.1%,
-    0.991,
-    0.977 51%,
-    0.974 53.8%,
-    0.975 57.1%,
-    0.997 69.8%,
-    1.003 76.9%,
-    1.004 83.8%,
-    1
-  );
-  --spring-duration: 1.333s;
-
-  --background-app: var(--constant-white);
-  --background-prominent: var(--grey-80);
-  --background-standard: var(--grey-90);
-  --background-subtle: var(--grey-95);
-  --background-app-inverse: var(--constant-black);
-  --background-subtle-inverse: var(--dark-grey-15);
-  --background-standard-inverse: var(--dark-grey-25);
-  --background-prominent-inverse: var(--dark-grey-40);
-
-  --border-divider: var(--grey-90);
-  --border-inverse: var(--constant-white);
-  --border-prominent: var(--grey-10);
-  --border-standard: var(--grey-60);
-  --border-subtle: var(--grey-90);
-
-  --icon-disabled: var(--grey-60);
-  --icon-extra-subtle: var(--grey-60);
-  --icon-inverse: var(--constant-white);
-  --icon-prominent: var(--grey-10);
-  --icon-standard: var(--grey-20);
-  --icon-subtle: var(--grey-50);
-
-  --text-placeholder: var(--grey-60);
-  --text-prominent: var(--grey-10);
-  --text-standard: var(--grey-20);
-  --text-standard-inverse: var(--dark-grey-90);
-  --text-subtle: var(--grey-50);
-  --text-subtle-inverse: var(--dark-grey-60);
-  --text-prominent-inverse: var(--constant-white);
-}
-
-.dark {
-  --background-app: var(--constant-black);
-  --background-prominent: var(--dark-grey-40);
-  --background-standard: var(--dark-grey-25);
-  --background-subtle: var(--dark-grey-15);
-  --background-app-inverse: var(--constant-white);
-  --background-subtle-inverse: var(--grey-95);
-  --background-standard-inverse: var(--grey-90);
-  --background-prominent-inverse: var(--grey-80);
-
-  --border-divider: var(--dark-grey-25);
-  --border-inverse: var(--constant-black);
-  --border-prominent: var(--constant-white);
-  --border-standard: var(--dark-grey-45);
-  --border-subtle: var(--dark-grey-25);
-
-  --icon-disabled: var(--dark-grey-45);
-  --icon-extra-subtle: var(--dark-grey-45);
-  --icon-inverse: var(--constant-black);
-  --icon-prominent: var(--constant-white);
-  --icon-standard: var(--dark-grey-90);
-  --icon-subtle: var(--dark-grey-60);
-
-  --text-placeholder: var(--dark-grey-45);
-  --text-prominent: var(--constant-white);
-  --text-standard: var(--dark-grey-90);
-  --text-standard-inverse: var(--grey-20);
-  --text-subtle: var(--dark-grey-60);
-  --text-subtle-inverse: var(--grey-50);
-  --text-prominent-inverse: var(--grey-20);
-}
-
-@theme inline {
-  --color-background-app: var(--background-app);
-  --color-background-prominent: var(--background-prominent);
-  --color-background-standard: var(--background-standard);
-  --color-background-subtle: var(--background-subtle);
-  --color-background-app-inverse: var(--background-app-inverse);
-  --color-background-subtle-inverse: var(--background-subtle-inverse);
-  --color-background-standard-inverse: var(--background-standard-inverse);
-  --color-background-prominent-inverse: var(--background-prominent-inverse);
-
-  --color-border-divider: var(--border-divider);
-  --color-border-inverse: var(--border-inverse);
-  --color-border-prominent: var(--border-prominent);
-  --color-border-standard: var(--border-standard);
-  --color-border-subtle: var(--border-subtle);
-
-  --color-icon-disabled: var(--icon-disabled);
-  --color-icon-extra-subtle: var(--icon-extra-subtle);
-  --color-icon-inverse: var(--icon-inverse);
-  --color-icon-prominent: var(--icon-prominent);
-  --color-icon-standard: var(--icon-standard);
-  --color-icon-subtle: var(--icon-subtle);
-
-  --color-text-placeholder: var(--text-placeholder);
-  --color-text-prominent: var(--text-prominent);
-  --color-text-standard: var(--text-standard);
-  --color-text-standard-inverse: var(--text-standard-inverse);
-  --color-text-subtle: var(--text-subtle);
-  --color-text-subtle-inverse: var(--text-subtle-inverse);
-  --color-text-prominent-inverse: var(--text-prominent-inverse);
-} */
-
 /* animations */
 @keyframes appear {
   from {
@@ -420,7 +294,7 @@
 @keyframes sidebar-item-in {
   from {
     opacity: 0;
-    transform: translateX(10px);
+    transform: translateX(20px);
   }
   to {
     opacity: 1;
@@ -442,7 +316,10 @@
 
 /* Non-blocking sidebar animations */
 .sidebar-item {
-  animation: sidebar-item-in 0.2s ease-out forwards;
+  /* Start hidden and positioned to the right */
+  opacity: 0;
+  transform: translateX(20px);
+  animation: sidebar-item-in 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   /* Use will-change sparingly and remove after animation */
   will-change: transform, opacity;
 }
@@ -451,19 +328,22 @@
   animation-delay: 0.05s;
 }
 .sidebar-item:nth-child(2) {
-  animation-delay: 0.1s;
-}
-.sidebar-item:nth-child(3) {
-  animation-delay: 0.15s;
-}
-.sidebar-item:nth-child(4) {
   animation-delay: 0.2s;
 }
+.sidebar-item:nth-child(3) {
+  animation-delay: 0.4s;
+}
+.sidebar-item:nth-child(4) {
+  animation-delay: 0.45s;
+}
 .sidebar-item:nth-child(5) {
-  animation-delay: 0.25s;
+  animation-delay: 0.5s;
 }
 .sidebar-item:nth-child(6) {
-  animation-delay: 0.3s;
+  animation-delay: 0.25s;
+}
+.sidebar-item:nth-child(7) {
+  animation-delay: 0.5s;
 }
 
 /* Remove will-change after animation completes */
@@ -513,7 +393,7 @@
 }
 
 .animate-fade-slide-up {
-  animation: fade-slide-up 0.3s ease-out forwards;
+  animation: fade-slide-up 0.15s ease-out forwards;
 }
 
 /* Force scrollbars to be visible */
@@ -663,104 +543,9 @@ p > code.bg-inline-code {
   scrollbar-width: thin;
 }
 
-/* chat connectors */
-
-/* .user:has(+ .assistant) {
-  position: relative;
-}
-
-.user::before {
-  content: '';
-  position: absolute;
-  top: 18px;
-  left: -2px;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background-color: var(--background-medium);
-}
-
-.user:has(+ .assistant)::before {
-  content: '';
-  position: absolute;
-  top: 20px;
-  left: 0px;
-  width: 1px;
-  height: 0;
-  background-color: var(--border-default);
-  animation: grow-height 0.3s forwards;
-}
-
-.user:has(+ .assistant)::after {
-  content: '';
-  position: absolute;
-  top: 18px;
-  left: -2px;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background-color: var(--background-medium);
-}
-
-.assistant:has(+ .assistant) {
-  position: relative;
-}
-
-.assistant:has(+ .assistant)::before {
-  content: '';
-  position: absolute;
-  top: 20px;
-  left: 0px;
-  width: 1px;
-  height: 0;
-  background-color: var(--border-default);
-  animation: grow-height 0.3s forwards;
-}
-
-.assistant::after {
-  content: '';
-  position: absolute;
-  top: 18px;
-  left: -2px;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background-color: var(--background-medium);
-} */
-
-/* .assistant:has(+ .assistant)::after {
-  content: '';
-  position: absolute;
-  top: 18px;
-  left: -2px;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background-color: var(--background-medium);
-} */
-
 .assistant:has(+ .user) .goose-message {
   padding-bottom: 24px;
 }
-
-/* .assistant:has(+ .user) .goose-message::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  width: 50%;
-  height: 1px;
-  background-color: var(--border-default);
-} */
-
-/* @keyframes grow-height {
-  from {
-    height: 0;
-  }
-  to {
-    height: calc(100% + 16px);
-  }
-} */
 
 /* Virtualized list styles */
 .virtualized-list {
@@ -820,24 +605,6 @@ p > code.bg-inline-code {
   transform-origin: bottom left;
 }
 
-/* Session item staggered entrance animation */
-@keyframes session-item-entrance {
-  from {
-    opacity: 0;
-    transform: translateY(5px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* Apply staggered animation to session items */
-.session-item[style*='animation-delay'] {
-  animation: session-item-entrance 0.3s ease-out forwards;
-  opacity: 0;
-}
-
 /* Session list optimizations */
 .session-grid {
   /* Use CSS Grid for better performance */
@@ -849,10 +616,13 @@ p > code.bg-inline-code {
 }
 
 .session-item {
+  /* Default state - visible and positioned */
+  opacity: 1;
+  transform: translateY(0) translateZ(0);
+
   /* Optimize individual session cards */
   contain: layout style;
   /* Use hardware acceleration */
-  transform: translateZ(0);
   backface-visibility: hidden;
   /* Ensure smooth interactions */
   will-change: auto;
@@ -917,6 +687,8 @@ p > code.bg-inline-code {
 }
 
 .page-transition {
+  /* Start with proper initial state to prevent flicker */
+  opacity: 0;
   animation: page-fade-in 0.08s ease-out forwards;
   /* Don't block interactions during animation */
   pointer-events: auto;
