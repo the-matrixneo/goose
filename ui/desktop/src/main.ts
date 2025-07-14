@@ -560,7 +560,7 @@ const createChat = async (
   // Load and manage window state
   const mainWindowState = windowStateKeeper({
     defaultWidth: 800,
-    defaultHeight: 800,
+    defaultHeight: 625,
   });
 
   const mainWindow = new BrowserWindow({
