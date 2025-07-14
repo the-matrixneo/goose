@@ -8,7 +8,9 @@ Append to this file content for tracking phases of a migration between the two. 
 
 Make it so I have incremental milestones I can check in and put up as separate PRs
 
-I want you to complete code changes for the initial phase in the first run of this against the coding agent
+I want you to complete code changes for each phase when you're asked to complete the phase, and then commit the result
+
+Make sure to make the compatibility layer have a feature where a single value can control whether the old crates are being used, or rmcp is being used. I should be able to keep this variable set to false and continually ship the branch, then flip it to true to enable the rmcp integration.
 
 ## Migration Analysis
 
