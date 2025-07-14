@@ -1,4 +1,3 @@
-import React from 'react';
 import { Card } from './card';
 
 interface RecipeWarningModalProps {
@@ -31,7 +30,8 @@ export function RecipeWarningModal({
         <div className="p-8 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 32px)' }}>
           <h2 className="text-2xl font-bold mb-4 text-textStandard">⚠️ New Recipe Warning</h2>
           <p className="mb-4 text-textStandard">
-            You are about to execute a recipe that you haven't run before. Only proceed if you trust the source of this recipe.
+            You are about to execute a recipe that you haven't run before. Only proceed if you trust
+            the source of this recipe.
           </p>
 
           <div className="mb-6 bg-bgSubtle p-4 rounded-lg">
