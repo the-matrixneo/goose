@@ -1,6 +1,27 @@
 // Re-export RMCP types for compatibility during migration
 pub use rmcp;
 
+// Feature flag configuration for RMCP migration
+pub mod config {
+    /// Feature flag to control whether RMCP or legacy implementation is used.
+    ///
+    /// When `false` (default): Uses the legacy internal MCP implementation
+    /// When `true`: Uses the RMCP (official Rust SDK) implementation
+    ///
+    /// This allows for gradual migration and easy rollback during development.
+    pub const USE_RMCP: bool = false;
+
+    /// Check if RMCP implementation should be used
+    pub fn use_rmcp() -> bool {
+        USE_RMCP
+    }
+
+    /// Check if legacy implementation should be used
+    pub fn use_legacy() -> bool {
+        !USE_RMCP
+    }
+}
+
 // Legacy module structure - maintained for backward compatibility
 pub mod content;
 pub use content::{Annotations, Content, ImageContent, TextContent};
@@ -30,4 +51,24 @@ pub mod rmcp_compat {
     pub type RmcpPrompt = rmcp::model::Prompt;
     pub type RmcpJsonRpcMessage = rmcp::model::JsonRpcMessage;
     pub type RmcpErrorData = rmcp::model::ErrorData;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::config;
+
+    #[test]
+    fn test_feature_flag_default_state() {
+        // By default, RMCP should be disabled (false)
+        assert!(!config::USE_RMCP);
+        assert!(config::use_legacy());
+        assert!(!config::use_rmcp());
+    }
+
+    #[test]
+    fn test_feature_flag_functions() {
+        // Test that the helper functions work correctly
+        assert_eq!(config::use_rmcp(), config::USE_RMCP);
+        assert_eq!(config::use_legacy(), !config::USE_RMCP);
+    }
 }
