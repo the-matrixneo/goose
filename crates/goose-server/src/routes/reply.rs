@@ -130,6 +130,26 @@ async fn handler(
         .unwrap_or_else(session::generate_session_id);
 
     tokio::spawn(async move {
+        // Handle session change detection and agent state reset
+        if let Err(e) = state.handle_session_change(&session_id).await {
+            tracing::error!("Failed to handle session change: {}", e);
+            let _ = stream_event(
+                MessageEvent::Error {
+                    error: format!("Session change handling failed: {}", e),
+                },
+                &tx,
+            )
+            .await;
+            let _ = stream_event(
+                MessageEvent::Finish {
+                    reason: "error".to_string(),
+                },
+                &tx,
+            )
+            .await;
+            return;
+        }
+
         let agent = state.get_agent().await;
         let agent = match agent {
             Ok(agent) => {
@@ -340,6 +360,12 @@ async fn ask_handler(
     let session_id = request
         .session_id
         .unwrap_or_else(session::generate_session_id);
+
+    // Handle session change detection and agent state reset
+    if let Err(e) = state.handle_session_change(&session_id).await {
+        tracing::error!("Failed to handle session change in ask handler: {}", e);
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
 
     let agent = state
         .get_agent()

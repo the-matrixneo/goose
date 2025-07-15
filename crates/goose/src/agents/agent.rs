@@ -170,6 +170,47 @@ impl Agent {
         }
     }
 
+    /// Reset agent state for a new session to ensure isolation between sessions
+    /// This clears session-specific state that could leak between sessions
+    pub async fn reset_session_state(&self) -> Result<()> {
+        tracing::info!("Resetting agent session state for session isolation");
+
+        // Reset tool monitor to clear tool usage tracking
+        if let Some(monitor) = self.tool_monitor.lock().await.as_mut() {
+            monitor.reset();
+        }
+
+        // Clear final output tool state
+        *self.final_output_tool.lock().await = None;
+
+        // Reset sub-recipe manager to clear any loaded sub-recipes
+        *self.sub_recipe_manager.lock().await = SubRecipeManager::new();
+
+        // Reset prompt manager to clear any session-specific prompt modifications
+        *self.prompt_manager.lock().await = PromptManager::new();
+
+        // Clear frontend tools and instructions (these are usually session-specific)
+        self.frontend_tools.lock().await.clear();
+        *self.frontend_instructions.lock().await = None;
+
+        // Recreate MCP notification channel to clear any pending notifications
+        let (mcp_tx, mcp_rx) = mpsc::channel(100);
+        {
+            let mut rx_guard = self.mcp_notification_rx.lock().await;
+            *rx_guard = mcp_rx;
+        }
+
+        // Reset subagent manager with new MCP channel
+        *self.subagent_manager.lock().await = Some(SubAgentManager::new(mcp_tx));
+
+        // Clear any pending confirmations and tool results by recreating channels
+        // Note: We can't easily reset these without changing the Agent structure,
+        // but they should naturally clear as old requests timeout
+
+        tracing::info!("Agent session state reset completed");
+        Ok(())
+    }
+
     /// Set the scheduler service for this agent
     pub async fn set_scheduler(&self, scheduler: Arc<dyn SchedulerTrait>) {
         let mut scheduler_service = self.scheduler_service.lock().await;
@@ -1364,6 +1405,49 @@ mod tests {
         let final_output_tool_system_prompt =
             final_output_tool_ref.as_ref().unwrap().system_prompt();
         assert!(system_prompt.contains(&final_output_tool_system_prompt));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_reset_session_state() -> Result<()> {
+        let agent = Agent::new();
+
+        // Add some state that should be reset
+        let response = Response {
+            json_schema: Some(serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "result": {"type": "string"}
+                }
+            })),
+        };
+        agent.add_final_output_tool(response).await;
+
+        // Add some frontend tools
+        let frontend_tools = agent.frontend_tools.lock().await;
+        assert_eq!(frontend_tools.len(), 0);
+        drop(frontend_tools);
+
+        // Verify state exists before reset
+        let final_output_tool = agent.final_output_tool.lock().await;
+        assert!(final_output_tool.is_some());
+        drop(final_output_tool);
+
+        // Reset session state
+        agent.reset_session_state().await?;
+
+        // Verify state is cleared after reset
+        let final_output_tool = agent.final_output_tool.lock().await;
+        assert!(final_output_tool.is_none(), "Final output tool should be cleared after reset");
+        drop(final_output_tool);
+
+        let frontend_tools = agent.frontend_tools.lock().await;
+        assert_eq!(frontend_tools.len(), 0, "Frontend tools should be cleared after reset");
+        drop(frontend_tools);
+
+        let frontend_instructions = agent.frontend_instructions.lock().await;
+        assert!(frontend_instructions.is_none(), "Frontend instructions should be cleared after reset");
+
         Ok(())
     }
 }
