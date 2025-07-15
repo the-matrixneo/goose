@@ -31,6 +31,7 @@ interface UseChatEngineProps {
   chat: ChatType;
   setChat: (chat: ChatType) => void;
   onMessageStreamFinish?: () => void;
+  onMessageSent?: () => void; // Add callback for when message is sent
   enableLocalStorage?: boolean;
 }
 
@@ -38,6 +39,7 @@ export const useChatEngine = ({
   chat,
   setChat,
   onMessageStreamFinish,
+  onMessageSent,
   enableLocalStorage = false,
 }: UseChatEngineProps) => {
   const [lastInteractionTime, setLastInteractionTime] = useState<number>(Date.now());
@@ -200,16 +202,20 @@ export const useChatEngine = ({
           onSummaryReset();
           setTimeout(() => {
             append(userMessage);
+            // Call onMessageSent after the message is sent
+            onMessageSent?.();
           }, 150);
         } else {
           append(userMessage);
+          // Call onMessageSent after the message is sent
+          onMessageSent?.();
         }
       } else {
         // If nothing was actually submitted (e.g. empty input and no images pasted)
         window.electron.stopPowerSaveBlocker();
       }
     },
-    [append]
+    [append, onMessageSent]
   );
 
   // Handle stopping the message stream

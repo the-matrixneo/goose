@@ -27,20 +27,33 @@ export const useRecipeManager = (messages: Message[], locationState?: LocationSt
     // First check if we have a persisted recipe in chat context
     // We need to distinguish between null (explicitly cleared) and undefined (not set)
     if (chatContext?.chat.recipeConfig !== undefined) {
+      console.log('useRecipeManager: Using recipe from chat context:', {
+        recipeConfig: chatContext.chat.recipeConfig,
+        title: chatContext.chat.recipeConfig?.title,
+      });
       return chatContext.chat.recipeConfig; // This could be null or a Recipe
     }
 
     // Then check if recipe config is passed via navigation state
     if (locationState?.recipeConfig) {
+      console.log('useRecipeManager: Using recipe from location state:', {
+        recipeConfig: locationState.recipeConfig,
+        title: locationState.recipeConfig.title,
+      });
       return locationState.recipeConfig as Recipe;
     }
 
     // Fallback to app config (from deeplinks)
     const appRecipeConfig = window.appConfig.get('recipeConfig') as Recipe | null;
     if (appRecipeConfig) {
+      console.log('useRecipeManager: Using recipe from app config:', {
+        recipeConfig: appRecipeConfig,
+        title: appRecipeConfig.title,
+      });
       return appRecipeConfig;
     }
 
+    console.log('useRecipeManager: No recipe config found');
     return null;
   }, [chatContext, locationState]);
 

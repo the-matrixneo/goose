@@ -559,7 +559,7 @@ const createChat = async (
 
   // Load and manage window state
   const mainWindowState = windowStateKeeper({
-    defaultWidth: 800,
+    defaultWidth: 940, // large enough to show the sidebar on launch
     defaultHeight: 800,
   });
 

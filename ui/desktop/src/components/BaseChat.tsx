@@ -175,6 +175,10 @@ function BaseChatContent({
       // Call the original callback if provided
       onMessageStreamFinish?.();
     },
+    onMessageSent: () => {
+      // Create new session after message is sent if needed
+      createNewSessionIfNeeded();
+    },
     enableLocalStorage,
   });
 
@@ -190,7 +194,7 @@ function BaseChatContent({
   }, [handleAutoExecution, append, isLoading]);
 
   // Use shared session continuation
-  useSessionContinuation({
+  const { createNewSessionIfNeeded } = useSessionContinuation({
     chat,
     setChat,
     summarizedThread,
@@ -278,6 +282,14 @@ function BaseChatContent({
                   chatId={chat.id}
                   workingDir={window.appConfig.get('GOOSE_WORKING_DIR') as string}
                   contextType={getContextHandlerType(message)}
+                  onSummaryComplete={() => {
+                    // Auto-scroll to bottom when summary is complete
+                    setTimeout(() => {
+                      if (scrollRef.current?.scrollToBottom) {
+                        scrollRef.current.scrollToBottom();
+                      }
+                    }, 100);
+                  }}
                 />
               ) : (
                 <UserMessage message={message} />
@@ -292,6 +304,14 @@ function BaseChatContent({
                   chatId={chat.id}
                   workingDir={window.appConfig.get('GOOSE_WORKING_DIR') as string}
                   contextType={getContextHandlerType(message)}
+                  onSummaryComplete={() => {
+                    // Auto-scroll to bottom when summary is complete
+                    setTimeout(() => {
+                      if (scrollRef.current?.scrollToBottom) {
+                        scrollRef.current.scrollToBottom();
+                      }
+                    }, 100);
+                  }}
                 />
               ) : (
                 <GooseMessage
@@ -361,9 +381,15 @@ function BaseChatContent({
 
             {/* Messages or Splash or Popular Topics */}
             {
-              messages.length === 0 && !suppressEmptyState ? (
+              // Check if we should show splash instead of messages
+              (() => {
+                // Always show splash when recipe is loaded, regardless of existing messages
+                const shouldShowSplash = recipeConfig && !suppressEmptyState;
+
+                return shouldShowSplash;
+              })() ? (
                 <>
-                  {/* Show Splash when no messages and we have a recipe config */}
+                  {/* Show Splash when no real messages and we have a recipe config */}
                   {recipeConfig ? (
                     <Splash
                       append={(text: string) => append(text)}
@@ -373,11 +399,11 @@ function BaseChatContent({
                       title={recipeConfig.title}
                     />
                   ) : showPopularTopics ? (
-                    /* Show PopularChatTopics when no messages, no recipe, and showPopularTopics is true (Pair view) */
+                    /* Show PopularChatTopics when no real messages, no recipe, and showPopularTopics is true (Pair view) */
                     <PopularChatTopics append={(text: string) => append(text)} />
                   ) : null}
                 </>
-              ) : messages.length > 0 ? (
+              ) : filteredMessages.length > 0 ? (
                 <>
                   {disableSearch ? (
                     // Render messages without SearchView wrapper when search is disabled

@@ -9,6 +9,7 @@ interface ContextHandlerProps {
   chatId: string;
   workingDir: string;
   contextType: 'contextLengthExceeded' | 'summarizationRequested';
+  onSummaryComplete?: () => void; // Add callback for when summary is complete
 }
 
 export const ContextHandler: React.FC<ContextHandlerProps> = ({
@@ -17,6 +18,7 @@ export const ContextHandler: React.FC<ContextHandlerProps> = ({
   chatId,
   workingDir,
   contextType,
+  onSummaryComplete,
 }) => {
   const {
     summaryContent,
@@ -40,6 +42,33 @@ export const ContextHandler: React.FC<ContextHandlerProps> = ({
 
   // Use a ref to track if we've started the fetch
   const fetchStartedRef = useRef(false);
+  const hasCalledSummaryComplete = useRef(false);
+
+  // Call onSummaryComplete when summary is ready
+  useEffect(() => {
+    if (summaryContent && shouldAllowSummaryInteraction && !hasCalledSummaryComplete.current) {
+      hasCalledSummaryComplete.current = true;
+      // Delay the scroll slightly to ensure the content is rendered
+      setTimeout(() => {
+        onSummaryComplete?.();
+      }, 100);
+    }
+
+    // Reset the flag when summary is cleared
+    if (!summaryContent) {
+      hasCalledSummaryComplete.current = false;
+    }
+  }, [summaryContent, shouldAllowSummaryInteraction, onSummaryComplete]);
+
+  // Scroll when summarization starts (loading state)
+  useEffect(() => {
+    if (isLoadingSummary && shouldAllowSummaryInteraction) {
+      // Delay the scroll slightly to ensure the loading content is rendered
+      setTimeout(() => {
+        onSummaryComplete?.();
+      }, 100);
+    }
+  }, [isLoadingSummary, shouldAllowSummaryInteraction, onSummaryComplete]);
 
   // Function to trigger the async operation properly
   const triggerContextLengthExceeded = () => {
