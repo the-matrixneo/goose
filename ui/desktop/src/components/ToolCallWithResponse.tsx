@@ -13,6 +13,7 @@ interface ToolCallWithResponseProps {
   toolRequest: ToolRequestMessageContent;
   toolResponse?: ToolResponseMessageContent;
   notifications?: NotificationEvent[];
+  isStreamingMessage?: boolean;
 }
 
 export default function ToolCallWithResponse({
@@ -20,6 +21,7 @@ export default function ToolCallWithResponse({
   toolRequest,
   toolResponse,
   notifications,
+  isStreamingMessage = false,
 }: ToolCallWithResponseProps) {
   const toolCall = toolRequest.toolCall.status === 'success' ? toolRequest.toolCall.value : null;
   if (!toolCall) {
@@ -32,7 +34,9 @@ export default function ToolCallWithResponse({
         'w-full text-sm rounded-lg overflow-hidden border-borderSubtle border bg-background-muted'
       )}
     >
-      <ToolCallView {...{ isCancelledMessage, toolCall, toolResponse, notifications }} />
+      <ToolCallView
+        {...{ isCancelledMessage, toolCall, toolResponse, notifications, isStreamingMessage }}
+      />
     </div>
   );
 }
@@ -87,6 +91,7 @@ interface ToolCallViewProps {
   };
   toolResponse?: ToolResponseMessageContent;
   notifications?: NotificationEvent[];
+  isStreamingMessage?: boolean;
 }
 
 interface Progress {
@@ -121,6 +126,7 @@ function ToolCallView({
   toolCall,
   toolResponse,
   notifications,
+  isStreamingMessage = false,
 }: ToolCallViewProps) {
   const [responseStyle, setResponseStyle] = useState(() => localStorage.getItem('response_style'));
 
@@ -153,19 +159,27 @@ function ToolCallView({
   })();
 
   const isToolDetails = Object.entries(toolCall?.arguments).length > 0;
-  const loadingStatus: LoadingStatus = !toolResponse?.toolResult.status
-    ? 'loading'
-    : toolResponse?.toolResult.status;
+
+  // Check if streaming has finished but no tool response was received
+  // This is a workaround for cases where the backend doesn't send tool responses
+  const isStreamingComplete = !isStreamingMessage;
+  const shouldShowAsComplete = isStreamingComplete && !toolResponse;
+
+  const loadingStatus: LoadingStatus = !toolResponse
+    ? shouldShowAsComplete
+      ? 'success'
+      : 'loading'
+    : toolResponse.toolResult.status;
 
   // Tool call timing tracking
   const [startTime, setStartTime] = useState<number | null>(null);
 
   // Track when tool call starts (when there's no response yet)
   useEffect(() => {
-    if (!toolResponse?.toolResult.status && startTime === null) {
+    if (!toolResponse && startTime === null) {
       setStartTime(Date.now());
     }
-  }, [toolResponse?.toolResult.status, startTime]);
+  }, [toolResponse, startTime]);
 
   const toolResults: { result: Content; isExpandToolResults: boolean }[] =
     loadingStatus === 'success' && Array.isArray(toolResponse?.toolResult.value)
@@ -404,9 +418,9 @@ function ToolCallView({
         <div className="border-t border-borderSubtle">
           <ToolLogsView
             logs={logs}
-            working={toolResults.length === 0}
+            working={loadingStatus === 'loading'}
             isStartExpanded={
-              toolResults.length === 0 || responseStyle === 'detailed' || responseStyle === null
+              loadingStatus === 'loading' || responseStyle === 'detailed' || responseStyle === null
             }
           />
         </div>

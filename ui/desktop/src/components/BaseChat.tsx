@@ -321,7 +321,7 @@ function BaseChatContent({
         {renderHeader && renderHeader()}
 
         {/* Chat container with sticky recipe header */}
-        <div className="flex flex-col flex-1 mb-0.5 min-h-0">
+        <div className="flex flex-col flex-1 mb-0.5 min-h-0 relative">
           <ScrollArea
             ref={scrollRef}
             className={`flex-1 bg-background-default rounded-b-2xl min-h-0 relative ${contentClassName}`}
@@ -393,6 +393,7 @@ function BaseChatContent({
                       }}
                       isUserMessage={isUserMessage}
                       onScrollToBottom={handleScrollToBottom}
+                      isStreamingMessage={isLoading}
                     />
                   ) : (
                     // Render messages with SearchView wrapper when search is enabled
@@ -408,6 +409,7 @@ function BaseChatContent({
                         }}
                         isUserMessage={isUserMessage}
                         onScrollToBottom={handleScrollToBottom}
+                        isStreamingMessage={isLoading}
                       />
                     </SearchView>
                   )}
@@ -442,14 +444,19 @@ function BaseChatContent({
               ) : null /* Show nothing when messages.length === 0 && suppressEmptyState === true */
             }
 
-            {/* Loading indicator at bottom of messages container */}
-            {isLoading && (
-              <LoadingGoose message={isLoadingSummary ? 'summarizing conversation…' : undefined} />
-            )}
-
             {/* Custom content after messages */}
             {renderAfterMessages && renderAfterMessages()}
+
+            {/* Bottom padding to make space for the loading indicator */}
+            <div className="block h-12" />
           </ScrollArea>
+
+          {/* Fixed loading indicator at bottom left of chat container */}
+          {isLoading && (
+            <div className="absolute bottom-1 left-4 z-20 pointer-events-none">
+              <LoadingGoose message={isLoadingSummary ? 'summarizing conversation…' : undefined} />
+            </div>
+          )}
         </div>
 
         <div

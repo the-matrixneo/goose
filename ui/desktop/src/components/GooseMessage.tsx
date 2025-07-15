@@ -29,6 +29,7 @@ interface GooseMessageProps {
   toolCallNotifications: Map<string, NotificationEvent[]>;
   append: (value: string) => void;
   appendMessage: (message: Message) => void;
+  isStreaming?: boolean; // Whether this message is currently being streamed
 }
 
 export default function GooseMessage({
@@ -39,6 +40,7 @@ export default function GooseMessage({
   toolCallNotifications,
   append,
   appendMessage,
+  isStreaming = false,
 }: GooseMessageProps) {
   const contentRef = useRef<HTMLDivElement>(null);
   // Track which tool confirmations we've already handled to prevent infinite loops
@@ -174,18 +176,20 @@ export default function GooseMessage({
               </div>
             )}
 
-            {/* Only show MessageCopyLink if there's text content and no tool requests/responses */}
+            {/* Only show timestamp and copy link when not streaming */}
             <div className="relative flex justify-start">
-              {toolRequests.length === 0 && (
+              {toolRequests.length === 0 && !isStreaming && (
                 <div className="text-xs font-mono text-text-muted pt-1 transition-all duration-200 group-hover:-translate-y-4 group-hover:opacity-0">
                   {timestamp}
                 </div>
               )}
-              {displayText && message.content.every((content) => content.type === 'text') && (
-                <div className="absolute left-0 pt-1">
-                  <MessageCopyLink text={displayText} contentRef={contentRef} />
-                </div>
-              )}
+              {displayText &&
+                message.content.every((content) => content.type === 'text') &&
+                !isStreaming && (
+                  <div className="absolute left-0 pt-1">
+                    <MessageCopyLink text={displayText} contentRef={contentRef} />
+                  </div>
+                )}
             </div>
           </div>
         )}
@@ -203,11 +207,12 @@ export default function GooseMessage({
                   toolRequest={toolRequest}
                   toolResponse={toolResponsesMap.get(toolRequest.id)}
                   notifications={toolCallNotifications.get(toolRequest.id)}
+                  isStreamingMessage={isStreaming}
                 />
               </div>
             ))}
             <div className="text-xs text-text-muted pt-1 transition-all duration-200 group-hover:-translate-y-4 group-hover:opacity-0">
-              {timestamp}
+              {!isStreaming && timestamp}
             </div>
           </div>
         )}
