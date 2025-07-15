@@ -7,6 +7,7 @@
 
 use crate::message::Message;
 use crate::providers::base::Provider;
+use crate::utils::safe_truncate;
 use anyhow::Result;
 use chrono::Local;
 use etcetera::{choose_app_strategy, AppStrategy, AppStrategyArgs};
@@ -610,7 +611,7 @@ pub fn read_messages_with_truncation(
         // Log details about corrupted lines (with limited detail for security)
         for (num, line) in &corrupted_lines {
             let preview = if line.len() > 50 {
-                format!("{}... (truncated)", safe_truncate_str(line, 50))
+                format!("{}... (truncated)", safe_truncate(line, 50))
             } else {
                 line.clone()
             };
@@ -701,12 +702,12 @@ fn truncate_message_content_in_place(message: &mut Message, max_content_size: us
     for content in &mut message.content {
         match content {
             MessageContent::Text(text_content) => {
-                if text_content.text.len() > max_content_size {
+                if text_content.text.chars().count() > max_content_size {
                     let truncated_text = safe_truncate_str(&text_content.text, max_content_size);
                     let truncated = format!(
                         "{}\n\n[... content truncated during session loading from {} to {} characters ...]",
-                        truncated_text,
-                        text_content.text.len(),
+                        safe_truncate(&text_content.text, max_content_size),
+                        text_content.text.chars().count(),
                         max_content_size
                     );
                     text_content.text = truncated;
@@ -717,13 +718,13 @@ fn truncate_message_content_in_place(message: &mut Message, max_content_size: us
                     for content_item in result {
                         match content_item {
                             Content::Text(ref mut text_content) => {
-                                if text_content.text.len() > max_content_size {
+                                if text_content.text.chars().count() > max_content_size {
                                     let truncated_text =
                                         safe_truncate_str(&text_content.text, max_content_size);
                                     let truncated = format!(
                                         "{}\n\n[... tool response truncated during session loading from {} to {} characters ...]",
-                                        truncated_text,
-                                        text_content.text.len(),
+                                        safe_truncate(&text_content.text, max_content_size),
+                                        text_content.text.chars().count(),
                                         max_content_size
                                     );
                                     text_content.text = truncated;
@@ -733,13 +734,13 @@ fn truncate_message_content_in_place(message: &mut Message, max_content_size: us
                                 if let ResourceContents::TextResourceContents { text, .. } =
                                     &mut resource_content.resource
                                 {
-                                    if text.len() > max_content_size {
+                                    if text.chars().count() > max_content_size {
                                         let truncated_text =
                                             safe_truncate_str(text, max_content_size);
                                         let truncated = format!(
                                             "{}\n\n[... resource content truncated during session loading from {} to {} characters ...]",
-                                            truncated_text,
-                                            text.len(),
+                                            safe_truncate(text, max_content_size),
+                                            text.chars().count(),
                                             max_content_size
                                         );
                                         *text = truncated;
@@ -779,7 +780,7 @@ fn attempt_corruption_recovery(json_str: &str, max_content_size: Option<usize>) 
     // Strategy 4: Create a placeholder message with the raw content
     println!("[SESSION] All recovery strategies failed, creating placeholder message");
     let preview = if json_str.len() > 200 {
-        format!("{}...", safe_truncate_str(json_str, 200))
+        format!("{}...", safe_truncate(json_str, 200))
     } else {
         json_str.to_string()
     };
@@ -996,7 +997,7 @@ fn truncate_json_string(json_str: &str, max_content_size: usize) -> String {
             if text_content.len() > max_content_size {
                 let truncated_text = format!(
                     "{}\n\n[... content truncated during JSON parsing from {} to {} characters ...]",
-                    safe_truncate_str(&text_content, max_content_size),
+                    safe_truncate(text_content, max_content_size),
                     text_content.len(),
                     max_content_size
                 );
@@ -1297,11 +1298,7 @@ pub async fn generate_description_with_schedule_id(
         .take(3) // Use up to first 3 user messages for context
         .map(|m| {
             let text = m.as_concat_text();
-            if text.len() > 300 {
-                format!("{}...", safe_truncate_str(&text, 300))
-            } else {
-                text
-            }
+            safe_truncate(&text, 300)
         })
         .collect();
 
@@ -1330,9 +1327,9 @@ pub async fn generate_description_with_schedule_id(
     let description = result.0.as_concat_text();
 
     // Validate description length for security
-    let sanitized_description = if description.len() > 100 {
+    let sanitized_description = if description.chars().count() > 100 {
         tracing::warn!("Generated description too long, truncating");
-        format!("{}...", safe_truncate_str(&description, 97))
+        safe_truncate(&description, 100)
     } else {
         description
     };
@@ -1407,9 +1404,9 @@ mod tests {
             println!(
                 "[TEST] Input: {}",
                 if corrupt_json.len() > 100 {
-                    safe_truncate_str(corrupt_json, 100)
+                    safe_truncate(corrupt_json, 100)
                 } else {
-                    corrupt_json
+                    corrupt_json.to_string()
                 }
             );
 
@@ -1554,7 +1551,7 @@ mod tests {
             "]}}\"\\n\\\"{[",
             "Edge case: } ] some text",
             "{\"foo\": \"} ]\"}",
-            "}]",   
+            "}]",
         ];
 
         let mut messages = Vec::new();

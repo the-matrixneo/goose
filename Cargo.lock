@@ -3486,6 +3486,7 @@ dependencies = [
  "tokio",
  "tokio-cron-scheduler",
  "tokio-stream",
+ "tokio-util",
  "tracing",
  "tracing-subscriber",
  "url",
@@ -3597,6 +3598,7 @@ dependencies = [
  "criterion",
  "ctor",
  "dotenv",
+ "goose",
  "include_dir",
  "indoc 1.0.9",
  "lazy_static",
@@ -3625,6 +3627,7 @@ dependencies = [
  "chrono",
  "docx-rs",
  "etcetera",
+ "glob",
  "google-apis-common",
  "google-docs1",
  "google-drive3",
@@ -8604,9 +8607,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-util"
-version = "0.7.13"
+version = "0.7.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d7fcaa8d55a2bdd6b83ace262b016eca0d79ee02818c5c1bcdf0305114081078"
+checksum = "66a539a9ad6d5d281510d5bd368c973d636c02dbf8a67300bfb6b950696ad7df"
 dependencies = [
  "bytes",
  "futures-core",
