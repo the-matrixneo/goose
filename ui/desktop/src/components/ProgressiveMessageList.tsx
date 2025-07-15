@@ -80,30 +80,18 @@ export default function ProgressiveMessageList({
 
   // Simple progressive loading - start immediately when component mounts if needed
   useEffect(() => {
-    console.log(
-      `ProgressiveMessageList: ${messages.length} messages, threshold: ${showLoadingThreshold}, renderedCount: ${renderedCount}`
-    );
-
     if (messages.length <= showLoadingThreshold) {
-      // Small list - render all immediately
-      console.log('ProgressiveMessageList: Small list, rendering all immediately');
       setRenderedCount(messages.length);
       setIsLoading(false);
       return;
     }
 
-    console.log('ProgressiveMessageList: Large list, starting progressive loading');
-
     // Large list - start progressive loading
     const loadNextBatch = () => {
       setRenderedCount((current) => {
         const nextCount = Math.min(current + batchSize, messages.length);
-        console.log(
-          `ProgressiveMessageList: Loading batch, now showing ${nextCount}/${messages.length}`
-        );
 
         if (nextCount >= messages.length) {
-          console.log('ProgressiveMessageList: All messages loaded');
           setIsLoading(false);
           // Trigger scroll to bottom
           window.setTimeout(() => {

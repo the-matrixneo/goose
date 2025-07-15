@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { createRecipe, Recipe } from '../recipe';
 import { Message, createUserMessage } from '../types/message';
 import { updateSystemPromptWithParameters } from '../utils/providerUtils';
@@ -15,9 +15,19 @@ export const useRecipeManager = (messages: Message[], locationState?: LocationSt
   const [isParameterModalOpen, setIsParameterModalOpen] = useState(false);
   const [recipeParameters, setRecipeParameters] = useState<Record<string, string> | null>(null);
   const [readyForAutoUserPrompt, setReadyForAutoUserPrompt] = useState(false);
+  const [recipeError, setRecipeError] = useState<string | null>(null);
 
   // Get chat context to access persisted recipe
   const chatContext = useChatContext();
+
+  // Use a ref to capture the current messages for the event handler
+  const messagesRef = useRef(messages);
+  const isCreatingRecipeRef = useRef(false);
+
+  // Update the ref when messages change
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   // Get recipeConfig from multiple sources with priority:
   // 1. Chat context (persisted recipe)
@@ -149,13 +159,27 @@ export const useRecipeManager = (messages: Message[], locationState?: LocationSt
   // Listen for make-agent-from-chat event
   useEffect(() => {
     const handleMakeAgent = async () => {
+      // Prevent duplicate calls using global flag
+      if (window.isCreatingRecipe) {
+        return;
+      }
+
+      // Prevent duplicate calls using local ref
+      if (isCreatingRecipeRef.current) {
+        return;
+      }
+
       window.electron.logInfo('Making recipe from chat...');
+
+      // Set both local and global flags
+      isCreatingRecipeRef.current = true;
+      window.isCreatingRecipe = true;
       setIsGeneratingRecipe(true);
 
       try {
-        // Create recipe directly from chat messages
+        // Create recipe directly from chat messages using the ref to get current messages
         const createRecipeRequest = {
-          messages: messages,
+          messages: messagesRef.current,
           title: '',
           description: '',
         };
@@ -166,16 +190,14 @@ export const useRecipeManager = (messages: Message[], locationState?: LocationSt
           throw new Error(`Failed to create recipe: ${response.error}`);
         }
 
-        window.electron.logInfo('Created recipe:');
-        window.electron.logInfo(JSON.stringify(response.recipe, null, 2));
+        window.electron.logInfo('Created recipe successfully');
 
-        // First, verify the recipe data
+        // Verify the recipe data
         if (!response.recipe) {
           throw new Error('No recipe data received');
         }
 
         // Create a new window for the recipe editor
-        console.log('Opening recipe editor with config:', response.recipe);
         const recipeConfig = {
           id: response.recipe.title || 'untitled',
           title: response.recipe.title || 'Untitled Recipe',
@@ -184,6 +206,12 @@ export const useRecipeManager = (messages: Message[], locationState?: LocationSt
           activities: response.recipe.activities || [],
           prompt: response.recipe.prompt || '',
         };
+
+        // Set a flag to prevent the current window from reacting to recipe config changes
+        // This prevents navigation conflicts when creating new windows
+        window.sessionStorage.setItem('ignoreRecipeConfigChanges', 'true');
+
+        // Create the new window
         window.electron.createChatWindow(
           undefined, // query
           undefined, // dir
@@ -194,11 +222,21 @@ export const useRecipeManager = (messages: Message[], locationState?: LocationSt
         );
 
         window.electron.logInfo('Opening recipe editor window');
+
+        // Clear the ignore flag after a short delay
+        setTimeout(() => {
+          window.sessionStorage.removeItem('ignoreRecipeConfigChanges');
+        }, 1000);
       } catch (error) {
         window.electron.logInfo('Failed to create recipe:');
         const errorMessage = error instanceof Error ? error.message : String(error);
         window.electron.logInfo(errorMessage);
+
+        // Set the error state to show in modal
+        setRecipeError(errorMessage);
       } finally {
+        isCreatingRecipeRef.current = false;
+        window.isCreatingRecipe = false;
         setIsGeneratingRecipe(false);
       }
     };
@@ -208,7 +246,7 @@ export const useRecipeManager = (messages: Message[], locationState?: LocationSt
     return () => {
       window.removeEventListener('make-agent-from-chat', handleMakeAgent);
     };
-  }, [messages]);
+  }, []);
 
   return {
     recipeConfig,
@@ -219,5 +257,7 @@ export const useRecipeManager = (messages: Message[], locationState?: LocationSt
     recipeParameters,
     handleParameterSubmit,
     handleAutoExecution,
+    recipeError,
+    setRecipeError,
   };
 };

@@ -188,10 +188,14 @@ function BaseChatContent({
   });
 
   // Use shared recipe manager
-  const { recipeConfig, initialPrompt, isGeneratingRecipe, handleAutoExecution } = useRecipeManager(
-    messages,
-    location.state
-  );
+  const {
+    recipeConfig,
+    initialPrompt,
+    isGeneratingRecipe,
+    handleAutoExecution,
+    recipeError,
+    setRecipeError,
+  } = useRecipeManager(messages, location.state);
 
   // Reset recipe usage tracking when recipe changes
   useEffect(() => {
@@ -487,6 +491,24 @@ function BaseChatContent({
         }}
         summaryContent={summaryContent}
       />
+
+      {/* Recipe Error Modal */}
+      {recipeError && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/50">
+          <div className="bg-background-default border border-borderSubtle rounded-lg p-6 w-96 max-w-[90vw]">
+            <h3 className="text-lg font-medium text-textProminent mb-4">Recipe Creation Failed</h3>
+            <p className="text-textStandard mb-6">{recipeError}</p>
+            <div className="flex justify-end">
+              <button
+                onClick={() => setRecipeError(null)}
+                className="px-4 py-2 bg-textProminent text-bgApp rounded-lg hover:bg-opacity-90 transition-colors"
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

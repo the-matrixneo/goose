@@ -168,7 +168,7 @@ async fn get_session_insights(
 
     // Calculate insights
     let total_sessions = sessions.len();
-    
+
     // Debug: Log if we have very few sessions, which might indicate filtering issues
     if total_sessions == 0 {
         info!("Warning: No sessions found with descriptions");
@@ -191,7 +191,10 @@ async fn get_session_insights(
                 total_tokens += tokens as i64;
             } else if tokens < 0 {
                 // Log negative token values for debugging
-                info!("Warning: Session {} has negative accumulated_total_tokens: {}", session.id, tokens);
+                info!(
+                    "Warning: Session {} has negative accumulated_total_tokens: {}",
+                    session.id, tokens
+                );
             }
         }
 

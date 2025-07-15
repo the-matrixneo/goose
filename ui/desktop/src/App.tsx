@@ -431,7 +431,8 @@ const RecipeEditorRoute = () => {
   }
 
   if (!config) {
-    config = window.electron.getConfig().recipeConfig;
+    const electronConfig = window.electron.getConfig();
+    config = electronConfig.recipeConfig;
   }
 
   return <RecipeEditor config={config} />;
@@ -767,27 +768,28 @@ export default function App() {
 
     if (viewType) {
       if (viewType === 'recipeEditor' && recipeConfig) {
-        console.log('Setting view to recipeEditor with config:', recipeConfig);
-        // Handle recipe editor deep link
-        window.history.replaceState({ config: recipeConfig }, '', '/recipe-editor');
+        // Handle recipe editor deep link - use hash routing
+        window.location.hash = '#/recipe-editor';
+        window.history.replaceState({ config: recipeConfig }, '', '#/recipe-editor');
       } else {
         // Handle other deep links by redirecting to appropriate route
         const routeMap: Record<string, string> = {
-          chat: '/',
-          pair: '/pair',
-          settings: '/settings',
-          sessions: '/sessions',
-          schedules: '/schedules',
-          recipes: '/recipes',
-          permission: '/permission',
-          ConfigureProviders: '/configure-providers',
-          sharedSession: '/shared-session',
-          recipeEditor: '/recipe-editor',
-          welcome: '/welcome',
+          chat: '#/',
+          pair: '#/pair',
+          settings: '#/settings',
+          sessions: '#/sessions',
+          schedules: '#/schedules',
+          recipes: '#/recipes',
+          permission: '#/permission',
+          ConfigureProviders: '#/configure-providers',
+          sharedSession: '#/shared-session',
+          recipeEditor: '#/recipe-editor',
+          welcome: '#/welcome',
         };
 
         const route = routeMap[viewType];
         if (route) {
+          window.location.hash = route;
           window.history.replaceState({}, '', route);
         }
       }
@@ -859,7 +861,12 @@ export default function App() {
             });
 
             // Check if we have a recipe config from a deeplink
-            if (recipeConfig && typeof recipeConfig === 'object') {
+            // But skip navigation if we're ignoring recipe config changes (to prevent conflicts with new window creation)
+            if (
+              recipeConfig &&
+              typeof recipeConfig === 'object' &&
+              !window.sessionStorage.getItem('ignoreRecipeConfigChanges')
+            ) {
               console.log(
                 'Recipe deeplink detected, navigating to pair view with config:',
                 recipeConfig
@@ -881,6 +888,10 @@ export default function App() {
                 },
                 '',
                 '#/pair'
+              );
+            } else if (window.sessionStorage.getItem('ignoreRecipeConfigChanges')) {
+              console.log(
+                'Ignoring recipe config changes to prevent navigation conflicts with new window creation'
               );
             } else {
               // Only navigate to chat route if we're not already on a valid route
@@ -941,12 +952,19 @@ export default function App() {
   // Handle navigation to pair view for recipe deeplinks after router is ready
   useEffect(() => {
     const recipeConfig = window.appConfig.get('recipeConfig');
-    if (recipeConfig && typeof recipeConfig === 'object' && window.location.hash === '#/') {
+    if (
+      recipeConfig &&
+      typeof recipeConfig === 'object' &&
+      window.location.hash === '#/' &&
+      !window.sessionStorage.getItem('ignoreRecipeConfigChanges')
+    ) {
       console.log('Router ready - navigating to pair view for recipe deeplink:', recipeConfig);
       // Small delay to ensure router is fully initialized
       setTimeout(() => {
         window.location.hash = '#/pair';
       }, 100);
+    } else if (window.sessionStorage.getItem('ignoreRecipeConfigChanges')) {
+      console.log('Router ready - ignoring recipe config navigation due to new window creation');
     }
   }, []);
 

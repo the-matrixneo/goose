@@ -352,7 +352,7 @@ export default function RecipeEditor({ config }: RecipeEditorProps) {
                   setErrors({ ...errors, title: undefined });
                 }
               }}
-              className={`w-full p-3 border rounded-lg bg-background-default text-textStandard focus:outline-none focus:ring-2 focus:ring-borderProminent ${
+              className={`w-full max-w-full p-3 border rounded-lg bg-background-default text-textStandard focus:outline-none focus:ring-2 focus:ring-borderProminent overflow-hidden ${
                 errors.title ? 'border-red-500' : 'border-borderSubtle'
               }`}
               placeholder="Agent Recipe Title (required)"
@@ -375,7 +375,7 @@ export default function RecipeEditor({ config }: RecipeEditorProps) {
                   setErrors({ ...errors, description: undefined });
                 }
               }}
-              className={`w-full p-3 border rounded-lg bg-background-default text-textStandard focus:outline-none focus:ring-2 focus:ring-borderProminent ${
+              className={`w-full max-w-full p-3 border rounded-lg bg-background-default text-textStandard focus:outline-none focus:ring-2 focus:ring-borderProminent overflow-hidden ${
                 errors.description ? 'border-red-500' : 'border-borderSubtle'
               }`}
               placeholder="Description (required)"
@@ -423,21 +423,21 @@ export default function RecipeEditor({ config }: RecipeEditorProps) {
           </div>
 
           {/* Deep Link Display */}
-          <div className="w-full p-4 bg-bgSubtle rounded-lg">
+          <div className="w-full p-4 bg-bgSubtle rounded-lg overflow-hidden">
             {!requiredFieldsAreFilled() ? (
               <div className="text-sm text-textSubtle text-xs text-textSubtle">
                 Fill in required fields to generate link
               </div>
             ) : (
-              <div className="flex items-center justify-between mb-2">
-                <div className="text-sm text-textSubtle text-xs text-textSubtle">
+              <div className="flex items-center justify-between mb-2 gap-4">
+                <div className="text-sm text-textSubtle text-xs text-textSubtle flex-shrink-0">
                   Copy this link to share with friends or paste directly in Chrome to open
                 </div>
                 <Button
                   onClick={() => validateForm() && handleCopy()}
                   variant="ghost"
                   size="sm"
-                  className="ml-4 p-2 hover:bg-background-default rounded-lg transition-colors flex items-center disabled:opacity-50 disabled:hover:bg-transparent"
+                  className="p-2 hover:bg-background-default rounded-lg transition-colors flex items-center disabled:opacity-50 disabled:hover:bg-transparent flex-shrink-0"
                 >
                   {copied ? (
                     <Check className="w-4 h-4 text-green-500" />
@@ -451,11 +451,14 @@ export default function RecipeEditor({ config }: RecipeEditorProps) {
               </div>
             )}
             {requiredFieldsAreFilled() && (
-              <div
-                onClick={() => validateForm() && handleCopy()}
-                className={`text-sm truncate dark:text-white font-mono ${!title.trim() || !description.trim() ? 'text-textDisabled' : 'text-textStandard'}`}
-              >
-                {deeplink}
+              <div className="w-full overflow-hidden">
+                <div
+                  onClick={() => validateForm() && handleCopy()}
+                  className={`text-sm dark:text-white font-mono cursor-pointer hover:bg-background-default p-2 rounded transition-colors overflow-x-auto whitespace-nowrap ${!title.trim() || !description.trim() ? 'text-textDisabled' : 'text-textStandard'}`}
+                  style={{ maxWidth: '500px', width: '100%' }}
+                >
+                  {deeplink}
+                </div>
               </div>
             )}
           </div>
@@ -507,17 +510,9 @@ export default function RecipeEditor({ config }: RecipeEditorProps) {
         onClose={() => setIsScheduleModalOpen(false)}
         recipe={getCurrentConfig()}
         onCreateSchedule={(deepLink) => {
-          // Open the schedules view with the deep link pre-filled
-          window.electron.createChatWindow(
-            undefined,
-            undefined,
-            undefined,
-            undefined,
-            undefined,
-            'schedules'
-          );
-          // Store the deep link in localStorage for the schedules view to pick up
+          // Navigate to the schedules view with the deep link pre-filled
           localStorage.setItem('pendingScheduleDeepLink', deepLink);
+          navigate('/schedules');
         }}
       />
 

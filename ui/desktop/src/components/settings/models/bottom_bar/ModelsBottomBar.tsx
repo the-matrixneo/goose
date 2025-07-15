@@ -25,12 +25,14 @@ interface ModelsBottomBarProps {
   setView: (view: View) => void;
   alerts: Alert[];
   recipeConfig?: Recipe | null;
+  hasMessages?: boolean; // Add prop to know if there are messages to create a recipe from
 }
 export default function ModelsBottomBar({
   dropdownRef,
   setView,
   alerts,
   recipeConfig,
+  hasMessages = false,
 }: ModelsBottomBarProps) {
   const {
     currentModel,
@@ -243,10 +245,18 @@ export default function ModelsBottomBar({
           )}
 
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => setView('recipeEditor')}>
-            <span>Create a recipe</span>
-            <ChefHat className="ml-auto h-4 w-4" />
-          </DropdownMenuItem>
+          {/* Only show "Create a recipe from this session" when there are messages to create from */}
+          {hasMessages && (
+            <DropdownMenuItem
+              onClick={() => {
+                // Signal to create an agent from the current chat
+                window.dispatchEvent(new CustomEvent('make-agent-from-chat'));
+              }}
+            >
+              <span>Create a recipe from this session</span>
+              <ChefHat className="ml-auto h-4 w-4" />
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 
