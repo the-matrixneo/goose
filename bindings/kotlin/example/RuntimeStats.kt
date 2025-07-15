@@ -27,7 +27,7 @@ suspend fun timeGooseCall(
             Message(
                 Role.USER,
                 System.currentTimeMillis() / 1000,
-                listOf(MessageContent.Text(TextContent("Tell me a joke")))
+                listOf(MessageContent.Text(TextContent("Write me a 1000 word chapter about learning Go vs Rust in the world of LLMs and AI.")))
             )
         ),
         extensions = emptyList()
@@ -38,15 +38,16 @@ suspend fun timeGooseCall(
     return wallMs to resp
 }
 
-/* ---------- OpenAI helpers (no OkHttp) ---------- */
+/* ---------- OpenAI helpers ---------- */
 
 fun timeOpenAiCall(client: HttpClient, apiKey: String): Double {
     val body = """
         {
           "model": "gpt-4.1",
+          "max_tokens": 500,
           "messages": [
             {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user",   "content": "Tell me a joke."}
+            {"role": "user",   "content": "Write me a 1000 word chapter about learning Go vs Rust in the world of LLMs and AI."}
           ]
         }
     """.trimIndent()
@@ -83,7 +84,8 @@ fun main() = runBlocking {
 
     /* --- Goose timing --- */
     for (model in gooseModels) {
-        val cfg = ModelConfig(model, 100_000u, 0.1f, 200)
+        val maxTokens = 500
+        val cfg = ModelConfig(model, 100_000u, 0.0f, maxTokens)
         var wallSum = 0.0
         var gooseSum = 0.0
 
