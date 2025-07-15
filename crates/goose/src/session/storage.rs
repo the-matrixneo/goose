@@ -131,7 +131,7 @@ impl SessionMetadata {
 
 impl Default for SessionMetadata {
     fn default() -> Self {
-        Self::new(std::env::current_dir().unwrap_or_else(|_| get_home_dir()))
+        Self::new(get_home_dir())
     }
 }
 
@@ -676,24 +676,6 @@ fn parse_message_with_truncation(
     }
 }
 
-/// Safely truncate a string at a UTF-8 character boundary
-fn safe_truncate_str(s: &str, max_bytes: usize) -> &str {
-    if s.len() <= max_bytes {
-        return s;
-    }
-
-    // UTF-8 characters are at most 4 bytes, so we only need to check back at most 3 bytes
-    let start = max_bytes.saturating_sub(3);
-    for i in (start..=max_bytes).rev() {
-        if s.is_char_boundary(i) {
-            return &s[..i];
-        }
-    }
-
-    // Fallback - should never happen with valid UTF-8
-    &s[..start]
-}
-
 /// Truncate content within a message in place
 fn truncate_message_content_in_place(message: &mut Message, max_content_size: usize) {
     use crate::message::MessageContent;
@@ -703,7 +685,6 @@ fn truncate_message_content_in_place(message: &mut Message, max_content_size: us
         match content {
             MessageContent::Text(text_content) => {
                 if text_content.text.chars().count() > max_content_size {
-                    let truncated_text = safe_truncate_str(&text_content.text, max_content_size);
                     let truncated = format!(
                         "{}\n\n[... content truncated during session loading from {} to {} characters ...]",
                         safe_truncate(&text_content.text, max_content_size),
@@ -719,8 +700,6 @@ fn truncate_message_content_in_place(message: &mut Message, max_content_size: us
                         match content_item {
                             Content::Text(ref mut text_content) => {
                                 if text_content.text.chars().count() > max_content_size {
-                                    let truncated_text =
-                                        safe_truncate_str(&text_content.text, max_content_size);
                                     let truncated = format!(
                                         "{}\n\n[... tool response truncated during session loading from {} to {} characters ...]",
                                         safe_truncate(&text_content.text, max_content_size),
@@ -735,8 +714,6 @@ fn truncate_message_content_in_place(message: &mut Message, max_content_size: us
                                     &mut resource_content.resource
                                 {
                                     if text.chars().count() > max_content_size {
-                                        let truncated_text =
-                                            safe_truncate_str(text, max_content_size);
                                         let truncated = format!(
                                             "{}\n\n[... resource content truncated during session loading from {} to {} characters ...]",
                                             safe_truncate(text, max_content_size),
@@ -1423,7 +1400,7 @@ mod tests {
                         println!(
                             "[TEST] Recovered content: {}",
                             if text_content.text.len() > 50 {
-                                format!("{}...", safe_truncate_str(&text_content.text, 50))
+                                format!("{}...", &text_content.text[..50])
                             } else {
                                 text_content.text.clone()
                             }

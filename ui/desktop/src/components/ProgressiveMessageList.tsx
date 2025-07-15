@@ -179,7 +179,7 @@ export default function ProgressiveMessageList({
 
         const result = (
           <div
-            key={message.id || index}
+            key={message.id && `${message.id}-${message.content.length}`}
             className={`relative ${index === 0 ? 'mt-0' : 'mt-4'} ${isUser ? 'user' : 'assistant'}`}
             data-testid="message-container"
           >
