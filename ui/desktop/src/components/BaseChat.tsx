@@ -42,22 +42,20 @@
  * while remaining flexible enough to support different UI contexts (Hub vs Pair).
  */
 
-import React, { useEffect, useContext, createContext, useRef } from 'react';
+import React, { useEffect, useContext, createContext, useRef, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
-import GooseMessage from './GooseMessage';
-import UserMessage from './UserMessage';
 import { SearchView } from './conversation/SearchView';
 import { AgentHeader } from './AgentHeader';
 import LayingEggLoader from './LayingEggLoader';
 import LoadingGoose from './LoadingGoose';
 import Splash from './Splash';
 import PopularChatTopics from './PopularChatTopics';
+import ProgressiveMessageList from './ProgressiveMessageList';
 import { SessionSummaryModal } from './context_management/SessionSummaryModal';
 import {
   ChatContextManagerProvider,
   useChatContextManager,
 } from './context_management/ChatContextManager';
-import { ContextHandler } from './context_management/ContextHandler';
 import { type View, ViewOptions } from '../App';
 import { MainPanelLayout } from './Layout/MainPanelLayout';
 import ChatInput from './ChatInput';
@@ -137,8 +135,6 @@ function BaseChatContent({
     resetMessagesWithSummary,
     closeSummaryModal,
     updateSummary,
-    hasContextHandlerContent,
-    getContextHandlerType,
   } = useChatContextManager();
 
   // Use shared chat engine
@@ -298,75 +294,14 @@ function BaseChatContent({
     }
     append(text);
   };
-  const renderMessages = () => {
-    return filteredMessages.map((message, index) => {
-      const isUser = isUserMessage(message);
-
-      return (
-        <div
-          key={message.id || index}
-          className={`relative ${index === 0 ? 'mt-0' : 'mt-4'} ${isUser ? 'user' : 'assistant'}`}
-          data-testid="message-container"
-        >
-          {isUser ? (
-            <>
-              {hasContextHandlerContent(message) ? (
-                <ContextHandler
-                  messages={messages}
-                  messageId={message.id ?? message.created.toString()}
-                  chatId={chat.id}
-                  workingDir={window.appConfig.get('GOOSE_WORKING_DIR') as string}
-                  contextType={getContextHandlerType(message)}
-                  onSummaryComplete={() => {
-                    // Auto-scroll to bottom when summary is complete
-                    setTimeout(() => {
-                      if (scrollRef.current?.scrollToBottom) {
-                        scrollRef.current.scrollToBottom();
-                      }
-                    }, 100);
-                  }}
-                />
-              ) : (
-                <UserMessage message={message} />
-              )}
-            </>
-          ) : (
-            <>
-              {hasContextHandlerContent(message) ? (
-                <ContextHandler
-                  messages={messages}
-                  messageId={message.id ?? message.created.toString()}
-                  chatId={chat.id}
-                  workingDir={window.appConfig.get('GOOSE_WORKING_DIR') as string}
-                  contextType={getContextHandlerType(message)}
-                  onSummaryComplete={() => {
-                    // Auto-scroll to bottom when summary is complete
-                    setTimeout(() => {
-                      if (scrollRef.current?.scrollToBottom) {
-                        scrollRef.current.scrollToBottom();
-                      }
-                    }, 100);
-                  }}
-                />
-              ) : (
-                <GooseMessage
-                  messageHistoryIndex={chat?.messageHistoryIndex}
-                  message={message}
-                  messages={messages}
-                  append={append}
-                  appendMessage={(newMessage) => {
-                    const updatedMessages = [...messages, newMessage];
-                    setMessages(updatedMessages);
-                  }}
-                  toolCallNotifications={toolCallNotifications}
-                />
-              )}
-            </>
-          )}
-        </div>
-      );
-    });
-  };
+  // Callback to handle scroll to bottom from ProgressiveMessageList
+  const handleScrollToBottom = useCallback(() => {
+    setTimeout(() => {
+      if (scrollRef.current?.scrollToBottom) {
+        scrollRef.current.scrollToBottom();
+      }
+    }, 100);
+  }, []);
 
   return (
     <div className="h-full flex flex-col min-h-0">
@@ -443,10 +378,34 @@ function BaseChatContent({
                 <>
                   {disableSearch ? (
                     // Render messages without SearchView wrapper when search is disabled
-                    renderMessages()
+                    <ProgressiveMessageList
+                      messages={filteredMessages}
+                      chat={chat}
+                      toolCallNotifications={toolCallNotifications}
+                      append={append}
+                      appendMessage={(newMessage) => {
+                        const updatedMessages = [...messages, newMessage];
+                        setMessages(updatedMessages);
+                      }}
+                      isUserMessage={isUserMessage}
+                      onScrollToBottom={handleScrollToBottom}
+                    />
                   ) : (
                     // Render messages with SearchView wrapper when search is enabled
-                    <SearchView>{renderMessages()}</SearchView>
+                    <SearchView>
+                      <ProgressiveMessageList
+                        messages={filteredMessages}
+                        chat={chat}
+                        toolCallNotifications={toolCallNotifications}
+                        append={append}
+                        appendMessage={(newMessage) => {
+                          const updatedMessages = [...messages, newMessage];
+                          setMessages(updatedMessages);
+                        }}
+                        isUserMessage={isUserMessage}
+                        onScrollToBottom={handleScrollToBottom}
+                      />
+                    </SearchView>
                   )}
 
                   {error && (

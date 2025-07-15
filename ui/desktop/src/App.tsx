@@ -752,7 +752,7 @@ export default function App() {
     }
     initAttemptedRef.current = true;
 
-    console.log(`Initializing app with settings v2`);
+    console.log(`Initializing app`);
 
     const urlParams = new URLSearchParams(window.location.search);
     const viewType = urlParams.get('view');

@@ -28,9 +28,46 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../ui/dialog';
-import UserMessage from '../UserMessage';
-import GooseMessage from '../GooseMessage';
+import ProgressiveMessageList from '../ProgressiveMessageList';
+import { SearchView } from '../conversation/SearchView';
+import { ChatContextManagerProvider } from '../context_management/ChatContextManager';
 import { Message } from '../../types/message';
+
+// Helper function to determine if a message is a user message (same as useChatEngine)
+const isUserMessage = (message: Message): boolean => {
+  if (message.role === 'assistant') {
+    return false;
+  }
+  if (message.content.every((c) => c.type === 'toolConfirmationRequest')) {
+    return false;
+  }
+  return true;
+};
+
+// Filter messages for display (same logic as useChatEngine)
+const filterMessagesForDisplay = (messages: Message[]): Message[] => {
+  return messages.filter((message) => {
+    // Only filter out when display is explicitly false
+    if (message.display === false) return false;
+
+    // Keep all assistant messages and user messages that aren't just tool responses
+    if (message.role === 'assistant') return true;
+
+    // For user messages, check if they're only tool responses
+    if (message.role === 'user') {
+      const hasOnlyToolResponses = message.content.every((c) => c.type === 'toolResponse');
+      const hasTextContent = message.content.some((c) => c.type === 'text');
+      const hasToolConfirmation = message.content.every(
+        (c) => c.type === 'toolConfirmationRequest'
+      );
+
+      // Keep the message if it has text content or tool confirmation or is not just tool responses
+      return hasTextContent || !hasOnlyToolResponses || hasToolConfirmation;
+    }
+
+    return true;
+  });
+};
 
 interface SessionHistoryViewProps {
   session: SessionDetails;
@@ -64,13 +101,16 @@ const SessionHeader: React.FC<{
   );
 };
 
-// New component for displaying session messages with chat styling
+// Session messages component that uses the same rendering as BaseChat
 const SessionMessages: React.FC<{
   messages: Message[];
   isLoading: boolean;
   error: string | null;
   onRetry: () => void;
 }> = ({ messages, isLoading, error, onRetry }) => {
+  // Filter messages for display (same as BaseChat)
+  const filteredMessages = filterMessagesForDisplay(messages);
+
   return (
     <ScrollArea className="h-full w-full">
       <div className="pb-24 pt-8">
@@ -90,35 +130,30 @@ const SessionMessages: React.FC<{
                 Try Again
               </Button>
             </div>
-          ) : messages?.length > 0 ? (
-            <div className="max-w-4xl mx-auto w-full">
-              {messages
-                .map((message) => {
-                  // Skip pure tool response messages for cleaner display
-                  const isOnlyToolResponse =
-                    message.content.length > 0 &&
-                    message.content.every((c) => c.type === 'toolResponse');
-
-                  if (isOnlyToolResponse) {
-                    return null;
-                  }
-
-                  return message.role === 'user' ? (
-                    <UserMessage key={message.id} message={message} />
-                  ) : (
-                    <GooseMessage
-                      key={message.id}
-                      messageHistoryIndex={messages.length}
-                      message={message}
-                      messages={messages}
-                      append={() => {}}
-                      appendMessage={() => {}}
-                      toolCallNotifications={new Map()}
-                    />
-                  );
-                })
-                .filter(Boolean)}
-            </div>
+          ) : filteredMessages?.length > 0 ? (
+            <ChatContextManagerProvider>
+              <div className="max-w-4xl mx-auto w-full">
+                <SearchView>
+                  <ProgressiveMessageList
+                    messages={filteredMessages}
+                    chat={{
+                      id: 'session-preview',
+                      messageHistoryIndex: filteredMessages.length,
+                    }}
+                    toolCallNotifications={new Map()}
+                    append={() => {}} // Read-only for session history
+                    appendMessage={(newMessage) => {
+                      // Read-only - do nothing
+                      console.log('appendMessage called in read-only session history:', newMessage);
+                    }}
+                    isUserMessage={isUserMessage} // Use the same function as BaseChat
+                    batchSize={15} // Same as BaseChat default
+                    batchDelay={30} // Same as BaseChat default
+                    showLoadingThreshold={30} // Same as BaseChat default
+                  />
+                </SearchView>
+              </div>
+            </ChatContextManagerProvider>
           ) : (
             <div className="flex flex-col items-center justify-center py-8 text-textSubtle">
               <MessageSquareText className="w-12 h-12 mb-4" />
