@@ -444,11 +444,7 @@ function BaseChatContent({
 
             {/* Loading indicator at bottom of messages container */}
             {isLoading && (
-              <div className="px-0 -mx-6">
-                <LoadingGoose
-                  message={isLoadingSummary ? 'summarizing conversation…' : undefined}
-                />
-              </div>
+              <LoadingGoose message={isLoadingSummary ? 'summarizing conversation…' : undefined} />
             )}
 
             {/* Custom content after messages */}
