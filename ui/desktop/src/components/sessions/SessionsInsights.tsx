@@ -291,7 +291,7 @@ export function SessionInsights() {
             <CardContent className="page-transition flex flex-col justify-end h-full p-0">
               <div className="flex flex-col justify-end">
                 <p className="text-4xl font-mono font-light flex items-end">
-                  {insights?.totalSessions ?? 0}
+                  {Math.max(insights?.totalSessions ?? 0, 0)}
                 </p>
                 <span className="text-xs text-text-muted">Total sessions</span>
               </div>
@@ -317,7 +317,7 @@ export function SessionInsights() {
             <CardContent className="page-transition flex flex-col justify-end h-full p-0">
               <div className="flex flex-col justify-end">
                 <p className="text-4xl font-mono font-light flex items-end">
-                  {insights?.totalTokens
+                  {insights?.totalTokens && insights.totalTokens > 0
                     ? `${(insights.totalTokens / 1000000).toFixed(2)}M`
                     : '0.00M'}
                 </p>
