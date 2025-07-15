@@ -166,7 +166,7 @@ mod tests {
         assert_eq!(response.status, "completed");
         assert_eq!(response.results.len(), 1);
         assert_eq!(response.stats.total_tasks, 1);
-        
+
         // Note: We can't directly verify the timeout was applied since process_task
         // is called internally, but we can verify the function completes without error
         // and that the config merging logic doesn't panic
@@ -309,8 +309,8 @@ mod tests {
 
         // Verify only timeout was overridden, others remain from global config
         assert_eq!(merged_config.timeout_seconds, 600); // Overridden
-        assert_eq!(merged_config.max_workers, 5);        // From global config
-        assert_eq!(merged_config.initial_workers, 2);    // From global config
+        assert_eq!(merged_config.max_workers, 5); // From global config
+        assert_eq!(merged_config.initial_workers, 2); // From global config
     }
 
     #[test]
@@ -352,7 +352,7 @@ mod tests {
 
         // Verify invalid types are ignored, valid ones are applied
         assert_eq!(merged_config.timeout_seconds, 300); // Invalid, so global value retained
-        assert_eq!(merged_config.max_workers, 8);        // Valid, so overridden
-        assert_eq!(merged_config.initial_workers, 2);    // Invalid, so global value retained
+        assert_eq!(merged_config.max_workers, 8); // Valid, so overridden
+        assert_eq!(merged_config.initial_workers, 2); // Invalid, so global value retained
     }
 }
