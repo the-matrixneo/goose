@@ -103,7 +103,7 @@ pub async fn create_sub_recipe_task(sub_recipe: &SubRecipe, params: Value) -> Re
             "recipe_path": sub_recipe.path.clone(),
         }
     });
-    
+
     // Include config if present
     if let Some(config) = &sub_recipe.config {
         payload["config"] = json!({
@@ -112,7 +112,7 @@ pub async fn create_sub_recipe_task(sub_recipe: &SubRecipe, params: Value) -> Re
             "initial_workers": config.initial_workers,
         });
     }
-    
+
     let task = Task {
         id: uuid::Uuid::new_v4().to_string(),
         task_type: "sub_recipe".to_string(),

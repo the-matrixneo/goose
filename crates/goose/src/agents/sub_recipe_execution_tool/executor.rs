@@ -11,26 +11,35 @@ use crate::agents::sub_recipe_execution_tool::workers::{run_scaler, spawn_worker
 
 pub async fn execute_single_task(task: &Task, global_config: Config) -> ExecutionResponse {
     let start_time = Instant::now();
-    
+
     // Extract config from task payload if present and merge with global config
     let effective_config = if let Some(task_config_value) = task.payload.get("config") {
         let mut merged_config = global_config.clone();
-        
-        if let Some(timeout) = task_config_value.get("timeout_seconds").and_then(|v| v.as_u64()) {
+
+        if let Some(timeout) = task_config_value
+            .get("timeout_seconds")
+            .and_then(|v| v.as_u64())
+        {
             merged_config.timeout_seconds = timeout;
         }
-        if let Some(max_workers) = task_config_value.get("max_workers").and_then(|v| v.as_u64()) {
+        if let Some(max_workers) = task_config_value
+            .get("max_workers")
+            .and_then(|v| v.as_u64())
+        {
             merged_config.max_workers = max_workers as usize;
         }
-        if let Some(initial_workers) = task_config_value.get("initial_workers").and_then(|v| v.as_u64()) {
+        if let Some(initial_workers) = task_config_value
+            .get("initial_workers")
+            .and_then(|v| v.as_u64())
+        {
             merged_config.initial_workers = initial_workers as usize;
         }
-        
+
         merged_config
     } else {
         global_config
     };
-    
+
     let result = process_task(task, effective_config.timeout_seconds).await;
 
     let execution_time = start_time.elapsed().as_millis();

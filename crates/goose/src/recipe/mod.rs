@@ -697,15 +697,15 @@ isGlobal: true"#;
 
         let recipe = Recipe::from_content(content).unwrap();
         assert_eq!(recipe.title, "Test Recipe");
-        
+
         assert!(recipe.sub_recipes.is_some());
         let sub_recipes = recipe.sub_recipes.unwrap();
         assert_eq!(sub_recipes.len(), 1);
-        
+
         let sub_recipe = &sub_recipes[0];
         assert_eq!(sub_recipe.name, "test_sub_recipe");
         assert_eq!(sub_recipe.path, "test_sub_recipe.yaml");
-        
+
         assert!(sub_recipe.config.is_some());
         let config = sub_recipe.config.as_ref().unwrap();
         assert_eq!(config.timeout_seconds, Some(600));
