@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronLeft } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { Button } from './button';
 import type { VariantProps } from 'class-variance-authority';
 import { buttonVariants } from './button';
@@ -14,8 +14,8 @@ interface BackButtonProps extends VariantProps<typeof buttonVariants> {
 const BackButton: React.FC<BackButtonProps> = ({
   onClick,
   className = '',
-  variant = 'outline',
-  size = 'xs',
+  variant = 'secondary',
+  size = 'default',
   shape = 'pill',
   showText = true,
   ...props
@@ -39,7 +39,7 @@ const BackButton: React.FC<BackButtonProps> = ({
       className={className}
       {...props}
     >
-      <ChevronLeft />
+      <ArrowLeft />
       {showText && 'Back'}
     </Button>
   );
