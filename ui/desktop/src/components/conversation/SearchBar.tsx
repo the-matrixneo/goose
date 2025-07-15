@@ -143,86 +143,90 @@ export const SearchBar: React.FC<SearchBarProps> = ({
 
   return (
     <div
-      className={`sticky top-0 bg-background-inverse text-text-inverse z-50 mb-4 ${
+      className={`sticky top-0 z-[10000] mb-4 ${
         isExiting ? 'search-bar-exit' : 'search-bar-enter'
       }`}
     >
-      <div className="flex w-full items-center">
-        <div className="relative flex flex-1 items-center h-full min-w-0">
-          <SearchIcon className="h-4 w-4 text-text-inverse/70 absolute left-3" />
-          <div className="w-full">
-            <input
-              ref={inputRef}
-              id="search-input"
-              type="text"
-              value={searchTerm}
-              onChange={handleSearch}
-              onKeyDown={handleKeyDown}
-              placeholder="Search conversation..."
-              className="w-full text-sm pl-9 pr-24 py-3 bg-background-inverse text-text-inverse
+      {/* Background that matches main background to hide content behind top rounded corners */}
+      <div className="absolute left-0 right-0 -top-4 h-8 bg-background-default"></div>
+      <div className="relative bg-background-inverse text-text-inverse rounded-lg">
+        <div className="flex w-full items-center">
+          <div className="relative flex flex-1 items-center h-full min-w-0">
+            <SearchIcon className="h-4 w-4 text-text-inverse/70 absolute left-3" />
+            <div className="w-full">
+              <input
+                ref={inputRef}
+                id="search-input"
+                type="text"
+                value={searchTerm}
+                onChange={handleSearch}
+                onKeyDown={handleKeyDown}
+                placeholder="Search conversation..."
+                className="w-full text-sm pl-9 pr-24 py-3 bg-background-inverse text-text-inverse
                       placeholder:text-text-inverse/50 focus:outline-none 
-                       active:border-border-strong"
-            />
-          </div>
+                       active:border-border-strong rounded-lg"
+              />
+            </div>
 
-          <div className="absolute right-3 flex h-full items-center justify-end">
-            <div className="flex items-center gap-1">
-              <div className="w-16 text-right text-sm text-text-inverse/80 flex items-center justify-end">
-                {(() => {
-                  return localSearchResults?.count && localSearchResults.count > 0 && searchTerm
-                    ? `${localSearchResults.currentIndex}/${localSearchResults.count}`
-                    : null;
-                })()}
+            <div className="absolute right-3 flex h-full items-center justify-end">
+              <div className="flex items-center gap-1">
+                <div className="w-16 text-right text-sm text-text-inverse/80 flex items-center justify-end">
+                  {(() => {
+                    return localSearchResults?.count && localSearchResults.count > 0 && searchTerm
+                      ? `${localSearchResults.currentIndex}/${localSearchResults.count}`
+                      : null;
+                  })()}
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        <div className="flex items-center justify-center h-auto px-4 gap-2 flex-shrink-0">
-          <Button
-            onClick={toggleCaseSensitive}
-            variant="ghost"
-            className={`flex items-center justify-center min-w-[32px] h-[28px] rounded transition-all duration-150 ${
-              caseSensitive
-                ? 'bg-white/20 shadow-[inset_0_1px_2px_rgba(0,0,0,0.2)] text-text-inverse hover:bg-white/25'
-                : 'text-text-inverse/70 hover:text-text-inverse hover:bg-white/10'
-            }`}
-            title="Case Sensitive"
-          >
-            <span className="text-md font-normal">Aa</span>
-          </Button>
-
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-center h-auto px-4 gap-2 flex-shrink-0">
             <Button
-              onClick={(e) => handleNavigate('prev', e)}
+              onClick={toggleCaseSensitive}
               variant="ghost"
-              className="flex items-center justify-center min-w-[32px] h-[28px] rounded transition-all duration-150 text-text-inverse/70 hover:text-text-inverse hover:bg-white/10"
-              title="Previous (↑)"
+              className={`flex items-center justify-center min-w-[32px] h-[28px] rounded transition-all duration-150 ${
+                caseSensitive
+                  ? 'bg-white/20 shadow-[inset_0_1px_2px_rgba(0,0,0,0.2)] text-text-inverse hover:bg-white/25'
+                  : 'text-text-inverse/70 hover:text-text-inverse hover:bg-white/10'
+              }`}
+              title="Case Sensitive"
             >
-              <ArrowUp
-                className={`h-5 w-5 transition-opacity ${!hasResults ? 'opacity-30' : ''}`}
-              />
+              <span className="text-md font-normal">Aa</span>
             </Button>
+
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={(e) => handleNavigate('prev', e)}
+                variant="ghost"
+                className="flex items-center justify-center min-w-[32px] h-[28px] rounded transition-all duration-150 text-text-inverse/70 hover:text-text-inverse hover:bg-white/10"
+                title="Previous (↑)"
+              >
+                <ArrowUp
+                  className={`h-5 w-5 transition-opacity ${!hasResults ? 'opacity-30' : ''}`}
+                />
+              </Button>
+              <Button
+                onClick={(e) => handleNavigate('next', e)}
+                variant="ghost"
+                className="flex items-center justify-center min-w-[32px] h-[28px] rounded transition-all duration-150 text-text-inverse/70 hover:text-text-inverse hover:bg-white/10"
+                title="Next (↓ or Enter)"
+              >
+                <ArrowDown
+                  className={`h-5 w-5 transition-opacity ${!hasResults ? 'opacity-30' : ''}`}
+                />
+              </Button>
+            </div>
+
             <Button
-              onClick={(e) => handleNavigate('next', e)}
+              onClick={handleClose}
               variant="ghost"
               className="flex items-center justify-center min-w-[32px] h-[28px] rounded transition-all duration-150 text-text-inverse/70 hover:text-text-inverse hover:bg-white/10"
-              title="Next (↓ or Enter)"
+              title="Close (Esc)"
             >
-              <ArrowDown
-                className={`h-5 w-5 transition-opacity ${!hasResults ? 'opacity-30' : ''}`}
-              />
+              <Close className="h-5 w-5" />
             </Button>
           </div>
-
-          <Button
-            onClick={handleClose}
-            variant="ghost"
-            className="flex items-center justify-center min-w-[32px] h-[28px] rounded transition-all duration-150 text-text-inverse/70 hover:text-text-inverse hover:bg-white/10"
-            title="Close (Esc)"
-          >
-            <Close className="h-5 w-5" />
-          </Button>
         </div>
       </div>
     </div>
