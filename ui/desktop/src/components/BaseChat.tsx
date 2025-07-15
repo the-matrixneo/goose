@@ -125,6 +125,10 @@ function BaseChatContent({
   // Get disableAnimation from location state
   const disableAnimation = location.state?.disableAnimation || false;
 
+  // Track if user has started using the current recipe
+  const [hasStartedUsingRecipe, setHasStartedUsingRecipe] = React.useState(false);
+  const [currentRecipeTitle, setCurrentRecipeTitle] = React.useState<string | null>(null);
+
   const {
     summaryContent,
     summarizedThread,
@@ -176,6 +180,11 @@ function BaseChatContent({
       onMessageStreamFinish?.();
     },
     onMessageSent: () => {
+      // Mark that user has started using the recipe
+      if (recipeConfig) {
+        setHasStartedUsingRecipe(true);
+      }
+
       // Create new session after message is sent if needed
       createNewSessionIfNeeded();
     },
@@ -187,6 +196,20 @@ function BaseChatContent({
     messages,
     location.state
   );
+
+  // Reset recipe usage tracking when recipe changes
+  useEffect(() => {
+    if (recipeConfig?.title !== currentRecipeTitle) {
+      setCurrentRecipeTitle(recipeConfig?.title || null);
+      setHasStartedUsingRecipe(false);
+
+      // Clear existing messages when a new recipe is loaded
+      if (recipeConfig?.title && recipeConfig.title !== currentRecipeTitle) {
+        setMessages([]);
+        setAncestorMessages([]);
+      }
+    }
+  }, [recipeConfig?.title, currentRecipeTitle, setMessages, setAncestorMessages]);
 
   // Handle recipe auto-execution
   useEffect(() => {
@@ -226,6 +249,11 @@ function BaseChatContent({
     const customEvent = e as unknown as CustomEvent;
     const combinedTextFromInput = customEvent.detail?.value || '';
 
+    // Mark that user has started using the recipe when they submit a message
+    if (recipeConfig && combinedTextFromInput.trim()) {
+      setHasStartedUsingRecipe(true);
+    }
+
     const onSummaryReset =
       summarizedThread.length > 0
         ? () => {
@@ -262,7 +290,14 @@ function BaseChatContent({
     }
   };
 
-  // Helper function to render messages
+  // Wrapper for append that tracks recipe usage
+  const appendWithTracking = (text: string | Message) => {
+    // Mark that user has started using the recipe when they use append
+    if (recipeConfig) {
+      setHasStartedUsingRecipe(true);
+    }
+    append(text);
+  };
   const renderMessages = () => {
     return filteredMessages.map((message, index) => {
       const isUser = isUserMessage(message);
@@ -346,7 +381,7 @@ function BaseChatContent({
         {/* Custom header */}
         {renderHeader && renderHeader()}
 
-        {/* Recipe agent header - inside the messages container when present */}
+        {/* Chat container with sticky recipe header */}
         <div className="flex flex-col flex-1 mb-0.5 min-h-0">
           <ScrollArea
             ref={scrollRef}
@@ -358,9 +393,9 @@ function BaseChatContent({
             paddingX={6}
             paddingY={0}
           >
-            {/* Recipe agent header - now inside the messages container */}
+            {/* Recipe agent header - sticky at top of chat container */}
             {recipeConfig?.title && (
-              <div className="px-0 -mx-6 mb-6">
+              <div className="sticky top-0 z-10 bg-background-default px-0 -mx-6 mb-6 pt-6">
                 <AgentHeader
                   title={recipeConfig.title}
                   profileInfo={
@@ -383,16 +418,17 @@ function BaseChatContent({
             {
               // Check if we should show splash instead of messages
               (() => {
-                // Always show splash when recipe is loaded, regardless of existing messages
-                const shouldShowSplash = recipeConfig && !suppressEmptyState;
+                // Show splash if we have a recipe and user hasn't started using it yet
+                const shouldShowSplash =
+                  recipeConfig && !hasStartedUsingRecipe && !suppressEmptyState;
 
                 return shouldShowSplash;
               })() ? (
                 <>
-                  {/* Show Splash when no real messages and we have a recipe config */}
+                  {/* Show Splash when we have a recipe config and user hasn't started using it */}
                   {recipeConfig ? (
                     <Splash
-                      append={(text: string) => append(text)}
+                      append={(text: string) => appendWithTracking(text)}
                       activities={
                         Array.isArray(recipeConfig.activities) ? recipeConfig.activities : null
                       }
@@ -400,10 +436,10 @@ function BaseChatContent({
                     />
                   ) : showPopularTopics ? (
                     /* Show PopularChatTopics when no real messages, no recipe, and showPopularTopics is true (Pair view) */
-                    <PopularChatTopics append={(text: string) => append(text)} />
+                    <PopularChatTopics append={(text: string) => appendWithTracking(text)} />
                   ) : null}
                 </>
-              ) : filteredMessages.length > 0 ? (
+              ) : filteredMessages.length > 0 || (recipeConfig && hasStartedUsingRecipe) ? (
                 <>
                   {disableSearch ? (
                     // Render messages without SearchView wrapper when search is disabled
@@ -437,6 +473,9 @@ function BaseChatContent({
                   )}
                   <div className="block h-8" />
                 </>
+              ) : showPopularTopics ? (
+                /* Show PopularChatTopics when no messages, no recipe, and showPopularTopics is true (Pair view) */
+                <PopularChatTopics append={(text: string) => append(text)} />
               ) : null /* Show nothing when messages.length === 0 && suppressEmptyState === true */
             }
 
