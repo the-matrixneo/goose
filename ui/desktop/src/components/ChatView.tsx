@@ -38,7 +38,7 @@ import { useModelAndProvider } from './ModelAndProviderContext';
 import { getCostForModel } from '../utils/costDatabase';
 import { updateSystemPromptWithParameters } from '../utils/providerUtils';
 import { RecipeWarningModal } from './ui/RecipeWarningModal';
-import { hasAcceptedRecipeBefore, recordRecipeHash } from '../utils/recipeHash';
+
 import {
   Message,
   createUserMessage,
@@ -62,15 +62,11 @@ export interface ChatType {
   messages: Message[];
 }
 
-// Helper function to determine if a message is a user message
 const isUserMessage = (message: Message): boolean => {
   if (message.role === 'assistant') {
     return false;
   }
-  if (message.content.every((c) => c.type === 'toolConfirmationRequest')) {
-    return false;
-  }
-  return true;
+  return !message.content.every((c) => c.type === 'toolConfirmationRequest');
 };
 
 const substituteParameters = (prompt: string, params: Record<string, string>): string => {
@@ -176,7 +172,7 @@ function ChatContent({
     const checkRecipeAcceptance = async () => {
       if (recipeConfig) {
         try {
-          const hasAccepted = await hasAcceptedRecipeBefore(recipeConfig);
+          const hasAccepted = await window.electron.hasAcceptedRecipeBefore(recipeConfig);
           if (!hasAccepted) {
             setIsRecipeWarningModalOpen(true);
           } else {
@@ -222,8 +218,6 @@ function ChatContent({
     setMessages,
     input: _input,
     setInput: _setInput,
-    handleInputChange: _handleInputChange,
-    handleSubmit: _submitMessage,
     updateMessageStreamBody,
     notifications,
     currentModelInfo,
@@ -455,7 +449,7 @@ function ChatContent({
   const handleRecipeAccept = async () => {
     try {
       if (recipeConfig) {
-        await recordRecipeHash(recipeConfig);
+        await window.electron.recordRecipeHash(recipeConfig);
         setRecipeAccepted(true);
         setIsRecipeWarningModalOpen(false);
       }

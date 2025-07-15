@@ -1,39 +1,38 @@
+import { ipcMain, app } from 'electron';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'crypto';
-import { app } from 'electron';
 
-export async function getRecipeHashesDir(): Promise<string> {
+function calculateRecipeHash(recipeConfig: unknown): string {
+  const hash = crypto.createHash('sha256');
+  hash.update(JSON.stringify(recipeConfig));
+  return hash.digest('hex');
+}
+
+async function getRecipeHashesDir(): Promise<string> {
   const userDataPath = app.getPath('userData');
   const hashesDir = path.join(userDataPath, 'recipe_hashes');
   await fs.mkdir(hashesDir, { recursive: true });
   return hashesDir;
 }
 
-export function calculateRecipeHash(recipeConfig: unknown): string {
-  const hash = crypto.createHash('sha256');
-  hash.update(JSON.stringify(recipeConfig));
-  return hash.digest('hex');
-}
-
-export async function hasAcceptedRecipeBefore(recipeConfig: unknown): Promise<boolean> {
+ipcMain.handle('has-accepted-recipe-before', async (_event, recipeConfig) => {
   const hash = calculateRecipeHash(recipeConfig);
   const hashFile = path.join(await getRecipeHashesDir(), `${hash}.hash`);
   try {
     await fs.access(hashFile);
     return true;
-  } catch (error) {
-    if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
+  } catch (err) {
+    if (typeof err === 'object' && err !== null && 'code' in err && err.code === 'ENOENT') {
       return false;
     }
-    throw error;
+    throw err;
   }
-}
+});
 
-export async function recordRecipeHash(recipeConfig: unknown): Promise<boolean> {
+ipcMain.handle('record-recipe-hash', async (_event, recipeConfig) => {
   const hash = calculateRecipeHash(recipeConfig);
-  const dir = await getRecipeHashesDir();
-  const filePath = path.join(dir, `${hash}.hash`);
+  const filePath = path.join(await getRecipeHashesDir(), `${hash}.hash`);
   await fs.writeFile(filePath, new Date().toISOString());
   return true;
-}
+});

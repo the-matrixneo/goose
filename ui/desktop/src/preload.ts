@@ -106,6 +106,8 @@ type ElectronAPI = {
   restartApp: () => void;
   onUpdaterEvent: (callback: (event: UpdaterEvent) => void) => void;
   getUpdateState: () => Promise<{ updateAvailable: boolean; latestVersion?: string } | null>;
+  hasAcceptedRecipeBefore: (recipeConfig: RecipeConfig) => Promise<boolean>;
+  recordRecipeHash: (recipeConfig: RecipeConfig) => Promise<boolean>;
 };
 
 type AppConfigAPI = {
@@ -209,6 +211,10 @@ const electronAPI: ElectronAPI = {
   getUpdateState: (): Promise<{ updateAvailable: boolean; latestVersion?: string } | null> => {
     return ipcRenderer.invoke('get-update-state');
   },
+  hasAcceptedRecipeBefore: (recipeConfig: unknown) =>
+    ipcRenderer.invoke('has-accepted-recipe-before', recipeConfig),
+  recordRecipeHash: (recipeConfig: unknown) =>
+    ipcRenderer.invoke('record-recipe-hash', recipeConfig),
 };
 
 const appConfigAPI: AppConfigAPI = {
