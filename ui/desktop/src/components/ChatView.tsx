@@ -463,8 +463,7 @@ function ChatContent({
 
   const handleRecipeCancel = () => {
     setIsRecipeWarningModalOpen(false);
-    // Navigate back or close the window
-    setView('welcome');
+    window.electron.closeWindow();
   };
 
   // Handle submit

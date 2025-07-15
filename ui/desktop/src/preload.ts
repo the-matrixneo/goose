@@ -59,6 +59,7 @@ type ElectronAPI = {
     viewType?: string
   ) => void;
   logInfo: (txt: string) => void;
+  closeWindow: () => void;
   showNotification: (data: NotificationData) => void;
   showMessageBox: (options: MessageBoxOptions) => Promise<MessageBoxResponse>;
   openInChrome: (url: string) => void;
@@ -139,6 +140,7 @@ const electronAPI: ElectronAPI = {
       viewType
     ),
   logInfo: (txt: string) => ipcRenderer.send('logInfo', txt),
+  closeWindow: () => ipcRenderer.send('close-window'),
   showNotification: (data: NotificationData) => ipcRenderer.send('notify', data),
   showMessageBox: (options: MessageBoxOptions) => ipcRenderer.invoke('show-message-box', options),
   openInChrome: (url: string) => ipcRenderer.send('open-in-chrome', url),
