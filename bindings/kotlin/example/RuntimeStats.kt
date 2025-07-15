@@ -2,11 +2,17 @@ import kotlin.system.measureNanoTime
 import kotlinx.coroutines.runBlocking
 import uniffi.goose_llm.*
 
-/* --- quick helper --- */
+import java.net.URI
+import java.net.http.HttpClient
+import java.net.http.HttpRequest
+import java.net.http.HttpResponse
+
+/* ---------- Goose helpers ---------- */
+
 fun buildProviderConfig(host: String, token: String): String =
     """{ "host": "$host", "token": "$token" }"""
 
-suspend fun timeOneCall(
+suspend fun timeGooseCall(
     modelCfg: ModelConfig,
     providerName: String,
     providerCfg: String
@@ -28,41 +34,80 @@ suspend fun timeOneCall(
     )
 
     lateinit var resp: CompletionResponse
-    val wallNs = measureNanoTime { resp = completion(req) }
-    return wallNs / 1_000_000.0 to resp   // → wall-clock in ms
+    val wallMs = measureNanoTime { resp = completion(req) } / 1_000_000.0
+    return wallMs to resp
 }
 
-/* --- entry point --- */
+/* ---------- OpenAI helpers (no OkHttp) ---------- */
+
+fun timeOpenAiCall(client: HttpClient, apiKey: String): Double {
+    val body = """
+        {
+          "model": "gpt-4.1",
+          "messages": [
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user",   "content": "Tell me a joke."}
+          ]
+        }
+    """.trimIndent()
+
+    val request = HttpRequest.newBuilder()
+        .uri(URI.create("https://api.openai.com/v1/chat/completions"))
+        .header("Authorization", "Bearer $apiKey")
+        .header("Content-Type", "application/json")
+        .POST(HttpRequest.BodyPublishers.ofString(body))
+        .build()
+
+    val wallMs = measureNanoTime {
+        client.send(request, HttpResponse.BodyHandlers.ofString())
+    } / 1_000_000.0
+
+    return wallMs
+}
+
+/* ---------- main ---------- */
+
 fun main() = runBlocking {
-    /* provider setup */
+    /* Goose provider setup */
     val providerName  = "databricks"
     val host  = System.getenv("DATABRICKS_HOST") ?: error("DATABRICKS_HOST not set")
     val token = System.getenv("DATABRICKS_TOKEN") ?: error("DATABRICKS_TOKEN not set")
     val providerCfg   = buildProviderConfig(host, token)
 
-    val modelNames = listOf("goose-claude-4-sonnet", "goose-gpt-4-1")
-    val runsPerModel = 3          // tweak as needed
+    /* OpenAI setup */
+    val openAiKey = System.getenv("OPENAI_API_KEY") ?: error("OPENAI_API_KEY not set")
+    val httpClient = HttpClient.newBuilder().build()
 
-    for (model in modelNames) {
+    val gooseModels  = listOf("goose-claude-4-sonnet", "goose-gpt-4-1")
+    val runsPerModel = 3
+
+    /* --- Goose timing --- */
+    for (model in gooseModels) {
         val cfg = ModelConfig(model, 100_000u, 0.1f, 200)
         var wallSum = 0.0
         var gooseSum = 0.0
 
-        println("=== $model ===")
-        repeat(runsPerModel) { i ->
-            val (wallMs, resp) = timeOneCall(cfg, providerName, providerCfg)
+        println("=== Goose: $model ===")
+        repeat(runsPerModel) { run ->
+            val (wall, resp) = timeGooseCall(cfg, providerName, providerCfg)
             val gooseMs = resp.runtimeMetrics.totalTimeSec * 1_000
-            val overhead = wallMs - gooseMs
-
-            wallSum += wallMs
+            val overhead = wall - gooseMs
+            wallSum += wall
             gooseSum += gooseMs
-
-            println("run ${i + 1}: wall = %.1f ms | goose-llm = %.1f ms | overhead = %.1f ms"
-                .format(wallMs, gooseMs, overhead))
+            println("run ${run + 1}: wall = %.1f ms | goose-llm = %.1f ms | overhead = %.1f ms"
+                .format(wall, gooseMs, overhead))
         }
-        println(
-            "-- averages: wall = %.1f ms | goose-llm = %.1f ms | overhead = %.1f ms --\n"
-                .format(wallSum / runsPerModel, gooseSum / runsPerModel, (wallSum - gooseSum) / runsPerModel)
-        )
+        println("-- avg wall = %.1f ms | avg overhead = %.1f ms --\n"
+            .format(wallSum / runsPerModel, (wallSum - gooseSum) / runsPerModel))
     }
+
+    /* --- OpenAI direct timing --- */
+    var oaSum = 0.0
+    println("=== OpenAI: gpt-4.1 (direct HTTPS) ===")
+    repeat(runsPerModel) { run ->
+        val wall = timeOpenAiCall(httpClient, openAiKey)
+        oaSum += wall
+        println("run ${run + 1}: wall = %.1f ms".format(wall))
+    }
+    println("-- avg wall = %.1f ms --".format(oaSum / runsPerModel))
 }
