@@ -1031,13 +1031,14 @@ impl Session {
 
                                         // Handle subagent notifications - show immediately
                                         if let Some(_id) = subagent_id {
-                                            // Show subagent notifications immediately (no buffering) with compact spacing
-                                            if interactive {
-                                                let _ = progress_bars.hide();
-                                                println!("{}", console::style(&formatted_message).green().dim());
-                                            } else {
-                                                progress_bars.log(&formatted_message);
-                                            }
+                                            // TODO: proper display for subagent notifications
+                                            // if interactive {
+                                            //     let _ = progress_bars.hide();
+                                            //     println!("{}", console::style(&formatted_message).green().dim());
+                                            // } else {
+                                            //     progress_bars.log(&formatted_message);
+                                            // }
+                                            continue;
                                         } else if let Some(ref notification_type) = _notification_type {
                                             if notification_type == TASK_EXECUTION_NOTIFICATION_TYPE {
                                                 if interactive {

@@ -12,11 +12,10 @@ use crate::agents::final_output_tool::{FINAL_OUTPUT_CONTINUATION_MESSAGE, FINAL_
 use crate::agents::recipe_tools::dynamic_task_tools::{
     create_dynamic_task, create_dynamic_task_tool, DYNAMIC_TASK_TOOL_NAME_PREFIX,
 };
-use crate::agents::sub_recipe_execution_tool::sub_recipe_execute_task_tool::{
-    self, SUB_RECIPE_EXECUTE_TASK_TOOL_NAME,
-};
 use crate::agents::sub_recipe_manager::SubRecipeManager;
-use crate::agents::task::TaskConfig;
+use crate::agents::subagent_execution_tool::subagent_execute_task_tool::{
+    self, SUBAGENT_EXECUTE_TASK_TOOL_NAME,
+};
 use crate::config::{Config, ExtensionConfigManager, PermissionManager};
 use crate::message::Message;
 use crate::permission::permission_judge::check_tool_permissions;
@@ -55,6 +54,7 @@ use super::final_output_tool::FinalOutputTool;
 use super::platform_tools;
 use super::router_tools;
 use super::tool_execution::{ToolCallResult, CHAT_MODE_TOOL_SKIPPED_RESPONSE, DECLINED_RESPONSE};
+use crate::agents::subagent_task_config::TaskConfig;
 
 const DEFAULT_MAX_TURNS: u32 = 1000;
 
@@ -293,13 +293,13 @@ impl Agent {
             sub_recipe_manager
                 .dispatch_sub_recipe_tool_call(&tool_call.name, tool_call.arguments.clone())
                 .await
-        } else if tool_call.name == SUB_RECIPE_EXECUTE_TASK_TOOL_NAME {
+        } else if tool_call.name == SUBAGENT_EXECUTE_TASK_TOOL_NAME {
             let provider = self.provider().await.ok();
             let mcp_tx = self.mcp_tx.lock().await.clone();
 
             let task_config =
                 TaskConfig::new(provider, Some(Arc::clone(&self.extension_manager)), mcp_tx);
-            sub_recipe_execute_task_tool::run_tasks(tool_call.arguments.clone(), task_config).await
+            subagent_execute_task_tool::run_tasks(tool_call.arguments.clone(), task_config).await
         } else if tool_call.name == DYNAMIC_TASK_TOOL_NAME_PREFIX {
             create_dynamic_task(tool_call.arguments.clone()).await
         } else if tool_call.name == PLATFORM_READ_RESOURCE_TOOL_NAME {
@@ -558,11 +558,8 @@ impl Agent {
                 platform_tools::manage_schedule_tool(),
             ]);
 
-            // Add subagent tool (only if ALPHA_FEATURES is enabled)
-            let config = Config::global();
-            if config.get_param::<bool>("ALPHA_FEATURES").unwrap_or(false) {
-                prefixed_tools.push(create_dynamic_task_tool());
-            }
+            // Dynamic task tool
+            prefixed_tools.push(create_dynamic_task_tool());
 
             // Add resource tools if supported
             if extension_manager.supports_resources() {
@@ -580,8 +577,7 @@ impl Agent {
             if let Some(final_output_tool) = self.final_output_tool.lock().await.as_ref() {
                 prefixed_tools.push(final_output_tool.tool());
             }
-            prefixed_tools
-                .push(sub_recipe_execute_task_tool::create_sub_recipe_execute_task_tool());
+            prefixed_tools.push(subagent_execute_task_tool::create_subagent_execute_task_tool());
         }
 
         prefixed_tools

@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use tokio::sync::mpsc;
 
-use crate::agents::sub_recipe_execution_tool::task_execution_tracker::TaskExecutionTracker;
+use crate::agents::subagent_execution_tool::task_execution_tracker::TaskExecutionTracker;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "lowercase")]

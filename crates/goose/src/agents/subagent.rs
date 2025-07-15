@@ -14,8 +14,6 @@ use std::{collections::HashMap, sync::Arc};
 use tokio::sync::{Mutex, RwLock};
 use tracing::{debug, error, instrument};
 
-use crate::agents::subagent_tools::SUBAGENT_RUN_TASK_TOOL_NAME;
-
 /// Status of a subagent
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum SubAgentStatus {
@@ -389,28 +387,7 @@ impl SubAgent {
     /// Filter out subagent spawning tools to prevent infinite recursion
     fn _filter_subagent_tools(tools: Vec<Tool>) -> Vec<Tool> {
         // TODO: add this in subagent loop
-        let original_count = tools.len();
-        let filtered_tools: Vec<Tool> = tools
-            .into_iter()
-            .filter(|tool| {
-                let should_keep = tool.name != SUBAGENT_RUN_TASK_TOOL_NAME;
-                if !should_keep {
-                    debug!("Filtering out subagent tool: {}", tool.name);
-                }
-                should_keep
-            })
-            .collect();
-
-        let filtered_count = filtered_tools.len();
-        if filtered_count < original_count {
-            debug!(
-                "Filtered {} subagent tool(s) from {} total tools",
-                original_count - filtered_count,
-                original_count
-            );
-        }
-
-        filtered_tools
+        tools
     }
 
     /// Build the system prompt for the subagent using the template

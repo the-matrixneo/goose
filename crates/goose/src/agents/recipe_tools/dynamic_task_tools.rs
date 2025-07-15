@@ -5,7 +5,7 @@
 use crate::agents::recipe_tools::sub_recipe_tools::{
     EXECUTION_MODE_PARALLEL, EXECUTION_MODE_SEQUENTIAL,
 };
-use crate::agents::sub_recipe_execution_tool::lib::Task;
+use crate::agents::subagent_execution_tool::task_types::Task;
 use crate::agents::tool_execution::ToolCallResult;
 use mcp_core::{tool::ToolAnnotations, Content, Tool, ToolError};
 use serde_json::{json, Value};
@@ -16,13 +16,30 @@ pub fn create_dynamic_task_tool() -> Tool {
     Tool::new(
         format!("{}", DYNAMIC_TASK_TOOL_NAME_PREFIX),
         format!(
-            "Creates a dynamic task object(s) based on textual instructions. \
-            Provide an array of parameter sets in the 'task_parameters' field:\n\
-            - For a single task: provide an array with one parameter set\n\
-            - For multiple tasks: provide an array with multiple parameter sets, each with different values\n\n\
-            Each task will run the same text instruction but with different parameter values. \
-            This is useful when you need to execute the same instruction multiple times with varying inputs. \
-            After creating the task list, pass it to the task executor to run all tasks."
+            "Use this tool to create one or more dynamic tasks from a shared text instruction and varying parameters.\
+            How it works:
+            - Provide a single text instruction
+            - Use the 'task_parameters' field to pass an array of parameter sets
+            - Each resulting task will use the same instruction with different parameter values
+            This is useful when performing the same operation across many inputs (e.g., getting weather for multiple cities, searching multiple slack channels, iterating through various linear tickets, etc).
+            Once created, these tasks should be passed to the 'subagent__execute_task' tool for execution. Tasks can run sequentially or in parallel.
+            ---
+            What is a 'subagent'?
+            A 'subagent' is a stateless sub-process that executes a single task independently. Use subagents when:
+            - You want to parallelize similar work across different inputs
+            - You are not sure your search or operation will succeed on the first try
+            Each subagent receives a task with a defined payload and returns a result, which is not visible to the user unless explicitly summarized by the system.
+            ---
+            Examples of 'task_parameters' for a single task:
+                text_instruction: Search for the config file in the root directory.
+            Examples of 'task_parameters' for multiple tasks:
+                text_instruction: Get weather for Melbourne.
+                timeout_seconds: 300
+                text_instruction: Get weather for Los Angeles.
+                timeout_seconds: 300
+                text_instruction: Get weather for San Francisco.
+                timeout_seconds: 300
+            "
         ),
         json!({
             "type": "object",

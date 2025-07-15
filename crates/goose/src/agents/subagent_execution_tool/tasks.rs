@@ -6,10 +6,10 @@ use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 use tokio::time::timeout;
 
-use crate::agents::sub_recipe_execution_tool::task_execution_tracker::TaskExecutionTracker;
-use crate::agents::sub_recipe_execution_tool::task_types::{Task, TaskResult, TaskStatus};
+use crate::agents::subagent_execution_tool::task_execution_tracker::TaskExecutionTracker;
+use crate::agents::subagent_execution_tool::task_types::{Task, TaskResult, TaskStatus};
 use crate::agents::subagent_handler::run_complete_subagent_task;
-use crate::agents::task::TaskConfig;
+use crate::agents::subagent_task_config::TaskConfig;
 
 const DEFAULT_TASK_TIMEOUT_SECONDS: u64 = 300;
 

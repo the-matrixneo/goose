@@ -1,10 +1,10 @@
-use crate::agents::sub_recipe_execution_tool::executor::{
+use crate::agents::subagent_execution_tool::executor::{
     execute_single_task, execute_tasks_in_parallel,
 };
-pub use crate::agents::sub_recipe_execution_tool::task_types::{
+pub use crate::agents::subagent_execution_tool::task_types::{
     ExecutionMode, ExecutionResponse, ExecutionStats, SharedState, Task, TaskResult, TaskStatus,
 };
-use crate::agents::task::TaskConfig;
+use crate::agents::subagent_task_config::TaskConfig;
 use mcp_core::protocol::JsonRpcMessage;
 use serde_json::Value;
 use tokio::sync::mpsc;

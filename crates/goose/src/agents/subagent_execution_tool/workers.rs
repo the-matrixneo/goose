@@ -1,6 +1,6 @@
-use crate::agents::sub_recipe_execution_tool::task_types::{SharedState, Task};
-use crate::agents::sub_recipe_execution_tool::tasks::process_task;
-use crate::agents::task::TaskConfig;
+use crate::agents::subagent_execution_tool::task_types::{SharedState, Task};
+use crate::agents::subagent_execution_tool::tasks::process_task;
+use crate::agents::subagent_task_config::TaskConfig;
 use std::sync::Arc;
 
 async fn receive_task(state: &SharedState) -> Option<Task> {

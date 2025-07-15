@@ -1,20 +1,20 @@
 use mcp_core::{tool::ToolAnnotations, Content, Tool, ToolError};
 use serde_json::Value;
 
-use crate::agents::task::TaskConfig;
+use crate::agents::subagent_task_config::TaskConfig;
 use crate::agents::{
-    sub_recipe_execution_tool::lib::execute_tasks,
-    sub_recipe_execution_tool::task_types::ExecutionMode, tool_execution::ToolCallResult,
+    subagent_execution_tool::lib::execute_tasks,
+    subagent_execution_tool::task_types::ExecutionMode, tool_execution::ToolCallResult,
 };
 use mcp_core::protocol::JsonRpcMessage;
 use tokio::sync::mpsc;
 use tokio_stream;
 
-pub const SUB_RECIPE_EXECUTE_TASK_TOOL_NAME: &str = "sub_recipe__execute_task";
-pub fn create_sub_recipe_execute_task_tool() -> Tool {
+pub const SUBAGENT_EXECUTE_TASK_TOOL_NAME: &str = "subagent__execute_task";
+pub fn create_subagent_execute_task_tool() -> Tool {
     Tool::new(
-        SUB_RECIPE_EXECUTE_TASK_TOOL_NAME,
-        "Only use this tool when you execute sub recipe task.
+        SUBAGENT_EXECUTE_TASK_TOOL_NAME,
+        "Only use the subagent__execute_task tool when you execute sub recipe task or dynamic task.
 EXECUTION STRATEGY DECISION:
 1. PRE-CREATED TASKS: If tasks were created by subrecipe__create_task_* tools, check the execution_mode in the response:
    - If execution_mode is 'parallel', use parallel execution

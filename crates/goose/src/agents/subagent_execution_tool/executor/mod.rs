@@ -1,20 +1,17 @@
-use crate::agents::sub_recipe_execution_tool::lib::{
+use crate::agents::subagent_execution_tool::lib::{
     ExecutionResponse, ExecutionStats, SharedState, Task, TaskResult, TaskStatus,
 };
-use crate::agents::sub_recipe_execution_tool::task_execution_tracker::{
+use crate::agents::subagent_execution_tool::task_execution_tracker::{
     DisplayMode, TaskExecutionTracker,
 };
-use crate::agents::sub_recipe_execution_tool::tasks::process_task;
-use crate::agents::sub_recipe_execution_tool::workers::spawn_worker;
-use crate::agents::task::TaskConfig;
+use crate::agents::subagent_execution_tool::tasks::process_task;
+use crate::agents::subagent_execution_tool::workers::spawn_worker;
+use crate::agents::subagent_task_config::TaskConfig;
 use mcp_core::protocol::JsonRpcMessage;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio::time::Instant;
-
-#[cfg(test)]
-mod tests;
 
 const EXECUTION_STATUS_COMPLETED: &str = "completed";
 const DEFAULT_MAX_WORKERS: usize = 10;
@@ -171,17 +168,25 @@ fn create_empty_response() -> ExecutionResponse {
         },
     }
 }
-
 async fn collect_results(
     result_rx: &mut mpsc::Receiver<TaskResult>,
     task_execution_tracker: Arc<TaskExecutionTracker>,
     expected_count: usize,
 ) -> Vec<TaskResult> {
     let mut results = Vec::new();
-    while let Some(result) = result_rx.recv().await {
+    while let Some(mut result) = result_rx.recv().await {
+        // Truncate data to 650 chars if needed
+        if let Some(data) = result.data.as_mut() {
+            if let Some(data_str) = data.as_str() {
+                if data_str.len() > 650 {
+                    *data = serde_json::Value::String(format!("{}...", &data_str[..650]));
+                }
+            }
+        }
         task_execution_tracker
             .complete_task(&result.task_id, result.clone())
             .await;
+
         results.push(result);
         if results.len() >= expected_count {
             break;
