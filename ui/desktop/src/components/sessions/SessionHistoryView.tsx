@@ -88,14 +88,10 @@ const SessionHeader: React.FC<{
 }> = ({ onBack, children, title, actionButtons }) => {
   return (
     <div className="flex flex-col pb-8 border-b">
-      <div className="flex items-center pt-0 pb-2">
-        <BackButton
-          onClick={onBack}
-          size="default"
-          className="rounded-full px-6 py-2 flex items-center gap-2 text-white hover:cursor-pointer"
-        />
+      <div className="flex items-center pt-0 mb-1">
+        <BackButton onClick={onBack} />
       </div>
-      <h1 className="text-4xl font-light mb-4 pt-5">{title}</h1>
+      <h1 className="text-4xl font-light mb-4 pt-6">{title}</h1>
       <div className="flex items-center">{children}</div>
       {actionButtons && <div className="flex items-center space-x-3 mt-4">{actionButtons}</div>}
     </div>

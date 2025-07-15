@@ -3,6 +3,7 @@ import { ArrowLeft } from 'lucide-react';
 import { Button } from './button';
 import type { VariantProps } from 'class-variance-authority';
 import { buttonVariants } from './button';
+import { cn } from '../../utils';
 
 interface BackButtonProps extends VariantProps<typeof buttonVariants> {
   onClick?: () => void;
@@ -36,7 +37,10 @@ const BackButton: React.FC<BackButtonProps> = ({
       variant={variant}
       size={size}
       shape={shape}
-      className={className}
+      className={cn(
+        'rounded-full px-6 py-2 flex items-center gap-2 text-text-default hover:cursor-pointer',
+        className
+      )}
       {...props}
     >
       <ArrowLeft />
