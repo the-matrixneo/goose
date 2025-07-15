@@ -41,6 +41,8 @@ export default function GooseMessage({
   appendMessage,
 }: GooseMessageProps) {
   const contentRef = useRef<HTMLDivElement>(null);
+  // Track which tool confirmations we've already handled to prevent infinite loops
+  const handledToolConfirmations = useRef<Set<string>>(new Set());
 
   // Extract text content from the message
   let textContent = getTextContent(message);
@@ -115,17 +117,29 @@ export default function GooseMessage({
     if (
       messageIndex === messageHistoryIndex - 1 &&
       hasToolConfirmation &&
-      toolConfirmationContent
+      toolConfirmationContent &&
+      !handledToolConfirmations.current.has(toolConfirmationContent.id)
     ) {
-      appendMessage(
-        createToolErrorResponseMessage(toolConfirmationContent.id, 'The tool call is cancelled.')
+      // Only append the error message if there isn't already a response for this tool confirmation
+      const hasExistingResponse = messages.some((msg) =>
+        getToolResponses(msg).some((response) => response.id === toolConfirmationContent.id)
       );
+
+      if (!hasExistingResponse) {
+        // Mark this tool confirmation as handled to prevent infinite loop
+        handledToolConfirmations.current.add(toolConfirmationContent.id);
+
+        appendMessage(
+          createToolErrorResponseMessage(toolConfirmationContent.id, 'The tool call is cancelled.')
+        );
+      }
     }
   }, [
     messageIndex,
     messageHistoryIndex,
     hasToolConfirmation,
     toolConfirmationContent,
+    messages,
     appendMessage,
   ]);
 
