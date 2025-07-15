@@ -23,16 +23,15 @@ pub async fn execute_tasks(
     match execution_mode {
         ExecutionMode::Sequential => {
             if task_count == 1 {
-                let response =
-                    execute_single_task(&tasks[0], notifier, task_config)
-                        .await;
+                let response = execute_single_task(&tasks[0], notifier, task_config).await;
                 handle_response(response)
             } else {
                 Err("Sequential execution mode requires exactly one task".to_string())
             }
         }
         ExecutionMode::Parallel => {
-            let response: ExecutionResponse = execute_tasks_in_parallel(tasks, notifier, task_config).await;
+            let response: ExecutionResponse =
+                execute_tasks_in_parallel(tasks, notifier, task_config).await;
             handle_response(response)
         }
     }

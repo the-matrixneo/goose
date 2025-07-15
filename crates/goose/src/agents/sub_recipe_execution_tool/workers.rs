@@ -23,7 +23,12 @@ pub fn spawn_worker(
 async fn worker_loop(state: Arc<SharedState>, _worker_id: usize, task_config: TaskConfig) {
     while let Some(task) = receive_task(&state).await {
         state.task_execution_tracker.start_task(&task.id).await;
-        let result = process_task(&task, state.task_execution_tracker.clone(), task_config.clone()).await;
+        let result = process_task(
+            &task,
+            state.task_execution_tracker.clone(),
+            task_config.clone(),
+        )
+        .await;
 
         if let Err(e) = state.result_sender.send(result).await {
             tracing::error!("Worker failed to send result: {}", e);

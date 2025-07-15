@@ -1,11 +1,11 @@
 use mcp_core::{tool::ToolAnnotations, Content, Tool, ToolError};
 use serde_json::Value;
 
+use crate::agents::task::TaskConfig;
 use crate::agents::{
     sub_recipe_execution_tool::lib::execute_tasks,
     sub_recipe_execution_tool::task_types::ExecutionMode, tool_execution::ToolCallResult,
 };
-use crate::agents::task::TaskConfig;
 use mcp_core::protocol::JsonRpcMessage;
 use tokio::sync::mpsc;
 use tokio_stream;
@@ -112,10 +112,7 @@ Pre-created Task Based:
     )
 }
 
-pub async fn run_tasks(
-    execute_data: Value,
-    task_config: TaskConfig,
-) -> ToolCallResult {
+pub async fn run_tasks(execute_data: Value, task_config: TaskConfig) -> ToolCallResult {
     let (notification_tx, notification_rx) = mpsc::channel::<JsonRpcMessage>(100);
 
     let execution_mode = execute_data
@@ -124,14 +121,7 @@ pub async fn run_tasks(
         .unwrap_or_default();
 
     let result_future = async move {
-        match execute_tasks(
-            execute_data,
-            execution_mode,
-            notification_tx,
-            task_config,
-        )
-        .await
-        {
+        match execute_tasks(execute_data, execution_mode, notification_tx, task_config).await {
             Ok(result) => {
                 let output = serde_json::to_string(&result).unwrap();
                 Ok(vec![Content::text(output)])
@@ -142,6 +132,8 @@ pub async fn run_tasks(
 
     ToolCallResult {
         result: Box::new(Box::pin(result_future)),
-        notification_stream: Some(Box::new(tokio_stream::wrappers::ReceiverStream::new(notification_rx))),
+        notification_stream: Some(Box::new(tokio_stream::wrappers::ReceiverStream::new(
+            notification_rx,
+        ))),
     }
 }

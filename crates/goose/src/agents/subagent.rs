@@ -43,7 +43,7 @@ pub struct SubAgent {
     pub status: Arc<RwLock<SubAgentStatus>>,
     pub config: TaskConfig,
     pub turn_count: Arc<Mutex<usize>>,
-    pub created_at: DateTime<Utc>
+    pub created_at: DateTime<Utc>,
 }
 
 impl SubAgent {
@@ -60,7 +60,7 @@ impl SubAgent {
             status: Arc::new(RwLock::new(SubAgentStatus::Ready)),
             config: task_config,
             turn_count: Arc::new(Mutex::new(0)),
-            created_at: Utc::now()
+            created_at: Utc::now(),
         });
 
         // Send initial MCP notification
@@ -168,10 +168,16 @@ impl SubAgent {
             .await;
 
         // Get provider and extension manager from task config
-        let provider = self.config.provider.as_ref()
+        let provider = self
+            .config
+            .provider
+            .as_ref()
             .ok_or_else(|| anyhow!("No provider configured for subagent"))?;
 
-        let extension_manager = self.config.extension_manager.as_ref()
+        let extension_manager = self
+            .config
+            .extension_manager
+            .as_ref()
             .ok_or_else(|| anyhow!("No extension manager configured for subagent"))?;
 
         // Check if we've exceeded max turns
@@ -284,16 +290,15 @@ impl SubAgent {
                             .await;
 
                             // Handle platform tools or dispatch to extension manager
-                            let tool_result = 
-                                match extension_manager
-                                    .read()
-                                    .await
-                                    .dispatch_tool_call(tool_call.clone())
-                                    .await
-                                {
-                                    Ok(result) => result.result.await,
-                                    Err(e) => Err(ToolError::ExecutionError(e.to_string())),
-                                };
+                            let tool_result = match extension_manager
+                                .read()
+                                .await
+                                .dispatch_tool_call(tool_call.clone())
+                                .await
+                            {
+                                Ok(result) => result.result.await,
+                                Err(e) => Err(ToolError::ExecutionError(e.to_string())),
+                            };
 
                             match tool_result {
                                 Ok(result) => {

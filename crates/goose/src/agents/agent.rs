@@ -15,8 +15,8 @@ use crate::agents::recipe_tools::dynamic_task_tools::{
 use crate::agents::sub_recipe_execution_tool::sub_recipe_execute_task_tool::{
     self, SUB_RECIPE_EXECUTE_TASK_TOOL_NAME,
 };
-use crate::agents::task::TaskConfig;
 use crate::agents::sub_recipe_manager::SubRecipeManager;
+use crate::agents::task::TaskConfig;
 use crate::config::{Config, ExtensionConfigManager, PermissionManager};
 use crate::message::Message;
 use crate::permission::permission_judge::check_tool_permissions;
@@ -294,19 +294,12 @@ impl Agent {
                 .dispatch_sub_recipe_tool_call(&tool_call.name, tool_call.arguments.clone())
                 .await
         } else if tool_call.name == SUB_RECIPE_EXECUTE_TASK_TOOL_NAME {
-            println!("About to call provider...");
             let provider = self.provider().await.ok();
-            println!("About to clone mcp_tx...");
             let mcp_tx = self.mcp_tx.lock().await.clone();
 
-            println!("Executing tool call: {:?}", tool_call);
-
-            let task_config = TaskConfig::new(provider, Some(Arc::clone(&self.extension_manager)), mcp_tx);
-            sub_recipe_execute_task_tool::run_tasks(
-                tool_call.arguments.clone(),
-                task_config,
-            )
-            .await
+            let task_config =
+                TaskConfig::new(provider, Some(Arc::clone(&self.extension_manager)), mcp_tx);
+            sub_recipe_execute_task_tool::run_tasks(tool_call.arguments.clone(), task_config).await
         } else if tool_call.name == DYNAMIC_TASK_TOOL_NAME_PREFIX {
             create_dynamic_task(tool_call.arguments.clone()).await
         } else if tool_call.name == PLATFORM_READ_RESOURCE_TOOL_NAME {

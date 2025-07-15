@@ -27,11 +27,7 @@ pub async fn process_task(
     let task_execution_tracker_clone = task_execution_tracker.clone();
     match timeout(
         timeout_duration,
-        get_task_result(
-            task_clone,
-            task_execution_tracker,
-            task_config,
-        ),
+        get_task_result(task_clone, task_execution_tracker, task_config),
     )
     .await
     {
@@ -72,12 +68,7 @@ async fn get_task_result(
 ) -> Result<Value, String> {
     if task.task_type == "text_instruction" {
         // Handle text_instruction tasks using subagent system
-        handle_text_instruction_task(
-            task,
-            task_execution_tracker,
-            task_config,
-        )
-        .await
+        handle_text_instruction_task(task, task_execution_tracker, task_config).await
     } else {
         // Handle sub_recipe tasks using command execution
         let (command, output_identifier) = build_command(&task)?;
@@ -109,28 +100,12 @@ async fn handle_text_instruction_task(
     // Start tracking the task
     task_execution_tracker.start_task(&task.id).await;
 
-    // Send initial status update
-    task_execution_tracker
-        .send_live_output(&task.id, &format!("Starting text instruction task: {}", text_instruction))
-        .await;
-
-    // Send progress update
-    task_execution_tracker
-        .send_live_output(&task.id, "Initializing subagent for task execution...")
-        .await;
-
     // Create arguments for the subagent task
     let task_arguments = serde_json::json!({
         "text_instruction": text_instruction,
         // "instructions": "You are a helpful assistant. Execute the given task and provide a clear, concise response.",
     });
 
-    // Execute the text instruction using the subagent system
-    task_execution_tracker
-        .send_live_output(&task.id, "Executing text instruction with subagent...")
-        .await;
-    
-    println!("Kicking off subagent task! ");
     match run_complete_subagent_task(task_arguments, task_config).await {
         Ok(contents) => {
             // Extract the text content from the result
@@ -143,35 +118,12 @@ async fn handle_text_instruction_task(
                 .collect::<Vec<_>>()
                 .join("\n");
 
-            // Send completion status
-            task_execution_tracker
-                .send_live_output(&task.id, "Text instruction task completed successfully")
-                .await;
-
-            // Send result preview if it's not too long
-            if result_text.len() > 200 {
-                let preview = format!("Result preview: {}...", &result_text[..200]);
-                task_execution_tracker
-                    .send_live_output(&task.id, &preview)
-                    .await;
-            } else {
-                task_execution_tracker
-                    .send_live_output(&task.id, &format!("Result: {}", result_text))
-                    .await;
-            }
-
             Ok(serde_json::json!({
                 "result": result_text
             }))
         }
         Err(e) => {
             let error_msg = format!("Subagent execution failed: {}", e);
-            
-            // Send error status
-            task_execution_tracker
-                .send_live_output(&task.id, &error_msg)
-                .await;
-
             Err(error_msg)
         }
     }

@@ -1,11 +1,11 @@
+use crate::agents::extension_manager::ExtensionManager;
 use crate::providers::base::Provider;
 use mcp_core::protocol::JsonRpcMessage;
 use mcp_core::tool::Tool;
+use std::fmt;
 use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
 use uuid::Uuid;
-use crate::agents::extension_manager::ExtensionManager;
-use std::fmt;
 
 /// Configuration for task execution with all necessary dependencies
 #[derive(Clone)]
@@ -53,4 +53,4 @@ impl TaskConfig {
     pub fn mcp_tx(&self) -> mpsc::Sender<JsonRpcMessage> {
         self.mcp_tx.clone()
     }
-} 
+}

@@ -1,8 +1,3 @@
-use mcp_core::protocol::JsonRpcMessage;
-use std::sync::atomic::AtomicUsize;
-use std::sync::Arc;
-use tokio::sync::mpsc;
-use tokio::time::Instant;
 use crate::agents::sub_recipe_execution_tool::lib::{
     ExecutionResponse, ExecutionStats, SharedState, Task, TaskResult, TaskStatus,
 };
@@ -12,6 +7,11 @@ use crate::agents::sub_recipe_execution_tool::task_execution_tracker::{
 use crate::agents::sub_recipe_execution_tool::tasks::process_task;
 use crate::agents::sub_recipe_execution_tool::workers::spawn_worker;
 use crate::agents::task::TaskConfig;
+use mcp_core::protocol::JsonRpcMessage;
+use std::sync::atomic::AtomicUsize;
+use std::sync::Arc;
+use tokio::sync::mpsc;
+use tokio::time::Instant;
 
 #[cfg(test)]
 mod tests;
@@ -30,16 +30,13 @@ pub async fn execute_single_task(
         DisplayMode::SingleTaskOutput,
         notifier,
     ));
-    let result = process_task(
-        task,
-        task_execution_tracker.clone(),
-        task_config
-    )
-    .await;
-    
+    let result = process_task(task, task_execution_tracker.clone(), task_config).await;
+
     // Complete the task in the tracker
-    task_execution_tracker.complete_task(&result.task_id, result.clone()).await;
-    
+    task_execution_tracker
+        .complete_task(&result.task_id, result.clone())
+        .await;
+
     let execution_time = start_time.elapsed().as_millis();
     let stats = calculate_stats(&[result.clone()], execution_time);
 
