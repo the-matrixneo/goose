@@ -213,11 +213,12 @@ impl SubAgent {
         let mut messages = self.get_conversation().await;
 
         // Get tools based on whether we're using a recipe or inheriting from parent
-        let tools: Vec<Tool> = if self.config.tools.is_empty() {
-            vec![]
-        } else {
-            self.config.tools.clone()
-        };
+        let tools: Vec<Tool> = extension_manager
+            .read()
+            .await
+            .get_prefixed_tools(None)
+            .await
+            .unwrap_or_default();
 
         let toolshim_tools: Vec<Tool> = vec![];
 

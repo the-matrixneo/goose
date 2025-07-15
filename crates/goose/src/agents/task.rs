@@ -13,8 +13,6 @@ pub struct TaskConfig {
     pub id: String,
     pub provider: Option<Arc<dyn Provider>>,
     pub extension_manager: Option<Arc<RwLock<ExtensionManager>>>,
-    pub tools: Vec<Tool>,
-    pub extensions: Vec<String>,
     pub mcp_tx: mpsc::Sender<JsonRpcMessage>,
     pub max_turns: Option<usize>,
 }
@@ -25,8 +23,6 @@ impl fmt::Debug for TaskConfig {
             .field("id", &self.id)
             .field("provider", &"<dyn Provider>")
             .field("extension_manager", &"<ExtensionManager>")
-            .field("tools", &self.tools)
-            .field("extensions", &self.extensions)
             .field("max_turns", &self.max_turns)
             .finish()
     }
@@ -37,16 +33,12 @@ impl TaskConfig {
     pub fn new(
         provider: Option<Arc<dyn Provider>>,
         extension_manager: Option<Arc<RwLock<ExtensionManager>>>,
-        tools: Vec<Tool>,
-        extensions: Vec<String>,
         mcp_tx: mpsc::Sender<JsonRpcMessage>,
     ) -> Self {
         Self {
             id: Uuid::new_v4().to_string(),
             provider,
             extension_manager,
-            tools,
-            extensions,
             mcp_tx,
             max_turns: Some(10),
         }
@@ -55,16 +47,6 @@ impl TaskConfig {
     /// Get a reference to the provider
     pub fn provider(&self) -> Option<&Arc<dyn Provider>> {
         self.provider.as_ref()
-    }
-
-    /// Get a reference to the tools
-    pub fn tools(&self) -> &[Tool] {
-        &self.tools
-    }
-
-    /// Get a reference to the extensions
-    pub fn extensions(&self) -> &[String] {
-        &self.extensions
     }
 
     /// Get a clone of the MCP sender

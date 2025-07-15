@@ -294,15 +294,14 @@ impl Agent {
                 .dispatch_sub_recipe_tool_call(&tool_call.name, tool_call.arguments.clone())
                 .await
         } else if tool_call.name == SUB_RECIPE_EXECUTE_TASK_TOOL_NAME {
-            // Get the provider and extension manager for text instruction tasks
-            let tools = self.list_tools(None).await;
-            let extensions = self.list_extensions().await;
+            println!("About to call provider...");
             let provider = self.provider().await.ok();
+            println!("About to clone mcp_tx...");
             let mcp_tx = self.mcp_tx.lock().await.clone();
 
             println!("Executing tool call: {:?}", tool_call);
 
-            let task_config = TaskConfig::new(provider, Some(Arc::clone(&self.extension_manager)), tools, extensions, mcp_tx);
+            let task_config = TaskConfig::new(provider, Some(Arc::clone(&self.extension_manager)), mcp_tx);
             sub_recipe_execute_task_tool::run_tasks(
                 tool_call.arguments.clone(),
                 task_config,
