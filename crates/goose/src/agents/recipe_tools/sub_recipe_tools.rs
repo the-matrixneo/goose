@@ -96,13 +96,23 @@ fn prepare_command_params(
 
 pub async fn create_sub_recipe_task(sub_recipe: &SubRecipe, params: Value) -> Result<String> {
     let command_params = prepare_command_params(sub_recipe, params)?;
-    let payload = json!({
+    let mut payload = json!({
         "sub_recipe": {
             "name": sub_recipe.name.clone(),
             "command_parameters": command_params,
             "recipe_path": sub_recipe.path.clone(),
         }
     });
+    
+    // Include config if present
+    if let Some(config) = &sub_recipe.config {
+        payload["config"] = json!({
+            "timeout_seconds": config.timeout_seconds,
+            "max_workers": config.max_workers,
+            "initial_workers": config.initial_workers,
+        });
+    }
+    
     let task = Task {
         id: uuid::Uuid::new_v4().to_string(),
         task_type: "sub_recipe".to_string(),

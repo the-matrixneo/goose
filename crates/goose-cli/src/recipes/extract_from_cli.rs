@@ -32,6 +32,7 @@ pub fn extract_recipe_info_from_cli(
                         path: recipe_file_path.to_string_lossy().to_string(),
                         name,
                         values: None,
+                        config: None,
                     };
                     all_sub_recipes.push(additional_sub_recipe);
                 }
@@ -111,6 +112,7 @@ mod tests {
         assert_eq!(sub_recipes[0].path, "existing_sub_recipe.yaml".to_string());
         assert_eq!(sub_recipes[0].name, "existing_sub_recipe".to_string());
         assert!(sub_recipes[0].values.is_none());
+        assert!(sub_recipes[0].config.is_none());
         assert!(response.is_some());
         let response = response.unwrap();
         assert_eq!(
@@ -167,6 +169,7 @@ mod tests {
         assert_eq!(sub_recipes[0].path, "existing_sub_recipe.yaml".to_string());
         assert_eq!(sub_recipes[0].name, "existing_sub_recipe".to_string());
         assert!(sub_recipes[0].values.is_none());
+        assert!(sub_recipes[0].config.is_none());
         assert_eq!(
             sub_recipes[1].path,
             sub_recipe1_path
@@ -177,6 +180,7 @@ mod tests {
         );
         assert_eq!(sub_recipes[1].name, "sub_recipe1".to_string());
         assert!(sub_recipes[1].values.is_none());
+        assert!(sub_recipes[1].config.is_none());
         assert_eq!(
             sub_recipes[2].path,
             sub_recipe2_path
@@ -187,6 +191,7 @@ mod tests {
         );
         assert_eq!(sub_recipes[2].name, "sub_recipe2".to_string());
         assert!(sub_recipes[2].values.is_none());
+        assert!(sub_recipes[2].config.is_none());
         assert!(response.is_some());
         let response = response.unwrap();
         assert_eq!(

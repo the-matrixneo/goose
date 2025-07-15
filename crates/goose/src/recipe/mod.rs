@@ -137,6 +137,18 @@ pub struct SubRecipe {
     pub path: String,
     #[serde(default, deserialize_with = "deserialize_value_map_as_string")]
     pub values: Option<HashMap<String, String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub config: Option<SubRecipeConfig>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct SubRecipeConfig {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timeout_seconds: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_workers: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub initial_workers: Option<usize>,
 }
 
 fn deserialize_value_map_as_string<'de, D>(
@@ -658,5 +670,46 @@ isGlobal: true"#;
         assert!(recipe.extensions.is_some());
         let extensions = recipe.extensions.unwrap();
         assert_eq!(extensions.len(), 0);
+    }
+
+    #[test]
+    fn test_from_content_with_sub_recipe_config() {
+        let content = r#"{
+            "version": "1.0.0",
+            "title": "Test Recipe",
+            "description": "A test recipe",
+            "instructions": "Test instructions",
+            "sub_recipes": [
+                {
+                    "name": "test_sub_recipe",
+                    "path": "test_sub_recipe.yaml",
+                    "values": {
+                        "param1": "value1"
+                    },
+                    "config": {
+                        "timeout_seconds": 600,
+                        "max_workers": 5,
+                        "initial_workers": 3
+                    }
+                }
+            ]
+        }"#;
+
+        let recipe = Recipe::from_content(content).unwrap();
+        assert_eq!(recipe.title, "Test Recipe");
+        
+        assert!(recipe.sub_recipes.is_some());
+        let sub_recipes = recipe.sub_recipes.unwrap();
+        assert_eq!(sub_recipes.len(), 1);
+        
+        let sub_recipe = &sub_recipes[0];
+        assert_eq!(sub_recipe.name, "test_sub_recipe");
+        assert_eq!(sub_recipe.path, "test_sub_recipe.yaml");
+        
+        assert!(sub_recipe.config.is_some());
+        let config = sub_recipe.config.as_ref().unwrap();
+        assert_eq!(config.timeout_seconds, Some(600));
+        assert_eq!(config.max_workers, Some(5));
+        assert_eq!(config.initial_workers, Some(3));
     }
 }

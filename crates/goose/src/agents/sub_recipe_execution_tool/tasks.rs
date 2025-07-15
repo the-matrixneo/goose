@@ -41,16 +41,18 @@ async fn execute_task(task: Task) -> Result<Value, String> {
         let sub_recipe = task.payload.get("sub_recipe").unwrap();
         let sub_recipe_name = sub_recipe.get("name").unwrap().as_str().unwrap();
         let path = sub_recipe.get("recipe_path").unwrap().as_str().unwrap();
-        let command_parameters = sub_recipe.get("command_parameters").unwrap();
+        let command_parameters = sub_recipe.get("command_parameters");
         output_identifier = format!("sub-recipe {}", sub_recipe_name);
         let mut cmd = Command::new("goose");
         cmd.arg("run").arg("--recipe").arg(path);
-        if let Some(params_map) = command_parameters.as_object() {
-            for (key, value) in params_map {
-                let key_str = key.to_string();
-                let value_str = value.as_str().unwrap_or(&value.to_string()).to_string();
-                cmd.arg("--params")
-                    .arg(format!("{}={}", key_str, value_str));
+        if let Some(params) = command_parameters {
+            if let Some(params_map) = params.as_object() {
+                for (key, value) in params_map {
+                    let key_str = key.to_string();
+                    let value_str = value.as_str().unwrap_or(&value.to_string()).to_string();
+                    cmd.arg("--params")
+                        .arg(format!("{}={}", key_str, value_str));
+                }
             }
         }
         cmd

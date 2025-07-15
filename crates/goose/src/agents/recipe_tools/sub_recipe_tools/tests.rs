@@ -9,6 +9,7 @@ mod tests {
             name: "test_sub_recipe".to_string(),
             path: "test_sub_recipe.yaml".to_string(),
             values: Some(HashMap::from([("key1".to_string(), "value1".to_string())])),
+            config: None,
         };
         sub_recipe
     }
@@ -42,6 +43,7 @@ mod tests {
                 name: "test_sub_recipe".to_string(),
                 path: "test_sub_recipe.yaml".to_string(),
                 values: None,
+                config: None,
             };
             let params: HashMap<String, String> = HashMap::new();
             let params_value = serde_json::to_value(params).unwrap();
@@ -113,6 +115,7 @@ mod tests {
                 name: "test_sub_recipe".to_string(),
                 path: "test_sub_recipe.yaml".to_string(),
                 values: None,
+                config: None,
             };
 
             let sub_recipe_file_content = r#"{
@@ -150,6 +153,61 @@ mod tests {
             assert_eq!(key1_prop["description"], "A test parameter");
             assert_eq!(result["required"].as_array().unwrap().len(), 1);
             assert_eq!(result["required"][0], "key1");
+        }
+    }
+
+    mod create_sub_recipe_task_tests {
+        use serde_json::Value;
+
+        use crate::{
+            agents::recipe_tools::sub_recipe_tools::{
+                create_sub_recipe_task, tests::tests::setup_sub_recipe,
+            },
+            recipe::SubRecipeConfig,
+        };
+
+        #[tokio::test]
+        async fn test_create_sub_recipe_task_with_config() {
+            let mut sub_recipe = setup_sub_recipe();
+            sub_recipe.config = Some(SubRecipeConfig {
+                timeout_seconds: Some(600),
+                max_workers: Some(5),
+                initial_workers: Some(3),
+            });
+
+            let params = serde_json::json!({
+                "param1": "value1"
+            });
+
+            let result = create_sub_recipe_task(&sub_recipe, params).await.unwrap();
+            let task: Value = serde_json::from_str(&result).unwrap();
+
+            // Verify the task structure
+            assert_eq!(task["task_type"], "sub_recipe");
+            assert!(task["payload"]["sub_recipe"].is_object());
+            assert!(task["payload"]["config"].is_object());
+
+            let config = &task["payload"]["config"];
+            assert_eq!(config["timeout_seconds"], 600);
+            assert_eq!(config["max_workers"], 5);
+            assert_eq!(config["initial_workers"], 3);
+        }
+
+        #[tokio::test]
+        async fn test_create_sub_recipe_task_without_config() {
+            let sub_recipe = setup_sub_recipe();
+
+            let params = serde_json::json!({
+                "param1": "value1"
+            });
+
+            let result = create_sub_recipe_task(&sub_recipe, params).await.unwrap();
+            let task: Value = serde_json::from_str(&result).unwrap();
+
+            // Verify the task structure
+            assert_eq!(task["task_type"], "sub_recipe");
+            assert!(task["payload"]["sub_recipe"].is_object());
+            assert!(task["payload"]["config"].is_null());
         }
     }
 }
