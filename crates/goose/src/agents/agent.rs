@@ -15,6 +15,7 @@ use crate::agents::recipe_tools::dynamic_task_tools::{
 use crate::agents::sub_recipe_execution_tool::sub_recipe_execute_task_tool::{
     self, SUB_RECIPE_EXECUTE_TASK_TOOL_NAME,
 };
+use crate::agents::task::TaskConfig;
 use crate::agents::sub_recipe_manager::SubRecipeManager;
 use crate::config::{Config, ExtensionConfigManager, PermissionManager};
 use crate::message::Message;
@@ -294,14 +295,17 @@ impl Agent {
                 .await
         } else if tool_call.name == SUB_RECIPE_EXECUTE_TASK_TOOL_NAME {
             // Get the provider and extension manager for text instruction tasks
+            let tools = self.list_tools(None).await;
+            let extensions = self.list_extensions().await;
             let provider = self.provider().await.ok();
-            let extension_manager = Some(Arc::clone(&self.extension_manager));
+            let mcp_tx = self.mcp_tx.lock().await.clone();
 
+            println!("Executing tool call: {:?}", tool_call);
+
+            let task_config = TaskConfig::new(provider, Some(Arc::clone(&self.extension_manager)), tools, extensions, mcp_tx);
             sub_recipe_execute_task_tool::run_tasks(
                 tool_call.arguments.clone(),
-                self.mcp_tx.lock().await.clone(),
-                provider,
-                extension_manager,
+                task_config,
             )
             .await
         } else if tool_call.name == DYNAMIC_TASK_TOOL_NAME_PREFIX {

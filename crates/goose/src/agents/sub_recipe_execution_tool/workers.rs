@@ -1,8 +1,7 @@
 use crate::agents::sub_recipe_execution_tool::task_types::{SharedState, Task};
 use crate::agents::sub_recipe_execution_tool::tasks::process_task;
+use crate::agents::task::TaskConfig;
 use std::sync::Arc;
-use mcp_core::protocol::JsonRpcMessage;
-use tokio::sync::mpsc;
 
 async fn receive_task(state: &SharedState) -> Option<Task> {
     let mut receiver = state.task_receiver.lock().await;
@@ -12,19 +11,19 @@ async fn receive_task(state: &SharedState) -> Option<Task> {
 pub fn spawn_worker(
     state: Arc<SharedState>,
     worker_id: usize,
-    mcp_tx: mpsc::Sender<JsonRpcMessage>,
+    task_config: TaskConfig,
 ) -> tokio::task::JoinHandle<()> {
     state.increment_active_workers();
 
     tokio::spawn(async move {
-        worker_loop(state, worker_id, mcp_tx).await;
+        worker_loop(state, worker_id, task_config).await;
     })
 }
 
-async fn worker_loop(state: Arc<SharedState>, _worker_id: usize, mcp_tx: mpsc::Sender<JsonRpcMessage>) {
+async fn worker_loop(state: Arc<SharedState>, _worker_id: usize, task_config: TaskConfig) {
     while let Some(task) = receive_task(&state).await {
         state.task_execution_tracker.start_task(&task.id).await;
-        let result = process_task(&task, state.task_execution_tracker.clone(), mcp_tx.clone(), None, None).await;
+        let result = process_task(&task, state.task_execution_tracker.clone(), task_config.clone()).await;
 
         if let Err(e) = state.result_sender.send(result).await {
             tracing::error!("Worker failed to send result: {}", e);

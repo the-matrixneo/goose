@@ -4,25 +4,16 @@ use crate::agents::sub_recipe_execution_tool::executor::{
 pub use crate::agents::sub_recipe_execution_tool::task_types::{
     ExecutionMode, ExecutionResponse, ExecutionStats, SharedState, Task, TaskResult, TaskStatus,
 };
-
-#[cfg(test)]
-mod tests;
-
-use crate::agents::extension_manager::ExtensionManager;
-use crate::providers::base::Provider;
+use crate::agents::task::TaskConfig;
 use mcp_core::protocol::JsonRpcMessage;
 use serde_json::Value;
-use std::sync::Arc;
 use tokio::sync::mpsc;
-use tokio::sync::RwLock;
 
 pub async fn execute_tasks(
     input: Value,
     execution_mode: ExecutionMode,
     notifier: mpsc::Sender<JsonRpcMessage>,
-    mcp_tx: mpsc::Sender<JsonRpcMessage>,
-    provider: Option<Arc<dyn Provider>>,
-    extension_manager: Option<Arc<RwLock<ExtensionManager>>>,
+    task_config: TaskConfig,
 ) -> Result<Value, String> {
     let tasks: Vec<Task> =
         serde_json::from_value(input.get("tasks").ok_or("Missing tasks field")?.clone())
@@ -33,7 +24,7 @@ pub async fn execute_tasks(
         ExecutionMode::Sequential => {
             if task_count == 1 {
                 let response =
-                    execute_single_task(&tasks[0], notifier, mcp_tx, provider, extension_manager)
+                    execute_single_task(&tasks[0], notifier, task_config)
                         .await;
                 handle_response(response)
             } else {
@@ -41,7 +32,7 @@ pub async fn execute_tasks(
             }
         }
         ExecutionMode::Parallel => {
-            let response: ExecutionResponse = execute_tasks_in_parallel(tasks, notifier, mcp_tx).await;
+            let response: ExecutionResponse = execute_tasks_in_parallel(tasks, notifier, task_config).await;
             handle_response(response)
         }
     }

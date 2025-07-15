@@ -4,25 +4,19 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
-use tokio::sync::mpsc;
 use tokio::time::timeout;
 
-use crate::agents::extension_manager::ExtensionManager;
 use crate::agents::sub_recipe_execution_tool::task_execution_tracker::TaskExecutionTracker;
 use crate::agents::sub_recipe_execution_tool::task_types::{Task, TaskResult, TaskStatus};
 use crate::agents::subagent_handler::run_complete_subagent_task;
-use crate::providers::base::Provider;
-use mcp_core::protocol::JsonRpcMessage;
-use tokio::sync::RwLock;
+use crate::agents::task::TaskConfig;
 
 const DEFAULT_TASK_TIMEOUT_SECONDS: u64 = 300;
 
 pub async fn process_task(
     task: &Task,
     task_execution_tracker: Arc<TaskExecutionTracker>,
-    mcp_tx: mpsc::Sender<JsonRpcMessage>,
-    provider: Option<Arc<dyn Provider>>,
-    extension_manager: Option<Arc<RwLock<ExtensionManager>>>,
+    task_config: TaskConfig,
 ) -> TaskResult {
     let timeout_in_seconds = task
         .timeout_in_seconds
@@ -36,9 +30,7 @@ pub async fn process_task(
         get_task_result(
             task_clone,
             task_execution_tracker,
-            mcp_tx,
-            provider,
-            extension_manager,
+            task_config,
         ),
     )
     .await
@@ -76,18 +68,14 @@ pub async fn process_task(
 async fn get_task_result(
     task: Task,
     task_execution_tracker: Arc<TaskExecutionTracker>,
-    mcp_tx: mpsc::Sender<JsonRpcMessage>,
-    provider: Option<Arc<dyn Provider>>,
-    extension_manager: Option<Arc<RwLock<ExtensionManager>>>,
+    task_config: TaskConfig,
 ) -> Result<Value, String> {
     if task.task_type == "text_instruction" {
         // Handle text_instruction tasks using subagent system
         handle_text_instruction_task(
             task,
             task_execution_tracker,
-            mcp_tx,
-            provider,
-            extension_manager,
+            task_config,
         )
         .await
     } else {
@@ -112,34 +100,38 @@ async fn get_task_result(
 async fn handle_text_instruction_task(
     task: Task,
     task_execution_tracker: Arc<TaskExecutionTracker>,
-    mcp_tx: mpsc::Sender<JsonRpcMessage>,
-    provider: Option<Arc<dyn Provider>>,
-    extension_manager: Option<Arc<RwLock<ExtensionManager>>>,
+    task_config: TaskConfig,
 ) -> Result<Value, String> {
     let text_instruction = task
         .get_text_instruction()
         .ok_or_else(|| format!("Task {}: Missing text_instruction", task.id))?;
 
-    // Check if we have the required dependencies for subagent execution
-    let (provider, extension_manager) = match (provider, extension_manager) {
-        (Some(p), Some(em)) => (p, em),
-        _ => {
-            return Err(
-                "Text instruction tasks require provider and extension_manager".to_string(),
-            );
-        }
-    };
+    // Start tracking the task
+    task_execution_tracker.start_task(&task.id).await;
+
+    // Send initial status update
+    task_execution_tracker
+        .send_live_output(&task.id, &format!("Starting text instruction task: {}", text_instruction))
+        .await;
+
+    // Send progress update
+    task_execution_tracker
+        .send_live_output(&task.id, "Initializing subagent for task execution...")
+        .await;
 
     // Create arguments for the subagent task
-    let arguments = serde_json::json!({
-        "task": text_instruction,
-        "instructions": "You are a helpful assistant. Execute the given task and provide a clear, concise response.",
-        "max_turns": 5,
-        "timeout_seconds": task.timeout_in_seconds.unwrap_or(300)
+    let task_arguments = serde_json::json!({
+        "text_instruction": text_instruction,
+        // "instructions": "You are a helpful assistant. Execute the given task and provide a clear, concise response.",
     });
 
     // Execute the text instruction using the subagent system
-    match run_complete_subagent_task(arguments, mcp_tx, provider, Some(extension_manager)).await {
+    task_execution_tracker
+        .send_live_output(&task.id, "Executing text instruction with subagent...")
+        .await;
+    
+    println!("Kicking off subagent task! ");
+    match run_complete_subagent_task(task_arguments, task_config).await {
         Ok(contents) => {
             // Extract the text content from the result
             let result_text = contents
@@ -151,11 +143,37 @@ async fn handle_text_instruction_task(
                 .collect::<Vec<_>>()
                 .join("\n");
 
+            // Send completion status
+            task_execution_tracker
+                .send_live_output(&task.id, "Text instruction task completed successfully")
+                .await;
+
+            // Send result preview if it's not too long
+            if result_text.len() > 200 {
+                let preview = format!("Result preview: {}...", &result_text[..200]);
+                task_execution_tracker
+                    .send_live_output(&task.id, &preview)
+                    .await;
+            } else {
+                task_execution_tracker
+                    .send_live_output(&task.id, &format!("Result: {}", result_text))
+                    .await;
+            }
+
             Ok(serde_json::json!({
                 "result": result_text
             }))
         }
-        Err(e) => Err(format!("Subagent execution failed: {}", e)),
+        Err(e) => {
+            let error_msg = format!("Subagent execution failed: {}", e);
+            
+            // Send error status
+            task_execution_tracker
+                .send_live_output(&task.id, &error_msg)
+                .await;
+
+            Err(error_msg)
+        }
     }
 }
 

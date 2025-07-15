@@ -1,19 +1,14 @@
 use mcp_core::{tool::ToolAnnotations, Content, Tool, ToolError};
 use serde_json::Value;
 
-use crate::agents::extension_manager::ExtensionManager;
 use crate::agents::{
     sub_recipe_execution_tool::lib::execute_tasks,
     sub_recipe_execution_tool::task_types::ExecutionMode, tool_execution::ToolCallResult,
 };
-use crate::providers::base::Provider;
+use crate::agents::task::TaskConfig;
 use mcp_core::protocol::JsonRpcMessage;
-use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio_stream;
-use std::future::Future;
-use std::pin::Pin;
-use tokio::sync::RwLock;
 
 pub const SUB_RECIPE_EXECUTE_TASK_TOOL_NAME: &str = "sub_recipe__execute_task";
 pub fn create_sub_recipe_execute_task_tool() -> Tool {
@@ -119,9 +114,7 @@ Pre-created Task Based:
 
 pub async fn run_tasks(
     execute_data: Value,
-    mcp_tx: mpsc::Sender<JsonRpcMessage>,
-    provider: Option<Arc<dyn Provider>>,
-    extension_manager: Option<Arc<RwLock<ExtensionManager>>>,
+    task_config: TaskConfig,
 ) -> ToolCallResult {
     let (notification_tx, notification_rx) = mpsc::channel::<JsonRpcMessage>(100);
 
@@ -135,9 +128,7 @@ pub async fn run_tasks(
             execute_data,
             execution_mode,
             notification_tx,
-            mcp_tx,
-            provider,
-            extension_manager,
+            task_config,
         )
         .await
         {
