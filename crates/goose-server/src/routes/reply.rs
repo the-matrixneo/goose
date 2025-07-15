@@ -86,7 +86,9 @@ async fn track_failed_session(
 
         let _ = manager.track_session_execution(failed_execution).await;
     } else {
-        tracing::warn!("Telemetry is disabled or not initialized - failed to track session failure");
+        tracing::warn!(
+            "Telemetry is disabled or not initialized - failed to track session failure"
+        );
     }
 }
 
@@ -265,7 +267,8 @@ async fn reply_handler(
                             start_time,
                             None,
                             None,
-                        ).await;
+                        )
+                        .await;
 
                         if let (Some(recipe_name), Some(recipe_version)) =
                             (&request.recipe_name, &request.recipe_version)
@@ -276,7 +279,8 @@ async fn reply_handler(
                                 SessionResult::Error("No provider configured".to_string()),
                                 start_time,
                                 "streaming",
-                            ).await;
+                            )
+                            .await;
                         }
                         return;
                     }
@@ -298,7 +302,8 @@ async fn reply_handler(
                     start_time,
                     None,
                     None,
-                ).await;
+                )
+                .await;
                 return;
             }
         };
@@ -334,7 +339,8 @@ async fn reply_handler(
                     start_time,
                     None,
                     None,
-                ).await;
+                )
+                .await;
                 return;
             }
         };
@@ -362,7 +368,8 @@ async fn reply_handler(
                     start_time,
                     None,
                     None,
-                ).await;
+                )
+                .await;
                 return;
             }
         };
@@ -486,7 +493,8 @@ async fn reply_handler(
             start_time,
             message_count as u64,
             turn_count as u64,
-        ).await;
+        )
+        .await;
 
         if let (Some(recipe_name), Some(recipe_version)) =
             (&request.recipe_name, &request.recipe_version)
@@ -497,7 +505,8 @@ async fn reply_handler(
                 SessionResult::Success,
                 start_time,
                 "streaming",
-            ).await;
+            )
+            .await;
         }
     });
 
