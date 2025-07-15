@@ -903,8 +903,6 @@ export default function App() {
                 console.log('No valid route detected, navigating to chat route (hub)');
                 window.location.hash = '#/';
                 window.history.replaceState({}, '', '#/');
-              } else {
-                console.log('Already on valid route:', currentHash);
               }
             }
           } catch (error) {

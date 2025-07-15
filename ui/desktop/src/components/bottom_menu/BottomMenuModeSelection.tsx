@@ -2,7 +2,6 @@ import { useEffect, useCallback, useState } from 'react';
 import { Tornado } from 'lucide-react';
 import { all_goose_modes, ModeSelectionItem } from '../settings/mode/ModeSelectionItem';
 import { useConfig } from '../ConfigContext';
-import { View, ViewOptions } from '../../App';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,11 +9,7 @@ import {
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
 
-interface BottomMenuModeSelectionProps {
-  setView: (view: View, viewOptions?: ViewOptions) => void;
-}
-
-export const BottomMenuModeSelection = ({ setView }: BottomMenuModeSelectionProps) => {
+export const BottomMenuModeSelection = () => {
   const [gooseMode, setGooseMode] = useState('auto');
   const { read, upsert } = useConfig();
 
@@ -74,9 +69,6 @@ export const BottomMenuModeSelection = ({ setView }: BottomMenuModeSelectionProp
                 currentMode={gooseMode}
                 showDescription={false}
                 isApproveModeConfigure={false}
-                parentView="chat"
-                parentViewOptions={undefined}
-                setView={setView}
                 handleModeChange={handleModeChange}
               />
             </DropdownMenuItem>

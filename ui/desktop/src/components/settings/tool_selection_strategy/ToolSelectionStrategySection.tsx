@@ -1,11 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, ViewOptions } from '../../../App';
 import { useConfig } from '../../ConfigContext';
 import { getApiUrl, getSecretKey } from '../../../config';
-
-interface ToolSelectionStrategySectionProps {
-  setView: (view: View, viewOptions?: ViewOptions) => void;
-}
 
 interface ToolSelectionStrategy {
   key: string;
@@ -32,9 +27,7 @@ export const all_tool_selection_strategies: ToolSelectionStrategy[] = [
   },
 ];
 
-export const ToolSelectionStrategySection = ({
-  setView: _setView,
-}: ToolSelectionStrategySectionProps) => {
+export const ToolSelectionStrategySection = () => {
   const [currentStrategy, setCurrentStrategy] = useState('default');
   const [_error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);

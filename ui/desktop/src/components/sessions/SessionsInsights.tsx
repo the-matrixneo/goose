@@ -170,7 +170,7 @@ export function SessionInsights() {
       {/* Stats containers - full bleed with 2px gaps */}
       <div className="flex flex-col flex-1 space-y-0.5">
         {/* Top row with three equal columns */}
-        <div className="grid grid-cols-3 gap-0.5">
+        <div className="grid grid-cols-2 gap-0.5">
           {/* Total Sessions Card Skeleton */}
           <Card className="w-full py-6 px-6 border-none rounded-2xl bg-background-default">
             <CardContent className="flex flex-col justify-end h-full p-0">
@@ -182,14 +182,14 @@ export function SessionInsights() {
           </Card>
 
           {/* Average Duration Card Skeleton */}
-          <Card className="w-full py-6 px-6 border-none rounded-2xl bg-background-default">
-            <CardContent className="flex flex-col justify-end h-full p-0">
-              <div className="flex flex-col justify-end">
-                <Skeleton className="h-10 w-20 mb-1" />
-                <span className="text-xs text-text-muted">Avg. chat length</span>
-              </div>
-            </CardContent>
-          </Card>
+          {/*<Card className="w-full py-6 px-6 border-none rounded-2xl bg-background-default">*/}
+          {/*  <CardContent className="flex flex-col justify-end h-full p-0">*/}
+          {/*    <div className="flex flex-col justify-end">*/}
+          {/*      <Skeleton className="h-10 w-20 mb-1" />*/}
+          {/*      <span className="text-xs text-text-muted">Avg. chat length</span>*/}
+          {/*    </div>*/}
+          {/*  </CardContent>*/}
+          {/*</Card>*/}
 
           {/* Total Tokens Card Skeleton */}
           <Card className="w-full py-6 px-6 border-none rounded-2xl bg-background-default">
@@ -285,13 +285,13 @@ export function SessionInsights() {
         )}
 
         {/* Top row with three equal columns */}
-        <div className="grid grid-cols-3 gap-0.5">
+        <div className="grid grid-cols-2 gap-0.5">
           {/* Total Sessions Card */}
           <Card className="w-full py-6 px-6 border-none rounded-2xl bg-background-default">
             <CardContent className="page-transition flex flex-col justify-end h-full p-0">
               <div className="flex flex-col justify-end">
                 <p className="text-4xl font-mono font-light flex items-end">
-                  {insights?.totalSessions ?? 0}
+                  {Math.max(insights?.totalSessions ?? 0, 0)}
                 </p>
                 <span className="text-xs text-text-muted">Total sessions</span>
               </div>
@@ -299,25 +299,25 @@ export function SessionInsights() {
           </Card>
 
           {/* Average Duration Card */}
-          <Card className="w-full py-6 px-6 border-none rounded-2xl bg-background-default">
-            <CardContent className="page-transition flex flex-col justify-end h-full p-0">
-              <div className="flex flex-col justify-end">
-                <p className="text-4xl font-mono font-light flex items-end">
-                  {insights?.avgSessionDuration
-                    ? `${insights.avgSessionDuration.toFixed(1)}m`
-                    : '0.0m'}
-                </p>
-                <span className="text-xs text-text-muted">Avg. chat length</span>
-              </div>
-            </CardContent>
-          </Card>
+          {/*<Card className="w-full py-6 px-6 border-none rounded-2xl bg-background-default">*/}
+          {/*  <CardContent className="page-transition flex flex-col justify-end h-full p-0">*/}
+          {/*    <div className="flex flex-col justify-end">*/}
+          {/*      <p className="text-4xl font-mono font-light flex items-end">*/}
+          {/*        {insights?.avgSessionDuration*/}
+          {/*          ? `${insights.avgSessionDuration.toFixed(1)}m`*/}
+          {/*          : '0.0m'}*/}
+          {/*      </p>*/}
+          {/*      <span className="text-xs text-text-muted">Avg. chat length</span>*/}
+          {/*    </div>*/}
+          {/*  </CardContent>*/}
+          {/*</Card>*/}
 
           {/* Total Tokens Card */}
           <Card className="w-full py-6 px-6 border-none rounded-2xl bg-background-default">
             <CardContent className="page-transition flex flex-col justify-end h-full p-0">
               <div className="flex flex-col justify-end">
                 <p className="text-4xl font-mono font-light flex items-end">
-                  {insights?.totalTokens
+                  {insights?.totalTokens && insights.totalTokens > 0
                     ? `${(insights.totalTokens / 1000000).toFixed(2)}M`
                     : '0.00M'}
                 </p>

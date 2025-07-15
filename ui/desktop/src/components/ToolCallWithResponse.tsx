@@ -112,7 +112,26 @@ function ToolCallView({
   toolResponse,
   notifications,
 }: ToolCallViewProps) {
-  const responseStyle = localStorage.getItem('response_style');
+  const [responseStyle, setResponseStyle] = useState(() => localStorage.getItem('response_style'));
+
+  // Listen for localStorage changes to update the response style
+  useEffect(() => {
+    const handleStorageChange = () => {
+      setResponseStyle(localStorage.getItem('response_style'));
+    };
+
+    // Listen for storage events (changes from other tabs/windows)
+    window.addEventListener('storage', handleStorageChange);
+
+    // Listen for custom events (changes from same tab)
+    window.addEventListener('responseStyleChanged', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('responseStyleChanged', handleStorageChange);
+    };
+  }, []);
+
   const isExpandToolDetails = (() => {
     switch (responseStyle) {
       case 'concise':
@@ -145,10 +164,17 @@ function ToolCallView({
             const audience = item.annotations?.audience as string[] | undefined;
             return !audience || audience.includes('user');
           })
-          .map((item) => ({
-            result: item,
-            isExpandToolResults: ((item.annotations?.priority as number | undefined) ?? -1) >= 0.5,
-          }))
+          .map((item) => {
+            // Use user preference for detailed/concise, but still respect high priority items
+            const priority = (item.annotations?.priority as number | undefined) ?? -1;
+            const isHighPriority = priority >= 0.5;
+            const shouldExpandBasedOnStyle = responseStyle === 'detailed' || responseStyle === null;
+
+            return {
+              result: item,
+              isExpandToolResults: isHighPriority || shouldExpandBasedOnStyle,
+            };
+          })
       : [];
 
   const logs = notifications
@@ -174,8 +200,16 @@ function ToolCallView({
   const isRenderingProgress =
     loadingStatus === 'loading' && (progressEntries.length > 0 || (logs || []).length > 0);
 
-  // Only expand if there are actual results that need to be shown, not just for tool details
-  const isShouldExpand = toolResults.some((v) => v.isExpandToolResults);
+  // Determine if the main tool call should be expanded
+  const isShouldExpand = (() => {
+    // Always expand if there are high priority results that need to be shown
+    const hasHighPriorityResults = toolResults.some((v) => v.isExpandToolResults);
+
+    // Also expand based on user preference for detailed mode
+    const shouldExpandBasedOnStyle = responseStyle === 'detailed' || responseStyle === null;
+
+    return hasHighPriorityResults || shouldExpandBasedOnStyle;
+  })();
 
   // Function to create a descriptive representation of what the tool is doing
   const getToolDescription = (): string | null => {
@@ -358,7 +392,9 @@ function ToolCallView({
             <ToolLogsView
               logs={logs}
               working={toolResults.length === 0}
-              isStartExpanded={toolResults.length === 0}
+              isStartExpanded={
+                toolResults.length === 0 || responseStyle === 'detailed' || responseStyle === null
+              }
             />
           </div>
         )}

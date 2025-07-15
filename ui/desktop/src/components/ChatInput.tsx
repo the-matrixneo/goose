@@ -1219,14 +1219,7 @@ export default function ChatInput({
               </div>
             </Tooltip>
             <div className="w-px h-4 bg-border-default mx-2" />
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div>
-                  <BottomMenuModeSelection setView={setView} />
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>Current Goose mode configuration</TooltipContent>
-            </Tooltip>
+            <BottomMenuModeSelection />
             {messages.length > 0 && (
               <ManualSummarizeButton
                 messages={messages}

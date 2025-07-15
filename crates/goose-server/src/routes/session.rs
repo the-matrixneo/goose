@@ -168,6 +168,11 @@ async fn get_session_insights(
 
     // Calculate insights
     let total_sessions = sessions.len();
+    
+    // Debug: Log if we have very few sessions, which might indicate filtering issues
+    if total_sessions == 0 {
+        info!("Warning: No sessions found with descriptions");
+    }
 
     // Track directory usage
     let mut dir_counts: HashMap<String, usize> = HashMap::new();
@@ -180,9 +185,14 @@ async fn get_session_insights(
         let dir = session.metadata.working_dir.to_string_lossy().to_string();
         *dir_counts.entry(dir).or_insert(0) += 1;
 
-        // Track tokens
+        // Track tokens - only add positive values to prevent negative totals
         if let Some(tokens) = session.metadata.accumulated_total_tokens {
-            total_tokens += tokens as i64;
+            if tokens > 0 {
+                total_tokens += tokens as i64;
+            } else if tokens < 0 {
+                // Log negative token values for debugging
+                info!("Warning: Session {} has negative accumulated_total_tokens: {}", session.id, tokens);
+            }
         }
 
         // Track activity by date

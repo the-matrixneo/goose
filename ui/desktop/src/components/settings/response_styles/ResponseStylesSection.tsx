@@ -22,6 +22,9 @@ export const ResponseStylesSection = () => {
   const handleStyleChange = async (newStyle: string) => {
     setCurrentStyle(newStyle);
     localStorage.setItem('response_style', newStyle);
+
+    // Dispatch custom event to notify other components of the change
+    window.dispatchEvent(new CustomEvent('responseStyleChanged'));
   };
 
   return (

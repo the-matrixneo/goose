@@ -133,8 +133,10 @@ export default function ExtensionsSection({
       console.error('Failed to activate extension:', error);
       // Even if activation fails, we don't reopen the modal
     } finally {
-      // Refresh the extensions list regardless of success or failure
-      await fetchExtensions();
+      // Add a small delay to ensure backend has updated, then refresh the extensions list
+      setTimeout(async () => {
+        await fetchExtensions();
+      }, 500);
     }
   };
 
