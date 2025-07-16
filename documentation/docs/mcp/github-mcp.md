@@ -6,69 +6,163 @@ description: Add GitHub MCP Server as a Goose Extension
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 import YouTubeShortEmbed from '@site/src/components/YouTubeShortEmbed';
-import CLIStreamExtensionInstructions from '@site/src/components/CLIStreamExtensionInstructions';
+import CLIExtensionInstructions from '@site/src/components/CLIExtensionInstructions';
 
 <YouTubeShortEmbed videoUrl="https://www.youtube.com/embed/TbmQDv3SQOE" />
 
-This tutorial covers how to add the [GitHub MCP Server](https://github.com/github/github-mcp-server) as a Goose extension to enable file operations, repository management, search functionality, and more.
+This tutorial covers how to add the [GitHub MCP Server](https://github.com/modelcontextprotocol/servers/tree/main/src/github) as a Goose extension to enable file operations, repository management, search functionality, and more.
+
+## Connection Methods
+
+The GitHub MCP server supports multiple connection methods:
+
+### Stdio (Default)
+The traditional method using Node.js process communication.
 
 :::tip TLDR
 <Tabs groupId="interface">
   <TabItem value="ui" label="Goose Desktop" default>
-  Use `Add custom extension` in Settings → Extensions to add a `Streamable HTTP` extension type with:
+  [Launch the installer](goose://extension?cmd=npx&arg=-y&arg=%40modelcontextprotocol%2Fserver-github&id=github&name=GitHub&description=GitHub%20API&env=GITHUB_PERSONAL_ACCESS_TOKEN%3DGitHub%20Personal%20Access%20Token)
   </TabItem>
   <TabItem value="cli" label="Goose CLI">
-  Use `goose configure` to add a `Remote Extension (Streaming HTTP)` extension type with:
+  **Command**
+  ```sh
+  npx -y @modelcontextprotocol/server-github
+  ```
   </TabItem>
 </Tabs>
 
-  **Endpoint URL**
+  **Environment Variable**
   ```
-  https://api.githubcopilot.com/mcp/
+  GITHUB_PERSONAL_ACCESS_TOKEN: <YOUR_TOKEN>
   ```
-  **Custom Request Header**
+:::
+
+### Streamable HTTP
+A modern HTTP-based approach that's more scalable and firewall-friendly.
+
+:::tip TLDR
+<Tabs groupId="interface">
+  <TabItem value="ui" label="Goose Desktop" default>
+  [Launch the HTTP installer](goose://extension?url=http%3A%2F%2Flocalhost%3A8000%2Fmcp&transport=streamable_http&id=github-http&name=GitHub%20HTTP&description=GitHub%20API%20via%20HTTP&env=GITHUB_PERSONAL_ACCESS_TOKEN%3DGitHub%20Personal%20Access%20Token&header_Authorization=Bearer%20YOUR_TOKEN_HERE)
+  </TabItem>
+  <TabItem value="cli" label="Goose CLI">
+  **Endpoint**
   ```
-  Authorization: Bearer <YOUR_GITHUB_PERSONAL_ACCESS_TOKEN>
+  http://localhost:8000/mcp
+  ```
+  </TabItem>
+</Tabs>
+
+  **Environment Variable**
+  ```
+  GITHUB_PERSONAL_ACCESS_TOKEN: <YOUR_TOKEN>
+  ```
+  
+  **Headers (Optional)**
+  ```
+  Authorization: Bearer <YOUR_TOKEN>
   ```
 :::
 
 ## Configuration
-These steps configure the Remote MCP Server. For other deployment options, see the [official GitHub MCP Server documentation](https://github.com/github/github-mcp-server).
 
-<Tabs groupId="interface">
-  <TabItem value="ui" label="Goose Desktop" default>
-    1. Obtain a [GitHub Personal Access Token](https://github.com/settings/personal-access-tokens)
-    2. Click the gear icon `⚙️` in the top right corner
-    3. Click `Advanced settings`
-    4. Under `Extensions`, click `Add custom extension`
-    5. On the `Add custom extension` modal, enter the following:
-       - **Extension Name**: GitHub
-       - **Type**: Streamable HTTP
-       - **Endpoint**: `https://api.githubcopilot.com/mcp/`
-       - **Request Headers**: 
-         - **Header name**: `Authorization`
-         - **Value**: `Bearer <YOUR_GITHUB_PERSONAL_ACCESS_TOKEN>` 
-    6. Click `+ Add` to save the header
-    7. Click `Add Extension` to save the extension
+:::info
+Note that you'll need [Node.js](https://nodejs.org/) installed on your system to run the stdio version, as it uses `npx`. The HTTP version requires the server to be running separately.
+:::
 
+<Tabs groupId="connection-method">
+  <TabItem value="stdio" label="Stdio Connection" default>
+    <Tabs groupId="interface">
+      <TabItem value="ui" label="Goose Desktop" default>
+      1. [Launch the installer](goose://extension?cmd=npx&arg=-y&arg=%40modelcontextprotocol%2Fserver-github&id=github&name=GitHub&description=GitHub%20API&env=GITHUB_PERSONAL_ACCESS_TOKEN%3DGitHub%20Personal%20Access%20Token)
+      2. Press `Yes` to confirm the installation
+      3. Obtain a [GitHub Personal Access Token](https://github.com/settings/personal-access-tokens) and paste it in
+      4. Click `Save Configuration`
+      5. Scroll to the top and click `Exit` from the upper left corner
+      </TabItem>
+      <TabItem value="cli" label="Goose CLI">
+
+        <CLIExtensionInstructions
+          name="github"
+          command="npx -y @modelcontextprotocol/server-github"
+          timeout={300}
+          envVars={[
+            { key: "GITHUB_TOKEN", value: "••••••••••••••••" }
+          ]}
+          infoNote={
+            <>
+              When creating your access token, you can specify the repositories and granular permissions you'd like Goose to have access to.{" "}
+              <a
+                href="https://github.com/settings/personal-access-tokens"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Create one here
+              </a>.
+            </>
+          }
+        />
+
+      </TabItem>
+    </Tabs>
   </TabItem>
-  <TabItem value="cli" label="Goose CLI">
-    <CLIStreamExtensionInstructions
-      name="github"
-      endpointUri="https://api.githubcopilot.com/mcp/"
-      timeout={300}
-      headers={[
-        { key: "Authorization", value: "Bearer ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" }
-      ]}
-      infoNote={
-        <>
-          Obtain your <a href="https://github.com/settings/personal-access-tokens" target="_blank" rel="noopener noreferrer">GitHub Personal Access Token</a> and paste it in
-        </>
-      }
-    />
+  <TabItem value="http" label="HTTP Connection">
+    <Tabs groupId="interface">
+      <TabItem value="ui" label="Goose Desktop" default>
+      1. First, start the GitHub MCP server in HTTP mode:
+         ```bash
+         npx -y @modelcontextprotocol/server-github --http --port 8000
+         ```
+      2. [Launch the HTTP installer](goose://extension?url=http%3A%2F%2Flocalhost%3A8000%2Fmcp&transport=streamable_http&id=github-http&name=GitHub%20HTTP&description=GitHub%20API%20via%20HTTP&env=GITHUB_PERSONAL_ACCESS_TOKEN%3DGitHub%20Personal%20Access%20Token)
+      3. Press `Yes` to confirm the installation
+      4. Obtain a [GitHub Personal Access Token](https://github.com/settings/personal-access-tokens) and paste it in
+      5. Click `Save Configuration`
+      6. Scroll to the top and click `Exit` from the upper left corner
+      </TabItem>
+      <TabItem value="cli" label="Goose CLI">
+      1. First, start the GitHub MCP server in HTTP mode:
+         ```bash
+         npx -y @modelcontextprotocol/server-github --http --port 8000
+         ```
+      2. Add the extension manually:
+         ```bash
+         goose extension add github-http \
+           --type streamable_http \
+           --uri http://localhost:8000/mcp \
+           --env GITHUB_PERSONAL_ACCESS_TOKEN=your_token_here
+         ```
+      </TabItem>
+    </Tabs>
 
+    :::info HTTP Server Setup
+    The HTTP version requires running the GitHub MCP server separately. You can also deploy it to a cloud service for better availability and scalability.
+    :::
   </TabItem>
 </Tabs>
+
+## Deep Link Parameters
+
+For advanced users, here are the supported deep link parameters:
+
+### Stdio Deep Link
+```
+goose://extension?cmd=npx&arg=-y&arg=@modelcontextprotocol/server-github&id=github&name=GitHub&description=GitHub%20API&env=GITHUB_PERSONAL_ACCESS_TOKEN=GitHub%20Personal%20Access%20Token
+```
+
+### Streamable HTTP Deep Link
+```
+goose://extension?url=http://localhost:8000/mcp&transport=streamable_http&id=github-http&name=GitHub%20HTTP&description=GitHub%20API%20via%20HTTP&env=GITHUB_PERSONAL_ACCESS_TOKEN=GitHub%20Personal%20Access%20Token&header_Authorization=Bearer%20YOUR_TOKEN
+```
+
+**Parameters:**
+- `url`: The HTTP endpoint URL (URL-encoded)
+- `transport=streamable_http`: Specifies HTTP transport (required for HTTP)
+- `id`: Unique identifier for the extension
+- `name`: Display name for the extension
+- `description`: Description of the extension
+- `env`: Environment variables (format: `KEY=Description`)
+- `header_*`: HTTP headers (format: `header_HeaderName=value`)
 
 ## Example Usage
 
@@ -133,3 +227,20 @@ You can view the pull request at: https://github.com/angiejones/goose-demo/pull/
 
 The pull request is now ready for your review. Would you like me to do anything else with it?
 ```
+
+## Benefits of HTTP vs Stdio
+
+### Stdio Connection
+- ✅ Simple setup - no separate server needed
+- ✅ Works out of the box with Node.js
+- ❌ Less scalable for high-volume usage
+- ❌ Process management overhead
+
+### HTTP Connection  
+- ✅ More scalable and performant
+- ✅ Firewall and proxy friendly
+- ✅ Can be deployed to cloud services
+- ✅ Better for production environments
+- ✅ Supports streaming responses
+- ❌ Requires separate server setup
+- ❌ More complex deployment
