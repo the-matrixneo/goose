@@ -1,5 +1,5 @@
 use bat::WrappingMode;
-use console::{style, Color};
+use console::{Color, style};
 use goose::config::Config;
 use goose::message::{Message, MessageContent, ToolRequest, ToolResponse};
 use goose::providers::pricing::get_model_pricing;

@@ -1,7 +1,7 @@
 use crate::project::{Project, ProjectMetadata};
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use chrono::Utc;
-use etcetera::{choose_app_strategy, AppStrategy, AppStrategyArgs};
+use etcetera::{AppStrategy, AppStrategyArgs, choose_app_strategy};
 use serde_json;
 use std::fs::{self, File};
 use std::io::Write;

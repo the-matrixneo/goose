@@ -516,7 +516,7 @@ mod tests {
     use mcp_core::handler::ToolError;
     use mcp_core::prompt::PromptMessageContent;
     use mcp_core::resource::ResourceContents;
-    use serde_json::{json, Value};
+    use serde_json::{Value, json};
 
     #[test]
     fn test_message_serialization() {

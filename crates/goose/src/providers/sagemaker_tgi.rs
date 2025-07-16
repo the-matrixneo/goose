@@ -7,7 +7,7 @@ use aws_config;
 use aws_sdk_bedrockruntime::config::ProvideCredentials;
 use aws_sdk_sagemakerruntime::Client as SageMakerClient;
 use mcp_core::Tool;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tokio::time::sleep;
 
 use super::base::{ConfigKey, Provider, ProviderMetadata, ProviderUsage, Usage};

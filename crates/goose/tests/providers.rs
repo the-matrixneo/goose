@@ -255,7 +255,7 @@ impl ProviderTester {
     }
 
     async fn test_image_content_support(&self) -> Result<()> {
-        use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
+        use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
         use mcp_core::content::ImageContent;
         use std::fs;
 

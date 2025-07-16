@@ -5,8 +5,8 @@ use std::sync::OnceLock;
 
 use super::utils::verify_secret_key;
 use crate::state::AppState;
-use axum::{extract::State, routing::post, Json, Router};
-use goose::agents::{extension::Envs, ExtensionConfig};
+use axum::{Json, Router, extract::State, routing::post};
+use goose::agents::{ExtensionConfig, extension::Envs};
 use http::{HeaderMap, StatusCode};
 use serde::{Deserialize, Serialize};
 use tracing;

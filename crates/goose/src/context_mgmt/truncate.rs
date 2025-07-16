@@ -1,6 +1,6 @@
 use crate::message::{Message, MessageContent};
 use crate::utils::safe_truncate;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use mcp_core::{Content, ResourceContents, Role};
 use std::collections::HashSet;
 use tracing::{debug, warn};
@@ -41,7 +41,10 @@ fn handle_oversized_messages(
 
             if estimated_new_tokens > context_limit {
                 // Even truncated message is too large, skip it entirely
-                warn!("Skipping message {} as even truncated version ({} tokens) exceeds context limit", i, estimated_new_tokens);
+                warn!(
+                    "Skipping message {} as even truncated version ({} tokens) exceeds context limit",
+                    i, estimated_new_tokens
+                );
                 any_truncated = true;
                 continue;
             }

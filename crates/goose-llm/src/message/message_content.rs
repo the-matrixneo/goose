@@ -263,8 +263,8 @@ impl From<Content> for MessageContent {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::core::{ToolCall, ToolError};
     use crate::UniFfiTag;
+    use crate::types::core::{ToolCall, ToolError};
     use serde_json::json;
     use uniffi::{FfiConverter, RustBuffer};
 

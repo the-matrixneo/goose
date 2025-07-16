@@ -10,7 +10,7 @@ use crate::providers::base::Provider;
 use crate::utils::safe_truncate;
 use anyhow::Result;
 use chrono::Local;
-use etcetera::{choose_app_strategy, AppStrategy, AppStrategyArgs};
+use etcetera::{AppStrategy, AppStrategyArgs, choose_app_strategy};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::fs;

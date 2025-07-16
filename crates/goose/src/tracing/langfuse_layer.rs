@@ -2,7 +2,7 @@ use crate::tracing::observation_layer::{BatchManager, ObservationLayer, SpanTrac
 use chrono::Utc;
 use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::env;
 use std::sync::Arc;
 use std::time::Duration;

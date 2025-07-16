@@ -1,5 +1,5 @@
-use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicUsize};
 use tokio::sync::mpsc;
 use tokio::time::Instant;
 
@@ -7,7 +7,7 @@ use crate::agents::sub_recipe_execution_tool::lib::{
     Config, ExecutionResponse, ExecutionStats, Task, TaskResult,
 };
 use crate::agents::sub_recipe_execution_tool::tasks::process_task;
-use crate::agents::sub_recipe_execution_tool::workers::{run_scaler, spawn_worker, SharedState};
+use crate::agents::sub_recipe_execution_tool::workers::{SharedState, run_scaler, spawn_worker};
 
 pub async fn execute_single_task(task: &Task, config: Config) -> ExecutionResponse {
     let start_time = Instant::now();

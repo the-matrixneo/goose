@@ -177,7 +177,7 @@ mod tests {
     use crate::message::{Message, MessageContent};
     use crate::providers::base::{ProviderMetadata, ProviderUsage, Usage};
     use chrono::Utc;
-    use mcp_core::{content::TextContent, Role};
+    use mcp_core::{Role, content::TextContent};
     use std::env;
 
     #[allow(dead_code)]

@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use etcetera::{choose_app_strategy, AppStrategy};
+use etcetera::{AppStrategy, choose_app_strategy};
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -7,8 +7,8 @@ use std::sync::Once;
 use tokio::sync::Mutex;
 use tracing_appender::rolling::Rotation;
 use tracing_subscriber::{
-    filter::LevelFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Layer,
-    Registry,
+    EnvFilter, Layer, Registry, filter::LevelFilter, fmt, layer::SubscriberExt,
+    util::SubscriberInitExt,
 };
 
 use goose::tracing::langfuse_layer;

@@ -2,11 +2,11 @@ use crate::message::{Message, MessageContent};
 use crate::model::ModelConfig;
 use crate::providers::base::Usage;
 use crate::providers::errors::ProviderError;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use mcp_core::content::Content;
 use mcp_core::role::Role;
 use mcp_core::tool::{Tool, ToolCall};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::HashSet;
 
 // Constants for frequently used strings in Anthropic API format
@@ -541,9 +541,11 @@ mod tests {
                 thinking.thinking,
                 "This is a step-by-step thought process..."
             );
-            assert!(thinking
-                .signature
-                .starts_with("EuYBCkQYAiJAVbJNBoH7HQiDcMwwAMhWqNyoe4G2xHRprK8ICM8g"));
+            assert!(
+                thinking
+                    .signature
+                    .starts_with("EuYBCkQYAiJAVbJNBoH7HQiDcMwwAMhWqNyoe4G2xHRprK8ICM8g")
+            );
         } else {
             panic!("Expected Thinking content at index 0");
         }

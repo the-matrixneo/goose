@@ -5,7 +5,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use aws_sdk_bedrockruntime::config::ProvideCredentials;
 use aws_sdk_bedrockruntime::operation::converse::ConverseError;
-use aws_sdk_bedrockruntime::{types as bedrock, Client};
+use aws_sdk_bedrockruntime::{Client, types as bedrock};
 use mcp_core::Tool;
 use serde_json::Value;
 use tokio::time::sleep;

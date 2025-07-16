@@ -555,10 +555,12 @@ mod tests {
             "Expected error for relative path, got: {:?}",
             result
         );
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("must be an absolute path"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("must be an absolute path")
+        );
 
         // Clean up
         // TODO: Audit that the environment access only happens in single-threaded code.

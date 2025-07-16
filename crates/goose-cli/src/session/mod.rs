@@ -7,20 +7,20 @@ mod prompt;
 mod thinking;
 
 pub use self::export::message_to_markdown;
-pub use builder::{build_session, SessionBuilderConfig, SessionSettings};
+pub use builder::{SessionBuilderConfig, SessionSettings, build_session};
 use console::Color;
 use goose::agents::AgentEvent;
 use goose::message::push_message;
-use goose::permission::permission_confirmation::PrincipalType;
 use goose::permission::Permission;
 use goose::permission::PermissionConfirmation;
+use goose::permission::permission_confirmation::PrincipalType;
 use goose::providers::base::Provider;
 pub use goose::session::Identifier;
 use goose::utils::safe_truncate;
 
 use anyhow::{Context, Result};
 use completion::GooseCompleter;
-use etcetera::{choose_app_strategy, AppStrategy};
+use etcetera::{AppStrategy, choose_app_strategy};
 use goose::agents::extension::{Envs, ExtensionConfig};
 use goose::agents::{Agent, SessionConfig};
 use goose::config::Config;
@@ -33,7 +33,7 @@ use mcp_core::prompt::PromptMessage;
 use mcp_core::protocol::JsonRpcMessage;
 use mcp_core::protocol::JsonRpcNotification;
 
-use rand::{distributions::Alphanumeric, Rng};
+use rand::{Rng, distributions::Alphanumeric};
 use rustyline::EditMode;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -91,7 +91,9 @@ pub async fn classify_planner_response(
     message_text: String,
     provider: Arc<dyn Provider>,
 ) -> Result<PlannerResponseType> {
-    let prompt = format!("The text below is the output from an AI model which can either provide a plan or list of clarifying questions. Based on the text below, decide if the output is a \"plan\" or \"clarifying questions\".\n---\n{message_text}");
+    let prompt = format!(
+        "The text below is the output from an AI model which can either provide a plan or list of clarifying questions. Based on the text below, decide if the output is a \"plan\" or \"clarifying questions\".\n---\n{message_text}"
+    );
 
     // Generate the description
     let message = Message::user().with_text(&prompt);
@@ -478,7 +480,10 @@ impl Session {
                                 Some(&content),
                                 session_id.as_deref(),
                             ) {
-                                eprintln!("Warning: Failed to update project tracker with instruction: {}", e);
+                                eprintln!(
+                                    "Warning: Failed to update project tracker with instruction: {}",
+                                    e
+                                );
                             }
 
                             // Get the provider from the agent for description generation

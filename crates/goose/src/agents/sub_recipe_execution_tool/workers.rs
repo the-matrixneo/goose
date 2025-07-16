@@ -1,9 +1,9 @@
 use crate::agents::sub_recipe_execution_tool::tasks::process_task;
 use crate::agents::sub_recipe_execution_tool::types::{Task, TaskResult};
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use tokio::sync::mpsc;
-use tokio::time::{sleep, Duration};
+use tokio::time::{Duration, sleep};
 
 #[cfg(test)]
 mod tests {
