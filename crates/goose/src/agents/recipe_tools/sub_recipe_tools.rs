@@ -106,11 +106,8 @@ pub async fn create_sub_recipe_task(sub_recipe: &SubRecipe, params: Value) -> Re
 
     // Include config if present
     if let Some(config) = &sub_recipe.config {
-        payload["config"] = json!({
-            "timeout_seconds": config.timeout_seconds,
-            "max_workers": config.max_workers,
-            "initial_workers": config.initial_workers,
-        });
+        payload["config"] = serde_json::to_value(config)
+            .map_err(|e| anyhow::anyhow!("Failed to serialize config: {}", e))?;
     }
 
     let task = Task {

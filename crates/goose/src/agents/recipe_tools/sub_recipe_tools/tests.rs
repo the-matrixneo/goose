@@ -209,5 +209,34 @@ mod tests {
             assert!(task["payload"]["sub_recipe"].is_object());
             assert!(task["payload"]["config"].is_null());
         }
+
+        #[tokio::test]
+        async fn test_create_sub_recipe_task_with_partial_config() {
+            let mut sub_recipe = setup_sub_recipe();
+            sub_recipe.config = Some(SubRecipeConfig {
+                timeout_seconds: Some(600),
+                max_workers: None,     // This should not appear in JSON
+                initial_workers: None, // This should not appear in JSON
+            });
+
+            let params = serde_json::json!({
+                "param1": "value1"
+            });
+
+            let result = create_sub_recipe_task(&sub_recipe, params).await.unwrap();
+            let task: Value = serde_json::from_str(&result).unwrap();
+
+            // Verify the task structure
+            assert_eq!(task["task_type"], "sub_recipe");
+            assert!(task["payload"]["sub_recipe"].is_object());
+            assert!(task["payload"]["config"].is_object());
+
+            let config = &task["payload"]["config"];
+            assert_eq!(config["timeout_seconds"], 600);
+
+            // These fields should not be present (not even as null) due to skip_serializing_if
+            assert!(!config.as_object().unwrap().contains_key("max_workers"));
+            assert!(!config.as_object().unwrap().contains_key("initial_workers"));
+        }
     }
 }
