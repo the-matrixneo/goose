@@ -7,7 +7,10 @@ mod prompt;
 mod task_execution_display;
 mod thinking;
 
-use crate::session::task_execution_display::TASK_EXECUTION_NOTIFICATION_TYPE;
+use crate::session::task_execution_display::{
+    format_task_execution_notification, TASK_EXECUTION_NOTIFICATION_TYPE,
+};
+use std::io::Write;
 
 pub use self::export::message_to_markdown;
 pub use builder::{build_session, SessionBuilderConfig, SessionSettings};
@@ -1072,13 +1075,13 @@ impl Session {
                                         // Handle subagent notifications - show immediately
                                         if let Some(_id) = subagent_id {
                                             // TODO: proper display for subagent notifications
-                                            // if interactive {
-                                            //     let _ = progress_bars.hide();
-                                            //     println!("{}", console::style(&formatted_message).green().dim());
-                                            // } else {
-                                            //     progress_bars.log(&formatted_message);
-                                            // }
-                                            continue;
+                                            if interactive {
+                                                let _ = progress_bars.hide();
+                                                println!("{}", console::style(&formatted_message).green().dim());
+                                            } else {
+                                                progress_bars.log(&formatted_message);
+                                            }
+                                            // continue;
                                         } else if let Some(ref notification_type) = _notification_type {
                                             if notification_type == TASK_EXECUTION_NOTIFICATION_TYPE {
                                                 if interactive {
