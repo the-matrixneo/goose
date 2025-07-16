@@ -33,15 +33,21 @@ fn main() {
         ..Default::default()
     };
 
-    let bindings = cbindgen::Builder::new()
+    let out_path = PathBuf::from(&crate_dir).join("include");
+    std::fs::create_dir_all(&out_path).expect("Failed to create include directory");
+    cbindgen::Builder::new()
         .with_crate(&crate_dir)
         .with_config(config)
         .generate()
-        .expect("Unable to generate bindings");
-
-    let out_path = PathBuf::from(&crate_dir).join("include");
-    std::fs::create_dir_all(&out_path).expect("Failed to create include directory");
-    bindings.write_to_file(out_path.join("goose_ffi.h"));
+        .map_or_else(
+            |error| match error {
+                cbindgen::Error::ParseSyntaxError { .. } => {}
+                e => panic!("{:?}", e),
+            },
+            |bindings| {
+                bindings.write_to_file(out_path.join("goose_ffi.h"));
+            },
+        );
 
     println!("cargo:rerun-if-changed=src/lib.rs");
     println!("cargo:rerun-if-changed=build.rs");
