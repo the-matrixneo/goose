@@ -554,15 +554,15 @@ impl Provider for DatabricksProvider {
 
         if !response.status().is_success() {
             let status = response.status();
-            if let Ok(error_text) = response.text().await {
+            match response.text().await { Ok(error_text) => {
                 tracing::warn!(
                     "Failed to fetch Databricks models: {} - {}",
                     status,
                     error_text
                 );
-            } else {
+            } _ => {
                 tracing::warn!("Failed to fetch Databricks models: {}", status);
-            }
+            }}
             return Ok(None); // Return None to fall back to manual input
         }
 

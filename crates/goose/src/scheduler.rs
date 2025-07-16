@@ -1008,15 +1008,15 @@ impl Scheduler {
                 // Abort the running task if it exists
                 {
                     let mut running_tasks_guard = self.running_tasks.lock().await;
-                    if let Some(abort_handle) = running_tasks_guard.remove(sched_id) {
+                    match running_tasks_guard.remove(sched_id) { Some(abort_handle) => {
                         abort_handle.abort();
                         tracing::info!("Aborted running task for job '{}'", sched_id);
-                    } else {
+                    } _ => {
                         tracing::warn!(
                             "No abort handle found for job '{}' in running tasks map",
                             sched_id
                         );
-                    }
+                    }}
                 }
 
                 // Mark the job as no longer running
@@ -1395,8 +1395,10 @@ mod tests {
     #[tokio::test]
     async fn test_scheduled_session_has_schedule_id() -> Result<(), Box<dyn std::error::Error>> {
         // Set environment variables for the test
-        env::set_var("GOOSE_PROVIDER", "test_provider");
-        env::set_var("GOOSE_MODEL", "test_model");
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { env::set_var("GOOSE_PROVIDER", "test_provider") };
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { env::set_var("GOOSE_MODEL", "test_model") };
 
         let temp_dir = tempdir()?;
         let recipe_dir = temp_dir.path().join("recipes_for_test_scheduler");
@@ -1489,8 +1491,10 @@ mod tests {
         );
 
         // Clean up environment variables
-        env::remove_var("GOOSE_PROVIDER");
-        env::remove_var("GOOSE_MODEL");
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { env::remove_var("GOOSE_PROVIDER") };
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { env::remove_var("GOOSE_MODEL") };
 
         Ok(())
     }

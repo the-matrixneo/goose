@@ -50,14 +50,14 @@ pub async fn pdf_tool(
                                                     }
                                                     // "TJ" operator: show text with positioning
                                                     "TJ" => {
-                                                        if let Some(Object::Array(ref arr)) =
+                                                        if let Some(Object::Array(arr)) =
                                                             operation.operands.first()
                                                         {
                                                             let mut last_was_text = false;
                                                             for element in arr {
                                                                 match element {
                                                                     Object::String(
-                                                                        ref bytes,
+                                                                        bytes,
                                                                         _,
                                                                     ) => {
                                                                         if let Ok(s) =

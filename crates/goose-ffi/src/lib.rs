@@ -94,8 +94,8 @@ pub struct AsyncResult {
 ///
 /// The result pointer must be a valid pointer returned by a goose FFI function,
 /// or NULL.
-#[no_mangle]
-pub unsafe extern "C" fn goose_free_async_result(result: *mut AsyncResult) {
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn goose_free_async_result(result: *mut AsyncResult) { unsafe {
     if !result.is_null() {
         let result = &mut *result;
         if !result.error_message.is_null() {
@@ -103,7 +103,7 @@ pub unsafe extern "C" fn goose_free_async_result(result: *mut AsyncResult) {
         }
         let _ = Box::from_raw(result);
     }
-}
+}}
 
 /// Create a new agent with the given provider configuration
 ///
@@ -119,8 +119,8 @@ pub unsafe extern "C" fn goose_free_async_result(result: *mut AsyncResult) {
 ///
 /// The config pointer must be valid or NULL. The resulting agent must be freed
 /// with goose_agent_free when no longer needed.
-#[no_mangle]
-pub unsafe extern "C" fn goose_agent_new(config: *const ProviderConfigFFI) -> AgentPtr {
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn goose_agent_new(config: *const ProviderConfigFFI) -> AgentPtr { unsafe {
     // Check for null pointer
     if config.is_null() {
         eprintln!("Error: config pointer is null");
@@ -189,7 +189,7 @@ pub unsafe extern "C" fn goose_agent_new(config: *const ProviderConfigFFI) -> Ag
             ptr::null_mut()
         }
     }
-}
+}}
 
 /// Free an agent
 ///
@@ -204,12 +204,12 @@ pub unsafe extern "C" fn goose_agent_new(config: *const ProviderConfigFFI) -> Ag
 /// The agent_ptr must be a valid pointer returned by goose_agent_new,
 /// or have a null internal pointer. The agent_ptr must not be used after
 /// calling this function.
-#[no_mangle]
-pub unsafe extern "C" fn goose_agent_free(agent_ptr: AgentPtr) {
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn goose_agent_free(agent_ptr: AgentPtr) { unsafe {
     if !agent_ptr.is_null() {
         let _ = Box::from_raw(agent_ptr);
     }
-}
+}}
 
 /// Send a message to the agent and get the response
 ///
@@ -231,11 +231,11 @@ pub unsafe extern "C" fn goose_agent_free(agent_ptr: AgentPtr) {
 ///
 /// The agent_ptr must be a valid pointer returned by goose_agent_new.
 /// The message must be a valid C string.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn goose_agent_send_message(
     agent_ptr: AgentPtr,
     message: *const c_char,
-) -> *mut c_char {
+) -> *mut c_char { unsafe {
     if agent_ptr.is_null() || message.is_null() {
         return ptr::null_mut();
     }
@@ -279,7 +279,7 @@ pub unsafe extern "C" fn goose_agent_send_message(
     });
 
     string_to_c_char(&response)
-}
+}}
 
 // Tool schema creation will be implemented in a future commit
 
@@ -295,12 +295,12 @@ pub unsafe extern "C" fn goose_agent_send_message(
 ///
 /// The string must have been allocated by a goose FFI function, or be NULL.
 /// The string must not be used after calling this function.
-#[no_mangle]
-pub unsafe extern "C" fn goose_free_string(s: *mut c_char) {
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn goose_free_string(s: *mut c_char) { unsafe {
     if !s.is_null() {
         let _ = CString::from_raw(s);
     }
-}
+}}
 
 // Helper function to convert a Rust string to a C char pointer
 fn string_to_c_char(s: &str) -> *mut c_char {

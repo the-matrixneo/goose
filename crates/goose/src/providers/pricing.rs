@@ -315,15 +315,15 @@ pub async fn get_all_pricing() -> HashMap<String, HashMap<String, PricingInfo>> 
         cached.pricing.clone()
     } else {
         // Try loading from disk
-        if let Ok(Some(disk_cache)) = PRICING_CACHE.load_from_disk().await {
+        match PRICING_CACHE.load_from_disk().await { Ok(Some(disk_cache)) => {
             // Update memory cache
             drop(cache);
             let mut write_cache = PRICING_CACHE.memory_cache.write().await;
             *write_cache = Some(disk_cache.clone());
             disk_cache.pricing
-        } else {
+        } _ => {
             HashMap::new()
-        }
+        }}
     }
 }
 

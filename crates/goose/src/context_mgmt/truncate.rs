@@ -89,7 +89,7 @@ fn truncate_message_content(message: &Message, max_content_size: usize) -> Resul
             MessageContent::ToolResponse(tool_response) => {
                 if let Ok(ref mut result) = tool_response.tool_result {
                     for content_item in result {
-                        if let Content::Text(ref mut text_content) = content_item {
+                        if let Content::Text(text_content) = content_item {
                             if text_content.text.chars().count() > max_content_size {
                                 let truncated = format!(
                                     "{}\n\n[... tool response truncated from {} to {} characters ...]",
@@ -101,7 +101,7 @@ fn truncate_message_content(message: &Message, max_content_size: usize) -> Resul
                             }
                         }
                         // Handle Resource content which might contain large text
-                        else if let Content::Resource(ref mut resource_content) = content_item {
+                        else if let Content::Resource(resource_content) = content_item {
                             if let ResourceContents::TextResourceContents { text, .. } =
                                 &mut resource_content.resource
                             {

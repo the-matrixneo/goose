@@ -81,7 +81,7 @@ impl EvalRunner {
         work_dir.set_eval(&bench_eval.selector, run_id);
         tracing::info!("Set evaluation directory for {}", bench_eval.selector);
 
-        if let Some(eval) = EvaluationSuite::from(&bench_eval.selector) {
+        match EvaluationSuite::from(&bench_eval.selector) { Some(eval) => {
             let now_stamp = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .context("Failed to get current timestamp")?
@@ -166,10 +166,10 @@ impl EvalRunner {
             .context("Failed to copy session file to evaluation directory")?;
 
             tracing::info!("Evaluation completed successfully");
-        } else {
+        } _ => {
             tracing::error!("No evaluation found for selector: {}", bench_eval.selector);
             bail!("No evaluation found for selector: {}", bench_eval.selector);
-        }
+        }}
 
         Ok(())
     }

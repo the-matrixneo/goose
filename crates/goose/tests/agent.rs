@@ -841,7 +841,7 @@ mod max_turns_tests {
         while let Some(response_result) = reply_stream.next().await {
             match response_result {
                 Ok(AgentEvent::Message(response)) => {
-                    if let Some(MessageContent::ToolConfirmationRequest(ref req)) =
+                    if let Some(MessageContent::ToolConfirmationRequest(req)) =
                         response.content.first()
                     {
                         agent.handle_confirmation(

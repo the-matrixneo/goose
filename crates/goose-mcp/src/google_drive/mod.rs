@@ -1286,7 +1286,7 @@ impl GoogleDriveRouter {
                 uri, e
             ))),
             Ok(r) => {
-                if let Ok(body) = r.into_body().collect().await {
+                match r.into_body().collect().await { Ok(body) => {
                     if let Ok(response) = String::from_utf8(body.to_bytes().to_vec()) {
                         if !include_images {
                             let content = self.strip_image_body(&response);
@@ -1310,12 +1310,12 @@ impl GoogleDriveRouter {
                             uri,
                         )))
                     }
-                } else {
+                } _ => {
                     Err(ToolError::ExecutionError(format!(
                         "Failed to export google drive document, {}.",
                         uri,
                     )))
-                }
+                }}
             }
         }
     }
@@ -1344,7 +1344,7 @@ impl GoogleDriveRouter {
             ))),
             Ok(r) => {
                 if mime_type.starts_with("text/") || mime_type == "application/json" {
-                    if let Ok(body) = r.0.into_body().collect().await {
+                    match r.0.into_body().collect().await { Ok(body) => {
                         if let Ok(response) = String::from_utf8(body.to_bytes().to_vec()) {
                             if !include_images {
                                 let content = self.strip_image_body(&response);
@@ -1368,12 +1368,12 @@ impl GoogleDriveRouter {
                                 uri,
                             )))
                         }
-                    } else {
+                    } _ => {
                         Err(ToolError::ExecutionError(format!(
                             "Failed to get google drive document, {}.",
                             uri,
                         )))
-                    }
+                    }}
                 } else {
                     //TODO: handle base64 image case, see typscript mcp-gdrive
                     Err(ToolError::ExecutionError(format!(

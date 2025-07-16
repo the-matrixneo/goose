@@ -1236,7 +1236,7 @@ pub async fn configure_tool_permissions_dialog() -> Result<(), Box<dyn Error>> {
     let agent = Agent::new();
     let new_provider = create(&provider_name, model_config)?;
     agent.update_provider(new_provider).await?;
-    if let Ok(Some(config)) = ExtensionConfigManager::get_config_by_name(&selected_extension_name) {
+    match ExtensionConfigManager::get_config_by_name(&selected_extension_name) { Ok(Some(config)) => {
         agent
             .add_extension(config.clone())
             .await
@@ -1247,14 +1247,14 @@ pub async fn configure_tool_permissions_dialog() -> Result<(), Box<dyn Error>> {
                     config.name()
                 );
             });
-    } else {
+    } _ => {
         println!(
             "{} Configuration not found for extension: {}",
             style("Warning").yellow().italic(),
             selected_extension_name
         );
         return Ok(());
-    }
+    }}
 
     let mut permission_manager = PermissionManager::default();
     let selected_tools = agent

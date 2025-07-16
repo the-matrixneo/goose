@@ -34,7 +34,7 @@ pub fn ensure_project_dir() -> Result<PathBuf> {
 fn generate_project_id() -> String {
     use rand::Rng;
     let timestamp = Utc::now().timestamp();
-    let random: u32 = rand::thread_rng().gen();
+    let random: u32 = rand::thread_rng().r#gen();
     format!("proj_{}_{}", timestamp, random)
 }
 

@@ -779,7 +779,8 @@ mod tests {
         assert_eq!(value, "test_value");
 
         // Test with environment variable override
-        std::env::set_var("TEST_KEY", "env_value");
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::set_var("TEST_KEY", "env_value") };
         let value: String = config.get_param("test_key")?;
         assert_eq!(value, "env_value");
 
@@ -888,10 +889,12 @@ mod tests {
         assert_eq!(value, "secret123");
 
         // Test environment variable override
-        std::env::set_var("API_KEY", "env_secret");
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::set_var("API_KEY", "env_secret") };
         let value: String = config.get_secret("api_key")?;
         assert_eq!(value, "env_secret");
-        std::env::remove_var("API_KEY");
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::remove_var("API_KEY") };
 
         // Test deleting a secret
         config.delete_secret("api_key")?;

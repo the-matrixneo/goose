@@ -526,14 +526,16 @@ mod tests {
         let custom_path = temp_dir.path().join("custom_vector_db");
 
         // Set the environment variable
-        env::set_var("GOOSE_VECTOR_DB_PATH", custom_path.to_str().unwrap());
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { env::set_var("GOOSE_VECTOR_DB_PATH", custom_path.to_str().unwrap()) };
 
         // Test that get_db_path returns the custom path
         let db_path = ToolVectorDB::get_db_path()?;
         assert_eq!(db_path, custom_path);
 
         // Clean up
-        env::remove_var("GOOSE_VECTOR_DB_PATH");
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { env::remove_var("GOOSE_VECTOR_DB_PATH") };
 
         Ok(())
     }
@@ -544,7 +546,8 @@ mod tests {
         use std::env;
 
         // Test that relative paths are rejected
-        env::set_var("GOOSE_VECTOR_DB_PATH", "relative/path");
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { env::set_var("GOOSE_VECTOR_DB_PATH", "relative/path") };
 
         let result = ToolVectorDB::get_db_path();
         assert!(
@@ -558,7 +561,8 @@ mod tests {
             .contains("must be an absolute path"));
 
         // Clean up
-        env::remove_var("GOOSE_VECTOR_DB_PATH");
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { env::remove_var("GOOSE_VECTOR_DB_PATH") };
     }
 
     #[test]
@@ -567,7 +571,8 @@ mod tests {
         use std::env;
 
         // Ensure no custom path is set
-        env::remove_var("GOOSE_VECTOR_DB_PATH");
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { env::remove_var("GOOSE_VECTOR_DB_PATH") };
 
         // Test that it falls back to default XDG path
         let db_path = ToolVectorDB::get_db_path()?;

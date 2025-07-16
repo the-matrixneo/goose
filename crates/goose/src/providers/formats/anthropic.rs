@@ -657,7 +657,8 @@ mod tests {
         let original_value = std::env::var("CLAUDE_THINKING_ENABLED").ok();
 
         // Set the env var for this test
-        std::env::set_var("CLAUDE_THINKING_ENABLED", "true");
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::set_var("CLAUDE_THINKING_ENABLED", "true") };
 
         // Execute the test
         let result = (|| {
@@ -686,8 +687,10 @@ mod tests {
 
         // Restore the original env var state
         match original_value {
-            Some(val) => std::env::set_var("CLAUDE_THINKING_ENABLED", val),
-            None => std::env::remove_var("CLAUDE_THINKING_ENABLED"),
+            // TODO: Audit that the environment access only happens in single-threaded code.
+            Some(val) => unsafe { std::env::set_var("CLAUDE_THINKING_ENABLED", val) },
+            // TODO: Audit that the environment access only happens in single-threaded code.
+            None => unsafe { std::env::remove_var("CLAUDE_THINKING_ENABLED") },
         }
 
         // Return the test result
