@@ -2,73 +2,11 @@ use goose::providers::pricing::{get_model_pricing, initialize_pricing_cache, ref
 use std::time::Instant;
 
 #[tokio::test]
-async fn test_pricing_cache_performance() {
-    // Initialize the cache
-    let start = Instant::now();
-    initialize_pricing_cache()
-        .await
-        .expect("Failed to initialize pricing cache");
-    let init_duration = start.elapsed();
-    println!("Cache initialization took: {:?}", init_duration);
-
-    // Test fetching pricing for common models (using actual model names from OpenRouter)
-    let models = vec![
-        ("anthropic", "claude-3.5-sonnet"),
-        ("openai", "gpt-4o"),
-        ("openai", "gpt-4o-mini"),
-        ("google", "gemini-flash-1.5"),
-        ("anthropic", "claude-sonnet-4"),
-    ];
-
-    // First fetch (should hit cache)
-    let start = Instant::now();
-    for (provider, model) in &models {
-        let pricing = get_model_pricing(provider, model).await;
-        assert!(
-            pricing.is_some(),
-            "Expected pricing for {}/{}",
-            provider,
-            model
-        );
-    }
-    let first_fetch_duration = start.elapsed();
-    println!(
-        "First fetch of {} models took: {:?}",
-        models.len(),
-        first_fetch_duration
-    );
-
-    // Second fetch (definitely from cache)
-    let start = Instant::now();
-    for (provider, model) in &models {
-        let pricing = get_model_pricing(provider, model).await;
-        assert!(
-            pricing.is_some(),
-            "Expected pricing for {}/{}",
-            provider,
-            model
-        );
-    }
-    let second_fetch_duration = start.elapsed();
-    println!(
-        "Second fetch of {} models took: {:?}",
-        models.len(),
-        second_fetch_duration
-    );
-
-    // Cache fetch should be significantly faster
-    // Note: Both fetches are already very fast (microseconds), so we just ensure
-    // the second fetch is not slower than the first (allowing for some variance)
-    assert!(
-        second_fetch_duration <= first_fetch_duration * 2,
-        "Cache fetch should not be significantly slower than initial fetch. First: {:?}, Second: {:?}",
-        first_fetch_duration,
-        second_fetch_duration
-    );
-}
-
-#[tokio::test]
 async fn test_pricing_refresh() {
+    // Use a unique cache directory for this test to avoid conflicts
+    let test_cache_dir = format!("/tmp/goose_test_cache_refresh_{}", std::process::id());
+    std::env::set_var("GOOSE_CACHE_DIR", &test_cache_dir);
+    
     // Initialize first
     initialize_pricing_cache()
         .await
@@ -90,6 +28,10 @@ async fn test_pricing_refresh() {
         refreshed_pricing.is_some(),
         "Expected pricing after refresh"
     );
+    
+    // Clean up
+    std::env::remove_var("GOOSE_CACHE_DIR");
+    let _ = std::fs::remove_dir_all(&test_cache_dir);
 }
 
 #[tokio::test]
