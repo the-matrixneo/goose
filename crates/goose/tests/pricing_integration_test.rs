@@ -6,7 +6,7 @@ async fn test_pricing_refresh() {
     // Use a unique cache directory for this test to avoid conflicts
     let test_cache_dir = format!("/tmp/goose_test_cache_refresh_{}", std::process::id());
     std::env::set_var("GOOSE_CACHE_DIR", &test_cache_dir);
-    
+
     // Initialize first
     initialize_pricing_cache()
         .await
@@ -28,7 +28,7 @@ async fn test_pricing_refresh() {
         refreshed_pricing.is_some(),
         "Expected pricing after refresh"
     );
-    
+
     // Clean up
     std::env::remove_var("GOOSE_CACHE_DIR");
     let _ = std::fs::remove_dir_all(&test_cache_dir);
