@@ -372,8 +372,6 @@ impl SubAgent {
                         }
                     }
 
-                    // Add the assistant message with tool calls to the conversation
-                    messages.push(response.clone());
                     self.log_conversation("LOOP_CONTINUE", "Adding response to conversation and continuing").await;
 
                     // Continue the loop to get the next response from the provider
