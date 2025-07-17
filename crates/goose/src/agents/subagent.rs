@@ -13,6 +13,8 @@ use serde_json::{self, json};
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::{Mutex, RwLock};
 use tracing::{debug, error, instrument};
+use std::fs::OpenOptions;
+use std::io::Write;
 
 /// Status of a subagent
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -45,6 +47,20 @@ pub struct SubAgent {
 }
 
 impl SubAgent {
+    /// Log conversation details to /tmp for debugging
+    async fn log_conversation(&self, message: &str, details: &str) {
+        let log_file = format!("/tmp/subagent_{}_conversation.log", self.id);
+        let timestamp = Utc::now().format("%Y-%m-%d %H:%M:%S.%3f UTC");
+        let log_entry = format!("[{}] {}: {}\n", timestamp, message, details);
+        
+        if let Ok(mut file) = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&log_file) {
+            let _ = file.write_all(log_entry.as_bytes());
+        }
+    }
+
     /// Create a new subagent with the given configuration and provider
     #[instrument(skip(task_config))]
     pub async fn new(
@@ -162,6 +178,8 @@ impl SubAgent {
         task_config: TaskConfig,
     ) -> Result<Message, anyhow::Error> {
         debug!("Processing message for subagent {}", self.id);
+        self.log_conversation("START", &format!("Processing message: {}", message)).await;
+        
         self.send_mcp_notification("message_processing", &format!("Processing: {}", message))
             .await;
 
@@ -183,6 +201,7 @@ impl SubAgent {
             let turn_count = *self.turn_count.lock().await;
             if let Some(max_turns) = self.config.max_turns {
                 if turn_count >= max_turns {
+                    self.log_conversation("ERROR", &format!("Maximum turns ({}) exceeded", max_turns)).await;
                     self.set_status(SubAgentStatus::Completed(
                         "Maximum turns exceeded".to_string(),
                     ))
@@ -206,6 +225,7 @@ impl SubAgent {
         {
             let mut turn_count = self.turn_count.lock().await;
             *turn_count += 1;
+            self.log_conversation("TURN", &format!("Turn {}/{}", turn_count, self.config.max_turns.unwrap_or(0))).await;
             self.send_mcp_notification(
                 "turn_progress",
                 &format!("Turn {}/{}", turn_count, self.config.max_turns.unwrap_or(0)),
@@ -228,9 +248,12 @@ impl SubAgent {
 
         // Build system prompt using the template
         let system_prompt = self.build_system_prompt(&tools).await?;
+        self.log_conversation("SYSTEM_PROMPT", &format!("Available tools: {}", tools.len())).await;
 
         // Generate response from provider
         loop {
+            self.log_conversation("LOOP_START", "Starting new iteration").await;
+            
             match Agent::generate_response_from_provider(
                 Arc::clone(provider),
                 &system_prompt,
@@ -241,6 +264,8 @@ impl SubAgent {
             .await
             {
                 Ok((response, _usage)) => {
+                    self.log_conversation("PROVIDER_RESPONSE", &format!("Response length: {} chars", response.as_concat_text().len())).await;
+                    
                     // Process any tool calls in the response
                     let tool_requests: Vec<ToolRequest> = response
                         .content
@@ -254,8 +279,11 @@ impl SubAgent {
                         })
                         .collect();
 
+                    self.log_conversation("TOOL_REQUESTS", &format!("Found {} tool requests", tool_requests.len())).await;
+
                     // If there are no tool requests, we're done
                     if tool_requests.is_empty() {
+                        self.log_conversation("COMPLETE", "No tool requests, completing").await;
                         self.add_message(response.clone()).await;
 
                         // Send notification about response
@@ -274,12 +302,21 @@ impl SubAgent {
                         break Ok(response);
                     }
 
-                    // Add the assistant message with tool calls to the conversation
-                    messages.push(response.clone());
+                    // Add a counter for tool calls per iteration
+                    let mut tool_call_count = 0;
+                    let max_tool_calls_per_iteration = 10; // Configurable limit
 
-                    // Process each tool request and create user response messages
                     for request in &tool_requests {
+                        tool_call_count += 1;
+                        if tool_call_count > max_tool_calls_per_iteration {
+                            self.log_conversation("TOOL_LIMIT", &format!("Reached limit of {} tool calls", max_tool_calls_per_iteration)).await;
+                            // Break out of tool processing
+                            break;
+                        }
+                        
                         if let Ok(tool_call) = &request.tool_call {
+                            self.log_conversation("TOOL_CALL", &format!("Tool {}: {}", tool_call_count, tool_call.name)).await;
+                            
                             // Send notification about tool usage
                             self.send_mcp_notification(
                                 "tool_usage",
@@ -300,6 +337,8 @@ impl SubAgent {
 
                             match tool_result {
                                 Ok(result) => {
+                                    self.log_conversation("TOOL_SUCCESS", &format!("Tool {} completed", tool_call.name)).await;
+                                    
                                     // Create a user message with the tool response
                                     let tool_response_message = Message::user()
                                         .with_tool_response(request.id.clone(), Ok(result.clone()));
@@ -313,6 +352,8 @@ impl SubAgent {
                                     .await;
                                 }
                                 Err(e) => {
+                                    self.log_conversation("TOOL_ERROR", &format!("Tool {} failed: {}", tool_call.name, e)).await;
+                                    
                                     // Create a user message with the tool error
                                     let tool_error_message = Message::user().with_tool_response(
                                         request.id.clone(),
@@ -331,9 +372,14 @@ impl SubAgent {
                         }
                     }
 
+                    // Add the assistant message with tool calls to the conversation
+                    messages.push(response.clone());
+                    self.log_conversation("LOOP_CONTINUE", "Adding response to conversation and continuing").await;
+
                     // Continue the loop to get the next response from the provider
                 }
                 Err(ProviderError::ContextLengthExceeded(_)) => {
+                    self.log_conversation("ERROR", "Context length exceeded").await;
                     self.set_status(SubAgentStatus::Completed(
                         "Context length exceeded".to_string(),
                     ))
@@ -343,12 +389,14 @@ impl SubAgent {
                     ));
                 }
                 Err(ProviderError::RateLimitExceeded(_)) => {
+                    self.log_conversation("ERROR", "Rate limit exceeded").await;
                     self.set_status(SubAgentStatus::Completed("Rate limit exceeded".to_string()))
                         .await;
                     break Ok(Message::assistant()
                         .with_text("Rate limit exceeded. Please try again later."));
                 }
                 Err(e) => {
+                    self.log_conversation("ERROR", &format!("Provider error: {}", e)).await;
                     self.set_status(SubAgentStatus::Completed(format!("Error: {}", e)))
                         .await;
                     error!("Error: {}", e);
@@ -400,14 +448,6 @@ impl SubAgent {
             serde_json::Value::String(Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string()),
         );
         context.insert("subagent_id", serde_json::Value::String(self.id.clone()));
-
-        // Add max turns if configured
-        if let Some(max_turns) = self.config.max_turns {
-            context.insert(
-                "max_turns",
-                serde_json::Value::Number(serde_json::Number::from(max_turns)),
-            );
-        }
 
         // Add available tools with descriptions for better context
         let tools_with_descriptions: Vec<String> = available_tools
