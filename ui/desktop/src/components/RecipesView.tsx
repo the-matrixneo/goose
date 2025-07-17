@@ -163,7 +163,8 @@ export default function RecipesView({ _onLoadRecipe }: RecipesViewProps = {}) {
       if (!configBase64) {
         throw new Error('No recipe configuration found in deeplink');
       }
-      const configJson = Buffer.from(configBase64, 'base64').toString('utf-8');
+      const urlDecoded = decodeURIComponent(configBase64);
+      const configJson = Buffer.from(urlDecoded, 'base64').toString('utf-8');
       const recipe = JSON.parse(configJson) as Recipe;
 
       if (!recipe.title || !recipe.description || !recipe.instructions) {
