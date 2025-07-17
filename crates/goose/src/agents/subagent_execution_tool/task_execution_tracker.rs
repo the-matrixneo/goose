@@ -123,12 +123,33 @@ impl TaskExecutionTracker {
             .map(|task_info| task_info.current_output.clone())
     }
 
+    async fn format_line(&self, task_info: Option<&TaskInfo>, line: &str) -> String {
+        if let Some(task_info) = task_info {
+            let task_name = get_task_name(task_info);
+            let task_type = task_info.task.task_type.clone();
+            let metadata = format_task_metadata(task_info);
+
+            if metadata.is_empty() {
+                format!("[{} ({})] {}", task_name, task_type, line)
+            } else {
+                format!("[{} ({}) {}] {}", task_name, task_type, metadata, line)
+            }
+        } else {
+            line.to_string()
+        }
+    }
+
     pub async fn send_live_output(&self, task_id: &str, line: &str) {
         match self.display_mode {
             DisplayMode::SingleTaskOutput => {
+                let tasks = self.tasks.read().await;
+                let task_info = tasks.get(task_id);
+
+                let formatted_line = self.format_line(task_info, line).await;
+                drop(tasks);
                 let event = TaskExecutionNotificationEvent::line_output(
                     task_id.to_string(),
-                    line.to_string(),
+                    formatted_line,
                 );
 
                 if let Err(e) =

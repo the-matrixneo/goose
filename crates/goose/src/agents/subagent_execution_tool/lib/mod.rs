@@ -7,7 +7,7 @@ use crate::agents::subagent_execution_tool::{
 };
 use crate::agents::subagent_task_config::TaskConfig;
 use mcp_core::protocol::JsonRpcMessage;
-use serde_json::Value;
+use serde_json::{json, Value};
 use tokio::sync::mpsc;
 
 pub async fn execute_tasks(
@@ -49,9 +49,19 @@ pub async fn execute_tasks(
             }
         }
         ExecutionMode::Parallel => {
-            let response: ExecutionResponse =
-                execute_tasks_in_parallel(tasks, notifier, task_config).await;
-            handle_response(response)
+            if tasks.iter().any(|task| task.get_sequential_when_repeated()) {
+                Ok(json!(
+                    {
+                        "execution_mode": ExecutionMode::Sequential,
+                        "task_ids": task_ids,
+                        "results": ["the tasks should be executed sequentially, no matter how user requests it. Please use the subrecipe__execute_task tool to execute the tasks sequentially."]
+                    }
+                ))
+            } else {
+                let response: ExecutionResponse =
+                    execute_tasks_in_parallel(tasks, notifier.clone()).await;
+                handle_response(response)
+            }
         }
     }
 }

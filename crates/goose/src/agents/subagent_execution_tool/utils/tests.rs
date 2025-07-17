@@ -1,5 +1,5 @@
-use crate::agents::sub_recipe_execution_tool::task_types::{Task, TaskInfo, TaskStatus};
-use crate::agents::sub_recipe_execution_tool::utils::{count_by_status, get_task_name};
+use crate::agents::subagent_execution_tool::task_types::{Task, TaskInfo, TaskStatus};
+use crate::agents::subagent_execution_tool::utils::{count_by_status, get_task_name};
 use serde_json::json;
 use std::collections::HashMap;
 
@@ -22,7 +22,6 @@ mod test_get_task_name {
         let sub_recipe_task = Task {
             id: "task_1".to_string(),
             task_type: "sub_recipe".to_string(),
-            timeout_in_seconds: None,
             payload: json!({
                 "sub_recipe": {
                     "name": "my_recipe",
@@ -40,7 +39,6 @@ mod test_get_task_name {
     fn falls_back_to_task_id_for_text_instruction() {
         let text_task = Task {
             id: "task_2".to_string(),
-            timeout_in_seconds: None,
             task_type: "text_instruction".to_string(),
             payload: json!({"text_instruction": "do something"}),
         };
@@ -55,7 +53,6 @@ mod test_get_task_name {
         let malformed_task = Task {
             id: "task_3".to_string(),
             task_type: "sub_recipe".to_string(),
-            timeout_in_seconds: None,
             payload: json!({
                 "sub_recipe": {
                     "recipe_path": "/path/to/recipe"
@@ -74,7 +71,6 @@ mod test_get_task_name {
         let malformed_task = Task {
             id: "task_4".to_string(),
             task_type: "sub_recipe".to_string(),
-            timeout_in_seconds: None,
             payload: json!({}), // missing "sub_recipe" field
         };
 
@@ -91,7 +87,6 @@ mod count_by_status {
         let task = Task {
             id: id.to_string(),
             task_type: "test".to_string(),
-            timeout_in_seconds: None,
             payload: json!({}),
         };
         create_task_info_with_defaults(task, status)

@@ -27,7 +27,7 @@ IMPLEMENTATION:
 EXAMPLES:
 User Intent Based:
 - User: 'get weather and tell me a joke' → Sequential (2 separate tool calls, 1 task each)
-- User: 'get weather and joke in parallel' → Parallel (1 tool call with task array)
+- User: 'get weather and joke in parallel' → Parallel (1 tool call with array of 2 tasks)
 - User: 'run these simultaneously' → Parallel (1 tool call with task array)
 - User: 'do task A then task B' → Sequential (2 separate tool calls)",
         serde_json::json!({
@@ -37,7 +37,7 @@ User Intent Based:
                     "type": "string",
                     "enum": ["sequential", "parallel"],
                     "default": "sequential",
-                    "description": "Execution strategy for multiple tasks. For pre-created tasks, respect the execution_mode from task creation. For user intent, use 'sequential' (default) unless user explicitly requests parallel execution with words like 'parallel', 'simultaneously', 'at the same time', or 'concurrently'."
+                    "description": "Execution strategy for multiple tasks. Use 'sequential' (default) unless user explicitly requests parallel execution with words like 'parallel', 'simultaneously', 'at the same time', or 'concurrently'."
                 },
                 "task_ids": {
                     "type": "array",

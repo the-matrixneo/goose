@@ -22,3 +22,6 @@ pub fn count_by_status(tasks: &HashMap<String, TaskInfo>) -> (usize, usize, usiz
     );
     (total, pending, running, completed, failed)
 }
+
+#[cfg(test)]
+mod tests;

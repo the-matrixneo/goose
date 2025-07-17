@@ -2,11 +2,8 @@
 // Module: Dynamic Task Tools
 // Handles creation of tasks dynamically without sub-recipes
 // =======================================
-use crate::agents::recipe_tools::sub_recipe_tools::{
-    EXECUTION_MODE_PARALLEL, EXECUTION_MODE_SEQUENTIAL,
-};
-use crate::agents::subagent_execution_tool::task_types::Task;
 use crate::agents::subagent_execution_tool::tasks_manager::TasksManager;
+use crate::agents::subagent_execution_tool::{lib::ExecutionMode, task_types::Task};
 use crate::agents::tool_execution::ToolCallResult;
 use mcp_core::{tool::ToolAnnotations, Content, Tool, ToolError};
 use serde_json::{json, Value};
@@ -108,7 +105,7 @@ fn create_text_instruction_tasks_from_params(task_params: &[Value]) -> Vec<Task>
         .collect()
 }
 
-fn create_task_execution_payload(tasks: Vec<Task>, execution_mode: &str) -> Value {
+fn create_task_execution_payload(tasks: Vec<Task>, execution_mode: ExecutionMode) -> Value {
     let task_ids: Vec<String> = tasks.iter().map(|task| task.id.clone()).collect();
     json!({
         "task_ids": task_ids,
@@ -129,9 +126,9 @@ pub async fn create_dynamic_task(params: Value, tasks_manager: &TasksManager) ->
 
     // Use parallel execution if there are multiple tasks, sequential for single task
     let execution_mode = if tasks.len() > 1 {
-        EXECUTION_MODE_PARALLEL
+        ExecutionMode::Parallel
     } else {
-        EXECUTION_MODE_SEQUENTIAL
+        ExecutionMode::Sequential
     };
 
     let task_execution_payload = create_task_execution_payload(tasks.clone(), execution_mode);
