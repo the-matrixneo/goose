@@ -153,6 +153,13 @@ pub struct Execution {
 pub struct ExecutionRun {
     #[serde(default, deserialize_with = "deserialize_value_map_as_string")]
     pub values: Option<HashMap<String, String>>,
+    #[serde(default)]
+    pub sequential_when_repeated: bool,
+}
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Execution {
+    #[serde(default)]
+    pub parallel: bool,
 }
 
 fn deserialize_value_map_as_string<'de, D>(

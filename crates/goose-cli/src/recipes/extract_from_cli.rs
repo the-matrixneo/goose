@@ -33,7 +33,7 @@ pub fn extract_recipe_info_from_cli(
                         name,
                         timeout_in_seconds: None,
                         values: None,
-                        executions: None,
+                        sequential_when_repeated: true,
                     };
                     all_sub_recipes.push(additional_sub_recipe);
                 }

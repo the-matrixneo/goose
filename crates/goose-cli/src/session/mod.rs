@@ -23,6 +23,8 @@ use goose::permission::PermissionConfirmation;
 use goose::providers::base::Provider;
 pub use goose::session::Identifier;
 use goose::utils::safe_truncate;
+use std::io::Write;
+use task_execution_display::format_task_execution_notification;
 
 use anyhow::{Context, Result};
 use completion::GooseCompleter;
@@ -633,6 +635,10 @@ impl Session {
                         &Message::assistant().with_text("Chat context cleared."),
                         self.debug,
                     );
+                    if let Some(file) = self.session_file.as_ref().filter(|f| f.exists()) {
+                        std::fs::remove_file(file)?;
+                        std::fs::File::create(file)?;
+                    }
                     continue;
                 }
                 input::InputResult::PromptCommand(opts) => {
@@ -1010,7 +1016,7 @@ impl Session {
                                 match method.as_str() {
                                     "notifications/message" => {
                                         let data = o.get("data").unwrap_or(&Value::Null);
-                                        let (formatted_message, subagent_id, _notification_type) = match data {
+                                        let (formatted_message, subagent_id, message_notification_type) = match data {
                                             Value::String(s) => (s.clone(), None, None),
                                             Value::Object(o) => {
                                                 // Check for subagent notification structure first
@@ -1081,8 +1087,7 @@ impl Session {
                                             } else {
                                                 progress_bars.log(&formatted_message);
                                             }
-                                            // continue;
-                                        } else if let Some(ref notification_type) = _notification_type {
+                                        } else if let Some(ref notification_type) = message_notification_type {
                                             if notification_type == TASK_EXECUTION_NOTIFICATION_TYPE {
                                                 if interactive {
                                                     let _ = progress_bars.hide();

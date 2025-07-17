@@ -3,8 +3,9 @@ use serde_json::Value;
 
 use crate::agents::subagent_task_config::TaskConfig;
 use crate::agents::{
-    subagent_execution_tool::lib::execute_tasks,
-    subagent_execution_tool::task_types::ExecutionMode, tool_execution::ToolCallResult,
+    sub_recipe_execution_tool::lib::execute_tasks,
+    sub_recipe_execution_tool::task_types::ExecutionMode,
+    sub_recipe_execution_tool::tasks_manager::TasksManager, tool_execution::ToolCallResult,
 };
 use mcp_core::protocol::JsonRpcMessage;
 use tokio::sync::mpsc;
@@ -13,17 +14,11 @@ use tokio_stream;
 pub const SUBAGENT_EXECUTE_TASK_TOOL_NAME: &str = "subagent__execute_task";
 pub fn create_subagent_execute_task_tool() -> Tool {
     Tool::new(
-        SUBAGENT_EXECUTE_TASK_TOOL_NAME,
+        SUB_RECIPE_EXECUTE_TASK_TOOL_NAME,
         "Only use the subagent__execute_task tool when you execute sub recipe task or dynamic task.
 EXECUTION STRATEGY DECISION:
-1. PRE-CREATED TASKS: If tasks were created by subrecipe__create_task_* tools, check the execution_mode in the response:
-   - If execution_mode is 'parallel', use parallel execution
-   - If execution_mode is 'sequential', use sequential execution
-   - Always respect the execution_mode from task creation to maintain consistency
-
-2. USER INTENT: If creating tasks inline or user explicitly specifies:
-   - DEFAULT: Execute tasks sequentially unless user explicitly requests parallel execution
-   - PARALLEL: When user uses keywords like 'parallel', 'simultaneously', 'at the same time', 'concurrently'
+1. If the tasks are created with execution_mode, use the execution_mode.
+2. Execute tasks sequentially unless user explicitly requests parallel execution. PARALLEL: User uses keywords like 'parallel', 'simultaneously', 'at the same time', 'concurrently'
 
 IMPLEMENTATION:
 - Sequential execution: Call this tool multiple times, passing exactly ONE task per call
@@ -48,59 +43,15 @@ Pre-created Task Based:
                     "default": "sequential",
                     "description": "Execution strategy for multiple tasks. For pre-created tasks, respect the execution_mode from task creation. For user intent, use 'sequential' (default) unless user explicitly requests parallel execution with words like 'parallel', 'simultaneously', 'at the same time', or 'concurrently'."
                 },
-                "tasks": {
+                "task_ids": {
                     "type": "array",
                     "items": {
-                        "type": "object",
-                        "properties": {
-                            "id": {
-                                "type": "string",
-                                "description": "Unique identifier for the task"
-                            },
-                            "task_type": {
-                                "type": "string",
-                                "enum": ["sub_recipe", "text_instruction"],
-                                "default": "sub_recipe",
-                                "description": "the type of task to execute, can be one of: sub_recipe, text_instruction"
-                            },
-                            "timeout_in_seconds": {
-                                "type": "number",
-                                "description": "timeout in seconds for the task."
-                            },
-                            "payload": {
-                                "type": "object",
-                                "properties": {
-                                    "sub_recipe": {
-                                        "type": "object",
-                                        "description": "sub recipe to execute",
-                                        "properties": {
-                                            "name": {
-                                                "type": "string",
-                                                "description": "name of the sub recipe to execute"
-                                            },
-                                            "recipe_path": {
-                                                "type": "string",
-                                                "description": "path of the sub recipe file"
-                                            },
-                                            "command_parameters": {
-                                                "type": "object",
-                                                "description": "parameters to pass to run recipe command with sub recipe file"
-                                            }
-                                        }
-                                    },
-                                    "text_instruction": {
-                                        "type": "string",
-                                        "description": "text instruction to execute"
-                                    }
-                                }
-                            }
-                        },
-                        "required": ["id", "payload"]
-                    },
-                    "description": "The tasks to run in parallel"
+                        "type": "string",
+                        "description": "Unique identifier for the task"
+                    }
                 }
             },
-            "required": ["tasks"]
+            "required": ["task_ids"]
         }),
         Some(ToolAnnotations {
             title: Some("Run tasks in parallel".to_string()),
@@ -112,16 +63,25 @@ Pre-created Task Based:
     )
 }
 
-pub async fn run_tasks(execute_data: Value, task_config: TaskConfig) -> ToolCallResult {
+pub async fn run_tasks(execute_data: Value, tasks_manager: &TasksManager) -> ToolCallResult {
     let (notification_tx, notification_rx) = mpsc::channel::<JsonRpcMessage>(100);
 
-    let execution_mode = execute_data
-        .get("execution_mode")
-        .and_then(|v| serde_json::from_value::<ExecutionMode>(v.clone()).ok())
-        .unwrap_or_default();
-
+    let tasks_manager_clone = tasks_manager.clone();
     let result_future = async move {
-        match execute_tasks(execute_data, execution_mode, notification_tx, task_config).await {
+        let execute_data_clone = execute_data.clone();
+        let execution_mode = execute_data_clone
+            .get("execution_mode")
+            .and_then(|v| serde_json::from_value::<ExecutionMode>(v.clone()).ok())
+            .unwrap_or_default();
+
+        match execute_tasks(
+            execute_data,
+            execution_mode,
+            notification_tx,
+            &tasks_manager_clone,
+        )
+        .await
+        {
             Ok(result) => {
                 let output = serde_json::to_string(&result).unwrap();
                 Ok(vec![Content::text(output)])
@@ -130,10 +90,11 @@ pub async fn run_tasks(execute_data: Value, task_config: TaskConfig) -> ToolCall
         }
     };
 
+    // Convert receiver to stream
+    let notification_stream = tokio_stream::wrappers::ReceiverStream::new(notification_rx);
+
     ToolCallResult {
         result: Box::new(Box::pin(result_future)),
-        notification_stream: Some(Box::new(tokio_stream::wrappers::ReceiverStream::new(
-            notification_rx,
-        ))),
+        notification_stream: Some(Box::new(notification_stream)),
     }
 }

@@ -12,6 +12,7 @@ use crate::agents::final_output_tool::{FINAL_OUTPUT_CONTINUATION_MESSAGE, FINAL_
 use crate::agents::recipe_tools::dynamic_task_tools::{
     create_dynamic_task, create_dynamic_task_tool, DYNAMIC_TASK_TOOL_NAME_PREFIX,
 };
+use crate::agents::sub_recipe_execution_tool::tasks_manager::TasksManager;
 use crate::agents::sub_recipe_manager::SubRecipeManager;
 use crate::agents::subagent_execution_tool::subagent_execute_task_tool::{
     self, SUBAGENT_EXECUTE_TASK_TOOL_NAME,
@@ -63,6 +64,7 @@ pub struct Agent {
     pub(super) provider: Mutex<Option<Arc<dyn Provider>>>,
     pub(super) extension_manager: Arc<RwLock<ExtensionManager>>,
     pub(super) sub_recipe_manager: Mutex<SubRecipeManager>,
+    pub(super) tasks_manager: TasksManager,
     pub(super) final_output_tool: Mutex<Option<FinalOutputTool>>,
     pub(super) frontend_tools: Mutex<HashMap<String, FrontendTool>>,
     pub(super) frontend_instructions: Mutex<Option<String>>,
@@ -137,6 +139,7 @@ impl Agent {
             provider: Mutex::new(None),
             extension_manager: Arc::new(RwLock::new(ExtensionManager::new())),
             sub_recipe_manager: Mutex::new(SubRecipeManager::new()),
+            tasks_manager: TasksManager::new(),
             final_output_tool: Mutex::new(None),
             frontend_tools: Mutex::new(HashMap::new()),
             frontend_instructions: Mutex::new(None),
@@ -291,7 +294,11 @@ impl Agent {
         let sub_recipe_manager = self.sub_recipe_manager.lock().await;
         let result: ToolCallResult = if sub_recipe_manager.is_sub_recipe_tool(&tool_call.name) {
             sub_recipe_manager
-                .dispatch_sub_recipe_tool_call(&tool_call.name, tool_call.arguments.clone())
+                .dispatch_sub_recipe_tool_call(
+                    &tool_call.name,
+                    tool_call.arguments.clone(),
+                    &self.tasks_manager,
+                )
                 .await
         } else if tool_call.name == SUBAGENT_EXECUTE_TASK_TOOL_NAME {
             let provider = self.provider().await.ok();
@@ -299,7 +306,7 @@ impl Agent {
 
             let task_config =
                 TaskConfig::new(provider, Some(Arc::clone(&self.extension_manager)), mcp_tx);
-            subagent_execute_task_tool::run_tasks(tool_call.arguments.clone(), task_config).await
+            subagent_execute_task_tool::run_tasks(tool_call.arguments.clone(), task_config, &self.tasks_manager,).await
         } else if tool_call.name == DYNAMIC_TASK_TOOL_NAME_PREFIX {
             create_dynamic_task(tool_call.arguments.clone()).await
         } else if tool_call.name == PLATFORM_READ_RESOURCE_TOOL_NAME {
