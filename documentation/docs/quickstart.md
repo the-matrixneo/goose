@@ -8,8 +8,7 @@ import Link from "@docusaurus/Link";
 import { IconDownload } from "@site/src/components/icons/download";
 import RateLimits from '@site/src/components/RateLimits';
 import YouTubeShortEmbed from '@site/src/components/YouTubeShortEmbed';
-import DesktopInstallSection from '@site/src/components/DesktopInstallSection';
-import CLIInstallSection from '@site/src/components/CLIInstallSection';
+import { DesktopInstall, CLIInstall } from '@site/src/components/InstallComponents';
 
 # Goose in 5 minutes
 
@@ -32,10 +31,10 @@ Let's begin 🚀
 
     <Tabs groupId="interface">
       <TabItem value="ui" label="Goose Desktop" default>
-        <DesktopInstallSection os="mac" showUpdateTip={false} />
+        <DesktopInstall os="mac" showUpdateTip={false} />
       </TabItem>
       <TabItem value="cli" label="Goose CLI">
-        <CLIInstallSection os="mac" showUpdateTip={false} />
+        <CLIInstall os="mac" showUpdateTip={false} />
       </TabItem>
     </Tabs>
   </TabItem>
@@ -43,10 +42,10 @@ Let's begin 🚀
   <TabItem value="linux" label="Linux">
     <Tabs groupId="interface">
       <TabItem value="ui" label="Goose Desktop" default>
-        <DesktopInstallSection os="linux" showUpdateTip={false} />
+        <DesktopInstall os="linux" showUpdateTip={false} />
       </TabItem>
       <TabItem value="cli" label="Goose CLI">
-        <CLIInstallSection os="linux" showUpdateTip={false} />
+        <CLIInstall os="linux" showUpdateTip={false} />
       </TabItem>
     </Tabs>
   </TabItem>
@@ -56,10 +55,10 @@ Let's begin 🚀
 
     <Tabs groupId="interface">
       <TabItem value="ui" label="Goose Desktop" default>
-        <DesktopInstallSection os="windows" showUpdateTip={false} />
+        <DesktopInstall os="windows" showUpdateTip={false} />
       </TabItem>
       <TabItem value="cli" label="Goose CLI">
-        <CLIInstallSection os="windows" showUpdateTip={false} showPrerequisites={false} showWSL={false} />
+        <CLIInstall os="windows" showUpdateTip={false} showPrerequisites={false} showWSL={false} />
         <p>Learn about prerequisites in the <a href="/docs/getting-started/installation">installation guide</a>.</p>
       </TabItem>
     </Tabs>
