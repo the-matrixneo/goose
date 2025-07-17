@@ -59,7 +59,7 @@ pub async fn execute_tasks(
                 ))
             } else {
                 let response: ExecutionResponse =
-                    execute_tasks_in_parallel(tasks, notifier.clone()).await;
+                    execute_tasks_in_parallel(tasks, notifier.clone(), task_config).await;
                 handle_response(response)
             }
         }
