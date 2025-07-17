@@ -6,7 +6,7 @@ async fn test_pricing_cache_performance() {
     // Use a unique cache directory for this test to avoid conflicts
     let test_cache_dir = format!("/tmp/goose_test_cache_perf_{}", std::process::id());
     std::env::set_var("GOOSE_CACHE_DIR", &test_cache_dir);
-    
+
     // Initialize the cache
     let start = Instant::now();
     initialize_pricing_cache()
@@ -69,7 +69,7 @@ async fn test_pricing_cache_performance() {
         first_fetch_duration,
         second_fetch_duration
     );
-    
+
     // Clean up
     std::env::remove_var("GOOSE_CACHE_DIR");
     let _ = std::fs::remove_dir_all(&test_cache_dir);
@@ -113,7 +113,7 @@ async fn test_model_not_in_openrouter() {
     // Use a unique cache directory for this test to avoid conflicts
     let test_cache_dir = format!("/tmp/goose_test_cache_model_{}", std::process::id());
     std::env::set_var("GOOSE_CACHE_DIR", &test_cache_dir);
-    
+
     initialize_pricing_cache()
         .await
         .expect("Failed to initialize pricing cache");
@@ -124,7 +124,7 @@ async fn test_model_not_in_openrouter() {
         pricing.is_none(),
         "Should return None for non-existent model"
     );
-    
+
     // Clean up
     std::env::remove_var("GOOSE_CACHE_DIR");
     let _ = std::fs::remove_dir_all(&test_cache_dir);
@@ -161,7 +161,7 @@ async fn test_concurrent_access() {
         assert!(has_pricing, "Task {} should have gotten pricing", task_id);
         println!("Task {} took: {:?}", task_id, duration);
     }
-    
+
     // Clean up
     std::env::remove_var("GOOSE_CACHE_DIR");
     let _ = std::fs::remove_dir_all(&test_cache_dir);

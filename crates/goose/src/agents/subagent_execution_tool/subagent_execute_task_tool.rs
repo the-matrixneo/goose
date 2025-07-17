@@ -59,7 +59,11 @@ User Intent Based:
     )
 }
 
-pub async fn run_tasks(execute_data: Value, task_config: TaskConfig, tasks_manager: &TasksManager) -> ToolCallResult {
+pub async fn run_tasks(
+    execute_data: Value,
+    task_config: TaskConfig,
+    tasks_manager: &TasksManager,
+) -> ToolCallResult {
     let (notification_tx, notification_rx) = mpsc::channel::<JsonRpcMessage>(100);
 
     let tasks_manager_clone = tasks_manager.clone();

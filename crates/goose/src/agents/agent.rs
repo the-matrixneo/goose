@@ -306,7 +306,12 @@ impl Agent {
 
             let task_config =
                 TaskConfig::new(provider, Some(Arc::clone(&self.extension_manager)), mcp_tx);
-            subagent_execute_task_tool::run_tasks(tool_call.arguments.clone(), task_config, &self.tasks_manager,).await
+            subagent_execute_task_tool::run_tasks(
+                tool_call.arguments.clone(),
+                task_config,
+                &self.tasks_manager,
+            )
+            .await
         } else if tool_call.name == DYNAMIC_TASK_TOOL_NAME_PREFIX {
             create_dynamic_task(tool_call.arguments.clone(), &self.tasks_manager).await
         } else if tool_call.name == PLATFORM_READ_RESOURCE_TOOL_NAME {

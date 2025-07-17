@@ -15,9 +15,8 @@ pub const DYNAMIC_TASK_TOOL_NAME_PREFIX: &str = "dynamic_task__create_task";
 
 pub fn create_dynamic_task_tool() -> Tool {
     Tool::new(
-        format!("{}", DYNAMIC_TASK_TOOL_NAME_PREFIX),
-        format!(
-            "Use this tool to create one or more dynamic tasks from a shared text instruction and varying parameters.\
+        DYNAMIC_TASK_TOOL_NAME_PREFIX.to_string(),
+        "Use this tool to create one or more dynamic tasks from a shared text instruction and varying parameters.\
             How it works:
             - Provide a single text instruction
             - Use the 'task_parameters' field to pass an array of parameter sets
@@ -40,8 +39,7 @@ pub fn create_dynamic_task_tool() -> Tool {
                 timeout_seconds: 300
                 text_instruction: Get weather for San Francisco.
                 timeout_seconds: 300
-            "
-        ),
+            ".to_string(),
         json!({
             "type": "object",
             "properties": {
@@ -70,7 +68,7 @@ pub fn create_dynamic_task_tool() -> Tool {
             }
         }),
         Some(ToolAnnotations {
-            title: Some(format!("Dynamic Task Creation")),
+            title: Some("Dynamic Task Creation".to_string()),
             read_only_hint: false,
             destructive_hint: true,
             idempotent_hint: false,

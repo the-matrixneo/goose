@@ -71,7 +71,7 @@ mod tests {
                 prepare_sub_recipe(SUB_RECIPE_FILE_CONTENT_WITH_TWO_PARAMS);
             sub_recipe.values = Some(HashMap::from([("key1".to_string(), "value1".to_string())]));
 
-                let result = get_input_schema(&sub_recipe).unwrap();
+            let result = get_input_schema(&sub_recipe).unwrap();
 
             verify_task_parameters(
                 result,
@@ -113,7 +113,7 @@ mod tests {
                 prepare_sub_recipe(SUB_RECIPE_FILE_CONTENT_WITH_TWO_PARAMS);
             sub_recipe.values = None;
 
-                let result = get_input_schema(&sub_recipe).unwrap();
+            let result = get_input_schema(&sub_recipe).unwrap();
 
             verify_task_parameters(
                 result,

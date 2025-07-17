@@ -26,7 +26,7 @@ pub async fn process_task(
             status: TaskStatus::Failed,
             data: None,
             error: Some(error),
-        }
+        },
     }
 }
 
