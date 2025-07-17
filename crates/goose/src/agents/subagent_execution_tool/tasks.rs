@@ -1,62 +1,31 @@
 use serde_json::Value;
 use std::process::Stdio;
 use std::sync::Arc;
-use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
-use tokio::time::timeout;
 
 use crate::agents::subagent_execution_tool::task_execution_tracker::TaskExecutionTracker;
 use crate::agents::subagent_execution_tool::task_types::{Task, TaskResult, TaskStatus};
 use crate::agents::subagent_handler::run_complete_subagent_task;
 use crate::agents::subagent_task_config::TaskConfig;
 
-const DEFAULT_TASK_TIMEOUT_SECONDS: u64 = 300;
-
 pub async fn process_task(
     task: &Task,
     task_execution_tracker: Arc<TaskExecutionTracker>,
     task_config: TaskConfig,
 ) -> TaskResult {
-    let timeout_in_seconds = task
-        .timeout_in_seconds
-        .unwrap_or(DEFAULT_TASK_TIMEOUT_SECONDS);
-    let task_clone = task.clone();
-    let timeout_duration = Duration::from_secs(timeout_in_seconds);
-
-    let task_execution_tracker_clone = task_execution_tracker.clone();
-    match timeout(
-        timeout_duration,
-        get_task_result(task_clone, task_execution_tracker, task_config),
-    )
-    .await
-    {
-        Ok(Ok(data)) => TaskResult {
+    match get_task_result(task.clone(), task_execution_tracker, task_config).await {
+        Ok(data) => TaskResult {
             task_id: task.id.clone(),
             status: TaskStatus::Completed,
             data: Some(data),
             error: None,
         },
-        Ok(Err(error)) => TaskResult {
+        Err(error) => TaskResult {
             task_id: task.id.clone(),
             status: TaskStatus::Failed,
             data: None,
             error: Some(error),
-        },
-        Err(_) => {
-            let current_output = task_execution_tracker_clone
-                .get_current_output(&task.id)
-                .await
-                .unwrap_or_default();
-
-            TaskResult {
-                task_id: task.id.clone(),
-                status: TaskStatus::Failed,
-                data: Some(serde_json::json!({
-                    "partial_output": current_output
-                })),
-                error: Some(format!("Task timed out after {}s", timeout_in_seconds)),
-            }
         }
     }
 }
@@ -132,8 +101,7 @@ async fn handle_text_instruction_task(
 fn build_command(task: &Task) -> Result<(Command, String), String> {
     let task_error = |field: &str| format!("Task {}: Missing {}", task.id, field);
 
-    let mut output_identifier = task.id.clone();
-    let mut command = if task.task_type == "sub_recipe" {
+    let (mut command, output_identifier) = if task.task_type == "sub_recipe" {
         let sub_recipe_name = task
             .get_sub_recipe_name()
             .ok_or_else(|| task_error("sub_recipe name"))?;
@@ -144,7 +112,6 @@ fn build_command(task: &Task) -> Result<(Command, String), String> {
             .get_command_parameters()
             .ok_or_else(|| task_error("command_parameters"))?;
 
-        output_identifier = format!("sub-recipe {}", sub_recipe_name);
         let mut cmd = Command::new("goose");
         cmd.arg("run").arg("--recipe").arg(path).arg("--no-session");
 
@@ -154,7 +121,7 @@ fn build_command(task: &Task) -> Result<(Command, String), String> {
             cmd.arg("--params")
                 .arg(format!("{}={}", key_str, value_str));
         }
-        cmd
+        (cmd, format!("sub-recipe {}", sub_recipe_name))
     } else {
         // This branch should not be reached for text_instruction tasks anymore
         // as they are handled in handle_text_instruction_task

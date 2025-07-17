@@ -6,6 +6,7 @@ use crate::agents::recipe_tools::sub_recipe_tools::{
     EXECUTION_MODE_PARALLEL, EXECUTION_MODE_SEQUENTIAL,
 };
 use crate::agents::subagent_execution_tool::task_types::Task;
+use crate::agents::subagent_execution_tool::tasks_manager::TasksManager;
 use crate::agents::tool_execution::ToolCallResult;
 use mcp_core::{tool::ToolAnnotations, Content, Tool, ToolError};
 use serde_json::{json, Value};
@@ -96,11 +97,6 @@ fn create_text_instruction_tasks_from_params(task_params: &[Value]) -> Vec<Task>
                 .unwrap_or("")
                 .to_string();
 
-            let timeout_seconds = task_param
-                .get("timeout_seconds")
-                .and_then(|v| v.as_u64())
-                .unwrap_or(300);
-
             let payload = json!({
                 "text_instruction": text_instruction
             });
@@ -108,7 +104,6 @@ fn create_text_instruction_tasks_from_params(task_params: &[Value]) -> Vec<Task>
             Task {
                 id: uuid::Uuid::new_v4().to_string(),
                 task_type: "text_instruction".to_string(),
-                timeout_in_seconds: Some(timeout_seconds),
                 payload,
             }
         })
@@ -116,13 +111,14 @@ fn create_text_instruction_tasks_from_params(task_params: &[Value]) -> Vec<Task>
 }
 
 fn create_task_execution_payload(tasks: Vec<Task>, execution_mode: &str) -> Value {
+    let task_ids: Vec<String> = tasks.iter().map(|task| task.id.clone()).collect();
     json!({
-        "tasks": tasks,
+        "task_ids": task_ids,
         "execution_mode": execution_mode
     })
 }
 
-pub async fn create_dynamic_task(params: Value) -> ToolCallResult {
+pub async fn create_dynamic_task(params: Value, tasks_manager: &TasksManager) -> ToolCallResult {
     let task_params_array = extract_task_parameters(&params);
 
     if task_params_array.is_empty() {
@@ -140,7 +136,7 @@ pub async fn create_dynamic_task(params: Value) -> ToolCallResult {
         EXECUTION_MODE_SEQUENTIAL
     };
 
-    let task_execution_payload = create_task_execution_payload(tasks, execution_mode);
+    let task_execution_payload = create_task_execution_payload(tasks.clone(), execution_mode);
 
     let tasks_json = match serde_json::to_string(&task_execution_payload) {
         Ok(json) => json,
@@ -151,5 +147,6 @@ pub async fn create_dynamic_task(params: Value) -> ToolCallResult {
             ))))
         }
     };
+    tasks_manager.save_tasks(tasks.clone()).await;
     ToolCallResult::from(Ok(vec![Content::text(tasks_json)]))
 }

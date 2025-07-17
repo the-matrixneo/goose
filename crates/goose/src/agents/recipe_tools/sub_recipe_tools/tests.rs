@@ -11,7 +11,6 @@ mod tests {
         let sub_recipe = SubRecipe {
             name: "test_sub_recipe".to_string(),
             path: "test_sub_recipe.yaml".to_string(),
-            timeout_in_seconds: None,
             values: Some(HashMap::from([("key1".to_string(), "value1".to_string())])),
             sequential_when_repeated: true,
         };

@@ -23,8 +23,6 @@ use goose::permission::PermissionConfirmation;
 use goose::providers::base::Provider;
 pub use goose::session::Identifier;
 use goose::utils::safe_truncate;
-use std::io::Write;
-use task_execution_display::format_task_execution_notification;
 
 use anyhow::{Context, Result};
 use completion::GooseCompleter;

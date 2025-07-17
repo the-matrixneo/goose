@@ -3,9 +3,9 @@ use serde_json::Value;
 
 use crate::agents::subagent_task_config::TaskConfig;
 use crate::agents::{
-    sub_recipe_execution_tool::lib::execute_tasks,
-    sub_recipe_execution_tool::task_types::ExecutionMode,
-    sub_recipe_execution_tool::tasks_manager::TasksManager, tool_execution::ToolCallResult,
+    subagent_execution_tool::lib::execute_tasks,
+    subagent_execution_tool::task_types::ExecutionMode,
+    subagent_execution_tool::tasks_manager::TasksManager, tool_execution::ToolCallResult,
 };
 use mcp_core::protocol::JsonRpcMessage;
 use tokio::sync::mpsc;
@@ -14,7 +14,7 @@ use tokio_stream;
 pub const SUBAGENT_EXECUTE_TASK_TOOL_NAME: &str = "subagent__execute_task";
 pub fn create_subagent_execute_task_tool() -> Tool {
     Tool::new(
-        SUB_RECIPE_EXECUTE_TASK_TOOL_NAME,
+        SUBAGENT_EXECUTE_TASK_TOOL_NAME,
         "Only use the subagent__execute_task tool when you execute sub recipe task or dynamic task.
 EXECUTION STRATEGY DECISION:
 1. If the tasks are created with execution_mode, use the execution_mode.
@@ -29,11 +29,7 @@ User Intent Based:
 - User: 'get weather and tell me a joke' → Sequential (2 separate tool calls, 1 task each)
 - User: 'get weather and joke in parallel' → Parallel (1 tool call with task array)
 - User: 'run these simultaneously' → Parallel (1 tool call with task array)
-- User: 'do task A then task B' → Sequential (2 separate tool calls)
-
-Pre-created Task Based:
-- subrecipe__create_task_weather returns execution_mode: 'parallel' → Use parallel execution
-- subrecipe__create_task_weather returns execution_mode: 'sequential' → Use sequential execution",
+- User: 'do task A then task B' → Sequential (2 separate tool calls)",
         serde_json::json!({
             "type": "object",
             "properties": {
@@ -63,7 +59,7 @@ Pre-created Task Based:
     )
 }
 
-pub async fn run_tasks(execute_data: Value, tasks_manager: &TasksManager) -> ToolCallResult {
+pub async fn run_tasks(execute_data: Value, task_config: TaskConfig, tasks_manager: &TasksManager) -> ToolCallResult {
     let (notification_tx, notification_rx) = mpsc::channel::<JsonRpcMessage>(100);
 
     let tasks_manager_clone = tasks_manager.clone();
@@ -78,6 +74,7 @@ pub async fn run_tasks(execute_data: Value, tasks_manager: &TasksManager) -> Too
             execute_data,
             execution_mode,
             notification_tx,
+            task_config,
             &tasks_manager_clone,
         )
         .await

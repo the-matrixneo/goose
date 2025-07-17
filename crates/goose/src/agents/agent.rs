@@ -12,11 +12,11 @@ use crate::agents::final_output_tool::{FINAL_OUTPUT_CONTINUATION_MESSAGE, FINAL_
 use crate::agents::recipe_tools::dynamic_task_tools::{
     create_dynamic_task, create_dynamic_task_tool, DYNAMIC_TASK_TOOL_NAME_PREFIX,
 };
-use crate::agents::sub_recipe_execution_tool::tasks_manager::TasksManager;
 use crate::agents::sub_recipe_manager::SubRecipeManager;
 use crate::agents::subagent_execution_tool::subagent_execute_task_tool::{
     self, SUBAGENT_EXECUTE_TASK_TOOL_NAME,
 };
+use crate::agents::subagent_execution_tool::tasks_manager::TasksManager;
 use crate::config::{Config, ExtensionConfigManager, PermissionManager};
 use crate::message::{push_message, Message};
 use crate::permission::permission_judge::check_tool_permissions;
@@ -308,7 +308,7 @@ impl Agent {
                 TaskConfig::new(provider, Some(Arc::clone(&self.extension_manager)), mcp_tx);
             subagent_execute_task_tool::run_tasks(tool_call.arguments.clone(), task_config, &self.tasks_manager,).await
         } else if tool_call.name == DYNAMIC_TASK_TOOL_NAME_PREFIX {
-            create_dynamic_task(tool_call.arguments.clone()).await
+            create_dynamic_task(tool_call.arguments.clone(), &self.tasks_manager).await
         } else if tool_call.name == PLATFORM_READ_RESOURCE_TOOL_NAME {
             // Check if the tool is read_resource and handle it separately
             ToolCallResult::from(
