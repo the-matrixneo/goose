@@ -1,13 +1,20 @@
 use super::common::{get_messages_token_counts, get_messages_token_counts_async};
 use crate::message::{Message, MessageContent};
 use crate::providers::base::Provider;
+use crate::prompt_template::render_global_file;
 use crate::token_counter::{AsyncTokenCounter, TokenCounter};
 use anyhow::Result;
 use mcp_core::Role;
+use serde::Serialize;
 use std::sync::Arc;
 
 // Constants for the summarization prompt and a follow-up user message.
 const SUMMARY_PROMPT: &str = "You are good at summarizing conversations";
+
+#[derive(Serialize)]
+struct SummarizeContext {
+    messages: String,
+}
 
 /// Summarize the combined messages from the accumulated summary and the current chunk.
 ///
@@ -102,12 +109,67 @@ fn reintegrate_removed_messages(
 }
 
 // Summarization steps:
+//    Using a single tailored prompt, summarize the entire conversation history.
+pub async fn summarize_messages_oneshot(
+    provider: Arc<dyn Provider>,
+    messages: &[Message],
+    token_counter: &TokenCounter,
+    _context_limit: usize,
+) -> Result<(Vec<Message>, Vec<usize>), anyhow::Error> {
+    // Preprocess messages to handle tool response edge case.
+    let (preprocessed_messages, removed_messages) = preprocess_messages(messages);
+
+    if preprocessed_messages.is_empty() {
+        // If no messages to summarize, just return the removed messages
+        return Ok((
+            removed_messages.clone(),
+            get_messages_token_counts(token_counter, &removed_messages),
+        ));
+    }
+
+    // Format all messages as a single string for the summarization prompt
+    let messages_text = preprocessed_messages
+        .iter()
+        .map(|msg| format!("{:?}", msg))
+        .collect::<Vec<_>>()
+        .join("\n\n");
+
+    let context = SummarizeContext {
+        messages: messages_text,
+    };
+
+    // Render the one-shot summarization prompt
+    let system_prompt = render_global_file("summarize_oneshot.md", &context)?;
+    
+    // Create a simple user message requesting summarization
+    let user_message = Message::user().with_text("Please summarize the conversation history provided in the system prompt.");
+    let summarization_request = vec![user_message];
+
+    // Send the request to the provider and fetch the response.
+    let mut response = provider
+        .complete(&system_prompt, &summarization_request, &[])
+        .await?
+        .0;
+    
+    // Set role to user as it will be used in following conversation as user content.
+    response.role = Role::User;
+
+    // Add back removed messages.
+    let final_summary = reintegrate_removed_messages(&vec![response], &removed_messages);
+
+    Ok((
+        final_summary.clone(),
+        get_messages_token_counts(token_counter, &final_summary),
+    ))
+}
+
+// Summarization steps:
 // 1. Break down large text into smaller chunks (roughly 30% of the model’s context window).
 // 2. For each chunk:
 //    a. Combine it with the previous summary (or leave blank for the first iteration).
 //    b. Summarize the combined text, focusing on extracting only the information we need.
 // 3. Generate a final summary using a tailored prompt.
-pub async fn summarize_messages(
+pub async fn summarize_messages_chunked(
     provider: Arc<dyn Provider>,
     messages: &[Message],
     token_counter: &TokenCounter,
@@ -157,6 +219,49 @@ pub async fn summarize_messages(
         final_summary.clone(),
         get_messages_token_counts(token_counter, &final_summary),
     ))
+}
+
+/// Main summarization function that chooses the best algorithm based on context size.
+/// 
+/// This function will:
+/// 1. First try the one-shot summarization if there's enough context window available
+/// 2. Fall back to the chunked approach if the one-shot fails or if context is too limited
+/// 3. Choose the algorithm based on available context window space
+pub async fn summarize_messages(
+    provider: Arc<dyn Provider>,
+    messages: &[Message],
+    token_counter: &TokenCounter,
+    context_limit: usize,
+) -> Result<(Vec<Message>, Vec<usize>), anyhow::Error> {
+    // Calculate total tokens in messages
+    let total_tokens: usize = get_messages_token_counts(token_counter, messages)
+        .iter()
+        .sum();
+    
+    // Reserve space for the system prompt and response (rough estimate)
+    let system_prompt_overhead = 1000; // Conservative estimate for the summarization prompt
+    let response_overhead = 2000; // Conservative estimate for the response
+    let available_context = context_limit.saturating_sub(system_prompt_overhead + response_overhead);
+    
+    // If the total tokens fit comfortably in the available context (with some buffer),
+    // try the one-shot approach first
+    if total_tokens <= available_context * 3 / 4 { // Use 75% of available context as threshold
+        match summarize_messages_oneshot(
+            Arc::clone(&provider),
+            messages,
+            token_counter,
+            context_limit,
+        ).await {
+            Ok(result) => return Ok(result),
+            Err(e) => {
+                // Log the error but continue to fallback
+                tracing::warn!("One-shot summarization failed, falling back to chunked approach: {}", e);
+            }
+        }
+    }
+    
+    // Fall back to the chunked approach
+    summarize_messages_chunked(provider, messages, token_counter, context_limit).await
 }
 
 /// Async version using AsyncTokenCounter for better performance
