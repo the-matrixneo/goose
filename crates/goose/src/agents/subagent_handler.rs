@@ -8,11 +8,12 @@ pub async fn run_complete_subagent_task(
     task_config: TaskConfig,
 ) -> Result<String, anyhow::Error> {
     // Create the subagent with the parent agent's provider
-    let (subagent, handle) = SubAgent::new(task_config.clone())
-        .await?;
+    let (subagent, handle) = SubAgent::new(task_config.clone()).await?;
 
     // Execute the subagent task
-    let result = subagent.reply_subagent(text_instruction, task_config).await?;
+    let result = subagent
+        .reply_subagent(text_instruction, task_config)
+        .await?;
     let response_text = result.as_concat_text();
 
     // Clean up the subagent handle

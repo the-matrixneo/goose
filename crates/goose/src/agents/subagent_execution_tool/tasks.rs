@@ -70,11 +70,9 @@ async fn handle_text_instruction_task(
     task_execution_tracker.start_task(&task.id).await;
 
     match run_complete_subagent_task(text_instruction.to_string(), task_config).await {
-        Ok(result_text) => {
-            Ok(serde_json::json!({
-                "result": result_text
-            }))
-        }
+        Ok(result_text) => Ok(serde_json::json!({
+            "result": result_text
+        })),
         Err(e) => {
             let error_msg = format!("Subagent execution failed: {}", e);
             Err(error_msg)
