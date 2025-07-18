@@ -31,7 +31,9 @@ macro_rules! derive_utoipa {
 
             impl<'__s> ToSchema<'__s> for [<Schema $inner_type>] {
                 fn schema() -> (&'__s str, utoipa::openapi::RefOr<utoipa::openapi::Schema>) {
-                    let schema = rmcp::schemars::schema_for!($inner_type);
+                    let settings = rmcp::schemars::gen::SchemaSettings::openapi3();
+                    let generator = settings.into_generator();
+                    let schema = generator.into_root_schema_for::<$inner_type>();
                     let schema = convert_schemars_to_utoipa(schema);
                     (stringify!($inner_type), schema)
                 }

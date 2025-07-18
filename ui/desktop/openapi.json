@@ -931,38 +931,17 @@
         "type": "object",
         "properties": {
           "audience": {
-            "anyOf": [
-              {
-                "type": "array",
-                "items": {
-                  "$ref": "#/definitions/Role"
-                }
-              },
-              {
-                "type": "string"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Role"
+            }
           },
           "priority": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "string"
-              }
-            ]
+            "type": "number"
           },
           "timestamp": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "string"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
@@ -1060,7 +1039,7 @@
             ],
             "properties": {
               "resource": {
-                "$ref": "#/definitions/ResourceContents"
+                "$ref": "#/components/schemas/ResourceContents"
               },
               "type": {
                 "type": "string"
@@ -1076,12 +1055,9 @@
             ],
             "properties": {
               "annotations": {
-                "anyOf": [
+                "allOf": [
                   {
-                    "$ref": "#/definitions/Annotations"
-                  },
-                  {
-                    "type": "string"
+                    "$ref": "#/components/schemas/Annotations"
                   }
                 ]
               },
@@ -1185,17 +1161,14 @@
         ],
         "properties": {
           "annotations": {
-            "anyOf": [
+            "allOf": [
               {
-                "$ref": "#/definitions/Annotations"
-              },
-              {
-                "type": "string"
+                "$ref": "#/components/schemas/Annotations"
               }
             ]
           },
           "resource": {
-            "$ref": "#/definitions/ResourceContents"
+            "$ref": "#/components/schemas/ResourceContents"
           }
         }
       },
@@ -1518,12 +1491,9 @@
         ],
         "properties": {
           "annotations": {
-            "anyOf": [
+            "allOf": [
               {
-                "$ref": "#/definitions/Annotations"
-              },
-              {
-                "type": "string"
+                "$ref": "#/components/schemas/Annotations"
               }
             ]
           },
@@ -2316,12 +2286,9 @@
         ],
         "properties": {
           "annotations": {
-            "anyOf": [
+            "allOf": [
               {
-                "$ref": "#/definitions/Annotations"
-              },
-              {
-                "type": "string"
+                "$ref": "#/components/schemas/Annotations"
               }
             ]
           },
