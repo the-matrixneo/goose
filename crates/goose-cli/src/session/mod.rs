@@ -742,9 +742,6 @@ impl Session {
                             )
                             .green()
                         );
-
-                        // Update the context display immediately after summarization
-                        self.display_context_usage().await?;
                     } else {
                         println!("{}", console::style("Summarization cancelled.").yellow());
                     }
@@ -1415,13 +1412,15 @@ impl Session {
             );
         }
 
-        match self.get_metadata() {
-            Ok(metadata) => {
-                let total_tokens = metadata.total_tokens.unwrap_or(0) as usize;
+        // Calculate actual current token count from messages
+        let current_token_count = self.calculate_current_token_count().await?;
+        
+        output::display_context_usage(current_token_count, context_limit);
 
-                output::display_context_usage(total_tokens, context_limit);
-
-                if show_cost {
+        if show_cost {
+            // For cost display, try to use metadata if available, otherwise fall back to current count
+            match self.get_metadata() {
+                Ok(metadata) => {
                     let input_tokens = metadata.input_tokens.unwrap_or(0) as usize;
                     let output_tokens = metadata.output_tokens.unwrap_or(0) as usize;
                     output::display_cost_usage(
@@ -1432,13 +1431,40 @@ impl Session {
                     )
                     .await;
                 }
-            }
-            Err(_) => {
-                output::display_context_usage(0, context_limit);
+                Err(_) => {
+                    // If no metadata available, we can't show cost breakdown
+                }
             }
         }
 
         Ok(())
+    }
+
+    /// Calculate the current token count of the messages in memory
+    async fn calculate_current_token_count(&self) -> Result<usize> {
+        use goose::token_counter::create_async_token_counter;
+        
+        let token_counter = create_async_token_counter().await
+            .map_err(|e| anyhow::anyhow!("Failed to create token counter: {}", e))?;
+        
+        // Get tools from agent
+        let tools = self.agent.list_tools(None).await;
+        
+        // For now, use a simplified system prompt calculation
+        // In a real implementation, we'd want to access the agent's prompt manager
+        // but since it's private, we'll use an empty system prompt as approximation
+        let system_prompt = ""; // This is a simplification
+        
+        let resources = vec![]; // No direct way to get resources currently
+        
+        let token_count = token_counter.count_everything(
+            system_prompt,
+            &self.messages,
+            &tools,
+            &resources,
+        );
+        
+        Ok(token_count)
     }
 
     /// Handle prompt command execution
