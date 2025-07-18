@@ -16,7 +16,6 @@ use super::utils::emit_debug_trace;
 use crate::message::{Message, MessageContent};
 use crate::model::ModelConfig;
 use chrono::Utc;
-use mcp_core::content::TextContent;
 use rmcp::model::Role;
 
 pub const SAGEMAKER_TGI_DOC_LINK: &str =

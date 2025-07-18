@@ -17,7 +17,6 @@ use std::{env, fs, future::Future, path::Path, pin::Pin, sync::Arc};
 use storage::CredentialsManager;
 use tokio::sync::mpsc;
 
-use mcp_core::content::Content;
 use mcp_core::{
     handler::{PromptError, ResourceError, ToolError},
     prompt::Prompt,

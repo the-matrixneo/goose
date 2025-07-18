@@ -455,7 +455,6 @@ mod tests {
     use crate::message::MessageContent;
     use crate::providers::base::{ProviderMetadata, ProviderUsage, Usage};
     use chrono::Utc;
-    use mcp_core::content::TextContent;
     use rmcp::model::Role;
 
     #[derive(Clone)]

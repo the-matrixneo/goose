@@ -6,7 +6,7 @@ use crate::providers::utils::{
 };
 use anyhow::{anyhow, Error};
 use mcp_core::ToolError;
-use mcp_core::{Content, Tool, ToolCall};
+use mcp_core::{Tool, ToolCall};
 use rmcp::model::Role;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -585,7 +585,6 @@ pub fn create_request(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use mcp_core::content::Content;
     use serde_json::json;
 
     #[test]

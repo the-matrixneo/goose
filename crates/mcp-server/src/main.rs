@@ -1,5 +1,4 @@
 use anyhow::Result;
-use mcp_core::content::Content;
 use mcp_core::handler::{PromptError, ResourceError};
 use mcp_core::prompt::{Prompt, PromptArgument};
 use mcp_core::protocol::JsonRpcMessage;

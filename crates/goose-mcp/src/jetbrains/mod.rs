@@ -2,7 +2,6 @@ mod proxy;
 
 use anyhow::Result;
 use mcp_core::{
-    content::Content,
     handler::{PromptError, ResourceError, ToolError},
     prompt::Prompt,
     protocol::{JsonRpcMessage, ServerCapabilities},

@@ -177,7 +177,6 @@ mod tests {
     use crate::message::{Message, MessageContent};
     use crate::providers::base::{ProviderMetadata, ProviderUsage, Usage};
     use chrono::Utc;
-    use mcp_core::content::TextContent;
     use rmcp::model::Role;
     use std::env;
 

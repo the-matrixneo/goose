@@ -11,7 +11,6 @@ use goose::permission::permission_confirmation::PrincipalType;
 use goose::providers::base::{ConfigKey, ModelInfo, ProviderMetadata};
 use goose::session::info::SessionInfo;
 use goose::session::SessionMetadata;
-use mcp_core::content::{Annotations, Content, EmbeddedResource, ImageContent, TextContent};
 use mcp_core::handler::ToolResultSchema;
 use mcp_core::resource::ResourceContents;
 use mcp_core::tool::{Tool, ToolAnnotations};

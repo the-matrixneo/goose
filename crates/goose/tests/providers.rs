@@ -6,7 +6,6 @@ use goose::providers::errors::ProviderError;
 use goose::providers::{
     anthropic, azure, bedrock, databricks, google, groq, ollama, openai, openrouter, snowflake, xai,
 };
-use mcp_core::content::Content;
 use mcp_core::tool::Tool;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -256,7 +255,6 @@ impl ProviderTester {
 
     async fn test_image_content_support(&self) -> Result<()> {
         use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
-        use mcp_core::content::ImageContent;
         use std::fs;
 
         // Try to read the test image

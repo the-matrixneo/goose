@@ -7,7 +7,6 @@ use crate::eval_suites::{
 use crate::register_evaluation;
 use async_trait::async_trait;
 use goose::message::MessageContent;
-use mcp_core::content::Content;
 use rmcp::model::Role;
 use serde_json::{self, Value};
 

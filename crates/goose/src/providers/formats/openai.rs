@@ -600,7 +600,6 @@ pub fn create_request(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use mcp_core::content::Content;
     use serde_json::json;
 
     #[test]

@@ -1,4 +1,3 @@
-use crate::content::{Annotations, EmbeddedResource, ImageContent};
 use crate::handler::PromptError;
 use crate::resource::ResourceContents;
 use base64::engine::{general_purpose::STANDARD as BASE64_STANDARD, Engine};

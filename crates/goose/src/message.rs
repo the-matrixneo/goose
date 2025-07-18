@@ -8,12 +8,14 @@ use std::collections::HashSet;
 /// The content of the messages uses MCP types to avoid additional conversions
 /// when interacting with MCP servers.
 use chrono::Utc;
-use mcp_core::content::{Content, ImageContent, TextContent};
 use mcp_core::handler::ToolResult;
-use mcp_core::prompt::{PromptMessage, PromptMessageContent, PromptMessageRole};
+use mcp_core::prompt::PromptMessageRole;
 use mcp_core::resource::ResourceContents;
 use mcp_core::tool::ToolCall;
 use rmcp::model::Role;
+use rmcp::model::{
+    AnnotateAble, Content, ImageContent, RawContent, RawImageContent, RawTextContent, TextContent,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::ToSchema;
@@ -114,18 +116,17 @@ pub enum MessageContent {
 
 impl MessageContent {
     pub fn text<S: Into<String>>(text: S) -> Self {
-        MessageContent::Text(TextContent {
-            text: text.into(),
-            annotations: None,
-        })
+        MessageContent::Text(RawTextContent { text: text.into() }.no_annotation())
     }
 
     pub fn image<S: Into<String>, T: Into<String>>(data: S, mime_type: T) -> Self {
-        MessageContent::Image(ImageContent {
-            data: data.into(),
-            mime_type: mime_type.into(),
-            annotations: None,
-        })
+        MessageContent::Image(
+            RawImageContent {
+                data: data.into(),
+                mime_type: mime_type.into(),
+            }
+            .no_annotation(),
+        )
     }
 
     pub fn tool_request<S: Into<String>>(id: S, tool_call: ToolResult<ToolCall>) -> Self {
@@ -220,7 +221,7 @@ impl MessageContent {
             if let Ok(contents) = &tool_response.tool_result {
                 let texts: Vec<String> = contents
                     .iter()
-                    .filter_map(|content| content.as_text().map(String::from))
+                    .filter_map(|content| content.as_text().map(|t| t.text.to_string()))
                     .collect();
                 if !texts.is_empty() {
                     return Some(texts.join("\n"));
@@ -257,13 +258,17 @@ impl MessageContent {
 
 impl From<Content> for MessageContent {
     fn from(content: Content) -> Self {
-        match content {
-            Content::Text(text) => MessageContent::Text(text),
-            Content::Image(image) => MessageContent::Image(image),
-            Content::Resource(resource) => MessageContent::Text(TextContent {
-                text: resource.get_text(),
-                annotations: None,
+        match content.raw {
+            RawContent::Text(text) => {
+                MessageContent::Text(text.optional_annotate(content.annotations))
+            }
+            RawContent::Image(image) => {
+                MessageContent::Image(image.optional_annotate(content.annotations))
+            }
+            RawContent::Resource(resource) => MessageContent::Text(RawTextContent {
+                text: resource.resource,
             }),
+            RawContent::Audio(annotated) => todo!(),
         }
     }
 }
@@ -512,10 +517,10 @@ impl Message {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use mcp_core::content::EmbeddedResource;
     use mcp_core::handler::ToolError;
     use mcp_core::prompt::PromptMessageContent;
     use mcp_core::resource::ResourceContents;
+    use rmcp::model::PromptMessage;
     use serde_json::{json, Value};
 
     #[test]
@@ -654,10 +659,9 @@ mod tests {
     #[test]
     fn test_from_prompt_message_image() {
         let prompt_content = PromptMessageContent::Image {
-            image: ImageContent {
+            image: RawImageContent {
                 data: "base64data".to_string(),
                 mime_type: "image/jpeg".to_string(),
-                annotations: None,
             },
         };
 

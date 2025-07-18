@@ -1,7 +1,6 @@
 use crate::message::{Message, MessageContent};
 use crate::utils::safe_truncate;
 use anyhow::{anyhow, Result};
-use mcp_core::{Content, ResourceContents};
 use rmcp::model::Role;
 use std::collections::HashSet;
 use tracing::{debug, warn};
@@ -376,7 +375,6 @@ mod tests {
     use super::*;
     use crate::message::Message;
     use anyhow::Result;
-    use mcp_core::content::Content;
     use mcp_core::tool::ToolCall;
     use serde_json::json;
 

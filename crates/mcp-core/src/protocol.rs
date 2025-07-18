@@ -1,6 +1,5 @@
 /// The protocol messages exchanged between client and server
 use crate::{
-    content::Content,
     prompt::{Prompt, PromptMessage},
     resource::Resource,
     resource::ResourceContents,

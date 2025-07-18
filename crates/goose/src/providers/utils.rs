@@ -11,7 +11,6 @@ use std::io::Read;
 use std::path::Path;
 
 use crate::providers::errors::{OpenAIError, ProviderError};
-use mcp_core::content::ImageContent;
 
 #[derive(serde::Deserialize)]
 struct OpenAIErrorResponse {

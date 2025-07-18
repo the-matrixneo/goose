@@ -10,7 +10,6 @@ use super::errors::ProviderError;
 use super::utils::emit_debug_trace;
 use crate::message::{Message, MessageContent};
 use crate::model::ModelConfig;
-use mcp_core::content::TextContent;
 use mcp_core::tool::Tool;
 use rmcp::model::Role;
 
@@ -356,7 +355,7 @@ impl ClaudeCodeProvider {
         let message = Message::new(
             rmcp::model::Role::Assistant,
             chrono::Utc::now().timestamp(),
-            vec![MessageContent::Text(mcp_core::content::TextContent {
+            vec![MessageContent::Text(TextContent {
                 text: description.clone(),
                 annotations: None,
             })],

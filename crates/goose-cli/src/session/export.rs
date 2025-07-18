@@ -1,6 +1,5 @@
 use goose::message::{Message, MessageContent, ToolRequest, ToolResponse};
 use goose::utils::safe_truncate;
-use mcp_core::content::Content as McpContent;
 use mcp_core::resource::ResourceContents;
 use rmcp::model::Role;
 use serde_json::Value;
@@ -220,7 +219,7 @@ pub fn tool_response_to_markdown(resp: &ToolResponse, export_all_content: bool) 
                 }
 
                 match content {
-                    McpContent::Text(text_content) => {
+                    Content::Text(text_content) => {
                         let trimmed_text = text_content.text.trim();
                         if (trimmed_text.starts_with('{') && trimmed_text.ends_with('}'))
                             || (trimmed_text.starts_with('[') && trimmed_text.ends_with(']'))
@@ -236,7 +235,7 @@ pub fn tool_response_to_markdown(resp: &ToolResponse, export_all_content: bool) 
                             md.push_str("\n\n");
                         }
                     }
-                    McpContent::Image(image_content) => {
+                    Content::Image(image_content) => {
                         if image_content.mime_type.starts_with("image/") {
                             // For actual images, provide a placeholder that indicates it's an image
                             md.push_str(&format!(
@@ -252,7 +251,7 @@ pub fn tool_response_to_markdown(resp: &ToolResponse, export_all_content: bool) 
                             ));
                         }
                     }
-                    McpContent::Resource(resource) => {
+                    Content::Resource(resource) => {
                         match &resource.resource {
                             ResourceContents::TextResourceContents {
                                 uri,
@@ -360,7 +359,6 @@ pub fn message_to_markdown(message: &Message, export_all_content: bool) -> Strin
 mod tests {
     use super::*;
     use goose::message::{Message, ToolRequest, ToolResponse};
-    use mcp_core::content::{Content as McpContent, TextContent};
     use mcp_core::tool::ToolCall;
     use serde_json::json;
 
