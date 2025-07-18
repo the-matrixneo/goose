@@ -102,15 +102,9 @@ function PenpotCanvas({
 
       // Clean up any existing containers (ignore errors)
       console.log('Cleaning up existing containers...');
-      await window.electron.dockerCommand('docker stop penpot-goose');
-      await window.electron.dockerCommand('docker rm penpot-goose');
-      await window.electron.dockerCommand('docker stop penpot-backend');
-      await window.electron.dockerCommand('docker rm penpot-backend');
-      await window.electron.dockerCommand('docker stop penpot-postgres');
-      await window.electron.dockerCommand('docker rm penpot-postgres');
-      await window.electron.dockerCommand('docker stop penpot-redis');
-      await window.electron.dockerCommand('docker rm penpot-redis');
-      await window.electron.dockerCommand('docker network rm penpot-network');
+      await window.electron.dockerCommand('docker stop penpot-goose penpot-backend penpot-postgres penpot-redis penpot-exporter || true');
+      await window.electron.dockerCommand('docker rm penpot-goose penpot-backend penpot-postgres penpot-redis penpot-exporter || true');
+      await window.electron.dockerCommand('docker network rm penpot-network || true');
 
       // Create network
       console.log('Creating Docker network...');
@@ -119,9 +113,9 @@ function PenpotCanvas({
       
       setErrorMessage('📦 Starting database containers...');
       
-      // Start PostgreSQL
+      // Start PostgreSQL with proper health check
       console.log('Starting PostgreSQL...');
-      const postgresResult = await window.electron.dockerCommand('docker run -d --name penpot-postgres --network penpot-network -e POSTGRES_DB=penpot -e POSTGRES_USER=penpot -e POSTGRES_PASSWORD=penpot postgres:13');
+      const postgresResult = await window.electron.dockerCommand('docker run -d --name penpot-postgres --network penpot-network -e POSTGRES_DB=penpot -e POSTGRES_USER=penpot -e POSTGRES_PASSWORD=penpot --health-cmd="pg_isready -U penpot" --health-interval=10s --health-timeout=5s --health-retries=5 postgres:13');
       console.log('PostgreSQL result:', postgresResult);
 
       // Start Redis
@@ -131,26 +125,93 @@ function PenpotCanvas({
 
       setErrorMessage('⏳ Waiting for databases to initialize...');
       
-      // Wait for dependencies to start
-      await new Promise(resolve => setTimeout(resolve, 10000));
+      // Wait for PostgreSQL to be ready
+      let dbReady = false;
+      for (let i = 0; i < 30; i++) {
+        try {
+          const healthCheck = await window.electron.dockerCommand('docker exec penpot-postgres pg_isready -U penpot');
+          if (healthCheck.success) {
+            dbReady = true;
+            break;
+          }
+        } catch (e) {
+          // Continue waiting
+        }
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        setErrorMessage(`⏳ Waiting for databases to initialize... (${i + 1}/30)`);
+      }
+
+      if (!dbReady) {
+        throw new Error('PostgreSQL failed to start within timeout');
+      }
 
       setErrorMessage('🚀 Starting Penpot backend...');
 
-      // Start Penpot backend
+      // Start Penpot backend with corrected environment variables
       console.log('Starting Penpot backend...');
-      const backendResult = await window.electron.dockerCommand('docker run -d --name penpot-backend --network penpot-network -e PENPOT_FLAGS=enable-registration,enable-login-with-password -e PENPOT_SECRET_KEY=penpot-secret-key -e PENPOT_DATABASE_URI="postgresql://penpot:penpot@penpot-postgres:5432/penpot" -e PENPOT_REDIS_URI="redis://penpot-redis:6379/0" -e PENPOT_ASSETS_STORAGE_BACKEND=assets-fs -e PENPOT_STORAGE_ASSETS_FS_DIRECTORY=/opt/data/assets -e PENPOT_HTTP_SERVER_HOST=0.0.0.0 penpotapp/backend:latest');
+      const backendResult = await window.electron.dockerCommand([
+        'docker', 'run', '-d', 
+        '--name', 'penpot-backend', 
+        '--network', 'penpot-network',
+        '-e', 'PENPOT_FLAGS=enable-registration,enable-login-with-password',
+        '-e', 'PENPOT_SECRET_KEY=penpot-secret-key',
+        '-e', 'PENPOT_DATABASE_URI=postgresql://penpot:penpot@penpot-postgres:5432/penpot',
+        '-e', 'PENPOT_REDIS_URI=redis://penpot-redis:6379/0',
+        '-e', 'PENPOT_ASSETS_STORAGE_BACKEND=assets-fs',
+        '-e', 'PENPOT_STORAGE_ASSETS_FS_DIRECTORY=/opt/data/assets',
+        '-e', 'PENPOT_HTTP_SERVER_HOST=0.0.0.0',
+        '-e', 'PENPOT_HTTP_SERVER_PORT=6060',
+        '-p', '6060:6060',
+        'penpotapp/backend:latest'
+      ].join(' '));
       console.log('Backend result:', backendResult);
 
       setErrorMessage('⏳ Waiting for backend to initialize...');
       
-      // Wait for backend to start
-      await new Promise(resolve => setTimeout(resolve, 15000));
+      // Wait for backend to be ready
+      let backendReady = false;
+      for (let i = 0; i < 60; i++) {
+        try {
+          const healthCheck = await window.electron.dockerCommand('docker logs penpot-backend 2>&1 | grep -i "server started"');
+          if (healthCheck.success || i > 30) { // Give it at least 30 attempts
+            backendReady = true;
+            break;
+          }
+        } catch (e) {
+          // Continue waiting
+        }
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        setErrorMessage(`⏳ Waiting for backend to initialize... (${i + 1}/60)`);
+      }
+
+      setErrorMessage('📋 Starting Penpot exporter...');
+
+      // Start Penpot exporter (required by frontend)
+      console.log('Starting Penpot exporter...');
+      const exporterResult = await window.electron.dockerCommand([
+        'docker', 'run', '-d',
+        '--name', 'penpot-exporter',
+        '--network', 'penpot-network',
+        '-e', 'PENPOT_PUBLIC_URI=http://penpot-backend:6060',
+        '-e', 'PENPOT_REDIS_URI=redis://penpot-redis:6379/0',
+        'penpotapp/exporter:latest'
+      ].join(' '));
+      console.log('Exporter result:', exporterResult);
 
       setErrorMessage('🎨 Starting Penpot frontend...');
 
-      // Start Penpot frontend (now that backend is ready)
+      // Start Penpot frontend with backend configuration
       console.log('Starting Penpot frontend...');
-      const penpotResult = await window.electron.dockerCommand('docker run -d --name penpot-goose -p 9001:80 --network penpot-network -e PENPOT_FLAGS=enable-registration,enable-login-with-password penpotapp/frontend:latest');
+      const penpotResult = await window.electron.dockerCommand([
+        'docker', 'run', '-d',
+        '--name', 'penpot-goose',
+        '-p', '9001:80',
+        '--network', 'penpot-network',
+        '-e', 'PENPOT_FLAGS=enable-registration,enable-login-with-password',
+        '-e', 'PENPOT_BACKEND_URI=http://penpot-backend:6060',
+        '-e', 'PENPOT_EXPORTER_URI=http://penpot-exporter:6061',
+        'penpotapp/frontend:latest'
+      ].join(' '));
       console.log('Penpot frontend result:', penpotResult);
       
       if (penpotResult.success) {
@@ -184,8 +245,8 @@ function PenpotCanvas({
     
     try {
       // Stop all Penpot containers
-      await window.electron.dockerCommand('docker stop penpot-goose penpot-postgres penpot-redis || true');
-      await window.electron.dockerCommand('docker rm penpot-goose penpot-postgres penpot-redis || true');
+      await window.electron.dockerCommand('docker stop penpot-goose penpot-backend penpot-postgres penpot-redis penpot-exporter || true');
+      await window.electron.dockerCommand('docker rm penpot-goose penpot-backend penpot-postgres penpot-redis penpot-exporter || true');
       await window.electron.dockerCommand('docker network rm penpot-network || true');
       
       setDockerState({
