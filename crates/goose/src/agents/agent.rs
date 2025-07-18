@@ -48,8 +48,9 @@ use crate::agents::tool_vectordb::generate_table_id;
 use crate::agents::types::SessionConfig;
 use crate::agents::types::{FrontendTool, ToolResultReceiver};
 use mcp_core::{
-    prompt::Prompt, protocol::GetPromptResult, tool::Tool, Content, ToolError, ToolResult,
+    prompt::Prompt, protocol::GetPromptResult, tool::Tool, ToolError, ToolResult,
 };
+use rmcp::model::Content;
 
 use super::final_output_tool::FinalOutputTool;
 use super::platform_tools;

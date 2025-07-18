@@ -1,5 +1,6 @@
 use lopdf::{content::Content as PdfContent, Document, Object};
-use mcp_core::{Content, ToolError};
+use mcp_core::ToolError;
+use rmcp::model::Content;
 use std::{fs, path::Path};
 
 pub async fn pdf_tool(

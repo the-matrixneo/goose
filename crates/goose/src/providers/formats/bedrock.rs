@@ -34,7 +34,7 @@ pub fn to_bedrock_message_content(content: &MessageContent) -> Result<bedrock::C
             bedrock::ContentBlock::Text("".to_string())
         }
         MessageContent::Image(image) => {
-            bedrock::ContentBlock::Image(to_bedrock_image(image.data, image.mime_type)?)
+            bedrock::ContentBlock::Image(to_bedrock_image(&image.data, &image.mime_type)?)
         }
         MessageContent::Thinking(_) => {
             // Thinking blocks are not supported in Bedrock - skip
@@ -90,7 +90,7 @@ pub fn to_bedrock_message_content(content: &MessageContent) -> Result<bedrock::C
                             c.audience()
                                 .is_none_or(|audience| !audience.contains(&Role::User))
                         })
-                        .map(|c| to_bedrock_tool_result_content_block(&tool_res.id, c))
+                        .map(|c| to_bedrock_tool_result_content_block(&tool_res.id, c.clone()))
                         .collect::<Result<_>>()?,
                 ),
                 Err(_) => None,

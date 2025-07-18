@@ -9,12 +9,11 @@ use std::collections::HashSet;
 /// when interacting with MCP servers.
 use chrono::Utc;
 use mcp_core::handler::ToolResult;
-use mcp_core::prompt::PromptMessageRole;
-use mcp_core::resource::ResourceContents;
+use rmcp::model::ResourceContents;
 use mcp_core::tool::ToolCall;
 use rmcp::model::Role;
 use rmcp::model::{
-    AnnotateAble, Content, ImageContent, RawContent, RawImageContent, RawTextContent, TextContent,
+    AnnotateAble, Content, ImageContent, PromptMessage, PromptMessageContent, PromptMessageRole, RawContent, RawImageContent, RawTextContent, TextContent,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -265,9 +264,15 @@ impl From<Content> for MessageContent {
             RawContent::Image(image) => {
                 MessageContent::Image(image.optional_annotate(content.annotations))
             }
-            RawContent::Resource(resource) => MessageContent::Text(RawTextContent {
-                text: resource.resource,
-            }),
+            RawContent::Resource(resource) => {
+                let text = match &resource.resource {
+                    ResourceContents::TextResourceContents { text, .. } => text.clone(),
+                    ResourceContents::BlobResourceContents { blob, .. } => {
+                        format!("[Binary content: {}]", blob.clone())
+                    }
+                };
+                MessageContent::text(text)
+            },
             RawContent::Audio(annotated) => todo!(),
         }
     }
@@ -285,16 +290,16 @@ impl From<PromptMessage> for Message {
         let content = match prompt_message.content {
             PromptMessageContent::Text { text } => MessageContent::text(text),
             PromptMessageContent::Image { image } => {
-                MessageContent::image(image.data, image.mime_type)
+                MessageContent::image(image.data.clone(), image.mime_type.clone())
             }
             PromptMessageContent::Resource { resource } => {
                 // For resources, convert to text content with the resource text
-                match resource.resource {
+                match &resource.resource {
                     ResourceContents::TextResourceContents { text, .. } => {
-                        MessageContent::text(text)
+                        MessageContent::text(text.clone())
                     }
                     ResourceContents::BlobResourceContents { blob, .. } => {
-                        MessageContent::text(format!("[Binary content: {}]", blob))
+                        MessageContent::text(format!("[Binary content: {}]", blob.clone()))
                     }
                 }
             }
@@ -519,7 +524,7 @@ mod tests {
     use super::*;
     use mcp_core::handler::ToolError;
     use mcp_core::prompt::PromptMessageContent;
-    use mcp_core::resource::ResourceContents;
+    use rmcp::model::ResourceContents;
     use rmcp::model::PromptMessage;
     use serde_json::{json, Value};
 

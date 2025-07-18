@@ -6,10 +6,12 @@ use crate::providers::utils::{
     sanitize_function_name, ImageFormat,
 };
 use anyhow::{anyhow, Error};
+use std::ops::Deref;
 use async_stream::try_stream;
 use futures::Stream;
 use mcp_core::ToolError;
-use mcp_core::{Content, Tool, ToolCall};
+use mcp_core::{Tool, ToolCall};
+use rmcp::model::{Content, RawContent, ResourceContents, AnnotateAble};
 use rmcp::model::Role;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -135,7 +137,7 @@ pub fn format_messages(messages: &[Message], image_format: &ImageFormat) -> Vec<
                                         .audience()
                                         .is_none_or(|audience| audience.contains(&Role::Assistant))
                                 })
-                                .map(|content| content.unannotated())
+                                .cloned()
                                 .collect();
 
                             // Process all content, replacing images with placeholder text
@@ -143,19 +145,23 @@ pub fn format_messages(messages: &[Message], image_format: &ImageFormat) -> Vec<
                             let mut image_messages = Vec::new();
 
                             for content in abridged {
-                                match content {
-                                    Content::Image(image) => {
+                                match content.deref() {
+                                    RawContent::Image(image) => {
                                         // Add placeholder text in the tool response
                                         tool_content.push(Content::text("This tool result included an image that is uploaded in the next message."));
 
                                         // Create a separate image message
                                         image_messages.push(json!({
                                             "role": "user",
-                                            "content": [convert_image(&image, image_format)]
+                                            "content": [convert_image(&image.clone().no_annotation(), image_format)]
                                         }));
                                     }
-                                    Content::Resource(resource) => {
-                                        tool_content.push(Content::text(resource.get_text()));
+                                    RawContent::Resource(resource) => {
+                                        let text = match &resource.resource {
+                                            ResourceContents::TextResourceContents { text, .. } => text.clone(),
+                                            _ => String::new(),
+                                        };
+                                        tool_content.push(Content::text(text));
                                     }
                                     _ => {
                                         tool_content.push(content);
@@ -164,8 +170,8 @@ pub fn format_messages(messages: &[Message], image_format: &ImageFormat) -> Vec<
                             }
                             let tool_response_content: Value = json!(tool_content
                                 .iter()
-                                .map(|content| match content {
-                                    Content::Text(text) => text.text.clone(),
+                                .map(|content| match content.deref() {
+                                    RawContent::Text(text) => text.text.clone(),
                                     _ => String::new(),
                                 })
                                 .collect::<Vec<String>>()

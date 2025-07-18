@@ -1,5 +1,6 @@
 use chrono::Utc;
-use mcp_core::{Content, ToolError};
+use mcp_core::ToolError;
+use rmcp::model::Content;
 use std::fs::File;
 use std::io::Write;
 
@@ -14,8 +15,8 @@ pub fn process_tool_response(
             let mut processed_contents = Vec::new();
 
             for content in contents {
-                match content {
-                    Content::Text(text_content) => {
+                match content.as_text() {
+                    Some(text_content) => {
                         // Check if text exceeds threshold
                         if text_content.text.chars().count() > LARGE_TEXT_THRESHOLD {
                             // Write to temp file
@@ -41,11 +42,13 @@ pub fn process_tool_response(
                             }
                         } else {
                             // Keep original content for smaller texts
-                            processed_contents.push(Content::Text(text_content));
+                            processed_contents.push(content);
                         }
                     }
-                    // Pass through other content types unchanged
-                    _ => processed_contents.push(content),
+                    None => {
+                        // Pass through other content types unchanged
+                        processed_contents.push(content);
+                    }
                 }
             }
 

@@ -221,7 +221,8 @@ mod tests {
     use crate::providers::errors::ProviderError;
     use chrono::Utc;
     use mcp_core::tool::Tool;
-    use mcp_core::{Content, TextContent, ToolCall};
+    use mcp_core::ToolCall;
+    use rmcp::model::{Content, TextContent};
     use rmcp::model::Role;
     use serde_json::json;
     use std::sync::Arc;

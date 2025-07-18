@@ -1,4 +1,5 @@
 use anyhow::Result;
+use rmcp::model::TextContent;
 use async_trait::async_trait;
 use serde_json::{json, Value};
 use std::process::Stdio;
@@ -97,7 +98,7 @@ impl ClaudeCodeProvider {
                             // Convert tool result contents to text
                             let content_text = tool_contents
                                 .iter()
-                                .filter_map(|content| content.as_text())
+                                .filter_map(|content| content.as_text().map(|t| t.text.clone()))
                                 .collect::<Vec<_>>()
                                 .join("\n");
 
@@ -213,10 +214,7 @@ impl ClaudeCodeProvider {
             ));
         }
 
-        let message_content = vec![MessageContent::Text(TextContent {
-            text: combined_text,
-            annotations: None,
-        })];
+        let message_content = vec![MessageContent::text(combined_text)];
 
         let response_message = Message::new(
             Role::Assistant,
@@ -355,10 +353,7 @@ impl ClaudeCodeProvider {
         let message = Message::new(
             rmcp::model::Role::Assistant,
             chrono::Utc::now().timestamp(),
-            vec![MessageContent::Text(TextContent {
-                text: description.clone(),
-                annotations: None,
-            })],
+            vec![MessageContent::text(description.clone())],
         );
 
         let usage = Usage::default();

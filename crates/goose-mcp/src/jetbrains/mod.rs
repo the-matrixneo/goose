@@ -1,6 +1,7 @@
 mod proxy;
 
 use anyhow::Result;
+use rmcp::model::Content;
 use mcp_core::{
     handler::{PromptError, ResourceError, ToolError},
     prompt::Prompt,

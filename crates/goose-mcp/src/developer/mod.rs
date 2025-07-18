@@ -27,8 +27,8 @@ use mcp_core::{
     protocol::{JsonRpcMessage, JsonRpcNotification, ServerCapabilities},
     resource::Resource,
     tool::Tool,
-    Content,
 };
+use rmcp::model::Content;
 use mcp_core::{
     prompt::{Prompt, PromptArgument, PromptTemplate},
     tool::ToolAnnotations,

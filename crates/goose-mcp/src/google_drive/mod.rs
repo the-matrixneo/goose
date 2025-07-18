@@ -3,6 +3,7 @@ mod oauth_pkce;
 pub mod storage;
 
 use anyhow::{Context, Error};
+use rmcp::model::Content;
 use base64::Engine;
 use chrono::NaiveDate;
 use indoc::indoc;
@@ -1844,7 +1845,7 @@ impl GoogleDriveRouter {
             .map(|contents| {
                 contents
                     .into_iter()
-                    .map(|content| content.as_text().unwrap_or_default().to_string())
+                    .map(|content| content.as_text().map(|text| text.text.clone()).unwrap_or_default())
                     .collect::<Vec<_>>()
                     .join("\n")
             })

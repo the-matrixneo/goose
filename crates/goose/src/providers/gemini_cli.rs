@@ -1,4 +1,5 @@
 use anyhow::Result;
+use rmcp::model::TextContent;
 use async_trait::async_trait;
 use serde_json::json;
 use std::process::Stdio;
@@ -171,10 +172,7 @@ impl GeminiCliProvider {
         let message = Message::new(
             Role::Assistant,
             chrono::Utc::now().timestamp(),
-            vec![MessageContent::Text(TextContent {
-                text: response_text,
-                annotations: None,
-            })],
+            vec![MessageContent::text(response_text)],
         );
 
         let usage = Usage::default(); // No usage info available for gemini CLI
@@ -216,10 +214,7 @@ impl GeminiCliProvider {
         let message = Message::new(
             Role::Assistant,
             chrono::Utc::now().timestamp(),
-            vec![MessageContent::Text(TextContent {
-                text: description.clone(),
-                annotations: None,
-            })],
+            vec![MessageContent::text(description.clone())],
         );
 
         let usage = Usage::default();

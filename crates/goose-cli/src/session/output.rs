@@ -8,6 +8,7 @@ use mcp_core::prompt::PromptArgument;
 use mcp_core::tool::ToolCall;
 use regex::Regex;
 use serde_json::Value;
+use rmcp::model::Content;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::io::{Error, Write};
@@ -252,7 +253,7 @@ fn render_tool_response(resp: &ToolResponse, theme: Theme, debug: bool) {
 
                 if debug {
                     println!("{:#?}", content);
-                } else if let Content::Text(text) = content {
+                } else if let Some(text) = content.as_text() {
                     print_markdown(&text.text, theme);
                 }
             }

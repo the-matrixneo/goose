@@ -3,8 +3,8 @@ use crate::model::ModelConfig;
 use crate::providers::base::Usage;
 use crate::providers::errors::ProviderError;
 use anyhow::{anyhow, Result};
-use mcp_core::content::Content;
 use mcp_core::tool::{Tool, ToolCall};
+use rmcp::model::Content;
 use rmcp::model::Role;
 use serde_json::{json, Value};
 use std::collections::HashSet;
@@ -69,10 +69,7 @@ pub fn format_messages(messages: &[Message]) -> Vec<Value> {
                     Ok(result) => {
                         let text = result
                             .iter()
-                            .filter_map(|c| match c {
-                                Content::Text(t) => Some(t.text.clone()),
-                                _ => None,
-                            })
+                            .filter_map(|c| c.as_text().map(|t| t.text.clone()))
                             .collect::<Vec<_>>()
                             .join("\n");
 

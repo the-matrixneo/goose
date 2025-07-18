@@ -1,6 +1,7 @@
 use goose::message::{Message, MessageContent, ToolRequest, ToolResponse};
 use goose::utils::safe_truncate;
-use mcp_core::resource::ResourceContents;
+use rmcp::model::ResourceContents;
+use rmcp::model::Content;
 use rmcp::model::Role;
 use serde_json::Value;
 
@@ -218,8 +219,8 @@ pub fn tool_response_to_markdown(resp: &ToolResponse, export_all_content: bool) 
                     }
                 }
 
-                match content {
-                    Content::Text(text_content) => {
+                match content.as_text() {
+                    Some(text_content) => {
                         let trimmed_text = text_content.text.trim();
                         if (trimmed_text.starts_with('{') && trimmed_text.ends_with('}'))
                             || (trimmed_text.starts_with('[') && trimmed_text.ends_with(']'))
@@ -235,23 +236,23 @@ pub fn tool_response_to_markdown(resp: &ToolResponse, export_all_content: bool) 
                             md.push_str("\n\n");
                         }
                     }
-                    Content::Image(image_content) => {
-                        if image_content.mime_type.starts_with("image/") {
-                            // For actual images, provide a placeholder that indicates it's an image
-                            md.push_str(&format!(
-                                "**Image:** `(type: {}, data: first 30 chars of base64...)`\n\n",
-                                image_content.mime_type
-                            ));
-                        } else {
-                            // For non-image mime types, just indicate it's binary data
-                            md.push_str(&format!(
-                                "**Binary Content:** `(type: {}, length: {} bytes)`\n\n",
-                                image_content.mime_type,
-                                image_content.data.len()
-                            ));
-                        }
-                    }
-                    Content::Resource(resource) => {
+                    None => {
+                        if let Some(image_content) = content.as_image() {
+                            if image_content.mime_type.starts_with("image/") {
+                                // For actual images, provide a placeholder that indicates it's an image
+                                md.push_str(&format!(
+                                    "**Image:** `(type: {}, data: first 30 chars of base64...)`\n\n",
+                                    image_content.mime_type
+                                ));
+                            } else {
+                                // For non-image mime types, just indicate it's binary data
+                                md.push_str(&format!(
+                                    "**Binary Content:** `(type: {}, length: {} bytes)`\n\n",
+                                    image_content.mime_type,
+                                    image_content.data.len()
+                                ));
+                            }
+                        } else if let Some(resource) = content.as_resource() {
                         match &resource.resource {
                             ResourceContents::TextResourceContents {
                                 uri,
@@ -296,6 +297,7 @@ pub fn tool_response_to_markdown(resp: &ToolResponse, export_all_content: bool) 
                                     blob.len()
                                 ));
                             }
+                        }
                         }
                     }
                 }

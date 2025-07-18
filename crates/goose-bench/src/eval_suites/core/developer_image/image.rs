@@ -7,7 +7,7 @@ use crate::eval_suites::{
 use crate::register_evaluation;
 use async_trait::async_trait;
 use goose::message::MessageContent;
-use rmcp::model::Role;
+use rmcp::model::{Role, Content};
 use serde_json::{self, Value};
 
 #[derive(Debug)]
@@ -67,7 +67,7 @@ impl Evaluation for DeveloperImage {
                         if let Ok(result) = &tool_resp.tool_result {
                             // Check each item in the result list
                             for item in result {
-                                if let Content::Image(image) = item {
+                                if let Some(image) = item.as_image() {
                                     // Image content already contains mime_type and data
                                     if image.mime_type.starts_with("image/")
                                         && !image.data.is_empty()

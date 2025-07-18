@@ -31,6 +31,7 @@
 //!
 
 use super::errors::ProviderError;
+use std::ops::Deref;
 use super::ollama::OLLAMA_DEFAULT_PORT;
 use super::ollama::OLLAMA_HOST;
 use crate::message::{Message, MessageContent};
@@ -38,7 +39,7 @@ use crate::model::ModelConfig;
 use crate::providers::formats::openai::create_request;
 use anyhow::Result;
 use mcp_core::tool::{Tool, ToolCall};
-use mcp_core::Content;
+use rmcp::model::{Content, RawContent};
 use reqwest::Client;
 use serde_json::{json, Value};
 use std::time::Duration;
@@ -341,7 +342,12 @@ pub fn convert_tool_messages_to_text(messages: &[Message]) -> Vec<Message> {
                                 let text_contents: Vec<String> = contents
                                     .iter()
                                     .filter_map(|c| match c {
-                                        Content::Text(t) => Some(t.text.clone()),
+                                        content => {
+                                            match content.deref() {
+                                                RawContent::Text(t) => Some(t.text.clone()),
+                                                _ => None,
+                                            }
+                                        }
                                         _ => None,
                                     })
                                     .collect();

@@ -2,6 +2,7 @@ use super::base::Usage;
 use super::errors::GoogleErrorCode;
 use crate::model::ModelConfig;
 use anyhow::Result;
+use rmcp::model::{ImageContent, RawImageContent, AnnotateAble};
 use base64::Engine;
 use regex::Regex;
 use reqwest::{Response, StatusCode};
@@ -291,11 +292,10 @@ pub fn load_image_file(path: &str) -> Result<ImageContent, ProviderError> {
     // Convert to base64
     let data = base64::prelude::BASE64_STANDARD.encode(&bytes);
 
-    Ok(ImageContent {
+    Ok(RawImageContent {
         mime_type: mime_type.to_string(),
         data,
-        annotations: None,
-    })
+    }.no_annotation())
 }
 
 pub fn unescape_json_values(value: &Value) -> Value {

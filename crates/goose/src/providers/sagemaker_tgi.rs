@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use anyhow::Result;
+use rmcp::model::TextContent;
 use async_trait::async_trait;
 use aws_config;
 use aws_sdk_bedrockruntime::config::ProvideCredentials;
@@ -205,10 +206,7 @@ impl SageMakerTgiProvider {
         Ok(Message::new(
             Role::Assistant,
             Utc::now().timestamp(),
-            vec![MessageContent::Text(TextContent {
-                text: clean_text,
-                annotations: None,
-            })],
+            vec![MessageContent::text(clean_text)],
         ))
     }
 

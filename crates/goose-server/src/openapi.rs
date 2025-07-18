@@ -13,6 +13,7 @@ use goose::session::info::SessionInfo;
 use goose::session::SessionMetadata;
 use mcp_core::handler::ToolResultSchema;
 use mcp_core::resource::ResourceContents;
+use rmcp::model::{Content, EmbeddedResource, ImageContent, Annotations, TextContent};
 use mcp_core::tool::{Tool, ToolAnnotations};
 use utoipa::{OpenApi, ToSchema};
 
@@ -94,11 +95,6 @@ impl From<Role> for rmcp::model::Role {
         super::routes::session::SessionHistoryResponse,
         Message,
         MessageContent,
-        Content,
-        EmbeddedResource,
-        ImageContent,
-        Annotations,
-        TextContent,
         ToolResponse,
         ToolRequest,
         ToolResultSchema,

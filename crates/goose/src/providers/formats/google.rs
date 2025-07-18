@@ -4,10 +4,10 @@ use crate::providers::base::Usage;
 use crate::providers::errors::ProviderError;
 use crate::providers::utils::{is_valid_function_name, sanitize_function_name};
 use anyhow::Result;
-use mcp_core::content::Content;
 use mcp_core::tool::{Tool, ToolCall};
 use rand::{distributions::Alphanumeric, Rng};
-use rmcp::model::Role;
+use rmcp::model::Content;
+use rmcp::model::{AnnotateAble, RawContent, Role};
 use serde_json::{json, Map, Value};
 
 /// Convert internal Message format to Google's API message specification
@@ -66,13 +66,13 @@ pub fn format_messages(messages: &[Message]) -> Vec<Value> {
                                             audience.contains(&Role::Assistant)
                                         })
                                     })
-                                    .map(|content| content.unannotated())
+                                    .map(|content| content.raw.clone())
                                     .collect();
 
                                 let mut tool_content = Vec::new();
                                 for content in abridged {
                                     match content {
-                                        Content::Image(image) => {
+                                        RawContent::Image(image) => {
                                             parts.push(json!({
                                                 "inline_data": {
                                                     "mime_type": image.mime_type,
@@ -81,17 +81,13 @@ pub fn format_messages(messages: &[Message]) -> Vec<Value> {
                                             }));
                                         }
                                         _ => {
-                                            tool_content.push(content);
+                                            tool_content.push(content.no_annotation());
                                         }
                                     }
                                 }
                                 let mut text = tool_content
                                     .iter()
-                                    .filter_map(|c| match c {
-                                        Content::Text(t) => Some(t.text.clone()),
-                                        Content::Resource(r) => Some(r.get_text()),
-                                        _ => None,
-                                    })
+                                    .filter_map(|c| c.as_text().map(|t| t.text.clone()))
                                     .collect::<Vec<_>>()
                                     .join("\n");
 

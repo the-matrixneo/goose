@@ -1,4 +1,5 @@
 use anyhow::Result;
+use rmcp::model::Content;
 use include_dir::{include_dir, Dir};
 use indoc::formatdoc;
 use serde_json::{json, Value};

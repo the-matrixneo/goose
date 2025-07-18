@@ -17,8 +17,8 @@ use mcp_core::{
     protocol::{JsonRpcMessage, ServerCapabilities},
     resource::Resource,
     tool::{Tool, ToolAnnotations},
-    Content,
 };
+use rmcp::model::Content;
 use mcp_server::router::CapabilitiesBuilder;
 use mcp_server::Router;
 

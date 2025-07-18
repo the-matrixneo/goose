@@ -1,6 +1,7 @@
 use docx_rs::*;
 use image::{self, ImageFormat};
-use mcp_core::{Content, ToolError};
+use mcp_core::ToolError;
+use rmcp::model::Content;
 use std::{fs, io::Cursor};
 
 #[derive(Debug)]

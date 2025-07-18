@@ -9,6 +9,7 @@ use crate::message::Message;
 use crate::providers::base::Provider;
 use crate::utils::safe_truncate;
 use anyhow::Result;
+use std::ops::DerefMut;
 use chrono::Local;
 use etcetera::{choose_app_strategy, AppStrategy, AppStrategyArgs};
 use regex::Regex;
@@ -679,7 +680,7 @@ fn parse_message_with_truncation(
 /// Truncate content within a message in place
 fn truncate_message_content_in_place(message: &mut Message, max_content_size: usize) {
     use crate::message::MessageContent;
-    use mcp_core::{Content, ResourceContents};
+    use rmcp::model::{Content, RawContent, ResourceContents};
 
     for content in &mut message.content {
         match content {
@@ -697,8 +698,8 @@ fn truncate_message_content_in_place(message: &mut Message, max_content_size: us
             MessageContent::ToolResponse(tool_response) => {
                 if let Ok(ref mut result) = tool_response.tool_result {
                     for content_item in result {
-                        match content_item {
-                            Content::Text(ref mut text_content) => {
+                        match content_item.deref_mut() {
+                            RawContent::Text(ref mut text_content) => {
                                 if text_content.text.chars().count() > max_content_size {
                                     let truncated = format!(
                                         "{}\n\n[... tool response truncated during session loading from {} to {} characters ...]",
@@ -709,14 +710,14 @@ fn truncate_message_content_in_place(message: &mut Message, max_content_size: us
                                     text_content.text = truncated;
                                 }
                             }
-                            Content::Resource(ref mut resource_content) => {
+                            RawContent::Resource(ref mut resource_content) => {
                                 if let ResourceContents::TextResourceContents { text, .. } =
                                     &mut resource_content.resource
                                 {
                                     if text.chars().count() > max_content_size {
                                         let truncated = format!(
                                             "{}\n\n[... resource content truncated during session loading from {} to {} characters ...]",
-                                            safe_truncate(text, max_content_size),
+                                            safe_truncate(&text, max_content_size),
                                             text.chars().count(),
                                             max_content_size
                                         );
