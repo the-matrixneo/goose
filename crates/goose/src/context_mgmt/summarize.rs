@@ -573,4 +573,252 @@ mod tests {
             "The final message list should include the summary and removed messages."
         );
     }
+
+    #[tokio::test]
+    async fn test_summarize_messages_uses_oneshot_for_small_context() {
+        let provider = create_mock_provider();
+        let token_counter = TokenCounter::new();
+        let context_limit = 100_000; // Large context limit
+        let messages = create_test_messages(); // Small message set
+
+        let result = summarize_messages(
+            Arc::clone(&provider),
+            &messages,
+            &token_counter,
+            context_limit,
+        )
+        .await;
+
+        assert!(result.is_ok(), "The function should return Ok.");
+        let (summarized_messages, _) = result.unwrap();
+
+        // Should use one-shot and return a single summarized message
+        assert_eq!(
+            summarized_messages.len(),
+            1,
+            "Should use one-shot summarization for small context."
+        );
+    }
+
+    #[tokio::test]
+    async fn test_summarize_messages_uses_chunked_for_large_context() {
+        let provider = create_mock_provider();
+        let token_counter = TokenCounter::new();
+        let context_limit = 100; // Small context limit but not too small to cause overflow
+        let messages = create_test_messages();
+
+        let result = summarize_messages(
+            Arc::clone(&provider),
+            &messages,
+            &token_counter,
+            context_limit,
+        )
+        .await;
+
+        assert!(result.is_ok(), "The function should return Ok.");
+        let (summarized_messages, _) = result.unwrap();
+
+        // Should fall back to chunked approach
+        assert_eq!(
+            summarized_messages.len(),
+            1,
+            "Should use chunked summarization for large context."
+        );
+    }
+
+    // Mock provider that fails on one-shot but succeeds on chunked
+    #[derive(Clone)]
+    struct FailingOneshotProvider {
+        model_config: ModelConfig,
+        call_count: Arc<std::sync::Mutex<usize>>,
+    }
+
+    #[async_trait::async_trait]
+    impl Provider for FailingOneshotProvider {
+        fn metadata() -> ProviderMetadata {
+            ProviderMetadata::empty()
+        }
+
+        fn get_model_config(&self) -> ModelConfig {
+            self.model_config.clone()
+        }
+
+        async fn complete(
+            &self,
+            system: &str,
+            _messages: &[Message],
+            _tools: &[Tool],
+        ) -> Result<(Message, ProviderUsage), ProviderError> {
+            let mut count = self.call_count.lock().unwrap();
+            *count += 1;
+            
+            // Fail if this looks like a one-shot request (contains the one-shot prompt content)
+            if system.contains("expert at summarizing conversation histories") {
+                return Err(ProviderError::RateLimitExceeded(
+                    "Simulated one-shot failure".to_string(),
+                ));
+            }
+            
+            // Succeed for chunked requests (uses the old SUMMARY_PROMPT)
+            Ok((
+                Message::new(
+                    Role::Assistant,
+                    Utc::now().timestamp(),
+                    vec![MessageContent::Text(TextContent {
+                        text: "Chunked summary".to_string(),
+                        annotations: None,
+                    })],
+                ),
+                ProviderUsage::new("mock".to_string(), Usage::default()),
+            ))
+        }
+    }
+
+    #[tokio::test]
+    async fn test_summarize_messages_fallback_on_oneshot_failure() {
+        let call_count = Arc::new(std::sync::Mutex::new(0));
+        let provider = Arc::new(FailingOneshotProvider {
+            model_config: ModelConfig::new("test-model".to_string()).with_context_limit(200_000.into()),
+            call_count: Arc::clone(&call_count),
+        });
+        let token_counter = TokenCounter::new();
+        let context_limit = 100_000; // Large enough to try one-shot first
+        let messages = create_test_messages();
+
+        let result = summarize_messages(
+            provider,
+            &messages,
+            &token_counter,
+            context_limit,
+        )
+        .await;
+
+        assert!(result.is_ok(), "The function should return Ok after fallback.");
+        let (summarized_messages, _) = result.unwrap();
+
+        // Should have fallen back to chunked approach
+        assert_eq!(
+            summarized_messages.len(),
+            1,
+            "Should successfully fall back to chunked approach."
+        );
+
+        // Verify the content comes from the chunked approach
+        if let MessageContent::Text(text_content) = &summarized_messages[0].content[0] {
+            assert_eq!(text_content.text, "Chunked summary");
+        } else {
+            panic!("Expected text content");
+        }
+
+        // Should have made multiple calls (one-shot attempt + chunked calls)
+        let final_count = *call_count.lock().unwrap();
+        assert!(final_count > 1, "Should have made multiple provider calls during fallback");
+    }
+
+    #[tokio::test]
+    async fn test_summarize_messages_oneshot_direct_call() {
+        let provider = create_mock_provider();
+        let token_counter = TokenCounter::new();
+        let context_limit = 100_000;
+        let messages = create_test_messages();
+
+        let result = summarize_messages_oneshot(
+            Arc::clone(&provider),
+            &messages,
+            &token_counter,
+            context_limit,
+        )
+        .await;
+
+        assert!(result.is_ok(), "One-shot summarization should work directly.");
+        let (summarized_messages, token_counts) = result.unwrap();
+
+        assert_eq!(
+            summarized_messages.len(),
+            1,
+            "One-shot should return a single summary message."
+        );
+        assert_eq!(
+            summarized_messages[0].role,
+            Role::User,
+            "Summary should be from user role for context."
+        );
+        assert_eq!(
+            token_counts.len(),
+            1,
+            "Should have token count for the summary."
+        );
+    }
+
+    #[tokio::test]
+    async fn test_summarize_messages_chunked_direct_call() {
+        let provider = create_mock_provider();
+        let token_counter = TokenCounter::new();
+        let context_limit = 30; // Small to force chunking
+        let messages = create_test_messages();
+
+        let result = summarize_messages_chunked(
+            Arc::clone(&provider),
+            &messages,
+            &token_counter,
+            context_limit,
+        )
+        .await;
+
+        assert!(result.is_ok(), "Chunked summarization should work directly.");
+        let (summarized_messages, token_counts) = result.unwrap();
+
+        assert_eq!(
+            summarized_messages.len(),
+            1,
+            "Chunked should return a single final summary."
+        );
+        assert_eq!(
+            summarized_messages[0].role,
+            Role::User,
+            "Summary should be from user role for context."
+        );
+        assert_eq!(
+            token_counts.len(),
+            1,
+            "Should have token count for the summary."
+        );
+    }
+
+    #[tokio::test]
+    async fn test_context_size_threshold_calculation() {
+        let provider = create_mock_provider();
+        let token_counter = TokenCounter::new();
+        
+        // Test with a context limit where the calculation matters
+        let context_limit = 10_000;
+        let system_prompt_overhead = 1000;
+        let response_overhead = 2000;
+        let available_context = context_limit - system_prompt_overhead - response_overhead;
+        let threshold = available_context * 3 / 4; // 75% of available context
+        
+        // Create messages that are just under the threshold
+        let mut large_messages = Vec::new();
+        let base_message = set_up_text_message("x".repeat(100).as_str(), Role::User);
+        
+        // Add enough messages to approach but not exceed the threshold
+        let message_tokens = token_counter.count_tokens(&format!("{:?}", base_message));
+        let num_messages = (threshold / message_tokens).saturating_sub(1);
+        
+        for i in 0..num_messages {
+            large_messages.push(set_up_text_message(&format!("Message {}", i), Role::User));
+        }
+
+        let result = summarize_messages(
+            Arc::clone(&provider),
+            &large_messages,
+            &token_counter,
+            context_limit,
+        )
+        .await;
+
+        assert!(result.is_ok(), "Should handle threshold calculation correctly.");
+        let (summarized_messages, _) = result.unwrap();
+        assert_eq!(summarized_messages.len(), 1, "Should produce a summary.");
+    }
 }
