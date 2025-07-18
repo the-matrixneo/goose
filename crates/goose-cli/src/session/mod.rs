@@ -36,7 +36,7 @@ use goose::session;
 use input::InputResult;
 use mcp_core::handler::ToolError;
 use rmcp::model::PromptMessage;
-use mcp_core::protocol::JsonRpcMessage;
+use rmcp::model::JsonRpcMessage;
 use mcp_core::protocol::JsonRpcNotification;
 
 use rand::{distributions::Alphanumeric, Rng};
