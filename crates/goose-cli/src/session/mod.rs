@@ -742,7 +742,7 @@ impl Session {
                             )
                             .green()
                         );
-                        
+
                         // Update the context display immediately after summarization
                         self.display_context_usage().await?;
                     } else {

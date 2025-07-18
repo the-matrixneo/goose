@@ -1,7 +1,7 @@
 use super::common::{get_messages_token_counts, get_messages_token_counts_async};
 use crate::message::{Message, MessageContent};
-use crate::providers::base::Provider;
 use crate::prompt_template::render_global_file;
+use crate::providers::base::Provider;
 use crate::token_counter::{AsyncTokenCounter, TokenCounter};
 use anyhow::Result;
 use mcp_core::Role;
@@ -140,9 +140,10 @@ pub async fn summarize_messages_oneshot(
 
     // Render the one-shot summarization prompt
     let system_prompt = render_global_file("summarize_oneshot.md", &context)?;
-    
+
     // Create a simple user message requesting summarization
-    let user_message = Message::user().with_text("Please summarize the conversation history provided in the system prompt.");
+    let user_message = Message::user()
+        .with_text("Please summarize the conversation history provided in the system prompt.");
     let summarization_request = vec![user_message];
 
     // Send the request to the provider and fetch the response.
@@ -150,12 +151,12 @@ pub async fn summarize_messages_oneshot(
         .complete(&system_prompt, &summarization_request, &[])
         .await?
         .0;
-    
+
     // Set role to user as it will be used in following conversation as user content.
     response.role = Role::User;
 
     // Add back removed messages.
-    let final_summary = reintegrate_removed_messages(&vec![response], &removed_messages);
+    let final_summary = reintegrate_removed_messages(&[response], &removed_messages);
 
     Ok((
         final_summary.clone(),
@@ -222,11 +223,11 @@ pub async fn summarize_messages_chunked(
 }
 
 /// Main summarization function that chooses the best algorithm based on context size.
-/// 
+///
 /// This function will:
 /// 1. First try the one-shot summarization if there's enough context window available
 /// 2. Fall back to the chunked approach if the one-shot fails or if context is too limited
-/// 3. Choose the algorithm based on available context window space
+/// 3. Choose the algorithm based on absolute token requirements rather than percentages
 pub async fn summarize_messages(
     provider: Arc<dyn Provider>,
     messages: &[Message],
@@ -237,29 +238,34 @@ pub async fn summarize_messages(
     let total_tokens: usize = get_messages_token_counts(token_counter, messages)
         .iter()
         .sum();
-    
-    // Reserve space for the system prompt and response (rough estimate)
+
+    // Calculate absolute token requirements (future-proof for large context models)
     let system_prompt_overhead = 1000; // Conservative estimate for the summarization prompt
-    let response_overhead = 2000; // Conservative estimate for the response
-    let available_context = context_limit.saturating_sub(system_prompt_overhead + response_overhead);
-    
-    // If the total tokens fit comfortably in the available context (with some buffer),
-    // try the one-shot approach first
-    if total_tokens <= available_context * 3 / 4 { // Use 75% of available context as threshold
+    let response_overhead = 4000; // Generous buffer for response generation
+    let safety_buffer = 1000; // Small safety margin for tokenization variations
+    let total_required = total_tokens + system_prompt_overhead + response_overhead + safety_buffer;
+
+    // Use one-shot if we have enough absolute space (no percentage-based limits)
+    if total_required <= context_limit {
         match summarize_messages_oneshot(
             Arc::clone(&provider),
             messages,
             token_counter,
             context_limit,
-        ).await {
+        )
+        .await
+        {
             Ok(result) => return Ok(result),
             Err(e) => {
                 // Log the error but continue to fallback
-                tracing::warn!("One-shot summarization failed, falling back to chunked approach: {}", e);
+                tracing::warn!(
+                    "One-shot summarization failed, falling back to chunked approach: {}",
+                    e
+                );
             }
         }
     }
-    
+
     // Fall back to the chunked approach
     summarize_messages_chunked(provider, messages, token_counter, context_limit).await
 }
@@ -651,14 +657,14 @@ mod tests {
         ) -> Result<(Message, ProviderUsage), ProviderError> {
             let mut count = self.call_count.lock().unwrap();
             *count += 1;
-            
+
             // Fail if this looks like a one-shot request (contains the one-shot prompt content)
             if system.contains("expert at summarizing conversation histories") {
                 return Err(ProviderError::RateLimitExceeded(
                     "Simulated one-shot failure".to_string(),
                 ));
             }
-            
+
             // Succeed for chunked requests (uses the old SUMMARY_PROMPT)
             Ok((
                 Message::new(
@@ -678,22 +684,20 @@ mod tests {
     async fn test_summarize_messages_fallback_on_oneshot_failure() {
         let call_count = Arc::new(std::sync::Mutex::new(0));
         let provider = Arc::new(FailingOneshotProvider {
-            model_config: ModelConfig::new("test-model".to_string()).with_context_limit(200_000.into()),
+            model_config: ModelConfig::new("test-model".to_string())
+                .with_context_limit(200_000.into()),
             call_count: Arc::clone(&call_count),
         });
         let token_counter = TokenCounter::new();
         let context_limit = 100_000; // Large enough to try one-shot first
         let messages = create_test_messages();
 
-        let result = summarize_messages(
-            provider,
-            &messages,
-            &token_counter,
-            context_limit,
-        )
-        .await;
+        let result = summarize_messages(provider, &messages, &token_counter, context_limit).await;
 
-        assert!(result.is_ok(), "The function should return Ok after fallback.");
+        assert!(
+            result.is_ok(),
+            "The function should return Ok after fallback."
+        );
         let (summarized_messages, _) = result.unwrap();
 
         // Should have fallen back to chunked approach
@@ -712,7 +716,10 @@ mod tests {
 
         // Should have made multiple calls (one-shot attempt + chunked calls)
         let final_count = *call_count.lock().unwrap();
-        assert!(final_count > 1, "Should have made multiple provider calls during fallback");
+        assert!(
+            final_count > 1,
+            "Should have made multiple provider calls during fallback"
+        );
     }
 
     #[tokio::test]
@@ -730,7 +737,10 @@ mod tests {
         )
         .await;
 
-        assert!(result.is_ok(), "One-shot summarization should work directly.");
+        assert!(
+            result.is_ok(),
+            "One-shot summarization should work directly."
+        );
         let (summarized_messages, token_counts) = result.unwrap();
 
         assert_eq!(
@@ -765,7 +775,10 @@ mod tests {
         )
         .await;
 
-        assert!(result.is_ok(), "Chunked summarization should work directly.");
+        assert!(
+            result.is_ok(),
+            "Chunked summarization should work directly."
+        );
         let (summarized_messages, token_counts) = result.unwrap();
 
         assert_eq!(
@@ -786,25 +799,26 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_context_size_threshold_calculation() {
+    async fn test_absolute_token_threshold_calculation() {
         let provider = create_mock_provider();
         let token_counter = TokenCounter::new();
-        
-        // Test with a context limit where the calculation matters
+
+        // Test with a context limit where absolute token calculation matters
         let context_limit = 10_000;
         let system_prompt_overhead = 1000;
-        let response_overhead = 2000;
-        let available_context = context_limit - system_prompt_overhead - response_overhead;
-        let threshold = available_context * 3 / 4; // 75% of available context
-        
-        // Create messages that are just under the threshold
+        let response_overhead = 4000;
+        let safety_buffer = 1000;
+        let max_message_tokens =
+            context_limit - system_prompt_overhead - response_overhead - safety_buffer; // 4000 tokens
+
+        // Create messages that are just under the absolute threshold
         let mut large_messages = Vec::new();
-        let base_message = set_up_text_message("x".repeat(100).as_str(), Role::User);
-        
-        // Add enough messages to approach but not exceed the threshold
+        let base_message = set_up_text_message("x".repeat(50).as_str(), Role::User);
+
+        // Add enough messages to approach but not exceed the absolute threshold
         let message_tokens = token_counter.count_tokens(&format!("{:?}", base_message));
-        let num_messages = (threshold / message_tokens).saturating_sub(1);
-        
+        let num_messages = (max_message_tokens / message_tokens).saturating_sub(1);
+
         for i in 0..num_messages {
             large_messages.push(set_up_text_message(&format!("Message {}", i), Role::User));
         }
@@ -817,7 +831,10 @@ mod tests {
         )
         .await;
 
-        assert!(result.is_ok(), "Should handle threshold calculation correctly.");
+        assert!(
+            result.is_ok(),
+            "Should handle absolute threshold calculation correctly."
+        );
         let (summarized_messages, _) = result.unwrap();
         assert_eq!(summarized_messages.len(), 1, "Should produce a summary.");
     }
