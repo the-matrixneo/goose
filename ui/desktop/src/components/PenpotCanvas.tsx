@@ -134,6 +134,10 @@ function PenpotCanvas({
       ].join(' '));
       console.log('PostgreSQL result:', postgresResult);
 
+      if (!postgresResult.success) {
+        throw new Error(`Failed to start PostgreSQL: ${postgresResult.error || 'Unknown error'}`);
+      }
+
       // Start Valkey (Redis replacement - official Penpot setup)
       console.log('Starting Valkey...');
       const valkeyResult = await window.electron.dockerCommand([
@@ -156,16 +160,37 @@ function PenpotCanvas({
       let dbReady = false;
       for (let i = 0; i < 30; i++) {
         try {
+          // First check if container is running
+          const containerCheck = await window.electron.dockerCommand('docker ps --filter name=penpot-postgres --format "{{.Status}}"');
+          if (!containerCheck.success || !containerCheck.output || !containerCheck.output.includes('Up')) {
+            // Container not running, check logs for error
+            const logsCheck = await window.electron.dockerCommand('docker logs penpot-postgres 2>&1 | tail -10');
+            console.log('PostgreSQL container logs:', logsCheck.output);
+            setErrorMessage(`⏳ PostgreSQL container issue... (${i + 1}/30)\nLogs: ${logsCheck.output || 'No logs available'}`);
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            continue;
+          }
+
+          // Check health status
           const healthCheck = await window.electron.dockerCommand('docker inspect --format="{{.State.Health.Status}}" penpot-postgres');
           if (healthCheck.success && healthCheck.output && healthCheck.output.trim() === 'healthy') {
             dbReady = true;
             break;
+          } else if (healthCheck.success && healthCheck.output) {
+            setErrorMessage(`⏳ PostgreSQL health status: ${healthCheck.output.trim()} (${i + 1}/30)`);
+          } else {
+            // Try simple connection test if health check fails
+            const connectionTest = await window.electron.dockerCommand('docker exec penpot-postgres pg_isready -U penpot');
+            if (connectionTest.success) {
+              dbReady = true;
+              break;
+            }
           }
         } catch (e) {
-          // Continue waiting
+          console.error('PostgreSQL health check error:', e);
         }
         await new Promise(resolve => setTimeout(resolve, 2000));
-        setErrorMessage(`⏳ Waiting for databases to initialize... (${i + 1}/30)`);
+        setErrorMessage(`⏳ Waiting for PostgreSQL to initialize... (${i + 1}/30)`);
       }
 
       if (!dbReady) {
