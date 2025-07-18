@@ -156,12 +156,19 @@ function PenpotCanvas({
         '--restart', 'unless-stopped',
         '-e', 'PENPOT_FLAGS=enable-registration,enable-login-with-password',
         '-e', 'PENPOT_SECRET_KEY=penpot-secret-key',
-        '-e', 'PENPOT_DATABASE_URI=postgresql://penpot:penpot@penpot-postgres/penpot',
+        // Use the correct environment variable names for Penpot backend
+        '-e', 'PENPOT_DATABASE_HOST=penpot-postgres',
+        '-e', 'PENPOT_DATABASE_PORT=5432',
+        '-e', 'PENPOT_DATABASE_NAME=penpot',
+        '-e', 'PENPOT_DATABASE_USER=penpot',
+        '-e', 'PENPOT_DATABASE_PASSWORD=penpot',
         '-e', 'PENPOT_REDIS_URI=redis://penpot-redis:6379/0',
         '-e', 'PENPOT_ASSETS_STORAGE_BACKEND=assets-fs',
         '-e', 'PENPOT_STORAGE_ASSETS_FS_DIRECTORY=/opt/data/assets',
         '-e', 'PENPOT_HTTP_SERVER_HOST=0.0.0.0',
         '-e', 'PENPOT_HTTP_SERVER_PORT=6060',
+        '-e', 'PENPOT_PUBLIC_URI=http://localhost:9001',
+        '-v', '/tmp/penpot-assets:/opt/data/assets',
         '-p', '6060:6060',
         'penpotapp/backend:latest'
       ];
