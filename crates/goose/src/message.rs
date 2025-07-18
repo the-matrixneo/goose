@@ -9,11 +9,12 @@ use std::collections::HashSet;
 /// when interacting with MCP servers.
 use chrono::Utc;
 use mcp_core::handler::ToolResult;
-use rmcp::model::ResourceContents;
 use mcp_core::tool::ToolCall;
+use rmcp::model::ResourceContents;
 use rmcp::model::Role;
 use rmcp::model::{
-    AnnotateAble, Content, EmbeddedResource, ImageContent, PromptMessage, PromptMessageContent, PromptMessageRole, RawContent, RawEmbeddedResource, RawImageContent, RawTextContent, TextContent,
+    AnnotateAble, Content, ImageContent, PromptMessage, PromptMessageContent, PromptMessageRole,
+    RawContent, RawImageContent, RawTextContent, TextContent,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -272,8 +273,8 @@ impl From<Content> for MessageContent {
                     }
                 };
                 MessageContent::text(text)
-            },
-            RawContent::Audio(annotated) => todo!(),
+            }
+            RawContent::Audio(_) => todo!(),
         }
     }
 }
@@ -523,9 +524,7 @@ impl Message {
 mod tests {
     use super::*;
     use mcp_core::handler::ToolError;
-    use rmcp::model::PromptMessageContent;
-    use rmcp::model::ResourceContents;
-    use rmcp::model::PromptMessage;
+    use rmcp::model::{PromptMessage, PromptMessageContent, RawEmbeddedResource, ResourceContents};
     use serde_json::{json, Value};
 
     #[test]
@@ -667,7 +666,8 @@ mod tests {
             image: RawImageContent {
                 data: "base64data".to_string(),
                 mime_type: "image/jpeg".to_string(),
-            }.no_annotation(),
+            }
+            .no_annotation(),
         };
 
         let prompt_message = PromptMessage {
@@ -694,9 +694,7 @@ mod tests {
         };
 
         let prompt_content = PromptMessageContent::Resource {
-            resource: RawEmbeddedResource {
-                resource,
-            }.no_annotation(),
+            resource: RawEmbeddedResource { resource }.no_annotation(),
         };
 
         let prompt_message = PromptMessage {
@@ -722,9 +720,7 @@ mod tests {
         };
 
         let prompt_content = PromptMessageContent::Resource {
-            resource: RawEmbeddedResource {
-                resource,
-            }.no_annotation(),
+            resource: RawEmbeddedResource { resource }.no_annotation(),
         };
 
         let prompt_message = PromptMessage {

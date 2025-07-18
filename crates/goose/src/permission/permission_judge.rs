@@ -7,7 +7,6 @@ use chrono::Utc;
 use indoc::indoc;
 use mcp_core::tool::ToolAnnotations;
 use mcp_core::tool::Tool;
-use rmcp::model::TextContent;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashSet;

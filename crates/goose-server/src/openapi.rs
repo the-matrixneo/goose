@@ -13,7 +13,6 @@ use goose::session::info::SessionInfo;
 use goose::session::SessionMetadata;
 use mcp_core::handler::ToolResultSchema;
 use mcp_core::resource::ResourceContents;
-use rmcp::model::{Content, EmbeddedResource, ImageContent, Annotations, TextContent};
 use mcp_core::tool::{Tool, ToolAnnotations};
 use utoipa::{OpenApi, ToSchema};
 

@@ -1,6 +1,6 @@
 use anyhow::Result;
 use dotenv::dotenv;
-use rmcp::model::{Content, ImageContent, RawImageContent, AnnotateAble};
+use rmcp::model::{Content, RawImageContent, AnnotateAble};
 use goose::message::{Message, MessageContent};
 use goose::providers::base::Provider;
 use goose::providers::errors::ProviderError;

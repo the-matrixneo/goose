@@ -309,6 +309,7 @@ pub fn create_request(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rmcp::model::Content;
     use serde_json::json;
 
     fn set_up_text_message(text: &str, role: Role) -> Message {

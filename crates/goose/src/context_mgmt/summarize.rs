@@ -3,7 +3,7 @@ use crate::message::{Message, MessageContent};
 use crate::providers::base::Provider;
 use crate::token_counter::{AsyncTokenCounter, TokenCounter};
 use anyhow::Result;
-use rmcp::model::{Role, RawTextContent, AnnotateAble};
+use rmcp::model::Role;
 use std::sync::Arc;
 
 // Constants for the summarization prompt and a follow-up user message.
@@ -222,7 +222,7 @@ mod tests {
     use chrono::Utc;
     use mcp_core::tool::Tool;
     use mcp_core::ToolCall;
-    use rmcp::model::{Content, TextContent, RawTextContent, AnnotateAble};
+    use rmcp::model::{Content, RawTextContent, AnnotateAble};
     use rmcp::model::Role;
     use serde_json::json;
     use std::sync::Arc;

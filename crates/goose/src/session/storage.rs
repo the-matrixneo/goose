@@ -680,7 +680,7 @@ fn parse_message_with_truncation(
 /// Truncate content within a message in place
 fn truncate_message_content_in_place(message: &mut Message, max_content_size: usize) {
     use crate::message::MessageContent;
-    use rmcp::model::{Content, RawContent, ResourceContents};
+    use rmcp::model::{RawContent, ResourceContents};
 
     for content in &mut message.content {
         match content {

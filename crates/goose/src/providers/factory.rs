@@ -177,7 +177,7 @@ mod tests {
     use crate::message::{Message, MessageContent};
     use crate::providers::base::{ProviderMetadata, ProviderUsage, Usage};
     use chrono::Utc;
-    use rmcp::model::{Role, TextContent, RawTextContent, AnnotateAble};
+    use rmcp::model::{Role, RawTextContent, AnnotateAble};
     use std::env;
 
     #[allow(dead_code)]

@@ -1,6 +1,6 @@
 use mcp_core::tool::Tool;
 use mcp_core::ToolError;
-use rmcp::model::{Content, TextContent};
+use rmcp::model::Content;
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;

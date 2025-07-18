@@ -1,6 +1,6 @@
 use goose::message::{Message, MessageContent, ToolRequest, ToolResponse};
 use goose::utils::safe_truncate;
-use rmcp::model::{ResourceContents, Role, TextContent, RawTextContent, Content};
+use rmcp::model::{ResourceContents, Role};
 use serde_json::Value;
 
 const MAX_STRING_LENGTH_MD_EXPORT: usize = 4096; // Generous limit for export
@@ -251,51 +251,51 @@ pub fn tool_response_to_markdown(resp: &ToolResponse, export_all_content: bool) 
                                 ));
                             }
                         } else if let Some(resource) = content.as_resource() {
-                        match &resource.resource {
-                            ResourceContents::TextResourceContents {
-                                uri,
-                                mime_type,
-                                text,
-                            } => {
-                                // Extract file extension from the URI for syntax highlighting
-                                let file_extension = uri.split('.').next_back().unwrap_or("");
-                                let syntax_type = match file_extension {
-                                    "rs" => "rust",
-                                    "js" => "javascript",
-                                    "ts" => "typescript",
-                                    "py" => "python",
-                                    "json" => "json",
-                                    "yaml" | "yml" => "yaml",
-                                    "md" => "markdown",
-                                    "html" => "html",
-                                    "css" => "css",
-                                    "sh" => "bash",
-                                    _ => mime_type
-                                        .as_ref()
-                                        .map(|mime| if mime == "text" { "" } else { mime })
-                                        .unwrap_or(""),
-                                };
-
-                                md.push_str(&format!("**File:** `{}`\n", uri));
-                                md.push_str(&format!(
-                                    "```{}\n{}\n```\n\n",
-                                    syntax_type,
-                                    text.trim()
-                                ));
-                            }
-                            ResourceContents::BlobResourceContents {
-                                uri,
-                                mime_type,
-                                blob,
-                            } => {
-                                md.push_str(&format!(
-                                    "**Binary File:** `{}` (type: {}, {} bytes)\n\n",
+                            match &resource.resource {
+                                ResourceContents::TextResourceContents {
                                     uri,
-                                    mime_type.as_ref().map(|s| s.as_str()).unwrap_or("unknown"),
-                                    blob.len()
-                                ));
+                                    mime_type,
+                                    text,
+                                } => {
+                                    // Extract file extension from the URI for syntax highlighting
+                                    let file_extension = uri.split('.').next_back().unwrap_or("");
+                                    let syntax_type = match file_extension {
+                                        "rs" => "rust",
+                                        "js" => "javascript",
+                                        "ts" => "typescript",
+                                        "py" => "python",
+                                        "json" => "json",
+                                        "yaml" | "yml" => "yaml",
+                                        "md" => "markdown",
+                                        "html" => "html",
+                                        "css" => "css",
+                                        "sh" => "bash",
+                                        _ => mime_type
+                                            .as_ref()
+                                            .map(|mime| if mime == "text" { "" } else { mime })
+                                            .unwrap_or(""),
+                                    };
+
+                                    md.push_str(&format!("**File:** `{}`\n", uri));
+                                    md.push_str(&format!(
+                                        "```{}\n{}\n```\n\n",
+                                        syntax_type,
+                                        text.trim()
+                                    ));
+                                }
+                                ResourceContents::BlobResourceContents {
+                                    uri,
+                                    mime_type,
+                                    blob,
+                                } => {
+                                    md.push_str(&format!(
+                                        "**Binary File:** `{}` (type: {}, {} bytes)\n\n",
+                                        uri,
+                                        mime_type.as_ref().map(|s| s.as_str()).unwrap_or("unknown"),
+                                        blob.len()
+                                    ));
+                                }
                             }
-                        }
                         }
                     }
                 }
@@ -360,6 +360,7 @@ mod tests {
     use super::*;
     use goose::message::{Message, ToolRequest, ToolResponse};
     use mcp_core::tool::ToolCall;
+    use rmcp::model::{Content, RawTextContent, TextContent};
     use serde_json::json;
 
     #[test]

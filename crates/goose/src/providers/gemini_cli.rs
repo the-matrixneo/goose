@@ -1,5 +1,4 @@
 use anyhow::Result;
-use rmcp::model::TextContent;
 use async_trait::async_trait;
 use serde_json::json;
 use std::process::Stdio;

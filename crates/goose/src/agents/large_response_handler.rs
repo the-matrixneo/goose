@@ -79,7 +79,7 @@ fn write_large_text_to_file(content: &str) -> Result<String, std::io::Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rmcp::model::{Content, ImageContent, TextContent};
+    use rmcp::model::Content;
     use mcp_core::ToolError;
     use std::fs;
     use std::path::Path;

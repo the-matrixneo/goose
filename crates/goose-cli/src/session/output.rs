@@ -8,7 +8,6 @@ use mcp_core::prompt::PromptArgument;
 use mcp_core::tool::ToolCall;
 use regex::Regex;
 use serde_json::Value;
-use rmcp::model::Content;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::io::{Error, Write};
