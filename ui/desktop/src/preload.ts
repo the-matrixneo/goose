@@ -113,6 +113,13 @@ type ElectronAPI = {
     statusText: string;
     data: unknown;
   }>;
+  // Docker command integration
+  dockerCommand: (command: string) => Promise<{
+    success: boolean;
+    output?: string;
+    error?: string;
+    exitCode?: number;
+  }>;
   // Update-related functions
   getVersion: () => string;
   checkForUpdates: () => Promise<{ updateInfo: unknown; error: string | null }>;
@@ -226,6 +233,9 @@ const electronAPI: ElectronAPI = {
     body?: string;
   }) => {
     return ipcRenderer.invoke('penpot-api-call', options);
+  },
+  dockerCommand: (command: string) => {
+    return ipcRenderer.invoke('docker-command', command);
   },
   getVersion: (): string => {
     return config.GOOSE_VERSION || ipcRenderer.sendSync('get-app-version') || '';

@@ -2158,6 +2158,103 @@ app.whenReady().then(async () => {
     }
   });
 
+  // Handle Docker commands from renderer process
+  ipcMain.handle('docker-command', async (_event, command: string) => {
+    try {
+      console.log('Executing Docker command:', command);
+      
+      return new Promise((resolve) => {
+        // Use full path to docker to avoid PATH issues
+        const dockerPath = '/usr/local/bin/docker';
+        
+        // Parse command more carefully to handle quotes and complex arguments
+        const parts = [];
+        let current = '';
+        let inQuotes = false;
+        let quoteChar = '';
+        
+        for (let i = 0; i < command.length; i++) {
+          const char = command[i];
+          
+          if ((char === '"' || char === "'") && !inQuotes) {
+            inQuotes = true;
+            quoteChar = char;
+          } else if (char === quoteChar && inQuotes) {
+            inQuotes = false;
+            quoteChar = '';
+          } else if (char === ' ' && !inQuotes) {
+            if (current.trim()) {
+              parts.push(current.trim());
+              current = '';
+            }
+          } else {
+            current += char;
+          }
+        }
+        
+        if (current.trim()) {
+          parts.push(current.trim());
+        }
+        
+        // Remove 'docker' from the beginning and use our docker path
+        const args = parts.slice(1);
+        
+        console.log('Docker args:', args);
+        
+        const dockerProcess = spawn(dockerPath, args, {
+          stdio: ['pipe', 'pipe', 'pipe'],
+          env: {
+            ...process.env,
+            PATH: '/usr/local/bin:/usr/bin:/bin:' + (process.env.PATH || '')
+          }
+        });
+        
+        let output = '';
+        let errorOutput = '';
+        
+        dockerProcess.stdout.on('data', (data) => {
+          output += data.toString();
+        });
+        
+        dockerProcess.stderr.on('data', (data) => {
+          errorOutput += data.toString();
+        });
+        
+        dockerProcess.on('close', (code) => {
+          const success = code === 0;
+          console.log(`Docker command completed with code ${code}`);
+          console.log('Output:', output);
+          if (errorOutput) console.log('Error:', errorOutput);
+          
+          resolve({
+            success,
+            output: output.trim(),
+            error: errorOutput.trim(),
+            exitCode: code
+          });
+        });
+        
+        dockerProcess.on('error', (error) => {
+          console.error('Docker command error:', error);
+          resolve({
+            success: false,
+            output: '',
+            error: error.message,
+            exitCode: -1
+          });
+        });
+      });
+    } catch (error) {
+      console.error('Error executing Docker command:', error);
+      return {
+        success: false,
+        output: '',
+        error: error instanceof Error ? error.message : 'Unknown error',
+        exitCode: -1
+      };
+    }
+  });
+
   ipcMain.on('open-in-chrome', (_event, url) => {
     try {
       // Validate URL

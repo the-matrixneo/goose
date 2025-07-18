@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Palette, Download, Share, Layers, Square, ExternalLink, Plus, FolderOpen, Settings } from 'lucide-react';
+import { Palette, Download, Share, Layers, Square, ExternalLink, Plus, FolderOpen, Settings, Play, Square as StopIcon, RefreshCw, Terminal } from 'lucide-react';
 import { Button } from './ui/button';
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/Tooltip';
 
@@ -37,7 +37,16 @@ interface LocalPenpotProject {
   lastAccessed: string;
 }
 
-// Penpot Integration Component - Enhanced Deep Links + Local Project Management
+// Docker container state interface
+interface DockerContainerState {
+  isRunning: boolean;
+  containerId?: string;
+  port?: number;
+  status: 'stopped' | 'starting' | 'running' | 'error';
+  logs: string[];
+}
+
+// Penpot Integration Component - Docker + Canvas Integration
 function PenpotCanvas({ 
   projectId, 
   fileId, 
@@ -47,13 +56,174 @@ function PenpotCanvas({
   onExport 
 }: PenpotCanvasProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const [integrationMode, setIntegrationMode] = useState<'dashboard' | 'projects' | 'local'>('dashboard');
+  const [integrationMode, setIntegrationMode] = useState<'docker' | 'dashboard' | 'local'>('docker');
   const [localProjects, setLocalProjects] = useState<LocalPenpotProject[]>([]);
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [penpotToken, setPenpotToken] = useState<string>('');
   const [isTokenValid, setIsTokenValid] = useState<boolean | null>(null);
+  
+  // Docker state management
+  const [dockerState, setDockerState] = useState<DockerContainerState>({
+    isRunning: false,
+    status: 'stopped',
+    logs: []
+  });
+  const [penpotUrl, setPenpotUrl] = useState<string>('http://localhost:9001');
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  // Load local projects and token from localStorage
+  // Docker management functions
+  const checkDockerStatus = async () => {
+    try {
+      console.log('Checking Docker status...');
+      const result = await window.electron.dockerCommand('docker --version');
+      console.log('Docker version check result:', result);
+      return result.success;
+    } catch (error) {
+      console.error('Docker check failed:', error);
+      return false;
+    }
+  };
+
+  const startPenpotContainer = async () => {
+    setDockerState(prev => ({ ...prev, status: 'starting' }));
+    setErrorMessage('Starting Penpot container...');
+    
+    try {
+      // Check if Docker is available
+      console.log('Checking Docker availability...');
+      const dockerAvailable = await checkDockerStatus();
+      console.log('Docker available:', dockerAvailable);
+      
+      if (!dockerAvailable) {
+        throw new Error('Docker is not installed or not running. Please install Docker Desktop first.');
+      }
+
+      setErrorMessage('✅ Docker detected! Setting up Penpot containers...');
+
+      // Clean up any existing containers (ignore errors)
+      console.log('Cleaning up existing containers...');
+      await window.electron.dockerCommand('docker stop penpot-goose');
+      await window.electron.dockerCommand('docker rm penpot-goose');
+      await window.electron.dockerCommand('docker stop penpot-backend');
+      await window.electron.dockerCommand('docker rm penpot-backend');
+      await window.electron.dockerCommand('docker stop penpot-postgres');
+      await window.electron.dockerCommand('docker rm penpot-postgres');
+      await window.electron.dockerCommand('docker stop penpot-redis');
+      await window.electron.dockerCommand('docker rm penpot-redis');
+      await window.electron.dockerCommand('docker network rm penpot-network');
+
+      // Create network
+      console.log('Creating Docker network...');
+      const networkResult = await window.electron.dockerCommand('docker network create penpot-network');
+      console.log('Network creation result:', networkResult);
+      
+      setErrorMessage('📦 Starting database containers...');
+      
+      // Start PostgreSQL
+      console.log('Starting PostgreSQL...');
+      const postgresResult = await window.electron.dockerCommand('docker run -d --name penpot-postgres --network penpot-network -e POSTGRES_DB=penpot -e POSTGRES_USER=penpot -e POSTGRES_PASSWORD=penpot postgres:13');
+      console.log('PostgreSQL result:', postgresResult);
+
+      // Start Redis
+      console.log('Starting Redis...');
+      const redisResult = await window.electron.dockerCommand('docker run -d --name penpot-redis --network penpot-network redis:6-alpine');
+      console.log('Redis result:', redisResult);
+
+      setErrorMessage('⏳ Waiting for databases to initialize...');
+      
+      // Wait for dependencies to start
+      await new Promise(resolve => setTimeout(resolve, 10000));
+
+      setErrorMessage('🚀 Starting Penpot backend...');
+
+      // Start Penpot backend
+      console.log('Starting Penpot backend...');
+      const backendResult = await window.electron.dockerCommand('docker run -d --name penpot-backend --network penpot-network -e PENPOT_FLAGS=enable-registration,enable-login-with-password -e PENPOT_SECRET_KEY=penpot-secret-key -e PENPOT_DATABASE_URI="postgresql://penpot:penpot@penpot-postgres:5432/penpot" -e PENPOT_REDIS_URI="redis://penpot-redis:6379/0" -e PENPOT_ASSETS_STORAGE_BACKEND=assets-fs -e PENPOT_STORAGE_ASSETS_FS_DIRECTORY=/opt/data/assets -e PENPOT_HTTP_SERVER_HOST=0.0.0.0 penpotapp/backend:latest');
+      console.log('Backend result:', backendResult);
+
+      setErrorMessage('⏳ Waiting for backend to initialize...');
+      
+      // Wait for backend to start
+      await new Promise(resolve => setTimeout(resolve, 15000));
+
+      setErrorMessage('🎨 Starting Penpot frontend...');
+
+      // Start Penpot frontend (now that backend is ready)
+      console.log('Starting Penpot frontend...');
+      const penpotResult = await window.electron.dockerCommand('docker run -d --name penpot-goose -p 9001:80 --network penpot-network -e PENPOT_FLAGS=enable-registration,enable-login-with-password penpotapp/frontend:latest');
+      console.log('Penpot frontend result:', penpotResult);
+      
+      if (penpotResult.success) {
+        setDockerState({
+          isRunning: true,
+          containerId: 'penpot-goose',
+          port: 9001,
+          status: 'running',
+          logs: ['Container started successfully']
+        });
+        setErrorMessage('✅ Penpot containers started! Waiting for service to be ready...\n\nThis may take a few minutes on first run as Penpot initializes...');
+        
+        // Wait for Penpot to be ready
+        setTimeout(() => {
+          setErrorMessage('✅ Penpot should be ready! If the canvas below is blank, try refreshing it in a minute.');
+        }, 20000);
+        
+      } else {
+        throw new Error(penpotResult.error || 'Failed to start Penpot frontend container');
+      }
+    } catch (error) {
+      console.error('Error starting Penpot:', error);
+      setDockerState(prev => ({ ...prev, status: 'error' }));
+      setErrorMessage(`❌ Failed to start Penpot: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  const stopPenpotContainer = async () => {
+    setDockerState(prev => ({ ...prev, status: 'stopped' }));
+    setErrorMessage('Stopping Penpot container...');
+    
+    try {
+      // Stop all Penpot containers
+      await window.electron.dockerCommand('docker stop penpot-goose penpot-postgres penpot-redis || true');
+      await window.electron.dockerCommand('docker rm penpot-goose penpot-postgres penpot-redis || true');
+      await window.electron.dockerCommand('docker network rm penpot-network || true');
+      
+      setDockerState({
+        isRunning: false,
+        status: 'stopped',
+        logs: []
+      });
+      setErrorMessage('✅ Penpot container stopped successfully.');
+    } catch (error) {
+      setErrorMessage(`❌ Failed to stop Penpot: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  const refreshPenpotCanvas = () => {
+    if (iframeRef.current) {
+      iframeRef.current.src = iframeRef.current.src;
+    }
+  };
+
+  const checkContainerStatus = async () => {
+    try {
+      const result = await window.electron.dockerCommand('docker ps --filter name=penpot-goose --format "{{.Status}}"');
+      if (result.success && result.output && result.output.includes('Up')) {
+        setDockerState(prev => ({ ...prev, isRunning: true, status: 'running' }));
+      } else {
+        setDockerState(prev => ({ ...prev, isRunning: false, status: 'stopped' }));
+      }
+    } catch (error) {
+      console.error('Failed to check container status:', error);
+    }
+  };
+
+  // Check container status on mount
+  useEffect(() => {
+    checkContainerStatus();
+    const interval = setInterval(checkContainerStatus, 10000); // Check every 10 seconds
+    return () => clearInterval(interval);
+  }, []);
   useEffect(() => {
     const saved = localStorage.getItem('penpot-local-projects');
     if (saved) {
@@ -564,6 +734,15 @@ function PenpotCanvas({
           <Button
             variant="ghost"
             size="sm"
+            onClick={() => setIntegrationMode('docker')}
+            className={integrationMode === 'docker' ? 'bg-background-muted' : ''}
+          >
+            <Terminal size={14} className="mr-1" />
+            Docker Canvas
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => setIntegrationMode('dashboard')}
             className={integrationMode === 'dashboard' ? 'bg-background-muted' : ''}
           >
@@ -584,6 +763,149 @@ function PenpotCanvas({
 
       {/* Content */}
       <div className="flex-1 p-4 overflow-auto">
+        {integrationMode === 'docker' && (
+          <div className="space-y-6">
+            <div className="text-center">
+              <h3 className="text-xl font-semibold text-textStandard mb-2">Penpot Docker Canvas</h3>
+              <p className="text-textSubtle mb-6">Run Penpot locally in Docker with full canvas access</p>
+            </div>
+
+            {/* Docker Control Panel */}
+            <div className="bg-background-muted p-6 rounded-lg border border-borderSubtle">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-3">
+                  <div className={`w-3 h-3 rounded-full ${
+                    dockerState.status === 'running' ? 'bg-green-500' :
+                    dockerState.status === 'starting' ? 'bg-yellow-500' :
+                    dockerState.status === 'error' ? 'bg-red-500' :
+                    'bg-gray-500'
+                  }`} />
+                  <h4 className="font-semibold text-textStandard">
+                    Penpot Container: {dockerState.status.charAt(0).toUpperCase() + dockerState.status.slice(1)}
+                  </h4>
+                </div>
+                <div className="flex items-center space-x-2">
+                  {dockerState.status === 'running' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={refreshPenpotCanvas}
+                    >
+                      <RefreshCw size={14} className="mr-1" />
+                      Refresh
+                    </Button>
+                  )}
+                  {dockerState.status === 'stopped' || dockerState.status === 'error' ? (
+                    <Button
+                      onClick={startPenpotContainer}
+                      disabled={dockerState.status === 'starting'}
+                    >
+                      <Play size={14} className="mr-1" />
+                      {dockerState.status === 'starting' ? 'Starting...' : 'Start Penpot'}
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      onClick={stopPenpotContainer}
+                      disabled={dockerState.status === 'stopped'}
+                    >
+                      <StopIcon size={14} className="mr-1" />
+                      Stop
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              {dockerState.status === 'running' && (
+                <div className="text-sm text-textSubtle">
+                  <p>🎉 Penpot is running at: <a href={penpotUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{penpotUrl}</a></p>
+                  <p>Container ID: {dockerState.containerId}</p>
+                  <p>Port: {dockerState.port}</p>
+                </div>
+              )}
+
+              {errorMessage && (
+                <div className="mt-4 p-3 bg-yellow-100 dark:bg-yellow-800/50 rounded text-sm whitespace-pre-wrap">
+                  {errorMessage}
+                </div>
+              )}
+            </div>
+
+            {/* Embedded Penpot Canvas */}
+            {dockerState.status === 'running' && (
+              <div className="bg-background-muted rounded-lg border border-borderSubtle overflow-hidden">
+                <div className="flex items-center justify-between p-3 border-b border-borderSubtle bg-background-subtle">
+                  <div className="flex items-center space-x-2">
+                    <Palette size={16} className="text-primary" />
+                    <span className="text-sm font-medium text-textStandard">Penpot Design Canvas</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => window.open(penpotUrl, '_blank')}
+                    >
+                      <ExternalLink size={14} className="mr-1" />
+                      Open in New Tab
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={refreshPenpotCanvas}
+                    >
+                      <RefreshCw size={14} />
+                    </Button>
+                  </div>
+                </div>
+                <div className="relative" style={{ height: '600px' }}>
+                  <iframe
+                    ref={iframeRef}
+                    src={penpotUrl}
+                    className="w-full h-full border-0"
+                    title="Penpot Design Canvas"
+                    sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Docker Setup Instructions */}
+            {dockerState.status === 'stopped' && (
+              <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+                <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">🐳 Docker Setup Required</h4>
+                <p className="text-blue-800 dark:text-blue-200 text-sm mb-3">
+                  To use the embedded Penpot canvas, you need Docker installed:
+                </p>
+                <ol className="text-blue-800 dark:text-blue-200 text-sm space-y-1 ml-4 mb-3">
+                  <li>1. Install <a href="https://www.docker.com/products/docker-desktop/" target="_blank" rel="noopener noreferrer" className="underline">Docker Desktop</a></li>
+                  <li>2. Make sure Docker is running</li>
+                  <li>3. Click "Start Penpot" above</li>
+                  <li>4. Wait for the container to start (may take a few minutes on first run)</li>
+                </ol>
+                <div className="text-xs text-blue-700 dark:text-blue-300">
+                  <strong>What happens:</strong><br/>
+                  • Downloads Penpot, PostgreSQL, and Redis containers<br/>
+                  • Sets up a local Penpot instance on port 9001<br/>
+                  • Provides full design canvas access within Goose
+                </div>
+              </div>
+            )}
+
+            {/* Canvas Benefits */}
+            <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg border border-green-200 dark:border-green-800">
+              <h4 className="font-semibold text-green-900 dark:text-green-100 mb-2">✨ Canvas Benefits</h4>
+              <ul className="text-green-800 dark:text-green-200 text-sm space-y-1 ml-4">
+                <li>• Full Penpot design tools and canvas access</li>
+                <li>• No external dependencies or API limitations</li>
+                <li>• Local storage - your designs stay on your machine</li>
+                <li>• Seamless integration with Goose workflows</li>
+                <li>• Real-time design collaboration capabilities</li>
+                <li>• Export designs directly to your projects</li>
+              </ul>
+            </div>
+          </div>
+        )}
+
         {integrationMode === 'dashboard' && (
           <div className="space-y-6">
             <div className="text-center">
