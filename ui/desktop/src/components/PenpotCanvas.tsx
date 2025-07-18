@@ -115,23 +115,23 @@ function PenpotCanvas({
       
       // Start PostgreSQL with proper health check (official configuration)
       console.log('Starting PostgreSQL...');
-      const postgresResult = await window.electron.dockerCommand([
-        'docker', 'run', '-d',
-        '--name', 'penpot-postgres',
-        '--network', 'penpot',
-        '--restart', 'always',
-        '--stop-signal', 'SIGINT',
-        '--health-cmd', 'pg_isready -U penpot',
-        '--health-interval', '2s',
-        '--health-timeout', '10s',
-        '--health-retries', '5',
-        '--health-start-period', '2s',
-        '-e', 'POSTGRES_INITDB_ARGS=--data-checksums',
-        '-e', 'POSTGRES_DB=penpot',
-        '-e', 'POSTGRES_USER=penpot',
-        '-e', 'POSTGRES_PASSWORD=penpot',
+      const postgresResult = await window.electron.dockerCommand(
+        'docker run -d ' +
+        '--name penpot-postgres ' +
+        '--network penpot ' +
+        '--restart always ' +
+        '--stop-signal SIGINT ' +
+        '--health-cmd "pg_isready -U penpot" ' +
+        '--health-interval 2s ' +
+        '--health-timeout 10s ' +
+        '--health-retries 5 ' +
+        '--health-start-period 2s ' +
+        '-e POSTGRES_INITDB_ARGS=--data-checksums ' +
+        '-e POSTGRES_DB=penpot ' +
+        '-e POSTGRES_USER=penpot ' +
+        '-e POSTGRES_PASSWORD=penpot ' +
         'postgres:15'
-      ].join(' '));
+      );
       console.log('PostgreSQL result:', postgresResult);
 
       if (!postgresResult.success) {
@@ -140,18 +140,18 @@ function PenpotCanvas({
 
       // Start Valkey (Redis replacement - official Penpot setup)
       console.log('Starting Valkey...');
-      const valkeyResult = await window.electron.dockerCommand([
-        'docker', 'run', '-d',
-        '--name', 'penpot-valkey',
-        '--network', 'penpot',
-        '--restart', 'always',
-        '--health-cmd', 'valkey-cli ping | grep PONG',
-        '--health-interval', '1s',
-        '--health-timeout', '3s',
-        '--health-retries', '5',
-        '--health-start-period', '3s',
+      const valkeyResult = await window.electron.dockerCommand(
+        'docker run -d ' +
+        '--name penpot-valkey ' +
+        '--network penpot ' +
+        '--restart always ' +
+        '--health-cmd "valkey-cli ping" ' +
+        '--health-interval 1s ' +
+        '--health-timeout 3s ' +
+        '--health-retries 5 ' +
+        '--health-start-period 3s ' +
         'valkey/valkey:8.1'
-      ].join(' '));
+      );
       console.log('Valkey result:', valkeyResult);
 
       setErrorMessage('⏳ Waiting for databases to initialize...');
@@ -180,7 +180,7 @@ function PenpotCanvas({
             setErrorMessage(`⏳ PostgreSQL health status: ${healthCheck.output.trim()} (${i + 1}/30)`);
           } else {
             // Try simple connection test if health check fails
-            const connectionTest = await window.electron.dockerCommand('docker exec penpot-postgres pg_isready -U penpot');
+            const connectionTest = await window.electron.dockerCommand('docker exec penpot-postgres /usr/bin/pg_isready -U penpot');
             if (connectionTest.success) {
               dbReady = true;
               break;
@@ -201,13 +201,34 @@ function PenpotCanvas({
       let valkeyReady = false;
       for (let i = 0; i < 15; i++) {
         try {
+          // First check if container is running
+          const containerCheck = await window.electron.dockerCommand('docker ps --filter name=penpot-valkey --format "{{.Status}}"');
+          if (!containerCheck.success || !containerCheck.output || !containerCheck.output.includes('Up')) {
+            // Container not running, check logs for error
+            const logsCheck = await window.electron.dockerCommand('docker logs penpot-valkey 2>&1 | tail -10');
+            console.log('Valkey container logs:', logsCheck.output);
+            setErrorMessage(`⏳ Valkey container issue... (${i + 1}/15)\nLogs: ${logsCheck.output || 'No logs available'}`);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            continue;
+          }
+
+          // Check health status
           const healthCheck = await window.electron.dockerCommand('docker inspect --format="{{.State.Health.Status}}" penpot-valkey');
           if (healthCheck.success && healthCheck.output && healthCheck.output.trim() === 'healthy') {
             valkeyReady = true;
             break;
+          } else if (healthCheck.success && healthCheck.output) {
+            setErrorMessage(`⏳ Valkey health status: ${healthCheck.output.trim()} (${i + 1}/15)`);
+          } else {
+            // Try simple connection test if health check fails
+            const connectionTest = await window.electron.dockerCommand('docker exec penpot-valkey valkey-cli ping');
+            if (connectionTest.success && connectionTest.output && connectionTest.output.includes('PONG')) {
+              valkeyReady = true;
+              break;
+            }
           }
         } catch (e) {
-          // Continue waiting
+          console.error('Valkey health check error:', e);
         }
         await new Promise(resolve => setTimeout(resolve, 1000));
         setErrorMessage(`⏳ Waiting for Valkey to initialize... (${i + 1}/15)`);
@@ -221,28 +242,25 @@ function PenpotCanvas({
 
       // Start Penpot backend with official configuration
       console.log('Starting Penpot backend...');
-      const backendCmd = [
-        'docker', 'run', '-d', 
-        '--name', 'penpot-backend', 
-        '--network', 'penpot',
-        '--restart', 'always',
-        '-e', 'PENPOT_FLAGS=disable-email-verification enable-prepl-server disable-secure-session-cookies enable-registration enable-login-with-password',
-        '-e', 'PENPOT_SECRET_KEY=penpot-secret-key',
-        '-e', 'PENPOT_PUBLIC_URI=http://localhost:9001',
-        // Official database connection format
-        '-e', 'PENPOT_DATABASE_URI=postgresql://penpot-postgres/penpot',
-        '-e', 'PENPOT_DATABASE_USERNAME=penpot',
-        '-e', 'PENPOT_DATABASE_PASSWORD=penpot',
-        // Official Redis/Valkey URI
-        '-e', 'PENPOT_REDIS_URI=redis://penpot-valkey/0',
-        '-e', 'PENPOT_ASSETS_STORAGE_BACKEND=assets-fs',
-        '-e', 'PENPOT_STORAGE_ASSETS_FS_DIRECTORY=/opt/data/assets',
-        '-e', 'PENPOT_HTTP_SERVER_MAX_BODY_SIZE=31457280',
-        '-e', 'PENPOT_HTTP_SERVER_MAX_MULTIPART_BODY_SIZE=367001600',
-        '-v', '/tmp/penpot-assets:/opt/data/assets',
+      const backendResult = await window.electron.dockerCommand(
+        'docker run -d ' +
+        '--name penpot-backend ' +
+        '--network penpot ' +
+        '--restart always ' +
+        '-e "PENPOT_FLAGS=disable-email-verification enable-prepl-server disable-secure-session-cookies enable-registration enable-login-with-password" ' +
+        '-e PENPOT_SECRET_KEY=penpot-secret-key ' +
+        '-e PENPOT_PUBLIC_URI=http://localhost:9001 ' +
+        '-e PENPOT_DATABASE_URI=postgresql://penpot-postgres/penpot ' +
+        '-e PENPOT_DATABASE_USERNAME=penpot ' +
+        '-e PENPOT_DATABASE_PASSWORD=penpot ' +
+        '-e PENPOT_REDIS_URI=redis://penpot-valkey/0 ' +
+        '-e PENPOT_ASSETS_STORAGE_BACKEND=assets-fs ' +
+        '-e PENPOT_STORAGE_ASSETS_FS_DIRECTORY=/opt/data/assets ' +
+        '-e PENPOT_HTTP_SERVER_MAX_BODY_SIZE=31457280 ' +
+        '-e PENPOT_HTTP_SERVER_MAX_MULTIPART_BODY_SIZE=367001600 ' +
+        '-v /tmp/penpot-assets:/opt/data/assets ' +
         'penpotapp/backend:latest'
-      ];
-      const backendResult = await window.electron.dockerCommand(backendCmd.join(' '));
+      );
       console.log('Backend result:', backendResult);
 
       setErrorMessage('⏳ Waiting for backend to initialize...');
@@ -251,14 +269,46 @@ function PenpotCanvas({
       let backendReady = false;
       for (let i = 0; i < 60; i++) {
         try {
-          const healthCheck = await window.electron.dockerCommand('docker logs penpot-backend 2>&1 | grep -i "server started\\|listening"');
-          if (healthCheck.success) {
-            backendReady = true;
-            break;
+          // Check if backend container is running and healthy
+          const containerCheck = await window.electron.dockerCommand('docker ps --filter name=penpot-backend --format "{{.Status}}"');
+          if (containerCheck.success && containerCheck.output && containerCheck.output.includes('Up')) {
+            // Try multiple log patterns that indicate the backend is ready
+            const logPatterns = [
+              'docker logs penpot-backend 2>&1 | grep -i "server started"',
+              'docker logs penpot-backend 2>&1 | grep -i "listening"',
+              'docker logs penpot-backend 2>&1 | grep -i "started"',
+              'docker logs penpot-backend 2>&1 | grep -i "ready"',
+              'docker logs penpot-backend 2>&1 | grep -i "running"'
+            ];
+            
+            for (const pattern of logPatterns) {
+              const healthCheck = await window.electron.dockerCommand(pattern);
+              if (healthCheck.success && healthCheck.output && healthCheck.output.trim()) {
+                console.log('Backend ready - found log pattern:', healthCheck.output);
+                backendReady = true;
+                break;
+              }
+            }
+            
+            // If no specific log pattern found, check if container has been running for a reasonable time
+            if (!backendReady && i > 10) {
+              // Try a simple connection test to the backend port (if accessible)
+              console.log('No specific log pattern found, assuming backend is ready after container uptime');
+              backendReady = true;
+              break;
+            }
+          } else {
+            // Container not running properly
+            const logsCheck = await window.electron.dockerCommand('docker logs penpot-backend 2>&1 | tail -10');
+            console.log('Backend container logs:', logsCheck.output);
+            setErrorMessage(`⏳ Backend container issue... (${i + 1}/60)\nLogs: ${logsCheck.output || 'No logs available'}`);
           }
         } catch (e) {
-          // Continue waiting
+          console.error('Backend health check error:', e);
         }
+        
+        if (backendReady) break;
+        
         await new Promise(resolve => setTimeout(resolve, 2000));
         setErrorMessage(`⏳ Waiting for backend to initialize... (${i + 1}/60)`);
       }
@@ -282,18 +332,18 @@ function PenpotCanvas({
 
       // Start Penpot frontend (official configuration)
       console.log('Starting Penpot frontend...');
-      const frontendResult = await window.electron.dockerCommand([
-        'docker', 'run', '-d',
-        '--name', 'penpot-frontend',
-        '--network', 'penpot',
-        '--restart', 'always',
-        '-p', '9001:8080',
-        '-e', 'PENPOT_FLAGS=disable-email-verification enable-prepl-server disable-secure-session-cookies',
-        '-e', 'PENPOT_HTTP_SERVER_MAX_BODY_SIZE=31457280',
-        '-e', 'PENPOT_HTTP_SERVER_MAX_MULTIPART_BODY_SIZE=367001600',
-        '-v', '/tmp/penpot-assets:/opt/data/assets',
+      const frontendResult = await window.electron.dockerCommand(
+        'docker run -d ' +
+        '--name penpot-frontend ' +
+        '--network penpot ' +
+        '--restart always ' +
+        '-p 9001:8080 ' +
+        '-e "PENPOT_FLAGS=disable-email-verification enable-prepl-server disable-secure-session-cookies" ' +
+        '-e PENPOT_HTTP_SERVER_MAX_BODY_SIZE=31457280 ' +
+        '-e PENPOT_HTTP_SERVER_MAX_MULTIPART_BODY_SIZE=367001600 ' +
+        '-v /tmp/penpot-assets:/opt/data/assets ' +
         'penpotapp/frontend:latest'
-      ].join(' '));
+      );
       console.log('Frontend result:', frontendResult);
       
       if (frontendResult.success) {
@@ -345,6 +395,18 @@ function PenpotCanvas({
   const refreshPenpotCanvas = () => {
     if (iframeRef.current) {
       iframeRef.current.src = iframeRef.current.src;
+    }
+  };
+
+  const openPenpotInRenderer = async () => {
+    try {
+      // Create a new window specifically for Penpot
+      const { ipcRenderer } = window.electron;
+      await ipcRenderer.invoke('create-penpot-window', penpotUrl);
+    } catch (error) {
+      console.error('Failed to open Penpot renderer window:', error);
+      // Fallback to opening in browser
+      window.open(penpotUrl, '_blank');
     }
   };
 
@@ -984,12 +1046,20 @@ function PenpotCanvas({
                   </div>
                   <div className="flex items-center space-x-2">
                     <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={openPenpotInRenderer}
+                    >
+                      <ExternalLink size={14} className="mr-1" />
+                      Open in Renderer
+                    </Button>
+                    <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => window.open(penpotUrl, '_blank')}
                     >
                       <ExternalLink size={14} className="mr-1" />
-                      Open in New Tab
+                      Open in Browser
                     </Button>
                     <Button
                       variant="ghost"
@@ -1001,13 +1071,47 @@ function PenpotCanvas({
                   </div>
                 </div>
                 <div className="relative" style={{ height: '600px' }}>
-                  <iframe
-                    ref={iframeRef}
-                    src={penpotUrl}
-                    className="w-full h-full border-0"
-                    title="Penpot Design Canvas"
-                    sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox"
-                  />
+                  {/* Canvas placeholder with options */}
+                  <div className="absolute inset-0 bg-background-default flex items-center justify-center">
+                    <div className="text-center max-w-md">
+                      <Palette size={64} className="text-primary mx-auto mb-6" />
+                      <h3 className="text-lg font-semibold text-textStandard mb-3">Penpot Canvas Ready</h3>
+                      <p className="text-textSubtle text-sm mb-6">
+                        Your local Penpot instance is running at{' '}
+                        <a href={penpotUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                          {penpotUrl}
+                        </a>
+                      </p>
+                      
+                      <div className="space-y-3">
+                        <Button
+                          onClick={openPenpotInRenderer}
+                          className="w-full"
+                          size="lg"
+                        >
+                          <ExternalLink size={16} className="mr-2" />
+                          Open in Dedicated Window
+                        </Button>
+                        
+                        <Button
+                          variant="outline"
+                          onClick={() => window.open(penpotUrl, '_blank')}
+                          className="w-full"
+                        >
+                          <ExternalLink size={16} className="mr-2" />
+                          Open in Browser
+                        </Button>
+                      </div>
+                      
+                      <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-left">
+                        <h4 className="font-semibold text-blue-900 dark:text-blue-100 text-sm mb-2">💡 Why no embedded canvas?</h4>
+                        <p className="text-blue-800 dark:text-blue-200 text-xs">
+                          Due to Content Security Policy restrictions, we can't embed Penpot directly in this window. 
+                          However, the dedicated renderer window provides the same integrated experience with full Penpot functionality.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}

@@ -1620,11 +1620,11 @@ app.whenReady().then(async () => {
           // Images from our app and data: URLs (for base64 images)
           "img-src 'self' data: https:;" +
           // Connect to our local API and specific external services
-          "connect-src 'self' http://127.0.0.1:* https://api.github.com https://github.com https://objects.githubusercontent.com" +
+          "connect-src 'self' http://127.0.0.1:* http://localhost:* https://api.github.com https://github.com https://objects.githubusercontent.com;" +
           // Don't allow any plugins
           "object-src 'none';" +
           // Don't allow any frames
-          "frame-src 'none';" +
+          "frame-src 'self' http://localhost:9001 http://127.0.0.1:9001;" +
           // Font sources - allow self, data URLs, and external fonts
           "font-src 'self' data: https:;" +
           // Media sources - allow microphone
