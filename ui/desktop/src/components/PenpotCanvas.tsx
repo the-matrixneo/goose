@@ -102,35 +102,62 @@ function PenpotCanvas({
 
       // Clean up any existing containers (ignore errors)
       console.log('Cleaning up existing containers...');
-      await window.electron.dockerCommand('docker stop penpot-goose penpot-backend penpot-postgres penpot-redis penpot-exporter || true');
-      await window.electron.dockerCommand('docker rm penpot-goose penpot-backend penpot-postgres penpot-redis penpot-exporter || true');
-      await window.electron.dockerCommand('docker network rm penpot-network || true');
+      await window.electron.dockerCommand('docker stop penpot-frontend penpot-backend penpot-postgres penpot-valkey penpot-exporter || true');
+      await window.electron.dockerCommand('docker rm penpot-frontend penpot-backend penpot-postgres penpot-valkey penpot-exporter || true');
+      await window.electron.dockerCommand('docker network rm penpot || true');
 
-      // Create network
+      // Create network (using official name)
       console.log('Creating Docker network...');
-      const networkResult = await window.electron.dockerCommand('docker network create penpot-network');
+      const networkResult = await window.electron.dockerCommand('docker network create penpot');
       console.log('Network creation result:', networkResult);
       
       setErrorMessage('📦 Starting database containers...');
       
-      // Start PostgreSQL with proper health check
+      // Start PostgreSQL with proper health check (official configuration)
       console.log('Starting PostgreSQL...');
-      const postgresResult = await window.electron.dockerCommand('docker run -d --name penpot-postgres --network penpot-network -e POSTGRES_DB=penpot -e POSTGRES_USER=penpot -e POSTGRES_PASSWORD=penpot --health-cmd="pg_isready -U penpot" --health-interval=10s --health-timeout=5s --health-retries=5 postgres:13');
+      const postgresResult = await window.electron.dockerCommand([
+        'docker', 'run', '-d',
+        '--name', 'penpot-postgres',
+        '--network', 'penpot',
+        '--restart', 'always',
+        '--stop-signal', 'SIGINT',
+        '--health-cmd', 'pg_isready -U penpot',
+        '--health-interval', '2s',
+        '--health-timeout', '10s',
+        '--health-retries', '5',
+        '--health-start-period', '2s',
+        '-e', 'POSTGRES_INITDB_ARGS=--data-checksums',
+        '-e', 'POSTGRES_DB=penpot',
+        '-e', 'POSTGRES_USER=penpot',
+        '-e', 'POSTGRES_PASSWORD=penpot',
+        'postgres:15'
+      ].join(' '));
       console.log('PostgreSQL result:', postgresResult);
 
-      // Start Redis
-      console.log('Starting Redis...');
-      const redisResult = await window.electron.dockerCommand('docker run -d --name penpot-redis --network penpot-network redis:6-alpine');
-      console.log('Redis result:', redisResult);
+      // Start Valkey (Redis replacement - official Penpot setup)
+      console.log('Starting Valkey...');
+      const valkeyResult = await window.electron.dockerCommand([
+        'docker', 'run', '-d',
+        '--name', 'penpot-valkey',
+        '--network', 'penpot',
+        '--restart', 'always',
+        '--health-cmd', 'valkey-cli ping | grep PONG',
+        '--health-interval', '1s',
+        '--health-timeout', '3s',
+        '--health-retries', '5',
+        '--health-start-period', '3s',
+        'valkey/valkey:8.1'
+      ].join(' '));
+      console.log('Valkey result:', valkeyResult);
 
       setErrorMessage('⏳ Waiting for databases to initialize...');
       
-      // Wait for PostgreSQL to be ready
+      // Wait for PostgreSQL to be healthy
       let dbReady = false;
       for (let i = 0; i < 30; i++) {
         try {
-          const healthCheck = await window.electron.dockerCommand('docker exec penpot-postgres pg_isready -U penpot');
-          if (healthCheck.success) {
+          const healthCheck = await window.electron.dockerCommand('docker inspect --format="{{.State.Health.Status}}" penpot-postgres');
+          if (healthCheck.success && healthCheck.output && healthCheck.output.trim() === 'healthy') {
             dbReady = true;
             break;
           }
@@ -145,31 +172,49 @@ function PenpotCanvas({
         throw new Error('PostgreSQL failed to start within timeout');
       }
 
+      // Wait for Valkey to be healthy
+      let valkeyReady = false;
+      for (let i = 0; i < 15; i++) {
+        try {
+          const healthCheck = await window.electron.dockerCommand('docker inspect --format="{{.State.Health.Status}}" penpot-valkey');
+          if (healthCheck.success && healthCheck.output && healthCheck.output.trim() === 'healthy') {
+            valkeyReady = true;
+            break;
+          }
+        } catch (e) {
+          // Continue waiting
+        }
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        setErrorMessage(`⏳ Waiting for Valkey to initialize... (${i + 1}/15)`);
+      }
+
+      if (!valkeyReady) {
+        throw new Error('Valkey failed to start within timeout');
+      }
+
       setErrorMessage('🚀 Starting Penpot backend...');
 
-      // Start Penpot backend with corrected environment variables
+      // Start Penpot backend with official configuration
       console.log('Starting Penpot backend...');
       const backendCmd = [
         'docker', 'run', '-d', 
         '--name', 'penpot-backend', 
-        '--network', 'penpot-network',
-        '--restart', 'unless-stopped',
-        '-e', 'PENPOT_FLAGS=enable-registration,enable-login-with-password',
+        '--network', 'penpot',
+        '--restart', 'always',
+        '-e', 'PENPOT_FLAGS=disable-email-verification enable-prepl-server disable-secure-session-cookies enable-registration enable-login-with-password',
         '-e', 'PENPOT_SECRET_KEY=penpot-secret-key',
-        // Use the correct environment variable names for Penpot backend
-        '-e', 'PENPOT_DATABASE_HOST=penpot-postgres',
-        '-e', 'PENPOT_DATABASE_PORT=5432',
-        '-e', 'PENPOT_DATABASE_NAME=penpot',
-        '-e', 'PENPOT_DATABASE_USER=penpot',
+        '-e', 'PENPOT_PUBLIC_URI=http://localhost:9001',
+        // Official database connection format
+        '-e', 'PENPOT_DATABASE_URI=postgresql://penpot-postgres/penpot',
+        '-e', 'PENPOT_DATABASE_USERNAME=penpot',
         '-e', 'PENPOT_DATABASE_PASSWORD=penpot',
-        '-e', 'PENPOT_REDIS_URI=redis://penpot-redis:6379/0',
+        // Official Redis/Valkey URI
+        '-e', 'PENPOT_REDIS_URI=redis://penpot-valkey/0',
         '-e', 'PENPOT_ASSETS_STORAGE_BACKEND=assets-fs',
         '-e', 'PENPOT_STORAGE_ASSETS_FS_DIRECTORY=/opt/data/assets',
-        '-e', 'PENPOT_HTTP_SERVER_HOST=0.0.0.0',
-        '-e', 'PENPOT_HTTP_SERVER_PORT=6060',
-        '-e', 'PENPOT_PUBLIC_URI=http://localhost:9001',
+        '-e', 'PENPOT_HTTP_SERVER_MAX_BODY_SIZE=31457280',
+        '-e', 'PENPOT_HTTP_SERVER_MAX_MULTIPART_BODY_SIZE=367001600',
         '-v', '/tmp/penpot-assets:/opt/data/assets',
-        '-p', '6060:6060',
         'penpotapp/backend:latest'
       ];
       const backendResult = await window.electron.dockerCommand(backendCmd.join(' '));
@@ -177,12 +222,12 @@ function PenpotCanvas({
 
       setErrorMessage('⏳ Waiting for backend to initialize...');
       
-      // Wait for backend to be ready
+      // Wait for backend to be ready (check logs for startup)
       let backendReady = false;
       for (let i = 0; i < 60; i++) {
         try {
-          const healthCheck = await window.electron.dockerCommand('docker logs penpot-backend 2>&1 | grep -i "server started"');
-          if (healthCheck.success || i > 30) { // Give it at least 30 attempts
+          const healthCheck = await window.electron.dockerCommand('docker logs penpot-backend 2>&1 | grep -i "server started\\|listening"');
+          if (healthCheck.success) {
             backendReady = true;
             break;
           }
@@ -195,38 +240,41 @@ function PenpotCanvas({
 
       setErrorMessage('📋 Starting Penpot exporter...');
 
-      // Start Penpot exporter (required by frontend)
+      // Start Penpot exporter (official configuration)
       console.log('Starting Penpot exporter...');
       const exporterResult = await window.electron.dockerCommand([
         'docker', 'run', '-d',
         '--name', 'penpot-exporter',
-        '--network', 'penpot-network',
-        '-e', 'PENPOT_PUBLIC_URI=http://penpot-backend:6060',
-        '-e', 'PENPOT_REDIS_URI=redis://penpot-redis:6379/0',
+        '--network', 'penpot',
+        '--restart', 'always',
+        '-e', 'PENPOT_PUBLIC_URI=http://penpot-frontend:8080',
+        '-e', 'PENPOT_REDIS_URI=redis://penpot-valkey/0',
         'penpotapp/exporter:latest'
       ].join(' '));
       console.log('Exporter result:', exporterResult);
 
       setErrorMessage('🎨 Starting Penpot frontend...');
 
-      // Start Penpot frontend with backend configuration
+      // Start Penpot frontend (official configuration)
       console.log('Starting Penpot frontend...');
-      const penpotResult = await window.electron.dockerCommand([
+      const frontendResult = await window.electron.dockerCommand([
         'docker', 'run', '-d',
-        '--name', 'penpot-goose',
-        '-p', '9001:80',
-        '--network', 'penpot-network',
-        '-e', 'PENPOT_FLAGS=enable-registration,enable-login-with-password',
-        '-e', 'PENPOT_BACKEND_URI=http://penpot-backend:6060',
-        '-e', 'PENPOT_EXPORTER_URI=http://penpot-exporter:6061',
+        '--name', 'penpot-frontend',
+        '--network', 'penpot',
+        '--restart', 'always',
+        '-p', '9001:8080',
+        '-e', 'PENPOT_FLAGS=disable-email-verification enable-prepl-server disable-secure-session-cookies',
+        '-e', 'PENPOT_HTTP_SERVER_MAX_BODY_SIZE=31457280',
+        '-e', 'PENPOT_HTTP_SERVER_MAX_MULTIPART_BODY_SIZE=367001600',
+        '-v', '/tmp/penpot-assets:/opt/data/assets',
         'penpotapp/frontend:latest'
       ].join(' '));
-      console.log('Penpot frontend result:', penpotResult);
+      console.log('Frontend result:', frontendResult);
       
-      if (penpotResult.success) {
+      if (frontendResult.success) {
         setDockerState({
           isRunning: true,
-          containerId: 'penpot-goose',
+          containerId: 'penpot-frontend',
           port: 9001,
           status: 'running',
           logs: ['Container started successfully']
@@ -239,7 +287,7 @@ function PenpotCanvas({
         }, 20000);
         
       } else {
-        throw new Error(penpotResult.error || 'Failed to start Penpot frontend container');
+        throw new Error(frontendResult.error || 'Failed to start Penpot frontend container');
       }
     } catch (error) {
       console.error('Error starting Penpot:', error);
@@ -253,17 +301,17 @@ function PenpotCanvas({
     setErrorMessage('Stopping Penpot container...');
     
     try {
-      // Stop all Penpot containers
-      await window.electron.dockerCommand('docker stop penpot-goose penpot-backend penpot-postgres penpot-redis penpot-exporter || true');
-      await window.electron.dockerCommand('docker rm penpot-goose penpot-backend penpot-postgres penpot-redis penpot-exporter || true');
-      await window.electron.dockerCommand('docker network rm penpot-network || true');
+      // Stop all Penpot containers (using official names)
+      await window.electron.dockerCommand('docker stop penpot-frontend penpot-backend penpot-postgres penpot-valkey penpot-exporter || true');
+      await window.electron.dockerCommand('docker rm penpot-frontend penpot-backend penpot-postgres penpot-valkey penpot-exporter || true');
+      await window.electron.dockerCommand('docker network rm penpot || true');
       
       setDockerState({
         isRunning: false,
         status: 'stopped',
         logs: []
       });
-      setErrorMessage('✅ Penpot container stopped successfully.');
+      setErrorMessage('✅ Penpot containers stopped successfully.');
     } catch (error) {
       setErrorMessage(`❌ Failed to stop Penpot: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -277,7 +325,7 @@ function PenpotCanvas({
 
   const checkContainerStatus = async () => {
     try {
-      const result = await window.electron.dockerCommand('docker ps --filter name=penpot-goose --format "{{.Status}}"');
+      const result = await window.electron.dockerCommand('docker ps --filter name=penpot-frontend --format "{{.Status}}"');
       if (result.success && result.output && result.output.includes('Up')) {
         setDockerState(prev => ({ ...prev, isRunning: true, status: 'running' }));
       } else {
