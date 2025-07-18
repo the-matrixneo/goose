@@ -101,6 +101,18 @@ type ElectronAPI = {
   deleteTempFile: (filePath: string) => void;
   // Function to serve temp images
   getTempImage: (filePath: string) => Promise<string | null>;
+  // Penpot API integration
+  penpotApiCall: (options: {
+    url: string;
+    method?: string;
+    headers?: Record<string, string>;
+    body?: string;
+  }) => Promise<{
+    ok: boolean;
+    status: number;
+    statusText: string;
+    data: unknown;
+  }>;
   // Update-related functions
   getVersion: () => string;
   checkForUpdates: () => Promise<{ updateInfo: unknown; error: string | null }>;
@@ -206,6 +218,14 @@ const electronAPI: ElectronAPI = {
   },
   getTempImage: (filePath: string): Promise<string | null> => {
     return ipcRenderer.invoke('get-temp-image', filePath);
+  },
+  penpotApiCall: (options: {
+    url: string;
+    method?: string;
+    headers?: Record<string, string>;
+    body?: string;
+  }) => {
+    return ipcRenderer.invoke('penpot-api-call', options);
   },
   getVersion: (): string => {
     return config.GOOSE_VERSION || ipcRenderer.sendSync('get-app-version') || '';

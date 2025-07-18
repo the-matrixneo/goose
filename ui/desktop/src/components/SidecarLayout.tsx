@@ -1,8 +1,9 @@
 import React, { useState, createContext, useContext, useEffect } from 'react';
-import { X, FileDiff, SquareSplitHorizontal, BetweenHorizontalStart } from 'lucide-react';
+import { X, FileDiff, SquareSplitHorizontal, BetweenHorizontalStart, Palette } from 'lucide-react';
 import { Button } from './ui/button';
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/Tooltip';
 import { useWindowManager } from '../hooks/useWindowManager';
+import PenpotCanvas from './PenpotCanvas';
 
 interface SidecarView {
   id: string;
@@ -19,6 +20,8 @@ interface SidecarContextType {
   hideView: () => void;
   showDiffViewer: (diffContent: string, fileName?: string) => void;
   hideDiffViewer: () => void;
+  showPenpotDesigner: (projectId?: string, fileId?: string, initialDesign?: string) => void;
+  hidePenpotDesigner: () => void;
 }
 
 const SidecarContext = createContext<SidecarContextType | null>(null);
@@ -345,6 +348,38 @@ export function SidecarProvider({ children, showSidecar = true }: SidecarProvide
     }
   };
 
+  const showPenpotDesigner = (projectId?: string, fileId?: string, initialDesign?: string) => {
+    const penpotView: SidecarView = {
+      id: 'penpot',
+      title: 'Penpot Designer',
+      icon: <Palette size={16} />,
+      content: (
+        <PenpotCanvas
+          projectId={projectId}
+          fileId={fileId}
+          initialDesign={initialDesign}
+          onDesignChange={(design) => {
+            console.log('Design changed:', design);
+            // Here you could emit events or save the design
+          }}
+          onExport={(format) => {
+            console.log('Exporting as:', format);
+            // Handle export functionality
+          }}
+        />
+      ),
+      fileName: projectId ? `Project: ${projectId}` : 'New Design',
+    };
+    showView(penpotView);
+  };
+
+  const hidePenpotDesigner = () => {
+    setViews((prev) => prev.filter((v) => v.id !== 'penpot'));
+    if (activeView === 'penpot') {
+      setActiveView(null);
+    }
+  };
+
   const contextValue: SidecarContextType = {
     activeView,
     views,
@@ -352,6 +387,8 @@ export function SidecarProvider({ children, showSidecar = true }: SidecarProvide
     hideView,
     showDiffViewer,
     hideDiffViewer,
+    showPenpotDesigner,
+    hidePenpotDesigner,
   };
 
   // Don't render sidecar if showSidecar is false

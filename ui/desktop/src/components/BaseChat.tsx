@@ -71,6 +71,7 @@ import { useSidecar } from './SidecarLayout';
 import { hasDiffContent } from './ToolCallWithResponse';
 import { getToolRequests, getToolResponses, Message } from '../types/message';
 import { Recipe } from '../recipe';
+import PenpotDesignButton from './PenpotDesignButton';
 
 // Context for sharing current model info
 const CurrentModelContext = createContext<{ model: string; mode: string } | null>(null);
@@ -412,6 +413,8 @@ function BaseChatContent({
 
         {/* Chat container with sticky recipe header */}
         <div className="flex flex-col flex-1 mb-0.5 min-h-0 relative">
+          {/* Testing Penpot Button - positioned in top right */}
+          <PenpotDesignButton className="absolute top-4 right-4 z-50" />
           <ScrollArea
             ref={scrollRef}
             className={`flex-1 bg-background-default rounded-b-2xl min-h-0 relative ${contentClassName}`}

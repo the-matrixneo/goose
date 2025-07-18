@@ -2111,6 +2111,53 @@ app.whenReady().then(async () => {
     }
   });
 
+  // Handle Penpot API calls from renderer process (bypasses CORS)
+  ipcMain.handle('penpot-api-call', async (_event, options) => {
+    try {
+      console.log('Making Penpot API call:', options.url);
+      
+      // Validate the URL is for Penpot
+      const parsedUrl = new URL(options.url);
+      if (parsedUrl.hostname !== 'design.penpot.app') {
+        throw new Error('Invalid URL: Only Penpot API calls are allowed');
+      }
+
+      const response = await fetch(options.url, {
+        method: options.method || 'GET',
+        headers: {
+          ...options.headers,
+          'User-Agent': 'Mozilla/5.0 (compatible; Goose/1.0)',
+        },
+        body: options.body,
+      });
+
+      console.log('Penpot API response status:', response.status);
+
+      let data;
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        data = await response.text();
+      }
+
+      return {
+        ok: response.ok,
+        status: response.status,
+        statusText: response.statusText,
+        data: data,
+      };
+    } catch (error) {
+      console.error('Error in Penpot API call:', error);
+      return {
+        ok: false,
+        status: 0,
+        statusText: 'Network Error',
+        data: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  });
+
   ipcMain.on('open-in-chrome', (_event, url) => {
     try {
       // Validate URL
