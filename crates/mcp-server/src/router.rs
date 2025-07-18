@@ -15,7 +15,9 @@ use mcp_core::{
         PromptsCapability, ReadResourceResult, ResourcesCapability, ServerCapabilities,
         ToolsCapability,
     },
+    ResourceContents,
 };
+use rmcp::model::Content;
 use serde_json::Value;
 use tokio::sync::mpsc;
 use tower_service::Service;
