@@ -13,7 +13,7 @@ use rmcp::model::ResourceContents;
 use mcp_core::tool::ToolCall;
 use rmcp::model::Role;
 use rmcp::model::{
-    AnnotateAble, Content, ImageContent, PromptMessage, PromptMessageContent, PromptMessageRole, RawContent, RawImageContent, RawTextContent, TextContent,
+    AnnotateAble, Content, EmbeddedResource, ImageContent, PromptMessage, PromptMessageContent, PromptMessageRole, RawContent, RawEmbeddedResource, RawImageContent, RawTextContent, TextContent,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -523,7 +523,7 @@ impl Message {
 mod tests {
     use super::*;
     use mcp_core::handler::ToolError;
-    use mcp_core::prompt::PromptMessageContent;
+    use rmcp::model::PromptMessageContent;
     use rmcp::model::ResourceContents;
     use rmcp::model::PromptMessage;
     use serde_json::{json, Value};
@@ -667,7 +667,7 @@ mod tests {
             image: RawImageContent {
                 data: "base64data".to_string(),
                 mime_type: "image/jpeg".to_string(),
-            },
+            }.no_annotation(),
         };
 
         let prompt_message = PromptMessage {
@@ -694,10 +694,9 @@ mod tests {
         };
 
         let prompt_content = PromptMessageContent::Resource {
-            resource: EmbeddedResource {
+            resource: RawEmbeddedResource {
                 resource,
-                annotations: None,
-            },
+            }.no_annotation(),
         };
 
         let prompt_message = PromptMessage {
@@ -723,10 +722,9 @@ mod tests {
         };
 
         let prompt_content = PromptMessageContent::Resource {
-            resource: EmbeddedResource {
+            resource: RawEmbeddedResource {
                 resource,
-                annotations: None,
-            },
+            }.no_annotation(),
         };
 
         let prompt_message = PromptMessage {

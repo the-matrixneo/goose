@@ -1,8 +1,6 @@
 use goose::message::{Message, MessageContent, ToolRequest, ToolResponse};
 use goose::utils::safe_truncate;
-use rmcp::model::ResourceContents;
-use rmcp::model::Content;
-use rmcp::model::Role;
+use rmcp::model::{ResourceContents, Role, TextContent, RawTextContent, Content};
 use serde_json::Value;
 
 const MAX_STRING_LENGTH_MD_EXPORT: usize = 4096; // Generous limit for export
@@ -521,12 +519,14 @@ mod tests {
     #[test]
     fn test_tool_response_to_markdown_text() {
         let text_content = TextContent {
-            text: "Command executed successfully".to_string(),
+            raw: RawTextContent {
+                text: "Command executed successfully".to_string(),
+            },
             annotations: None,
         };
         let tool_response = ToolResponse {
             id: "test-id".to_string(),
-            tool_result: Ok(vec![McpContent::Text(text_content)]),
+            tool_result: Ok(vec![Content::text(text_content.raw.text)]),
         };
 
         let result = tool_response_to_markdown(&tool_response, true);
@@ -538,12 +538,14 @@ mod tests {
     fn test_tool_response_to_markdown_json() {
         let json_text = r#"{"status": "success", "data": "test"}"#;
         let text_content = TextContent {
-            text: json_text.to_string(),
+            raw: RawTextContent {
+                text: json_text.to_string(),
+            },
             annotations: None,
         };
         let tool_response = ToolResponse {
             id: "test-id".to_string(),
-            tool_result: Ok(vec![McpContent::Text(text_content)]),
+            tool_result: Ok(vec![Content::text(text_content.raw.text)]),
         };
 
         let result = tool_response_to_markdown(&tool_response, true);
@@ -640,12 +642,14 @@ if __name__ == "__main__":
     hello_world()"#;
 
         let text_content = TextContent {
-            text: python_code.to_string(),
+            raw: RawTextContent {
+                text: python_code.to_string(),
+            },
             annotations: None,
         };
         let tool_response = ToolResponse {
             id: "shell-cat".to_string(),
-            tool_result: Ok(vec![McpContent::Text(text_content)]),
+            tool_result: Ok(vec![Content::text(text_content.raw.text)]),
         };
 
         let request_result = tool_request_to_markdown(&tool_request, true);
@@ -677,12 +681,14 @@ if __name__ == "__main__":
 
         let git_output = " M src/main.rs\n?? temp.txt\n A new_feature.rs";
         let text_content = TextContent {
-            text: git_output.to_string(),
+            raw: RawTextContent {
+                text: git_output.to_string(),
+            },
             annotations: None,
         };
         let tool_response = ToolResponse {
             id: "git-status".to_string(),
-            tool_result: Ok(vec![McpContent::Text(text_content)]),
+            tool_result: Ok(vec![Content::text(text_content.raw.text)]),
         };
 
         let request_result = tool_request_to_markdown(&tool_request, true);
@@ -722,12 +728,14 @@ warning: unused variable `x`
     Finished dev [unoptimized + debuginfo] target(s) in 2.45s"#;
 
         let text_content = TextContent {
-            text: build_output.to_string(),
+            raw: RawTextContent {
+                text: build_output.to_string(),
+            },
             annotations: None,
         };
         let tool_response = ToolResponse {
             id: "cargo-build".to_string(),
-            tool_result: Ok(vec![McpContent::Text(text_content)]),
+            tool_result: Ok(vec![Content::text(text_content.raw.text)]),
         };
 
         let response_result = tool_response_to_markdown(&tool_response, true);
@@ -765,12 +773,14 @@ warning: unused variable `x`
 }"#;
 
         let text_content = TextContent {
-            text: api_response.to_string(),
+            raw: RawTextContent {
+                text: api_response.to_string(),
+            },
             annotations: None,
         };
         let tool_response = ToolResponse {
             id: "curl-api".to_string(),
-            tool_result: Ok(vec![McpContent::Text(text_content)]),
+            tool_result: Ok(vec![Content::text(text_content.raw.text)]),
         };
 
         let response_result = tool_response_to_markdown(&tool_response, true);
@@ -797,12 +807,14 @@ warning: unused variable `x`
         };
 
         let text_content = TextContent {
-            text: "File created successfully".to_string(),
+            raw: RawTextContent {
+                text: "File created successfully".to_string(),
+            },
             annotations: None,
         };
         let tool_response = ToolResponse {
             id: "editor-write".to_string(),
-            tool_result: Ok(vec![McpContent::Text(text_content)]),
+            tool_result: Ok(vec![Content::text(text_content.raw.text)]),
         };
 
         let request_result = tool_request_to_markdown(&tool_request, true);
@@ -850,12 +862,14 @@ def process_data(data: List[Dict]) -> List[Dict]:
     return [item for item in data if item.get('active', False)]"#;
 
         let text_content = TextContent {
-            text: python_code.to_string(),
+            raw: RawTextContent {
+                text: python_code.to_string(),
+            },
             annotations: None,
         };
         let tool_response = ToolResponse {
             id: "editor-view".to_string(),
-            tool_result: Ok(vec![McpContent::Text(text_content)]),
+            tool_result: Ok(vec![Content::text(text_content.raw.text)]),
         };
 
         let response_result = tool_response_to_markdown(&tool_response, true);
@@ -883,12 +897,14 @@ def process_data(data: List[Dict]) -> List[Dict]:
 Command failed with exit code 2"#;
 
         let text_content = TextContent {
-            text: error_output.to_string(),
+            raw: RawTextContent {
+                text: error_output.to_string(),
+            },
             annotations: None,
         };
         let tool_response = ToolResponse {
             id: "shell-error".to_string(),
-            tool_result: Ok(vec![McpContent::Text(text_content)]),
+            tool_result: Ok(vec![Content::text(text_content.raw.text)]),
         };
 
         let response_result = tool_response_to_markdown(&tool_response, true);
@@ -919,12 +935,14 @@ Command failed with exit code 2"#;
 5^2 = 25"#;
 
         let text_content = TextContent {
-            text: script_output.to_string(),
+            raw: RawTextContent {
+                text: script_output.to_string(),
+            },
             annotations: None,
         };
         let tool_response = ToolResponse {
             id: "script-exec".to_string(),
-            tool_result: Ok(vec![McpContent::Text(text_content)]),
+            tool_result: Ok(vec![Content::text(text_content.raw.text)]),
         };
 
         let request_result = tool_request_to_markdown(&tool_request, true);
@@ -962,12 +980,14 @@ drwx------   3 user  staff    96 Dec  6 16:20 com.apple.launchd.abc
 /tmp"#;
 
         let text_content = TextContent {
-            text: multi_output.to_string(),
+            raw: RawTextContent {
+                text: multi_output.to_string(),
+            },
             annotations: None,
         };
         let tool_response = ToolResponse {
             id: "multi-cmd".to_string(),
-            tool_result: Ok(vec![McpContent::Text(text_content)]),
+            tool_result: Ok(vec![Content::text(text_content.raw.text)]),
         };
 
         let request_result = tool_request_to_markdown(&_tool_request, true);
@@ -1001,12 +1021,14 @@ src/database.rs:23:async fn query_users(pool: &Pool) -> Result<Vec<User>> {
 src/middleware.rs:12:async fn auth_middleware(req: Request, next: Next) -> Result<Response> {"#;
 
         let text_content = TextContent {
-            text: grep_output.to_string(),
+            raw: RawTextContent {
+                text: grep_output.to_string(),
+            },
             annotations: None,
         };
         let tool_response = ToolResponse {
             id: "grep-search".to_string(),
-            tool_result: Ok(vec![McpContent::Text(text_content)]),
+            tool_result: Ok(vec![Content::text(text_content.raw.text)]),
         };
 
         let request_result = tool_request_to_markdown(&tool_request, true);
@@ -1037,12 +1059,14 @@ src/middleware.rs:12:async fn auth_middleware(req: Request, next: Next) -> Resul
 
         let json_output = r#"{"status": "success", "data": {"count": 42}}"#;
         let text_content = TextContent {
-            text: json_output.to_string(),
+            raw: RawTextContent {
+                text: json_output.to_string(),
+            },
             annotations: None,
         };
         let tool_response = ToolResponse {
             id: "json-test".to_string(),
-            tool_result: Ok(vec![McpContent::Text(text_content)]),
+            tool_result: Ok(vec![Content::text(text_content.raw.text)]),
         };
 
         let response_result = tool_response_to_markdown(&tool_response, true);
@@ -1074,12 +1098,14 @@ src/middleware.rs:12:async fn auth_middleware(req: Request, next: Next) -> Resul
 found 0 vulnerabilities"#;
 
         let text_content = TextContent {
-            text: npm_output.to_string(),
+            raw: RawTextContent {
+                text: npm_output.to_string(),
+            },
             annotations: None,
         };
         let tool_response = ToolResponse {
             id: "npm-install".to_string(),
-            tool_result: Ok(vec![McpContent::Text(text_content)]),
+            tool_result: Ok(vec![Content::text(text_content.raw.text)]),
         };
 
         let request_result = tool_request_to_markdown(&tool_request, true);

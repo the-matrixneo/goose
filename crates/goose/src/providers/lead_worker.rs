@@ -457,7 +457,7 @@ mod tests {
     use crate::message::MessageContent;
     use crate::providers::base::{ProviderMetadata, ProviderUsage, Usage};
     use chrono::Utc;
-    use rmcp::model::Role;
+    use rmcp::model::{Role, RawTextContent, AnnotateAble};
 
     #[derive(Clone)]
     struct MockProvider {
@@ -485,10 +485,9 @@ mod tests {
                 Message::new(
                     Role::Assistant,
                     Utc::now().timestamp(),
-                    vec![MessageContent::Text(TextContent {
+                    vec![MessageContent::Text(RawTextContent {
                         text: format!("Response from {}", self.name),
-                        annotations: None,
-                    })],
+                    }.no_annotation())],
                 ),
                 ProviderUsage::new(self.name.clone(), Usage::default()),
             ))
@@ -648,10 +647,9 @@ mod tests {
                     Message::new(
                         Role::Assistant,
                         Utc::now().timestamp(),
-                        vec![MessageContent::Text(TextContent {
+                        vec![MessageContent::Text(RawTextContent {
                             text: format!("Response from {}", self.name),
-                            annotations: None,
-                        })],
+                        }.no_annotation())],
                     ),
                     ProviderUsage::new(self.name.clone(), Usage::default()),
                 ))

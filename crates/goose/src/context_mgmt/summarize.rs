@@ -3,7 +3,7 @@ use crate::message::{Message, MessageContent};
 use crate::providers::base::Provider;
 use crate::token_counter::{AsyncTokenCounter, TokenCounter};
 use anyhow::Result;
-use rmcp::model::Role;
+use rmcp::model::{Role, RawTextContent, AnnotateAble};
 use std::sync::Arc;
 
 // Constants for the summarization prompt and a follow-up user message.
@@ -222,7 +222,7 @@ mod tests {
     use chrono::Utc;
     use mcp_core::tool::Tool;
     use mcp_core::ToolCall;
-    use rmcp::model::{Content, TextContent};
+    use rmcp::model::{Content, TextContent, RawTextContent, AnnotateAble};
     use rmcp::model::Role;
     use serde_json::json;
     use std::sync::Arc;
@@ -252,10 +252,9 @@ mod tests {
                 Message::new(
                     Role::Assistant,
                     Utc::now().timestamp(),
-                    vec![MessageContent::Text(TextContent {
+                    vec![MessageContent::Text(RawTextContent {
                         text: "Summarized content".to_string(),
-                        annotations: None,
-                    })],
+                    }.no_annotation())],
                 ),
                 ProviderUsage::new("mock".to_string(), Usage::default()),
             ))
@@ -449,10 +448,9 @@ mod tests {
         let summarized_messages = vec![Message::new(
             Role::Assistant,
             Utc::now().timestamp(),
-            vec![MessageContent::Text(TextContent {
+            vec![MessageContent::Text(RawTextContent {
                 text: "Summary".to_string(),
-                annotations: None,
-            })],
+            }.no_annotation())],
         )];
         let arguments = json!({
             "param1": "value1"

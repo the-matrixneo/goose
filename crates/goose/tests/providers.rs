@@ -1,5 +1,6 @@
 use anyhow::Result;
 use dotenv::dotenv;
+use rmcp::model::{Content, ImageContent, RawImageContent, AnnotateAble};
 use goose::message::{Message, MessageContent};
 use goose::providers::base::Provider;
 use goose::providers::errors::ProviderError;
@@ -271,11 +272,10 @@ impl ProviderTester {
         };
 
         let base64_image = BASE64.encode(image_data);
-        let image_content = ImageContent {
+        let image_content = RawImageContent {
             data: base64_image,
             mime_type: "image/png".to_string(),
-            annotations: None,
-        };
+        }.no_annotation();
 
         // Test 1: Direct image message
         let message_with_image =
@@ -323,7 +323,7 @@ impl ProviderTester {
             )),
         );
         let tool_response =
-            Message::user().with_tool_response("test_id", Ok(vec![Content::Image(image_content)]));
+            Message::user().with_tool_response("test_id", Ok(vec![Content::image(image_content.data.clone(), image_content.mime_type.clone())]));
 
         let result2 = self
             .provider
