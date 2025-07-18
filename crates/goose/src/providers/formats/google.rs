@@ -9,6 +9,7 @@ use rand::{distributions::Alphanumeric, Rng};
 use rmcp::model::Content;
 use rmcp::model::{AnnotateAble, RawContent, Role};
 use serde_json::{json, Map, Value};
+use std::ops::Deref;
 
 /// Convert internal Message format to Google's API message specification
 pub fn format_messages(messages: &[Message]) -> Vec<Value> {
@@ -87,7 +88,16 @@ pub fn format_messages(messages: &[Message]) -> Vec<Value> {
                                 }
                                 let mut text = tool_content
                                     .iter()
-                                    .filter_map(|c| c.as_text().map(|t| t.text.clone()))
+                                    .filter_map(|c| match c.deref() {
+                                        RawContent::Text(t) => Some(t.text.clone()),
+                                        RawContent::Resource(raw_embedded_resource) => Some(
+                                            raw_embedded_resource
+                                                .clone()
+                                                .no_annotation()
+                                                .get_text(),
+                                        ),
+                                        _ => None,
+                                    })
                                     .collect::<Vec<_>>()
                                     .join("\n");
 
