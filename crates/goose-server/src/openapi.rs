@@ -75,8 +75,7 @@ fn convert_schema_object_inner(schema: &SchemaObject) -> RefOr<Schema> {
     // Handle subschemas (oneOf, allOf, anyOf)
     if let Some(subschemas) = &schema.subschemas {
         if let Some(one_of) = &subschemas.one_of {
-            let schemas: Vec<RefOr<Schema>> =
-                one_of.iter().map(|s| convert_schema_object(s)).collect();
+            let schemas: Vec<RefOr<Schema>> = one_of.iter().map(convert_schema_object).collect();
             let mut builder = OneOfBuilder::new();
             for schema in schemas {
                 builder = builder.item(schema);
@@ -84,8 +83,7 @@ fn convert_schema_object_inner(schema: &SchemaObject) -> RefOr<Schema> {
             return RefOr::T(Schema::OneOf(builder.build()));
         }
         if let Some(all_of) = &subschemas.all_of {
-            let schemas: Vec<RefOr<Schema>> =
-                all_of.iter().map(|s| convert_schema_object(s)).collect();
+            let schemas: Vec<RefOr<Schema>> = all_of.iter().map(convert_schema_object).collect();
             let mut all_of = AllOfBuilder::new();
             for schema in schemas {
                 all_of = all_of.item(schema);
@@ -93,8 +91,7 @@ fn convert_schema_object_inner(schema: &SchemaObject) -> RefOr<Schema> {
             return RefOr::T(Schema::AllOf(all_of.build()));
         }
         if let Some(any_of) = &subschemas.any_of {
-            let schemas: Vec<RefOr<Schema>> =
-                any_of.iter().map(|s| convert_schema_object(s)).collect();
+            let schemas: Vec<RefOr<Schema>> = any_of.iter().map(convert_schema_object).collect();
             let mut any_of = AnyOfBuilder::new();
             for schema in schemas {
                 any_of = any_of.item(schema);
@@ -184,10 +181,8 @@ fn convert_single_instance_type(
                         }
                         rmcp::schemars::schema::SingleOrVec::Vec(item_schemas) => {
                             // Multiple item types - use AnyOf
-                            let schemas: Vec<RefOr<Schema>> = item_schemas
-                                .iter()
-                                .map(|s| convert_schema_object(s))
-                                .collect();
+                            let schemas: Vec<RefOr<Schema>> =
+                                item_schemas.iter().map(convert_schema_object).collect();
                             let mut any_of = AnyOfBuilder::new();
                             for schema in schemas {
                                 any_of = any_of.item(schema);

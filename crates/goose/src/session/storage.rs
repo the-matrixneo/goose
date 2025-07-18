@@ -9,13 +9,13 @@ use crate::message::Message;
 use crate::providers::base::Provider;
 use crate::utils::safe_truncate;
 use anyhow::Result;
-use std::ops::DerefMut;
 use chrono::Local;
 use etcetera::{choose_app_strategy, AppStrategy, AppStrategyArgs};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::{self, BufRead, Write};
+use std::ops::DerefMut;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use utoipa::ToSchema;
@@ -717,7 +717,7 @@ fn truncate_message_content_in_place(message: &mut Message, max_content_size: us
                                     if text.chars().count() > max_content_size {
                                         let truncated = format!(
                                             "{}\n\n[... resource content truncated during session loading from {} to {} characters ...]",
-                                            safe_truncate(&text, max_content_size),
+                                            safe_truncate(text, max_content_size),
                                             text.chars().count(),
                                             max_content_size
                                         );

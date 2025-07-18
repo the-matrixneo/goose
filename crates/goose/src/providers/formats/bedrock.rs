@@ -161,7 +161,7 @@ pub fn to_bedrock_image(data: &String, mime_type: &String) -> Result<bedrock::Im
     // Create image source with base64 data
     let source = bedrock::ImageSource::Bytes(aws_smithy_types::Blob::new(
         base64::prelude::BASE64_STANDARD
-            .decode(&data)
+            .decode(data)
             .map_err(|e| anyhow!("Failed to decode base64 image data: {}", e))?,
     ));
 
@@ -352,7 +352,7 @@ pub fn from_bedrock_json(document: &Document) -> Result<Value> {
 mod tests {
     use super::*;
     use anyhow::Result;
-    use rmcp::model::{RawImageContent, AnnotateAble};
+    use rmcp::model::{AnnotateAble, RawImageContent};
 
     // Base64 encoded 1x1 PNG image for testing
     const TEST_IMAGE_BASE64: &str = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==";
@@ -371,7 +371,8 @@ mod tests {
             let image = RawImageContent {
                 data: TEST_IMAGE_BASE64.to_string(),
                 mime_type: mime_type.to_string(),
-            }.no_annotation();
+            }
+            .no_annotation();
 
             let result = to_bedrock_image(&image.data, &image.mime_type);
             assert!(result.is_ok(), "Failed to convert {} format", mime_type);
@@ -385,7 +386,8 @@ mod tests {
         let image = RawImageContent {
             data: TEST_IMAGE_BASE64.to_string(),
             mime_type: "image/bmp".to_string(),
-        }.no_annotation();
+        }
+        .no_annotation();
 
         let result = to_bedrock_image(&image.data, &image.mime_type);
         assert!(result.is_err());
@@ -399,7 +401,8 @@ mod tests {
         let image = RawImageContent {
             data: "invalid_base64_data!!!".to_string(),
             mime_type: "image/png".to_string(),
-        }.no_annotation();
+        }
+        .no_annotation();
 
         let result = to_bedrock_image(&image.data, &image.mime_type);
         assert!(result.is_err());
@@ -412,7 +415,8 @@ mod tests {
         let image = RawImageContent {
             data: TEST_IMAGE_BASE64.to_string(),
             mime_type: "image/png".to_string(),
-        }.no_annotation();
+        }
+        .no_annotation();
 
         let message_content = MessageContent::Image(image);
         let result = to_bedrock_message_content(&message_content)?;
