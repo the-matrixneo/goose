@@ -14,32 +14,34 @@ use goose::session::SessionMetadata;
 use mcp_core::handler::ToolResultSchema;
 use mcp_core::resource::ResourceContents;
 use mcp_core::tool::{Tool, ToolAnnotations};
-use rmcp::model::{Annotations, Content, EmbeddedResource, ImageContent, TextContent};
+use rmcp::model::{Annotations, Content, EmbeddedResource, ImageContent, Role, TextContent};
 use utoipa::{OpenApi, ToSchema};
 
 use rmcp::schemars::schema::{InstanceType, SchemaObject, SingleOrVec};
-use rmcp::schemars::JsonSchema;
 use utoipa::openapi::schema::{
     AdditionalProperties, AnyOfBuilder, ArrayBuilder, ObjectBuilder, OneOfBuilder, Schema,
     SchemaFormat, SchemaType,
 };
 use utoipa::openapi::{AllOfBuilder, Ref, RefOr};
 
-pub struct SchemarsToUtoipa<T>(pub T);
+macro_rules! derive_utoipa {
+    ($inner_type:ident) => {
+        paste::paste! {
+            struct [<Schema $inner_type>] {}
 
-impl<'__s, T> ToSchema<'__s> for SchemarsToUtoipa<T>
-where
-    T: JsonSchema + 'static,
-{
-    fn schema() -> (&'__s str, utoipa::openapi::RefOr<utoipa::openapi::Schema>) {
-        let schema = rmcp::schemars::schema_for!(T);
-        let schema = convert_schemars_to_utoipa(schema);
-        ("TODO", schema)
-    }
+            impl<'__s> ToSchema<'__s> for [<Schema $inner_type>] {
+                fn schema() -> (&'__s str, utoipa::openapi::RefOr<utoipa::openapi::Schema>) {
+                    let schema = rmcp::schemars::schema_for!($inner_type);
+                    let schema = convert_schemars_to_utoipa(schema);
+                    (stringify!($inner_type), schema)
+                }
 
-    fn aliases() -> Vec<(&'__s str, utoipa::openapi::schema::Schema)> {
-        Vec::new()
-    }
+                fn aliases() -> Vec<(&'__s str, utoipa::openapi::schema::Schema)> {
+                    Vec::new()
+                }
+            }
+        }
+    };
 }
 
 fn convert_schemars_to_utoipa(schema: rmcp::schemars::schema::RootSchema) -> RefOr<Schema> {
@@ -283,39 +285,12 @@ fn convert_single_instance_type(
     }
 }
 
-/// A wrapper around rmcp::model::Role that implements ToSchema for utoipa
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub enum Role {
-    /// A human user or client making a request
-    User,
-    /// An AI assistant or server providing a response
-    Assistant,
-}
-
-impl From<rmcp::model::Role> for Role {
-    fn from(role: rmcp::model::Role) -> Self {
-        match role {
-            rmcp::model::Role::User => Role::User,
-            rmcp::model::Role::Assistant => Role::Assistant,
-        }
-    }
-}
-
-impl From<Role> for rmcp::model::Role {
-    fn from(role: Role) -> Self {
-        match role {
-            Role::User => rmcp::model::Role::User,
-            Role::Assistant => rmcp::model::Role::Assistant,
-        }
-    }
-}
-
-type SchemaContent = SchemarsToUtoipa<Content>;
-type SchemaEmbeddedResource = SchemarsToUtoipa<EmbeddedResource>;
-type SchemaImageContent = SchemarsToUtoipa<ImageContent>;
-type SchemaTextContent = SchemarsToUtoipa<TextContent>;
-type SchemaAnnotations = SchemarsToUtoipa<Annotations>;
+derive_utoipa!(Role);
+derive_utoipa!(Content);
+derive_utoipa!(EmbeddedResource);
+derive_utoipa!(ImageContent);
+derive_utoipa!(TextContent);
+derive_utoipa!(Annotations);
 
 #[allow(dead_code)] // Used by utoipa for OpenAPI generation
 #[derive(OpenApi)]
@@ -382,7 +357,7 @@ type SchemaAnnotations = SchemarsToUtoipa<Annotations>;
         ResourceContents,
         ContextLengthExceeded,
         SummarizationRequested,
-        Role,
+        SchemaRole,
         ProviderMetadata,
         ExtensionEntry,
         ExtensionConfig,

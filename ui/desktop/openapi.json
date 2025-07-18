@@ -931,21 +931,38 @@
         "type": "object",
         "properties": {
           "audience": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Role"
-            },
-            "nullable": true
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/definitions/Role"
+                }
+              },
+              {
+                "type": "string"
+              }
+            ]
           },
           "priority": {
-            "type": "number",
-            "format": "float",
-            "nullable": true
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ]
           },
           "timestamp": {
-            "type": "string",
-            "format": "date-time",
-            "example": "2023-01-01T00:00:00Z"
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "string"
+              }
+            ]
           }
         }
       },
@@ -1002,72 +1019,84 @@
       "Content": {
         "oneOf": [
           {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/TextContent"
+            "type": "object",
+            "required": [
+              "text",
+              "type"
+            ],
+            "properties": {
+              "text": {
+                "type": "string"
               },
-              {
-                "type": "object",
-                "required": [
-                  "type"
-                ],
-                "properties": {
-                  "type": {
-                    "type": "string",
-                    "enum": [
-                      "text"
-                    ]
-                  }
-                }
+              "type": {
+                "type": "string"
               }
-            ]
+            }
           },
           {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/ImageContent"
+            "type": "object",
+            "required": [
+              "data",
+              "mimeType",
+              "type"
+            ],
+            "properties": {
+              "data": {
+                "type": "string"
               },
-              {
-                "type": "object",
-                "required": [
-                  "type"
-                ],
-                "properties": {
-                  "type": {
-                    "type": "string",
-                    "enum": [
-                      "image"
-                    ]
-                  }
-                }
+              "mimeType": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
               }
-            ]
+            }
           },
           {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/EmbeddedResource"
+            "type": "object",
+            "required": [
+              "resource",
+              "type"
+            ],
+            "properties": {
+              "resource": {
+                "$ref": "#/definitions/ResourceContents"
               },
-              {
-                "type": "object",
-                "required": [
-                  "type"
-                ],
-                "properties": {
-                  "type": {
-                    "type": "string",
-                    "enum": [
-                      "resource"
-                    ]
-                  }
-                }
+              "type": {
+                "type": "string"
               }
-            ]
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "data",
+              "mimeType",
+              "type"
+            ],
+            "properties": {
+              "annotations": {
+                "anyOf": [
+                  {
+                    "$ref": "#/definitions/Annotations"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ]
+              },
+              "data": {
+                "type": "string"
+              },
+              "mimeType": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              }
+            }
           }
-        ],
-        "discriminator": {
-          "propertyName": "type"
-        }
+        ]
       },
       "ContextLengthExceeded": {
         "type": "object",
@@ -1156,15 +1185,17 @@
         ],
         "properties": {
           "annotations": {
-            "allOf": [
+            "anyOf": [
               {
-                "$ref": "#/components/schemas/Annotations"
+                "$ref": "#/definitions/Annotations"
+              },
+              {
+                "type": "string"
               }
-            ],
-            "nullable": true
+            ]
           },
           "resource": {
-            "$ref": "#/components/schemas/ResourceContents"
+            "$ref": "#/definitions/ResourceContents"
           }
         }
       },
@@ -1487,12 +1518,14 @@
         ],
         "properties": {
           "annotations": {
-            "allOf": [
+            "anyOf": [
               {
-                "$ref": "#/components/schemas/Annotations"
+                "$ref": "#/definitions/Annotations"
+              },
+              {
+                "type": "string"
               }
-            ],
-            "nullable": true
+            ]
           },
           "data": {
             "type": "string"
@@ -1997,11 +2030,13 @@
         ]
       },
       "Role": {
-        "type": "string",
-        "description": "A wrapper around rmcp::model::Role that implements ToSchema for utoipa",
-        "enum": [
-          "user",
-          "assistant"
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "string"
+          }
         ]
       },
       "RunNowResponse": {
@@ -2281,12 +2316,14 @@
         ],
         "properties": {
           "annotations": {
-            "allOf": [
+            "anyOf": [
               {
-                "$ref": "#/components/schemas/Annotations"
+                "$ref": "#/definitions/Annotations"
+              },
+              {
+                "type": "string"
               }
-            ],
-            "nullable": true
+            ]
           },
           "text": {
             "type": "string"

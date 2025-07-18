@@ -5,5 +5,3 @@ pub mod state;
 // Re-export commonly used items
 pub use openapi::*;
 pub use state::*;
-
-mod openapi_conversion;
