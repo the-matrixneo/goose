@@ -967,17 +967,16 @@ function PenpotCanvas({
       </div>
 
       {/* Content */}
-      <div className="flex-1 p-4 overflow-auto">
+      <div className="flex-1 p-4 flex flex-col">
         {integrationMode === 'docker' && (
-          <div className="space-y-6">
-            <div className="text-center">
-              <h3 className="text-xl font-semibold text-textStandard mb-2">Penpot Docker Canvas</h3>
-              <p className="text-textSubtle mb-6">Run Penpot locally in Docker with full canvas access</p>
-            </div>
-
+          <div className="space-y-6 flex-1 flex flex-col">
             {/* Docker Control Panel */}
-            <div className="bg-background-muted p-6 rounded-lg border border-borderSubtle">
-              <div className="flex items-center justify-between mb-4">
+            <div className={`bg-background-muted rounded-lg border border-borderSubtle flex-shrink-0 ${
+              dockerState.status === 'running' ? 'p-3' : 'p-6'
+            }`}>
+              <div className={`flex items-center justify-between ${
+                dockerState.status === 'running' ? 'mb-0' : 'mb-4'
+              }`}>
                 <div className="flex items-center space-x-3">
                   <div className={`w-3 h-3 rounded-full ${
                     dockerState.status === 'running' ? 'bg-green-500' :
@@ -985,9 +984,16 @@ function PenpotCanvas({
                     dockerState.status === 'error' ? 'bg-red-500' :
                     'bg-gray-500'
                   }`} />
-                  <h4 className="font-semibold text-textStandard">
-                    Penpot Container: {dockerState.status.charAt(0).toUpperCase() + dockerState.status.slice(1)}
+                  <h4 className={`font-semibold text-textStandard ${
+                    dockerState.status === 'running' ? 'text-sm' : ''
+                  }`}>
+                    {dockerState.status === 'running' ? 'Running' : `Penpot Container: ${dockerState.status.charAt(0).toUpperCase() + dockerState.status.slice(1)}`}
                   </h4>
+                  {dockerState.status === 'running' && (
+                    <span className="text-xs text-textSubtle">
+                      <a href={penpotUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{penpotUrl}</a>
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-center space-x-2">
                   {dockerState.status === 'running' && (
@@ -1021,7 +1027,7 @@ function PenpotCanvas({
                 </div>
               </div>
 
-              {dockerState.status === 'running' && (
+              {dockerState.status !== 'running' && (
                 <div className="text-sm text-textSubtle">
                   <p>🎉 Penpot is running at: <a href={penpotUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{penpotUrl}</a></p>
                   <p>Container ID: {dockerState.containerId}</p>
@@ -1029,7 +1035,7 @@ function PenpotCanvas({
                 </div>
               )}
 
-              {errorMessage && (
+              {errorMessage && dockerState.status !== 'running' && (
                 <div className="mt-4 p-3 bg-yellow-100 dark:bg-yellow-800/50 rounded text-sm whitespace-pre-wrap">
                   {errorMessage}
                 </div>
@@ -1038,8 +1044,8 @@ function PenpotCanvas({
 
             {/* Embedded Penpot Canvas */}
             {dockerState.status === 'running' && (
-              <div className="bg-background-muted rounded-lg border border-borderSubtle overflow-hidden">
-                <div className="flex items-center justify-between p-3 border-b border-borderSubtle bg-background-subtle">
+              <div className="bg-background-muted rounded-lg border border-borderSubtle overflow-hidden flex-1 flex flex-col">
+                <div className="flex items-center justify-between p-3 border-b border-borderSubtle bg-background-subtle flex-shrink-0">
                   <div className="flex items-center space-x-2">
                     <Palette size={16} className="text-primary" />
                     <span className="text-sm font-medium text-textStandard">Penpot Design Canvas</span>
@@ -1070,46 +1076,22 @@ function PenpotCanvas({
                     </Button>
                   </div>
                 </div>
-                <div className="relative" style={{ height: '600px' }}>
-                  {/* Canvas placeholder with options */}
-                  <div className="absolute inset-0 bg-background-default flex items-center justify-center">
-                    <div className="text-center max-w-md">
-                      <Palette size={64} className="text-primary mx-auto mb-6" />
-                      <h3 className="text-lg font-semibold text-textStandard mb-3">Penpot Canvas Ready</h3>
-                      <p className="text-textSubtle text-sm mb-6">
-                        Your local Penpot instance is running at{' '}
-                        <a href={penpotUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                          {penpotUrl}
-                        </a>
-                      </p>
-                      
-                      <div className="space-y-3">
-                        <Button
-                          onClick={openPenpotInRenderer}
-                          className="w-full"
-                          size="lg"
-                        >
-                          <ExternalLink size={16} className="mr-2" />
-                          Open in Dedicated Window
-                        </Button>
-                        
-                        <Button
-                          variant="outline"
-                          onClick={() => window.open(penpotUrl, '_blank')}
-                          className="w-full"
-                        >
-                          <ExternalLink size={16} className="mr-2" />
-                          Open in Browser
-                        </Button>
-                      </div>
-                      
-                      <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-left">
-                        <h4 className="font-semibold text-blue-900 dark:text-blue-100 text-sm mb-2">💡 Why no embedded canvas?</h4>
-                        <p className="text-blue-800 dark:text-blue-200 text-xs">
-                          Due to Content Security Policy restrictions, we can't embed Penpot directly in this window. 
-                          However, the dedicated renderer window provides the same integrated experience with full Penpot functionality.
-                        </p>
-                      </div>
+                <div className="relative flex-1">
+                  {/* Embedded Penpot iframe */}
+                  <iframe
+                    ref={iframeRef}
+                    src={penpotUrl}
+                    className="w-full h-full border-0"
+                    title="Penpot Design Canvas"
+                    allow="camera; microphone; fullscreen; display-capture"
+                    sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation allow-top-navigation-by-user-activation"
+                  />
+                  
+                  {/* Loading overlay */}
+                  <div className="absolute inset-0 bg-background-default flex items-center justify-center pointer-events-none opacity-0 transition-opacity duration-300" id="penpot-loading">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                      <p className="text-textSubtle text-sm">Loading Penpot canvas...</p>
                     </div>
                   </div>
                 </div>
@@ -1138,18 +1120,7 @@ function PenpotCanvas({
               </div>
             )}
 
-            {/* Canvas Benefits */}
-            <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg border border-green-200 dark:border-green-800">
-              <h4 className="font-semibold text-green-900 dark:text-green-100 mb-2">✨ Canvas Benefits</h4>
-              <ul className="text-green-800 dark:text-green-200 text-sm space-y-1 ml-4">
-                <li>• Full Penpot design tools and canvas access</li>
-                <li>• No external dependencies or API limitations</li>
-                <li>• Local storage - your designs stay on your machine</li>
-                <li>• Seamless integration with Goose workflows</li>
-                <li>• Real-time design collaboration capabilities</li>
-                <li>• Export designs directly to your projects</li>
-              </ul>
-            </div>
+
           </div>
         )}
 
