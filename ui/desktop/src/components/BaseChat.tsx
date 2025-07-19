@@ -79,6 +79,7 @@ export interface ChatType {
   messageHistoryIndex: number;
   messages: Message[];
   recipeConfig?: Recipe | null; // Add recipe configuration to chat state
+  recipeParameters?: Record<string, string> | null; // Add recipe parameters to chat state
 }
 
 interface BaseChatProps {
@@ -201,16 +202,25 @@ function BaseChatContent({
   // Reset recipe usage tracking when recipe changes
   useEffect(() => {
     if (recipeConfig?.title !== currentRecipeTitle) {
+      const previousTitle = currentRecipeTitle;
       setCurrentRecipeTitle(recipeConfig?.title || null);
-      setHasStartedUsingRecipe(false);
 
-      // Clear existing messages when a new recipe is loaded
-      if (recipeConfig?.title && recipeConfig.title !== currentRecipeTitle) {
+      // Only reset usage if we're switching between different recipes
+      // Don't reset if we're going from no recipe to a recipe (initial load)
+      // or if we already have messages (ongoing conversation)
+      if (previousTitle && recipeConfig?.title && previousTitle !== recipeConfig.title) {
+        console.log('Switching from recipe:', previousTitle, 'to:', recipeConfig.title);
+        setHasStartedUsingRecipe(false);
         setMessages([]);
         setAncestorMessages([]);
+      } else if (!previousTitle && recipeConfig?.title && messages.length === 0) {
+        setHasStartedUsingRecipe(false);
+        // Only clear messages if we don't have any yet
+      } else if (recipeConfig?.title && messages.length > 0) {
+        setHasStartedUsingRecipe(true); // Mark as started since we have messages
       }
     }
-  }, [recipeConfig?.title, currentRecipeTitle, setMessages, setAncestorMessages]);
+  }, [recipeConfig?.title, currentRecipeTitle, messages.length, setMessages, setAncestorMessages]);
 
   // Handle recipe auto-execution
   useEffect(() => {

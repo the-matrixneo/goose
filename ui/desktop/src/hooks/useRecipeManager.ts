@@ -13,11 +13,10 @@ interface LocationState {
 export const useRecipeManager = (messages: Message[], locationState?: LocationState) => {
   const [isGeneratingRecipe, setIsGeneratingRecipe] = useState(false);
   const [isParameterModalOpen, setIsParameterModalOpen] = useState(false);
-  const [recipeParameters, setRecipeParameters] = useState<Record<string, string> | null>(null);
   const [readyForAutoUserPrompt, setReadyForAutoUserPrompt] = useState(false);
   const [recipeError, setRecipeError] = useState<string | null>(null);
 
-  // Get chat context to access persisted recipe
+  // Get chat context to access persisted recipe and parameters
   const chatContext = useChatContext();
 
   // Use a ref to capture the current messages for the event handler
@@ -52,6 +51,11 @@ export const useRecipeManager = (messages: Message[], locationState?: LocationSt
     }
     return null;
   }, [chatContext, locationState]);
+
+  // Get recipe parameters from chat context
+  const recipeParameters = useMemo(() => {
+    return chatContext?.chat.recipeParameters || null;
+  }, [chatContext?.chat.recipeParameters]);
 
   // Effect to persist recipe config to chat context when it changes
   useEffect(() => {
@@ -101,6 +105,11 @@ export const useRecipeManager = (messages: Message[], locationState?: LocationSt
 
   // Pre-fill input with recipe prompt instead of auto-sending it
   const initialPrompt = useMemo(() => {
+    // Don't show initial prompt if we already have messages (ongoing conversation)
+    if (messages.length > 0) {
+      return '';
+    }
+
     if (!recipeConfig?.prompt) return '';
 
     const hasRequiredParams = recipeConfig.parameters && recipeConfig.parameters.length > 0;
@@ -117,11 +126,14 @@ export const useRecipeManager = (messages: Message[], locationState?: LocationSt
 
     // Otherwise, we are waiting for parameters, so the input should be empty.
     return '';
-  }, [recipeConfig, recipeParameters]);
+  }, [recipeConfig, recipeParameters, messages.length]);
 
   // Handle parameter submission
   const handleParameterSubmit = async (inputValues: Record<string, string>) => {
-    setRecipeParameters(inputValues);
+    // Store parameters in chat context instead of local state
+    if (chatContext?.setRecipeParameters) {
+      chatContext.setRecipeParameters(inputValues);
+    }
     setIsParameterModalOpen(false);
 
     // Update the system prompt with parameter-substituted instructions
