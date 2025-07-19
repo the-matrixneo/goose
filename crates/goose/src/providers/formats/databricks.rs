@@ -1,14 +1,15 @@
 use crate::message::{Message, MessageContent};
 use crate::model::ModelConfig;
-use crate::providers::base::Usage;
-use crate::providers::errors::ProviderError;
 use crate::providers::utils::{
     convert_image, detect_image_path, is_valid_function_name, load_image_file,
     sanitize_function_name, ImageFormat,
 };
 use anyhow::{anyhow, Error};
 use mcp_core::ToolError;
-use mcp_core::{Content, Role, Tool, ToolCall};
+use mcp_core::{Tool, ToolCall};
+use rmcp::model::Role;
+use rmcp::model::{AnnotateAble, Content, RawContent, ResourceContents};
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 /// Convert internal Message format to Databricks' API message specification
@@ -127,7 +128,7 @@ pub fn format_messages(messages: &[Message], image_format: &ImageFormat) -> Vec<
                                         .audience()
                                         .is_none_or(|audience| audience.contains(&Role::Assistant))
                                 })
-                                .map(|content| content.unannotated())
+                                .map(|content| content.raw.clone())
                                 .collect();
 
                             // Process all content, replacing images with placeholder text
@@ -136,30 +137,33 @@ pub fn format_messages(messages: &[Message], image_format: &ImageFormat) -> Vec<
 
                             for content in abridged {
                                 match content {
-                                    Content::Image(image) => {
+                                    RawContent::Image(image) => {
                                         // Add placeholder text in the tool response
                                         tool_content.push(Content::text("This tool result included an image that is uploaded in the next message."));
 
                                         // Create a separate image message
                                         image_messages.push(json!({
                                             "role": "user",
-                                            "content": [convert_image(&image, image_format)]
+                                            "content": [convert_image(&image.no_annotation(), image_format)]
                                         }));
                                     }
-                                    Content::Resource(resource) => {
-                                        tool_content.push(Content::text(resource.get_text()));
+                                    RawContent::Resource(resource) => {
+                                        let text = match &resource.resource {
+                                            ResourceContents::TextResourceContents {
+                                                text, ..
+                                            } => text.clone(),
+                                            _ => String::new(),
+                                        };
+                                        tool_content.push(Content::text(text));
                                     }
                                     _ => {
-                                        tool_content.push(content);
+                                        tool_content.push(content.no_annotation());
                                     }
                                 }
                             }
                             let tool_response_content: Value = json!(tool_content
                                 .iter()
-                                .map(|content| match content {
-                                    Content::Text(text) => text.text.clone(),
-                                    _ => String::new(),
-                                })
+                                .filter_map(|content| content.as_text().map(|t| t.text.clone()))
                                 .collect::<Vec<String>>()
                                 .join(" "));
 
@@ -358,38 +362,48 @@ pub fn response_to_message(response: Value) -> anyhow::Result<Message> {
         }
     }
 
-    Ok(Message {
-        role: Role::Assistant,
-        created: chrono::Utc::now().timestamp(),
+    Ok(Message::new(
+        Role::Assistant,
+        chrono::Utc::now().timestamp(),
         content,
-    })
+    ))
 }
 
-pub fn get_usage(data: &Value) -> Result<Usage, ProviderError> {
-    let usage = data
-        .get("usage")
-        .ok_or_else(|| ProviderError::UsageError("No usage data in response".to_string()))?;
+#[derive(Serialize, Deserialize, Debug)]
+struct DeltaToolCallFunction {
+    name: Option<String>,
+    arguments: String, // chunk of encoded JSON,
+}
 
-    let input_tokens = usage
-        .get("prompt_tokens")
-        .and_then(|v| v.as_i64())
-        .map(|v| v as i32);
+#[derive(Serialize, Deserialize, Debug)]
+struct DeltaToolCall {
+    id: Option<String>,
+    function: DeltaToolCallFunction,
+    index: Option<i32>,
+    r#type: Option<String>,
+}
 
-    let output_tokens = usage
-        .get("completion_tokens")
-        .and_then(|v| v.as_i64())
-        .map(|v| v as i32);
+#[derive(Serialize, Deserialize, Debug)]
+struct Delta {
+    content: Option<String>,
+    role: Option<String>,
+    tool_calls: Option<Vec<DeltaToolCall>>,
+}
 
-    let total_tokens = usage
-        .get("total_tokens")
-        .and_then(|v| v.as_i64())
-        .map(|v| v as i32)
-        .or_else(|| match (input_tokens, output_tokens) {
-            (Some(input), Some(output)) => Some(input + output),
-            _ => None,
-        });
+#[derive(Serialize, Deserialize, Debug)]
+struct StreamingChoice {
+    delta: Delta,
+    index: Option<i32>,
+    finish_reason: Option<String>,
+}
 
-    Ok(Usage::new(input_tokens, output_tokens, total_tokens))
+#[derive(Serialize, Deserialize, Debug)]
+struct StreamingChunk {
+    choices: Vec<StreamingChoice>,
+    created: Option<i64>,
+    id: Option<String>,
+    usage: Option<Value>,
+    model: String,
 }
 
 /// Validates and fixes tool schemas to ensure they have proper parameter structure.
@@ -575,7 +589,6 @@ pub fn create_request(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use mcp_core::content::Content;
     use serde_json::json;
 
     #[test]

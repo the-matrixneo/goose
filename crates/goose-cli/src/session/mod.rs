@@ -4,17 +4,25 @@ mod export;
 mod input;
 mod output;
 mod prompt;
+mod task_execution_display;
 mod thinking;
+
+use crate::session::task_execution_display::{
+    format_task_execution_notification, TASK_EXECUTION_NOTIFICATION_TYPE,
+};
+use std::io::Write;
 
 pub use self::export::message_to_markdown;
 pub use builder::{build_session, SessionBuilderConfig, SessionSettings};
 use console::Color;
 use goose::agents::AgentEvent;
+use goose::message::push_message;
 use goose::permission::permission_confirmation::PrincipalType;
 use goose::permission::Permission;
 use goose::permission::PermissionConfirmation;
 use goose::providers::base::Provider;
 pub use goose::session::Identifier;
+use goose::utils::safe_truncate;
 
 use anyhow::{Context, Result};
 use completion::GooseCompleter;
@@ -27,11 +35,12 @@ use goose::providers::pricing::initialize_pricing_cache;
 use goose::session;
 use input::InputResult;
 use mcp_core::handler::ToolError;
-use mcp_core::prompt::PromptMessage;
 use mcp_core::protocol::JsonRpcMessage;
 use mcp_core::protocol::JsonRpcNotification;
+use rmcp::model::PromptMessage;
 
 use rand::{distributions::Alphanumeric, Rng};
+use rustyline::EditMode;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -54,6 +63,7 @@ pub struct Session {
     run_mode: RunMode,
     scheduled_job_id: Option<String>, // ID of the scheduled job that triggered this session
     max_turns: Option<u32>,
+    edit_mode: Option<EditMode>,
 }
 
 // Cache structure for completion data
@@ -116,6 +126,7 @@ impl Session {
         debug: bool,
         scheduled_job_id: Option<String>,
         max_turns: Option<u32>,
+        edit_mode: Option<EditMode>,
     ) -> Self {
         let messages = if let Some(session_file) = &session_file {
             match session::read_messages(session_file) {
@@ -139,6 +150,7 @@ impl Session {
             run_mode: RunMode::Normal,
             scheduled_job_id,
             max_turns,
+            edit_mode,
         }
     }
 
@@ -244,6 +256,40 @@ impl Session {
         Ok(())
     }
 
+    /// Add a streamable HTTP extension to the session
+    ///
+    /// # Arguments
+    /// * `extension_url` - URL of the server
+    pub async fn add_streamable_http_extension(&mut self, extension_url: String) -> Result<()> {
+        let name: String = rand::thread_rng()
+            .sample_iter(&Alphanumeric)
+            .take(8)
+            .map(char::from)
+            .collect();
+
+        let config = ExtensionConfig::StreamableHttp {
+            name,
+            uri: extension_url,
+            envs: Envs::new(HashMap::new()),
+            env_keys: Vec::new(),
+            headers: HashMap::new(),
+            description: Some(goose::config::DEFAULT_EXTENSION_DESCRIPTION.to_string()),
+            // TODO: should set timeout
+            timeout: Some(goose::config::DEFAULT_EXTENSION_TIMEOUT),
+            bundled: None,
+        };
+
+        self.agent
+            .add_extension(config)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to start extension: {}", e))?;
+
+        // Invalidate the completion cache when a new extension is added
+        self.invalidate_completion_cache().await;
+
+        Ok(())
+    }
+
     /// Add a builtin extension to the session
     ///
     /// # Arguments
@@ -313,22 +359,53 @@ impl Session {
 
     pub async fn get_prompt(&mut self, name: &str, arguments: Value) -> Result<Vec<PromptMessage>> {
         let result = self.agent.get_prompt(name, arguments).await?;
-        Ok(result.messages)
+        // Convert mcp_core::prompt::PromptMessage to rmcp::model::PromptMessage
+        let converted_messages = result
+            .messages
+            .into_iter()
+            .map(|msg| rmcp::model::PromptMessage {
+                role: match msg.role {
+                    mcp_core::prompt::PromptMessageRole::User => {
+                        rmcp::model::PromptMessageRole::User
+                    }
+                    mcp_core::prompt::PromptMessageRole::Assistant => {
+                        rmcp::model::PromptMessageRole::Assistant
+                    }
+                },
+                content: match msg.content {
+                    mcp_core::prompt::PromptMessageContent::Text { text } => {
+                        rmcp::model::PromptMessageContent::Text { text }
+                    }
+                    mcp_core::prompt::PromptMessageContent::Image { image } => {
+                        rmcp::model::PromptMessageContent::Image { image }
+                    }
+                    mcp_core::prompt::PromptMessageContent::Resource { resource } => {
+                        rmcp::model::PromptMessageContent::Resource { resource }
+                    }
+                },
+            })
+            .collect();
+        Ok(converted_messages)
     }
 
     /// Process a single message and get the response
     async fn process_message(&mut self, message: String) -> Result<()> {
-        self.messages.push(Message::user().with_text(&message));
+        self.push_message(Message::user().with_text(&message));
         // Get the provider from the agent for description generation
         let provider = self.agent.provider().await?;
 
         // Persist messages with provider for automatic description generation
         if let Some(session_file) = &self.session_file {
+            let working_dir = Some(
+                std::env::current_dir().expect("failed to get current session working directory"),
+            );
+
             session::persist_messages_with_schedule_id(
                 session_file,
                 &self.messages,
                 Some(provider),
                 self.scheduled_job_id.clone(),
+                working_dir,
             )
             .await?;
         }
@@ -365,9 +442,15 @@ impl Session {
         self.update_completion_cache().await?;
 
         // Create a new editor with our custom completer
-        let config = rustyline::Config::builder()
-            .completion_type(rustyline::CompletionType::Circular)
-            .build();
+        let builder =
+            rustyline::Config::builder().completion_type(rustyline::CompletionType::Circular);
+        let builder = if let Some(edit_mode) = self.edit_mode {
+            builder.edit_mode(edit_mode)
+        } else {
+            // Default to Emacs mode if no edit mode is set
+            builder.edit_mode(EditMode::Emacs)
+        };
+        let config = builder.build();
         let mut editor =
             rustyline::Editor::<GooseCompleter, rustyline::history::DefaultHistory>::with_config(
                 config,
@@ -418,7 +501,7 @@ impl Session {
                         RunMode::Normal => {
                             save_history(&mut editor);
 
-                            self.messages.push(Message::user().with_text(&content));
+                            self.push_message(Message::user().with_text(&content));
 
                             // Track the current directory and last instruction in projects.json
                             let session_id = self
@@ -440,11 +523,17 @@ impl Session {
 
                             // Persist messages with provider for automatic description generation
                             if let Some(session_file) = &self.session_file {
+                                let working_dir = Some(
+                                    std::env::current_dir()
+                                        .expect("failed to get current session working directory"),
+                                );
+
                                 session::persist_messages_with_schedule_id(
                                     session_file,
                                     &self.messages,
                                     Some(provider),
                                     self.scheduled_job_id.clone(),
+                                    working_dir,
                                 )
                                 .await?;
                             }
@@ -581,6 +670,10 @@ impl Session {
                         &Message::assistant().with_text("Chat context cleared."),
                         self.debug,
                     );
+                    if let Some(file) = self.session_file.as_ref().filter(|f| f.exists()) {
+                        std::fs::remove_file(file)?;
+                        std::fs::File::create(file)?;
+                    }
                     continue;
                 }
                 input::InputResult::PromptCommand(opts) => {
@@ -652,11 +745,13 @@ impl Session {
 
                         // Persist the summarized messages
                         if let Some(session_file) = &self.session_file {
+                            let working_dir = std::env::current_dir().ok();
                             session::persist_messages_with_schedule_id(
                                 session_file,
                                 &self.messages,
                                 Some(provider),
                                 self.scheduled_job_id.clone(),
+                                working_dir,
                             )
                             .await?;
                         }
@@ -741,7 +836,7 @@ impl Session {
                     self.messages.clear();
                     // add the plan response as a user message
                     let plan_message = Message::user().with_text(plan_response.as_concat_text());
-                    self.messages.push(plan_message);
+                    self.push_message(plan_message);
                     // act on the plan
                     output::show_thinking();
                     self.process_agent_response(true).await?;
@@ -756,13 +851,13 @@ impl Session {
                 } else {
                     // add the plan response (assistant message) & carry the conversation forward
                     // in the next round, the user might wanna slightly modify the plan
-                    self.messages.push(plan_response);
+                    self.push_message(plan_response);
                 }
             }
             PlannerResponseType::ClarifyingQuestions => {
                 // add the plan response (assistant message) & carry the conversation forward
                 // in the next round, the user will answer the clarifying questions
-                self.messages.push(plan_response);
+                self.push_message(plan_response);
             }
         }
 
@@ -834,13 +929,15 @@ impl Session {
                                         confirmation.id.clone(),
                                         Err(ToolError::ExecutionError("Tool call cancelled by user".to_string()))
                                     ));
-                                    self.messages.push(response_message);
+                                    push_message(&mut self.messages, response_message);
                                     if let Some(session_file) = &self.session_file {
+                                        let working_dir = std::env::current_dir().ok();
                                         session::persist_messages_with_schedule_id(
                                             session_file,
                                             &self.messages,
                                             None,
                                             self.scheduled_job_id.clone(),
+                                            working_dir,
                                         )
                                         .await?;
                                     }
@@ -931,15 +1028,17 @@ impl Session {
                             }
                             // otherwise we have a model/tool to render
                             else {
-                                self.messages.push(message.clone());
+                                push_message(&mut self.messages, message.clone());
 
                                 // No need to update description on assistant messages
                                 if let Some(session_file) = &self.session_file {
+                                    let working_dir = std::env::current_dir().ok();
                                     session::persist_messages_with_schedule_id(
                                         session_file,
                                         &self.messages,
                                         None,
                                         self.scheduled_job_id.clone(),
+                                        working_dir,
                                     )
                                     .await?;
                                 }
@@ -947,7 +1046,6 @@ impl Session {
                                 if interactive {output::hide_thinking()};
                                 let _ = progress_bars.hide();
                                 output::render_message(&message, self.debug);
-                                if interactive {output::show_thinking()};
                             }
                         }
                         Some(Ok(AgentEvent::McpNotification((_id, message)))) => {
@@ -959,7 +1057,7 @@ impl Session {
                                 match method.as_str() {
                                     "notifications/message" => {
                                         let data = o.get("data").unwrap_or(&Value::Null);
-                                        let (formatted_message, subagent_id, _notification_type) = match data {
+                                        let (formatted_message, subagent_id, message_notification_type) = match data {
                                             Value::String(s) => (s.clone(), None, None),
                                             Value::Object(o) => {
                                                 // Check for subagent notification structure first
@@ -993,11 +1091,7 @@ impl Session {
                                                             if min_priority > 0.1 && !self.debug {
                                                                 // High/Medium verbosity: show truncated response
                                                                 if let Some(response_content) = msg.strip_prefix("Responded: ") {
-                                                                    if response_content.len() > 100 {
-                                                                        format!("🤖 Responded: {}...", &response_content[..100])
-                                                                    } else {
-                                                                        format!("🤖 {}", msg)
-                                                                    }
+                                                                    format!("🤖 Responded: {}", safe_truncate(response_content, 100))
                                                                 } else {
                                                                     format!("🤖 {}", msg)
                                                                 }
@@ -1014,6 +1108,8 @@ impl Session {
                                                 } else if let Some(Value::String(output)) = o.get("output") {
                                                     // Fallback for other MCP notification types
                                                     (output.to_owned(), None, None)
+                                                } else if let Some(result) = format_task_execution_notification(data) {
+                                                    result
                                                 } else {
                                                     (data.to_string(), None, None)
                                                 }
@@ -1025,14 +1121,26 @@ impl Session {
 
                                         // Handle subagent notifications - show immediately
                                         if let Some(_id) = subagent_id {
-                                            // Show subagent notifications immediately (no buffering) with compact spacing
+                                            // TODO: proper display for subagent notifications
                                             if interactive {
                                                 let _ = progress_bars.hide();
                                                 println!("{}", console::style(&formatted_message).green().dim());
                                             } else {
                                                 progress_bars.log(&formatted_message);
                                             }
-                                        } else {
+                                        } else if let Some(ref notification_type) = message_notification_type {
+                                            if notification_type == TASK_EXECUTION_NOTIFICATION_TYPE {
+                                                if interactive {
+                                                    let _ = progress_bars.hide();
+                                                    print!("{}", formatted_message);
+                                                    std::io::stdout().flush().unwrap();
+                                                } else {
+                                                    print!("{}", formatted_message);
+                                                    std::io::stdout().flush().unwrap();
+                                                }
+                                            }
+                                        }
+                                        else {
                                             // Non-subagent notification, display immediately with compact spacing
                                             if interactive {
                                                 let _ = progress_bars.hide();
@@ -1095,6 +1203,7 @@ impl Session {
                 }
             }
         }
+        println!();
 
         Ok(())
     }
@@ -1104,7 +1213,7 @@ impl Session {
         let tool_requests = self
             .messages
             .last()
-            .filter(|msg| msg.role == mcp_core::role::Role::Assistant)
+            .filter(|msg| msg.role == rmcp::model::Role::Assistant)
             .map_or(Vec::new(), |msg| {
                 msg.content
                     .iter()
@@ -1138,15 +1247,17 @@ impl Session {
                     Err(ToolError::ExecutionError(notification.clone())),
                 ));
             }
-            self.messages.push(response_message);
+            self.push_message(response_message);
 
             // No need for description update here
             if let Some(session_file) = &self.session_file {
+                let working_dir = std::env::current_dir().ok();
                 session::persist_messages_with_schedule_id(
                     session_file,
                     &self.messages,
                     None,
                     self.scheduled_job_id.clone(),
+                    working_dir,
                 )
                 .await?;
             }
@@ -1155,15 +1266,17 @@ impl Session {
                 "The existing call to {} was interrupted. How would you like to proceed?",
                 last_tool_name
             );
-            self.messages.push(Message::assistant().with_text(&prompt));
+            self.push_message(Message::assistant().with_text(&prompt));
 
             // No need for description update here
             if let Some(session_file) = &self.session_file {
+                let working_dir = std::env::current_dir().ok();
                 session::persist_messages_with_schedule_id(
                     session_file,
                     &self.messages,
                     None,
                     self.scheduled_job_id.clone(),
+                    working_dir,
                 )
                 .await?;
             }
@@ -1172,20 +1285,22 @@ impl Session {
         } else {
             // An interruption occurred outside of a tool request-response.
             if let Some(last_msg) = self.messages.last() {
-                if last_msg.role == mcp_core::role::Role::User {
+                if last_msg.role == rmcp::model::Role::User {
                     match last_msg.content.first() {
                         Some(MessageContent::ToolResponse(_)) => {
                             // Interruption occurred after a tool had completed but not assistant reply
                             let prompt = "The tool calling loop was interrupted. How would you like to proceed?";
-                            self.messages.push(Message::assistant().with_text(prompt));
+                            self.push_message(Message::assistant().with_text(prompt));
 
                             // No need for description update here
                             if let Some(session_file) = &self.session_file {
+                                let working_dir = std::env::current_dir().ok();
                                 session::persist_messages_with_schedule_id(
                                     session_file,
                                     &self.messages,
                                     None,
                                     self.scheduled_job_id.clone(),
+                                    working_dir,
                                 )
                                 .await?;
                             }
@@ -1375,9 +1490,9 @@ impl Session {
                         let msg = Message::from(prompt_message);
                         // ensure we get a User - Assistant - User type pattern
                         let expected_role = if i % 2 == 0 {
-                            mcp_core::Role::User
+                            rmcp::model::Role::User
                         } else {
-                            mcp_core::Role::Assistant
+                            rmcp::model::Role::Assistant
                         };
 
                         if msg.role != expected_role {
@@ -1391,10 +1506,10 @@ impl Session {
                             break;
                         }
 
-                        if msg.role == mcp_core::Role::User {
+                        if msg.role == rmcp::model::Role::User {
                             output::render_message(&msg, self.debug);
                         }
-                        self.messages.push(msg);
+                        self.push_message(msg);
                     }
 
                     if valid {
@@ -1451,6 +1566,10 @@ impl Session {
         serde_yaml::to_writer(file, recipe).context("Failed to save recipe")?;
 
         Ok(path)
+    }
+
+    fn push_message(&mut self, message: Message) {
+        push_message(&mut self.messages, message);
     }
 }
 

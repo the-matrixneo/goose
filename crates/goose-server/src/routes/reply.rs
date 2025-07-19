@@ -11,14 +11,15 @@ use bytes::Bytes;
 use futures::{stream::StreamExt, Stream};
 use goose::{
     agents::{AgentEvent, SessionConfig},
-    message::{Message, MessageContent},
+    message::{push_message, Message, MessageContent},
     permission::permission_confirmation::PrincipalType,
 };
 use goose::{
     permission::{Permission, PermissionConfirmation},
     session,
 };
-use mcp_core::{protocol::JsonRpcMessage, role::Role, Content, ToolResult};
+use mcp_core::{protocol::JsonRpcMessage, role::Role, ToolResult};
+use rmcp::model::Content;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use serde_json::Value;
@@ -123,7 +124,7 @@ async fn handler(
     let stream = ReceiverStream::new(rx);
 
     let messages = request.messages;
-    let session_working_dir = request.session_working_dir;
+    let session_working_dir = request.session_working_dir.clone();
 
     let session_id = request
         .session_id
@@ -181,7 +182,7 @@ async fn handler(
                 &messages,
                 Some(SessionConfig {
                     id: session::Identifier::Name(session_id.clone()),
-                    working_dir: PathBuf::from(session_working_dir),
+                    working_dir: PathBuf::from(&session_working_dir),
                     schedule_id: request.scheduled_job_id.clone(),
                     execution_mode: None,
                     max_turns: None,
@@ -225,13 +226,14 @@ async fn handler(
                 return;
             }
         };
+        let saved_message_count = all_messages.len();
 
         loop {
             tokio::select! {
                 response = timeout(Duration::from_millis(500), stream.next()) => {
                     match response {
                         Ok(Some(Ok(AgentEvent::Message(message)))) => {
-                            all_messages.push(message.clone());
+                            push_message(&mut all_messages, message.clone());
                             if let Err(e) = stream_event(MessageEvent::Message { message }, &tx).await {
                                 tracing::error!("Error sending message through channel: {}", e);
                                 let _ = stream_event(
@@ -242,16 +244,6 @@ async fn handler(
                                 ).await;
                                 break;
                             }
-
-
-                            let session_path = session_path.clone();
-                            let messages = all_messages.clone();
-                            let provider = Arc::clone(provider.as_ref().unwrap());
-                            tokio::spawn(async move {
-                                if let Err(e) = session::persist_messages(&session_path, &messages, Some(provider)).await {
-                                    tracing::error!("Failed to store session history: {:?}", e);
-                                }
-                            });
                         }
                         Ok(Some(Ok(AgentEvent::ModelChange { model, mode }))) => {
                             if let Err(e) = stream_event(MessageEvent::ModelChange { model, mode }, &tx).await {
@@ -303,6 +295,22 @@ async fn handler(
             }
         }
 
+        if all_messages.len() > saved_message_count {
+            let provider = Arc::clone(provider.as_ref().unwrap());
+            tokio::spawn(async move {
+                if let Err(e) = session::persist_messages(
+                    &session_path,
+                    &all_messages,
+                    Some(provider),
+                    Some(PathBuf::from(&session_working_dir)),
+                )
+                .await
+                {
+                    tracing::error!("Failed to store session history: {:?}", e);
+                }
+            });
+        }
+
         let _ = stream_event(
             MessageEvent::Finish {
                 reason: "stop".to_string(),
@@ -335,7 +343,7 @@ async fn ask_handler(
 ) -> Result<Json<AskResponse>, StatusCode> {
     verify_secret_key(&headers, &state)?;
 
-    let session_working_dir = request.session_working_dir;
+    let session_working_dir = request.session_working_dir.clone();
 
     let session_id = request
         .session_id
@@ -356,7 +364,7 @@ async fn ask_handler(
             &messages,
             Some(SessionConfig {
                 id: session::Identifier::Name(session_id.clone()),
-                working_dir: PathBuf::from(session_working_dir),
+                working_dir: PathBuf::from(&session_working_dir),
                 schedule_id: request.scheduled_job_id.clone(),
                 execution_mode: None,
                 max_turns: None,
@@ -404,7 +412,7 @@ async fn ask_handler(
     }
 
     if !response_message.content.is_empty() {
-        all_messages.push(response_message);
+        push_message(&mut all_messages, response_message);
     }
 
     let session_path = match session::get_path(session::Identifier::Name(session_id.clone())) {
@@ -418,9 +426,15 @@ async fn ask_handler(
     let session_path_clone = session_path.clone();
     let messages = all_messages.clone();
     let provider = Arc::clone(provider.as_ref().unwrap());
+    let session_working_dir_clone = session_working_dir.clone();
     tokio::spawn(async move {
-        if let Err(e) =
-            session::persist_messages(&session_path_clone, &messages, Some(provider)).await
+        if let Err(e) = session::persist_messages(
+            &session_path_clone,
+            &messages,
+            Some(provider),
+            Some(PathBuf::from(session_working_dir_clone)),
+        )
+        .await
         {
             tracing::error!("Failed to store session history: {:?}", e);
         }

@@ -11,9 +11,8 @@ use super::errors::ProviderError;
 use super::utils::emit_debug_trace;
 use crate::message::{Message, MessageContent};
 use crate::model::ModelConfig;
-use mcp_core::content::TextContent;
 use mcp_core::tool::Tool;
-use mcp_core::Role;
+use rmcp::model::Role;
 
 pub const GEMINI_CLI_DEFAULT_MODEL: &str = "gemini-2.5-pro";
 pub const GEMINI_CLI_KNOWN_MODELS: &[&str] = &["gemini-2.5-pro"];
@@ -241,14 +240,11 @@ impl GeminiCliProvider {
             ));
         }
 
-        let message = Message {
-            role: Role::Assistant,
-            created: chrono::Utc::now().timestamp(),
-            content: vec![MessageContent::Text(TextContent {
-                text: response_text,
-                annotations: None,
-            })],
-        };
+        let message = Message::new(
+            Role::Assistant,
+            chrono::Utc::now().timestamp(),
+            vec![MessageContent::text(response_text)],
+        );
 
         let usage = Usage::default(); // No usage info available for gemini CLI
 
@@ -286,14 +282,11 @@ impl GeminiCliProvider {
             println!("================================");
         }
 
-        let message = Message {
-            role: Role::Assistant,
-            created: chrono::Utc::now().timestamp(),
-            content: vec![MessageContent::Text(TextContent {
-                text: description.clone(),
-                annotations: None,
-            })],
-        };
+        let message = Message::new(
+            Role::Assistant,
+            chrono::Utc::now().timestamp(),
+            vec![MessageContent::text(description.clone())],
+        );
 
         let usage = Usage::default();
 

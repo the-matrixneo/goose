@@ -4,11 +4,11 @@ use crate::providers::base::Usage;
 use crate::providers::errors::ProviderError;
 use crate::providers::utils::{is_valid_function_name, sanitize_function_name};
 use anyhow::Result;
-use mcp_core::content::Content;
-use mcp_core::role::Role;
 use mcp_core::tool::{Tool, ToolCall};
 use rand::{distributions::Alphanumeric, Rng};
+use rmcp::model::{AnnotateAble, RawContent, Role};
 use serde_json::{json, Map, Value};
+use std::ops::Deref;
 
 /// Convert internal Message format to Google's API message specification
 pub fn format_messages(messages: &[Message]) -> Vec<Value> {
@@ -66,13 +66,13 @@ pub fn format_messages(messages: &[Message]) -> Vec<Value> {
                                             audience.contains(&Role::Assistant)
                                         })
                                     })
-                                    .map(|content| content.unannotated())
+                                    .map(|content| content.raw.clone())
                                     .collect();
 
                                 let mut tool_content = Vec::new();
                                 for content in abridged {
                                     match content {
-                                        Content::Image(image) => {
+                                        RawContent::Image(image) => {
                                             parts.push(json!({
                                                 "inline_data": {
                                                     "mime_type": image.mime_type,
@@ -81,15 +81,20 @@ pub fn format_messages(messages: &[Message]) -> Vec<Value> {
                                             }));
                                         }
                                         _ => {
-                                            tool_content.push(content);
+                                            tool_content.push(content.no_annotation());
                                         }
                                     }
                                 }
                                 let mut text = tool_content
                                     .iter()
-                                    .filter_map(|c| match c {
-                                        Content::Text(t) => Some(t.text.clone()),
-                                        Content::Resource(r) => Some(r.get_text()),
+                                    .filter_map(|c| match c.deref() {
+                                        RawContent::Text(t) => Some(t.text.clone()),
+                                        RawContent::Resource(raw_embedded_resource) => Some(
+                                            raw_embedded_resource
+                                                .clone()
+                                                .no_annotation()
+                                                .get_text(),
+                                        ),
                                         _ => None,
                                     })
                                     .collect::<Vec<_>>()
@@ -209,11 +214,7 @@ pub fn response_to_message(response: Value) -> Result<Message> {
     let role = Role::Assistant;
     let created = chrono::Utc::now().timestamp();
     if candidate.is_none() {
-        return Ok(Message {
-            role,
-            created,
-            content,
-        });
+        return Ok(Message::new(role, created, content));
     }
     let candidate = candidate.unwrap();
     let parts = candidate
@@ -252,11 +253,7 @@ pub fn response_to_message(response: Value) -> Result<Message> {
             }
         }
     }
-    Ok(Message {
-        role,
-        created,
-        content,
-    })
+    Ok(Message::new(role, created, content))
 }
 
 /// Extract usage information from Google's API response
@@ -321,46 +318,43 @@ pub fn create_request(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rmcp::model::Content;
     use serde_json::json;
 
     fn set_up_text_message(text: &str, role: Role) -> Message {
-        Message {
-            role,
-            created: 0,
-            content: vec![MessageContent::text(text.to_string())],
-        }
+        Message::new(role, 0, vec![MessageContent::text(text.to_string())])
     }
 
     fn set_up_tool_request_message(id: &str, tool_call: ToolCall) -> Message {
-        Message {
-            role: Role::User,
-            created: 0,
-            content: vec![MessageContent::tool_request(id.to_string(), Ok(tool_call))],
-        }
+        Message::new(
+            Role::User,
+            0,
+            vec![MessageContent::tool_request(id.to_string(), Ok(tool_call))],
+        )
     }
 
     fn set_up_tool_confirmation_message(id: &str, tool_call: ToolCall) -> Message {
-        Message {
-            role: Role::User,
-            created: 0,
-            content: vec![MessageContent::tool_confirmation_request(
+        Message::new(
+            Role::User,
+            0,
+            vec![MessageContent::tool_confirmation_request(
                 id.to_string(),
                 tool_call.name.clone(),
                 tool_call.arguments.clone(),
                 Some("Goose would like to call the above tool. Allow? (y/n):".to_string()),
             )],
-        }
+        )
     }
 
     fn set_up_tool_response_message(id: &str, tool_response: Vec<Content>) -> Message {
-        Message {
-            role: Role::Assistant,
-            created: 0,
-            content: vec![MessageContent::tool_response(
+        Message::new(
+            Role::Assistant,
+            0,
+            vec![MessageContent::tool_response(
                 id.to_string(),
                 Ok(tool_response),
             )],
-        }
+        )
     }
 
     fn set_up_tool(name: &str, description: &str, params: Value) -> Tool {

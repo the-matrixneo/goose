@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef, useId } from 'react';
+import { useState, useCallback, useEffect, useRef, useId, useReducer } from 'react';
 import useSWR from 'swr';
 import { getSecretKey } from '../config';
 import { Message, createUserMessage, hasCompletedToolCalls } from '../types/message';
@@ -235,6 +235,9 @@ export function useMessageStream({
     };
   }, [headers, body]);
 
+  // TODO: not this?
+  const [, forceUpdate] = useReducer((x) => x + 1, 0);
+
   // Process the SSE stream from the server
   const processMessageStream = useCallback(
     async (response: Response, currentMessages: Message[]) => {
@@ -285,7 +288,19 @@ export function useMessageStream({
                     };
 
                     // Update messages with the new message
-                    currentMessages = [...currentMessages, newMessage];
+                    if (
+                      newMessage.id &&
+                      currentMessages.length > 0 &&
+                      currentMessages[currentMessages.length - 1].id === newMessage.id
+                    ) {
+                      // If the last message has the same ID, update it instead of adding a new one
+                      const lastMessage = currentMessages[currentMessages.length - 1];
+                      lastMessage.content = [...lastMessage.content, ...newMessage.content];
+                      forceUpdate();
+                    } else {
+                      currentMessages = [...currentMessages, newMessage];
+                    }
+
                     mutate(currentMessages, false);
                     break;
                   }
@@ -308,8 +323,45 @@ export function useMessageStream({
                     break;
                   }
 
-                  case 'Error':
-                    throw new Error(parsedEvent.error);
+                  case 'Error': {
+                    // Check if this is a token limit error (more specific detection)
+                    const errorMessage = parsedEvent.error;
+                    const isTokenLimitError =
+                      errorMessage &&
+                      ((errorMessage.toLowerCase().includes('token') &&
+                        errorMessage.toLowerCase().includes('limit')) ||
+                        (errorMessage.toLowerCase().includes('context') &&
+                          errorMessage.toLowerCase().includes('length') &&
+                          errorMessage.toLowerCase().includes('exceeded')));
+
+                    // If this is a token limit error, create a contextLengthExceeded message instead of throwing
+                    if (isTokenLimitError) {
+                      const contextMessage: Message = {
+                        id: `context-${Date.now()}`,
+                        role: 'assistant',
+                        created: Math.floor(Date.now() / 1000),
+                        content: [
+                          {
+                            type: 'contextLengthExceeded',
+                            msg: errorMessage,
+                          },
+                        ],
+                        display: true,
+                        sendToLLM: false,
+                      };
+
+                      currentMessages = [...currentMessages, contextMessage];
+                      mutate(currentMessages, false);
+
+                      // Clear any existing error state since we handled this as a context message
+                      setError(undefined);
+                      break; // Don't throw error, just add the message
+                    }
+
+                    // For non-token-limit errors, still throw the error
+                    const error = new Error(parsedEvent.error);
+                    throw error;
+                  }
 
                   case 'Finish': {
                     // Call onFinish with the last message if available
@@ -356,6 +408,11 @@ export function useMessageStream({
                 if (onError && e instanceof Error) {
                   onError(e);
                 }
+                // Don't re-throw here, let the error be handled by the outer catch
+                // Instead, set the error state directly
+                if (e instanceof Error) {
+                  setError(e);
+                }
               }
             }
           }
@@ -366,6 +423,8 @@ export function useMessageStream({
           if (onError) {
             onError(e);
           }
+          // Re-throw the error so it gets caught by sendRequest and sets the error state
+          throw e;
         }
       } finally {
         reader.releaseLock();
@@ -373,7 +432,7 @@ export function useMessageStream({
 
       return currentMessages;
     },
-    [mutate, onFinish, onError]
+    [mutate, onFinish, onError, forceUpdate, setError]
   );
 
   // Send a request to the server
@@ -389,12 +448,6 @@ export function useMessageStream({
 
         // Filter out messages where sendToLLM is explicitly false
         const filteredMessages = requestMessages.filter((message) => message.sendToLLM !== false);
-
-        // Log request details for debugging
-        console.log('Request details:', {
-          messages: filteredMessages,
-          body: extraMetadataRef.current.body,
-        });
 
         // Send request to the server
         const response = await fetch(api, {
@@ -469,8 +522,6 @@ export function useMessageStream({
     async (message: Message | string) => {
       // If a string is passed, convert it to a Message object
       const messageToAppend = typeof message === 'string' ? createUserMessage(message) : message;
-
-      console.log('Appending message:', JSON.stringify(messageToAppend, null, 2));
 
       const currentMessages = [...messagesRef.current, messageToAppend];
       mutate(currentMessages, false);
