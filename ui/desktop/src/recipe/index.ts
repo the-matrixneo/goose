@@ -5,9 +5,10 @@ import { FullExtensionConfig } from '../extensions';
 export interface Parameter {
   key: string;
   description: string;
-  input_type: string;
+  input_type: 'string' | 'select' | 'number' | 'boolean';
   default?: string;
   requirement: 'required' | 'optional' | 'user_prompt';
+  options?: string[]; // For select input type
 }
 
 export interface Recipe {

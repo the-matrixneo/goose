@@ -401,13 +401,51 @@ export default function RecipeEditor({ config }: RecipeEditorProps) {
               <div className="text-red-500 text-sm mt-1">{errors.instructions}</div>
             )}
           </div>
-          {parameters.map((parameter: Parameter) => (
-            <ParameterInput
-              key={parameter.key}
-              parameter={parameter}
-              onChange={(name, value) => handleParameterChange(name, value)}
-            />
-          ))}
+          {/* Parameters section */}
+          <div className="pt-3 pb-6 border-b-2 border-borderSubtle">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium text-textProminent">Parameters</h3>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newKey = `param_${Date.now()}`;
+                    const newParam: Parameter = {
+                      key: newKey,
+                      description: `Enter value for ${newKey}`,
+                      input_type: 'string',
+                      requirement: 'required',
+                    };
+                    setParameters((prev) => [...prev, newParam]);
+                  }}
+                  className="px-3 py-2 bg-textProminent text-bgApp rounded-lg hover:bg-opacity-90 transition-colors text-sm"
+                >
+                  Add Parameter
+                </button>
+                {parameters.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (parameters.length > 0) {
+                        setParameters((prev) => prev.slice(0, -1));
+                      }
+                    }}
+                    className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm"
+                  >
+                    Remove Last
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {parameters.map((parameter: Parameter) => (
+              <ParameterInput
+                key={parameter.key}
+                parameter={parameter}
+                onChange={(name, value) => handleParameterChange(name, value)}
+              />
+            ))}
+          </div>
           <div className="pt-3 pb-6 border-b-2 border-borderSubtle">
             <RecipeExpandableInfo
               infoLabel="Initial Prompt"

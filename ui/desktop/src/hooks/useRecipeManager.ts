@@ -126,7 +126,7 @@ export const useRecipeManager = (messages: Message[], locationState?: LocationSt
 
     // Update the system prompt with parameter-substituted instructions
     try {
-      await updateSystemPromptWithParameters(inputValues);
+      await updateSystemPromptWithParameters(inputValues, recipeConfig || undefined);
     } catch (error) {
       console.error('Failed to update system prompt with parameters:', error);
     }
