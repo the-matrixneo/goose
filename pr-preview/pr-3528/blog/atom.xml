@@ -44,7 +44,7 @@
 <p>It didn’t go as planned. Each subagent brought its own interpretation of what “kid-friendly” meant. The result was a clashing mix of styles that felt disconnected and inconsistent.</p>
 <p>That confirmed a hunch I had. When tasks are interdependent, running subagents in parallel is not the right move. Those kinds of tasks are better handled sequentially.</p>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="a-better-prompt-strategy">A Better Prompt Strategy<a href="https://block.github.io/goose/pr-preview/pr-3528/blog/2025/07/21/orchestrating-subagents#a-better-prompt-strategy" class="hash-link" aria-label="Direct link to A Better Prompt Strategy" title="Direct link to A Better Prompt Strategy">​</a></h2>
-<p>This time, I took a different approach. I asked Goose to analyze the existing UI and generate a shared design plan. Then I told Goose to use that plan to span new subagents and assign them tasks based on the plan.</p>
+<p>This time, I took a different approach. I asked Goose to analyze the existing UI and generate a shared design plan. Then I told Goose to use that plan to spawn new subagents and assign them tasks based on the plan.</p>
 <p>The result was a much more consistent interface. This felt super meta and futuristic for me that I could have Goose instruct the subagents.</p>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="final-thoughts">Final Thoughts<a href="https://block.github.io/goose/pr-preview/pr-3528/blog/2025/07/21/orchestrating-subagents#final-thoughts" class="hash-link" aria-label="Direct link to Final Thoughts" title="Direct link to Final Thoughts">​</a></h2>
 <p>This was my first experience with subagents, and I learned that:</p>
