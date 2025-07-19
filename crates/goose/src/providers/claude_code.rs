@@ -9,10 +9,11 @@ use tokio::process::Command;
 use super::base::{ConfigKey, Provider, ProviderMetadata, ProviderUsage, Usage};
 use super::errors::ProviderError;
 use super::utils::emit_debug_trace;
+use crate::config::Config;
 use crate::message::{Message, MessageContent};
 use crate::model::ModelConfig;
 use mcp_core::tool::Tool;
-use rmcp::model::Role;
+use mcp_core::Role;
 
 pub const CLAUDE_CODE_DEFAULT_MODEL: &str = "claude-3-5-sonnet-latest";
 pub const CLAUDE_CODE_KNOWN_MODELS: &[&str] = &["sonnet", "opus", "claude-3-5-sonnet-latest"];
@@ -39,7 +40,6 @@ impl ClaudeCodeProvider {
             .get_param("CLAUDE_CODE_COMMAND")
             .unwrap_or_else(|_| "claude".to_string());
 
-        // If command is just "claude" (not a full path), search for it in common locations
         let resolved_command = if !command.contains('/') {
             Self::find_claude_executable(&command).unwrap_or(command)
         } else {
@@ -56,7 +56,6 @@ impl ClaudeCodeProvider {
     fn find_claude_executable(command_name: &str) -> Option<String> {
         let home = std::env::var("HOME").ok()?;
 
-        // Common locations where claude might be installed
         let search_paths = vec![
             format!("{}/.claude/local/{}", home, command_name),
             format!("{}/.local/bin/{}", home, command_name),
@@ -69,7 +68,6 @@ impl ClaudeCodeProvider {
         for path in search_paths {
             let path_buf = PathBuf::from(&path);
             if path_buf.exists() && path_buf.is_file() {
-                // Check if it's executable
                 #[cfg(unix)]
                 {
                     use std::os::unix::fs::PermissionsExt;
@@ -83,19 +81,22 @@ impl ClaudeCodeProvider {
                 }
                 #[cfg(not(unix))]
                 {
-                    // On non-Unix systems, just check if file exists
                     tracing::info!("Found claude executable at: {}", path);
                     return Some(path);
                 }
             }
         }
 
-        // If not found in common locations, check if it's in PATH
         if let Ok(path_var) = std::env::var("PATH") {
-            for dir in path_var.split(':') {
-                let full_path = format!("{}/{}", dir, command_name);
-                let path_buf = PathBuf::from(&full_path);
+            #[cfg(unix)]
+            let path_separator = ':';
+            #[cfg(windows)]
+            let path_separator = ';';
+
+            for dir in path_var.split(path_separator) {
+                let path_buf = PathBuf::from(dir).join(command_name);
                 if path_buf.exists() && path_buf.is_file() {
+                    let full_path = path_buf.to_string_lossy().to_string();
                     tracing::info!("Found claude executable in PATH at: {}", full_path);
                     return Some(full_path);
                 }
@@ -162,8 +163,13 @@ impl ClaudeCodeProvider {
                             // Convert tool result contents to text
                             let content_text = tool_contents
                                 .iter()
-                                .filter_map(|content| content.as_text().map(|t| t.text.clone()))
-                                .collect::<Vec<_>>()
+                                .filter_map(|content| match &content.raw {
+                                    rmcp::model::RawContent::Text(text_content) => {
+                                        Some(text_content.text.as_str())
+                                    }
+                                    _ => None,
+                                })
+                                .collect::<Vec<&str>>()
                                 .join("\n");
 
                             content_parts.push(json!({
@@ -280,11 +286,12 @@ impl ClaudeCodeProvider {
 
         let message_content = vec![MessageContent::text(combined_text)];
 
-        let response_message = Message::new(
-            Role::Assistant,
-            chrono::Utc::now().timestamp(),
-            message_content,
-        );
+        let response_message = Message {
+            id: None,
+            role: Role::Assistant,
+            created: chrono::Utc::now().timestamp(),
+            content: message_content,
+        };
 
         Ok((response_message, usage))
     }
@@ -331,6 +338,14 @@ impl ClaudeCodeProvider {
             .arg("--verbose")
             .arg("--output-format")
             .arg("json");
+
+        // Add permission mode based on GOOSE_MODE setting
+        let config = Config::global();
+        if let Ok(goose_mode) = config.get_param::<String>("GOOSE_MODE") {
+            if goose_mode.as_str() == "auto" {
+                cmd.arg("--permission-mode").arg("acceptEdits");
+            }
+        }
 
         cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
 
@@ -393,7 +408,7 @@ impl ClaudeCodeProvider {
         // Extract the first user message text
         let description = messages
             .iter()
-            .find(|m| m.role == rmcp::model::Role::User)
+            .find(|m| m.role == mcp_core::Role::User)
             .and_then(|m| {
                 m.content.iter().find_map(|c| match c {
                     MessageContent::Text(text_content) => Some(&text_content.text),
@@ -416,11 +431,12 @@ impl ClaudeCodeProvider {
             println!("================================");
         }
 
-        let message = Message::new(
-            rmcp::model::Role::Assistant,
-            chrono::Utc::now().timestamp(),
-            vec![MessageContent::text(description.clone())],
-        );
+        let message = Message {
+            id: None,
+            role: mcp_core::Role::Assistant,
+            created: chrono::Utc::now().timestamp(),
+            content: vec![MessageContent::text(description.clone())],
+        };
 
         let usage = Usage::default();
 
@@ -508,5 +524,17 @@ mod tests {
         assert_eq!(config.model_name, "claude-3-5-sonnet-latest");
         // Context limit should be set by the ModelConfig
         assert!(config.context_limit() > 0);
+    }
+
+    #[test]
+    fn test_permission_mode_flag_construction() {
+        // Test that in auto mode, the --permission-mode acceptEdits flag is added
+        std::env::set_var("GOOSE_MODE", "auto");
+
+        let config = Config::global();
+        let goose_mode: String = config.get_param("GOOSE_MODE").unwrap();
+        assert_eq!(goose_mode, "auto");
+
+        std::env::remove_var("GOOSE_MODE");
     }
 }
