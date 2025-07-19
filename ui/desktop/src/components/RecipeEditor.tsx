@@ -503,14 +503,16 @@ export default function RecipeEditor({ config }: RecipeEditorProps) {
           {/* Action Buttons */}
           <div className="flex flex-col space-y-3 pt-4">
             <div className="flex gap-3">
-              <button
+              <Button
                 onClick={handleSaveRecipeClick}
                 disabled={!requiredFieldsAreFilled() || saving}
+                variant="outline"
+                size="lg"
                 className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 bg-bgStandard text-textStandard border border-borderStandard rounded-lg hover:bg-bgSubtle transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Save className="w-4 h-4" />
                 {saving ? 'Saving...' : 'Save Recipe'}
-              </button>
+              </Button>
               <Button
                 onClick={() => setIsScheduleModalOpen(true)}
                 disabled={!requiredFieldsAreFilled()}
@@ -613,23 +615,27 @@ export default function RecipeEditor({ config }: RecipeEditorProps) {
             </div>
 
             <div className="flex justify-end space-x-3 mt-6">
-              <button
+              <Button
                 onClick={() => {
                   setShowSaveDialog(false);
                   setSaveRecipeName('');
                 }}
+                variant="ghost"
+                size="default"
                 className="px-4 py-2 text-textSubtle hover:text-textStandard transition-colors"
                 disabled={saving}
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={handleSaveRecipe}
                 disabled={!saveRecipeName.trim() || saving}
+                variant="default"
+                size="default"
                 className="px-4 py-2 bg-textProminent text-bgApp rounded-lg hover:bg-opacity-90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {saving ? 'Saving...' : 'Save Recipe'}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

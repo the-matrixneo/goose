@@ -60,6 +60,7 @@ import { type View, ViewOptions } from '../App';
 import { MainPanelLayout } from './Layout/MainPanelLayout';
 import ChatInput from './ChatInput';
 import { ScrollArea, ScrollAreaHandle } from './ui/scroll-area';
+import { Button } from './ui/button';
 import { useChatEngine } from '../hooks/useChatEngine';
 import { useRecipeManager } from '../hooks/useRecipeManager';
 import { useSessionContinuation } from '../hooks/useSessionContinuation';
@@ -421,29 +422,6 @@ function BaseChatContent({
                             {error.message || 'Honk! Goose experienced an error while responding'}
                           </div>
 
-                          {/* Expandable Error Details */}
-                          <details className="w-full max-w-2xl mb-2">
-                            <summary className="text-xs text-textSubtle cursor-pointer hover:text-textStandard transition-colors">
-                              Error details
-                            </summary>
-                            <div className="mt-2 p-3 bg-bgSubtle border border-borderSubtle rounded-lg text-xs font-mono text-textStandard">
-                              <div className="mb-2">
-                                <strong>Error Type:</strong> {error.name || 'Unknown'}
-                              </div>
-                              <div className="mb-2">
-                                <strong>Message:</strong> {error.message || 'No message'}
-                              </div>
-                              {error.stack && (
-                                <div>
-                                  <strong>Stack Trace:</strong>
-                                  <pre className="mt-1 whitespace-pre-wrap text-xs overflow-x-auto">
-                                    {error.stack}
-                                  </pre>
-                                </div>
-                              )}
-                            </div>
-                          </details>
-
                           {/* Regular retry button for non-token-limit errors */}
                           <div
                             className="px-3 py-2 mt-2 text-center whitespace-nowrap cursor-pointer text-textStandard border border-borderSubtle hover:bg-bgSubtle rounded-full inline-block transition-all duration-150"
@@ -530,12 +508,14 @@ function BaseChatContent({
             <h3 className="text-lg font-medium text-textProminent mb-4">Recipe Creation Failed</h3>
             <p className="text-textStandard mb-6">{recipeError}</p>
             <div className="flex justify-end">
-              <button
+              <Button
                 onClick={() => setRecipeError(null)}
+                variant="default"
+                size="default"
                 className="px-4 py-2 bg-textProminent text-bgApp rounded-lg hover:bg-opacity-90 transition-colors"
               >
                 OK
-              </button>
+              </Button>
             </div>
           </div>
         </div>
