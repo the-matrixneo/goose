@@ -21,8 +21,33 @@ const ParameterInputModal: React.FC<ParameterInputModalProps> = ({
   useEffect(() => {
     const initialValues: Record<string, string> = {};
     parameters.forEach((param) => {
-      if (param.default) {
-        initialValues[param.key] = param.default;
+      // Set default value for optional parameters if they have a default value
+      if (param.requirement === 'optional' && param.default) {
+        // Validate default value based on parameter type
+        let defaultValue = param.default;
+
+        // For boolean parameters, ensure the default is 'true' or 'false'
+        if (param.input_type === 'boolean') {
+          if (param.default.toLowerCase() === 'true' || param.default.toLowerCase() === 'false') {
+            defaultValue = param.default.toLowerCase();
+          }
+        }
+
+        // For select parameters, ensure the default is one of the valid options
+        if (param.input_type === 'select' && param.options) {
+          if (param.options.includes(param.default)) {
+            defaultValue = param.default;
+          }
+        }
+
+        // For number parameters, ensure the default is a valid number
+        if (param.input_type === 'number') {
+          if (!isNaN(Number(param.default))) {
+            defaultValue = param.default;
+          }
+        }
+
+        initialValues[param.key] = defaultValue;
       }
     });
     setInputValues(initialValues);

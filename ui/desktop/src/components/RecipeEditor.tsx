@@ -139,7 +139,7 @@ export default function RecipeEditor({ config }: RecipeEditorProps) {
     const formattedParameters = parameters.map((param) => {
       const formattedParam: Parameter = {
         key: param.key,
-        input_type: 'string',
+        input_type: param.input_type || 'string', // Use actual input_type instead of hardcoded 'string'
         requirement: param.requirement,
         description: param.description,
       };
@@ -148,6 +148,11 @@ export default function RecipeEditor({ config }: RecipeEditorProps) {
       if (param.requirement === 'optional' && param.default) {
         // Note: `default` is a reserved keyword in JS, but assigning it as a property key like this is valid.
         formattedParam.default = param.default;
+      }
+
+      // Add options for select input type
+      if (param.input_type === 'select' && param.options) {
+        formattedParam.options = param.options.filter((opt) => opt.trim() !== ''); // Filter empty options when saving
       }
 
       return formattedParam;

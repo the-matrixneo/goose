@@ -88,8 +88,15 @@ const ParameterInput: React.FC<ParameterInputProps> = ({ parameter, onChange }) 
           <textarea
             value={(parameter.options || []).join('\n')}
             onChange={(e) => {
-              const options = e.target.value.split('\n').filter((opt) => opt.trim() !== '');
+              // Don't filter out empty lines - preserve them so user can type on new lines
+              const options = e.target.value.split('\n');
               onChange(key, { options });
+            }}
+            onKeyDown={(e) => {
+              // Allow Enter key to work normally in textarea (prevent form submission or modal close)
+              if (e.key === 'Enter') {
+                e.stopPropagation();
+              }
             }}
             className="w-full p-3 border rounded-lg bg-background-default text-textStandard focus:outline-none focus:ring-2 focus:ring-borderProminent"
             placeholder="Option 1&#10;Option 2&#10;Option 3"

@@ -38,9 +38,7 @@ export default function ViewRecipeModal({ isOpen, onClose, config }: ViewRecipeM
   const [instructions, setInstructions] = useState(config?.instructions || '');
   const [prompt, setPrompt] = useState(config?.prompt || '');
   const [activities, setActivities] = useState<string[]>(config?.activities || []);
-  const [parameters, setParameters] = useState<Parameter[]>(
-    parseParametersFromInstructions(instructions)
-  );
+  const [parameters, setParameters] = useState<Parameter[]>(config?.parameters || []);
 
   const [extensionOptions, setExtensionOptions] = useState<FixedExtensionEntry[]>([]);
   const [extensionsLoaded, setExtensionsLoaded] = useState(false);
@@ -73,7 +71,8 @@ export default function ViewRecipeModal({ isOpen, onClose, config }: ViewRecipeM
       setInstructions(config.instructions || '');
       setPrompt(config.prompt || '');
       setActivities(config.activities || []);
-      setParameters(parseParametersFromInstructions(config.instructions || ''));
+      // Use the actual parameters from the config, not parsed from instructions
+      setParameters(config.parameters || []);
     }
   }, [config]);
 
@@ -102,28 +101,34 @@ export default function ViewRecipeModal({ isOpen, onClose, config }: ViewRecipeM
     }
   }, [isOpen, getExtensions, recipeExtensions, extensionsLoaded]);
 
-  // Use effect to set parameters whenever instructions or prompt changes
+  // Only auto-parse parameters from instructions if no parameters exist yet
+  // This prevents overwriting existing parameter configurations
   useEffect(() => {
-    const instructionsParams = parseParametersFromInstructions(instructions);
-    const promptParams = parseParametersFromInstructions(prompt);
+    // Only parse parameters if we don't have any existing parameters
+    if (parameters.length === 0) {
+      const instructionsParams = parseParametersFromInstructions(instructions);
+      const promptParams = parseParametersFromInstructions(prompt);
 
-    // Combine parameters, ensuring no duplicates by key
-    const allParams = [...instructionsParams];
-    promptParams.forEach((promptParam) => {
-      if (!allParams.some((param) => param.key === promptParam.key)) {
-        allParams.push(promptParam);
+      // Combine parameters, ensuring no duplicates by key
+      const allParams = [...instructionsParams];
+      promptParams.forEach((promptParam) => {
+        if (!allParams.some((param) => param.key === promptParam.key)) {
+          allParams.push(promptParam);
+        }
+      });
+
+      if (allParams.length > 0) {
+        setParameters(allParams);
       }
-    });
-
-    setParameters(allParams);
-  }, [instructions, prompt]);
+    }
+  }, [instructions, prompt, parameters.length]);
 
   const getCurrentConfig = (): Recipe => {
     // Transform the internal parameters state into the desired output format.
     const formattedParameters = parameters.map((param) => {
       const formattedParam: Parameter = {
         key: param.key,
-        input_type: 'string',
+        input_type: param.input_type || 'string', // Use actual input_type instead of hardcoded 'string'
         requirement: param.requirement,
         description: param.description,
       };
@@ -131,6 +136,11 @@ export default function ViewRecipeModal({ isOpen, onClose, config }: ViewRecipeM
       // Add the 'default' key ONLY if the parameter is optional and has a default value.
       if (param.requirement === 'optional' && param.default) {
         formattedParam.default = param.default;
+      }
+
+      // Add options for select input type
+      if (param.input_type === 'select' && param.options) {
+        formattedParam.options = param.options.filter((opt) => opt.trim() !== ''); // Filter empty options when saving
       }
 
       return formattedParam;
