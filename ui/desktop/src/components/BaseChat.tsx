@@ -60,7 +60,6 @@ import { type View, ViewOptions } from '../App';
 import { MainPanelLayout } from './Layout/MainPanelLayout';
 import ChatInput from './ChatInput';
 import { ScrollArea, ScrollAreaHandle } from './ui/scroll-area';
-import { Button } from './ui/button';
 import { useChatEngine } from '../hooks/useChatEngine';
 import { useRecipeManager } from '../hooks/useRecipeManager';
 import { useSessionContinuation } from '../hooks/useSessionContinuation';
@@ -518,14 +517,12 @@ function BaseChatContent({
             <h3 className="text-lg font-medium text-textProminent mb-4">Recipe Creation Failed</h3>
             <p className="text-textStandard mb-6">{recipeError}</p>
             <div className="flex justify-end">
-              <Button
+              <button
                 onClick={() => setRecipeError(null)}
-                variant="default"
-                size="default"
                 className="px-4 py-2 bg-textProminent text-bgApp rounded-lg hover:bg-opacity-90 transition-colors"
               >
                 OK
-              </Button>
+              </button>
             </div>
           </div>
         </div>

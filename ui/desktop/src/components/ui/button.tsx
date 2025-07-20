@@ -84,24 +84,18 @@ const Button = React.forwardRef<
       asChild?: boolean;
       shape?: 'pill' | 'round';
     }
->(
-  (
-    { className, variant, size, asChild = false, shape = 'pill', type = 'button', ...props },
-    ref
-  ) => {
-    const Comp = asChild ? Slot : 'button';
+>(({ className, variant, size, asChild = false, shape = 'pill', ...props }, ref) => {
+  const Comp = asChild ? Slot : 'button';
 
-    return (
-      <Comp
-        data-slot="button"
-        className={cn(buttonVariants({ variant, size, shape, className }))}
-        type={type}
-        ref={ref}
-        {...props}
-      />
-    );
-  }
-);
+  return (
+    <Comp
+      data-slot="button"
+      className={cn(buttonVariants({ variant, size, shape, className }))}
+      ref={ref}
+      {...props}
+    />
+  );
+});
 
 Button.displayName = 'Button';
 

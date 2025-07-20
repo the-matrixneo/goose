@@ -466,16 +466,14 @@ export default function ViewRecipeModal({ isOpen, onClose, config }: ViewRecipeM
           </Button>
 
           <div className="flex gap-3">
-            <Button
+            <button
               onClick={handleSaveRecipeClick}
               disabled={!requiredFieldsAreFilled() || saving}
-              variant="outline"
-              size="default"
               className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-bgStandard text-textStandard border border-borderStandard rounded-lg hover:bg-bgSubtle transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Save className="w-4 h-4" />
               {saving ? 'Saving...' : 'Save Recipe'}
-            </Button>
+            </button>
             <Button
               onClick={() => setIsScheduleModalOpen(true)}
               disabled={!requiredFieldsAreFilled()}
@@ -576,27 +574,23 @@ export default function ViewRecipeModal({ isOpen, onClose, config }: ViewRecipeM
             </div>
 
             <div className="flex justify-end space-x-3 mt-6">
-              <Button
+              <button
                 onClick={() => {
                   setShowSaveDialog(false);
                   setSaveRecipeName('');
                 }}
-                variant="ghost"
-                size="default"
                 className="px-4 py-2 text-textSubtle hover:text-textStandard transition-colors"
                 disabled={saving}
               >
                 Cancel
-              </Button>
-              <Button
+              </button>
+              <button
                 onClick={handleSaveRecipe}
                 disabled={!saveRecipeName.trim() || saving}
-                variant="default"
-                size="default"
                 className="px-4 py-2 bg-textProminent text-bgApp rounded-lg hover:bg-opacity-90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {saving ? 'Saving...' : 'Save Recipe'}
-              </Button>
+              </button>
             </div>
           </div>
         </div>
