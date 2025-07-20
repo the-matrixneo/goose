@@ -543,6 +543,55 @@ Parameters you can use:
 
             <div className="space-y-6">
               <div>
+                <h4 className="text-sm font-medium text-text-standard mb-2">Deeplink</h4>
+                <div className="bg-background-muted border border-border-subtle p-3 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <code className="text-xs text-text-muted font-mono flex-1 break-all">
+                      {(() => {
+                        try {
+                          const recipeJson = JSON.stringify(selectedRecipe.recipe);
+                          const base64Config = Buffer.from(recipeJson).toString('base64');
+                          const encodedConfig = encodeURIComponent(base64Config);
+                          return `goose://recipe?config=${encodedConfig}`;
+                        } catch {
+                          return 'Error generating deeplink';
+                        }
+                      })()}
+                    </code>
+                    <Button
+                      onClick={() => {
+                        try {
+                          const recipeJson = JSON.stringify(selectedRecipe.recipe);
+                          const base64Config = Buffer.from(recipeJson).toString('base64');
+                          const encodedConfig = encodeURIComponent(base64Config);
+                          const deeplink = `goose://recipe?config=${encodedConfig}`;
+                          navigator.clipboard.writeText(deeplink);
+                          toastSuccess({
+                            title: 'Copied!',
+                            msg: 'Recipe deeplink copied to clipboard',
+                          });
+                        } catch (error) {
+                          toastError({
+                            title: 'Copy Failed',
+                            msg: 'Failed to copy deeplink to clipboard',
+                            traceback: error instanceof Error ? error.message : String(error),
+                          });
+                        }
+                      }}
+                      variant="outline"
+                      size="sm"
+                      className="h-8 px-2 shrink-0"
+                    >
+                      Copy
+                    </Button>
+                  </div>
+                  <p className="text-xs text-text-muted mt-2">
+                    Share this deeplink to allow others to import this recipe
+                  </p>
+                </div>
+              </div>
+
+              <div>
                 <h4 className="text-sm font-medium text-text-standard mb-2">Description</h4>
                 <p className="text-text-muted">{selectedRecipe.recipe.description}</p>
               </div>
