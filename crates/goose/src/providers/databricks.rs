@@ -349,7 +349,9 @@ impl DatabricksProvider {
                     // We try to extract the error message from the payload and check for phrases that indicate context length exceeded
                     let bytes = response.bytes().await?;
                     let payload_str = String::from_utf8_lossy(&bytes).to_lowercase();
-                    let check_phrases = [
+
+                    // First check for explicit context length phrases
+                    let explicit_context_phrases = [
                         "too long",
                         "context length",
                         "context_length_exceeded",
@@ -362,8 +364,25 @@ impl DatabricksProvider {
                         "decrease input length",
                         "context limit",
                     ];
-                    if check_phrases.iter().any(|c| payload_str.contains(c)) {
+                    if explicit_context_phrases
+                        .iter()
+                        .any(|c| payload_str.contains(c))
+                    {
                         return Err(ProviderError::ContextLengthExceeded(payload_str));
+                    }
+
+                    // For Databricks, also check for generic "Bad Request" errors that might be context length issues
+                    // This is a heuristic since Databricks sometimes returns generic errors for context length issues
+                    if payload_str.contains("external_model_provider")
+                        && payload_str.contains("bad_request")
+                    {
+                        // This might be a context length exceeded error disguised as a generic bad request
+                        // Let's treat it as such to trigger auto-summarization
+                        tracing::warn!("Databricks returned generic Bad Request error, treating as potential context length exceeded: {}", payload_str);
+                        return Err(ProviderError::ContextLengthExceeded(format!(
+                            "Potential context length exceeded (Databricks generic error): {}",
+                            payload_str
+                        )));
                     }
 
                     let mut error_msg = "Unknown error".to_string();

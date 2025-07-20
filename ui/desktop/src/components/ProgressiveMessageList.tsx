@@ -77,9 +77,19 @@ export default function ProgressiveMessageList({
     getContextHandlerType = contextManager.getContextHandlerType;
   } catch (error) {
     // Context manager not available (e.g., in session history view)
-    // This is fine, we'll just skip context handler functionality
-    hasContextHandlerContent = undefined;
-    getContextHandlerType = undefined;
+    // Provide fallback functions to still handle context messages
+    hasContextHandlerContent = (message: Message) => {
+      return message.content.some(
+        (content) =>
+          content.type === 'contextLengthExceeded' || content.type === 'summarizationRequested'
+      );
+    };
+    getContextHandlerType = (message: Message) => {
+      const hasContextLengthExceeded = message.content.some(
+        (content) => content.type === 'contextLengthExceeded'
+      );
+      return hasContextLengthExceeded ? 'contextLengthExceeded' : 'summarizationRequested';
+    };
   }
 
   // Simple progressive loading - start immediately when component mounts if needed

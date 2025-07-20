@@ -176,7 +176,9 @@ impl MessageContent {
     }
 
     pub fn context_length_exceeded<S: Into<String>>(msg: S) -> Self {
-        MessageContent::ContextLengthExceeded(ContextLengthExceeded { msg: msg.into() })
+        MessageContent::ContextLengthExceeded(ContextLengthExceeded {
+            msg: msg.into(),
+        })
     }
 
     pub fn summarization_requested<S: Into<String>>(msg: S) -> Self {

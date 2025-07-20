@@ -18,7 +18,7 @@ use crate::agents::subagent_execution_tool::subagent_execute_task_tool::{
 };
 use crate::agents::subagent_execution_tool::tasks_manager::TasksManager;
 use crate::config::{Config, ExtensionConfigManager, PermissionManager};
-use crate::message::{push_message, Message};
+use crate::message::{push_message, Message, MessageContent};
 use crate::permission::permission_judge::check_tool_permissions;
 use crate::permission::PermissionConfirmation;
 use crate::providers::base::Provider;
@@ -1009,7 +1009,7 @@ impl Agent {
                                 // }
                             }
                         },
-                        Err(ProviderError::ContextLengthExceeded(_)) => {
+                        Err(ProviderError::ContextLengthExceeded(error_msg)) => {
                             // At this point, the last message should be a user message
                             // because call to provider led to context length exceeded error
                             // Immediately yield a special message and break

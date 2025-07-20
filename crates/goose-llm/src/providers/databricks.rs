@@ -119,6 +119,38 @@ impl DatabricksProvider {
                 ProviderError::RequestFailed("Response body is not valid JSON".to_string())
             }),
             StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN => {
+                let payload_str = serde_json::to_string(&payload)
+                    .unwrap_or_default()
+                    .to_lowercase();
+
+                // Check for potential context length issues in 403 errors too
+                let check_phrases = [
+                    "too long",
+                    "context length",
+                    "context_length_exceeded",
+                    "reduce the length",
+                    "token count",
+                    "exceeds",
+                    "exceed context limit",
+                    "input length",
+                    "max_tokens",
+                    "decrease input length",
+                    "context limit",
+                ];
+                if check_phrases.iter().any(|c| payload_str.contains(c)) {
+                    return Err(ProviderError::ContextLengthExceeded(payload_str));
+                }
+
+                // Also check for generic permission denied that might be context length
+                if payload_str.contains("external_model_provider")
+                    && (payload_str.contains("forbidden") || payload_str.contains("permission"))
+                {
+                    return Err(ProviderError::ContextLengthExceeded(format!(
+                        "Potential context length exceeded (Databricks permission error): {}",
+                        payload_str
+                    )));
+                }
+
                 Err(ProviderError::Authentication(format!(
                     "Authentication failed. Please ensure your API keys are valid and have the required permissions. \
                     Status: {}. Response: {:?}",
