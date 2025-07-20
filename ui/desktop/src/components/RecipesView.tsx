@@ -547,6 +547,17 @@ Parameters you can use:
                 <p className="text-text-muted">{selectedRecipe.recipe.description}</p>
               </div>
 
+              {selectedRecipe.recipe.version && (
+                <div>
+                  <h4 className="text-sm font-medium text-text-standard mb-2">Version</h4>
+                  <div className="bg-background-muted border border-border-subtle p-3 rounded-lg">
+                    <span className="text-sm text-text-muted font-mono">
+                      {selectedRecipe.recipe.version}
+                    </span>
+                  </div>
+                </div>
+              )}
+
               {selectedRecipe.recipe.instructions && (
                 <div>
                   <h4 className="text-sm font-medium text-text-standard mb-2">Instructions</h4>
@@ -569,6 +580,65 @@ Parameters you can use:
                 </div>
               )}
 
+              {selectedRecipe.recipe.parameters && selectedRecipe.recipe.parameters.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-medium text-text-standard mb-2">Parameters</h4>
+                  <div className="space-y-3">
+                    {selectedRecipe.recipe.parameters.map((param, index) => (
+                      <div
+                        key={index}
+                        className="bg-background-muted border border-border-subtle p-3 rounded-lg"
+                      >
+                        <div className="flex items-center gap-2 mb-2">
+                          <code className="text-sm font-mono bg-background-default px-2 py-1 rounded text-text-standard">
+                            {param.key}
+                          </code>
+                          <span className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                            {param.input_type}
+                          </span>
+                          <span
+                            className={`text-xs px-2 py-1 rounded ${
+                              param.requirement === 'required'
+                                ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                                : param.requirement === 'user_prompt'
+                                  ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                                  : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+                            }`}
+                          >
+                            {param.requirement}
+                          </span>
+                        </div>
+                        <p className="text-sm text-text-muted mb-2">{param.description}</p>
+
+                        {param.default && (
+                          <div className="text-xs text-text-muted">
+                            <span className="font-medium">Default:</span> {param.default}
+                          </div>
+                        )}
+
+                        {param.input_type === 'select' &&
+                          param.options &&
+                          param.options.length > 0 && (
+                            <div className="text-xs text-text-muted mt-2">
+                              <span className="font-medium">Options:</span>
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {param.options.map((option, optIndex) => (
+                                  <span
+                                    key={optIndex}
+                                    className="px-2 py-1 bg-background-default border border-border-subtle rounded text-xs"
+                                  >
+                                    {option}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {selectedRecipe.recipe.activities && selectedRecipe.recipe.activities.length > 0 && (
                 <div>
                   <h4 className="text-sm font-medium text-text-standard mb-2">Activities</h4>
@@ -581,6 +651,232 @@ Parameters you can use:
                         {activity}
                       </span>
                     ))}
+                  </div>
+                </div>
+              )}
+
+              {selectedRecipe.recipe.extensions && selectedRecipe.recipe.extensions.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-medium text-text-standard mb-2">Extensions</h4>
+                  <div className="space-y-2">
+                    {selectedRecipe.recipe.extensions.map((extension, index) => {
+                      const extWithDetails = extension as typeof extension & {
+                        version?: string;
+                        type?: string;
+                        bundled?: boolean;
+                        cmd?: string;
+                        args?: string[];
+                        timeout?: number;
+                      };
+
+                      return (
+                        <div
+                          key={index}
+                          className="bg-background-muted border border-border-subtle p-3 rounded-lg"
+                        >
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-medium text-text-standard">{extension.name}</span>
+                            {extWithDetails.version && (
+                              <span className="text-xs px-2 py-1 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 rounded">
+                                v{extWithDetails.version}
+                              </span>
+                            )}
+                            {extWithDetails.type && (
+                              <span className="text-xs px-2 py-1 bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 rounded">
+                                {extWithDetails.type}
+                              </span>
+                            )}
+                            {extWithDetails.bundled && (
+                              <span className="text-xs px-2 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded">
+                                bundled
+                              </span>
+                            )}
+                          </div>
+                          {extension.description && (
+                            <p className="text-sm text-text-muted mb-2">{extension.description}</p>
+                          )}
+
+                          {/* Extension command details */}
+                          {extWithDetails.cmd && (
+                            <div className="text-xs text-text-muted mt-2">
+                              <div className="mb-1">
+                                <span className="font-medium">Command:</span>{' '}
+                                <code className="bg-background-default px-1 rounded">
+                                  {extWithDetails.cmd}
+                                </code>
+                              </div>
+                              {extWithDetails.args && extWithDetails.args.length > 0 && (
+                                <div className="mb-1">
+                                  <span className="font-medium">Args:</span>
+                                  <div className="flex flex-wrap gap-1 mt-1">
+                                    {extWithDetails.args.map((arg: string, argIndex: number) => (
+                                      <code
+                                        key={argIndex}
+                                        className="px-1 bg-background-default border border-border-subtle rounded text-xs"
+                                      >
+                                        {arg}
+                                      </code>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              {extWithDetails.timeout && (
+                                <div>
+                                  <span className="font-medium">Timeout:</span>{' '}
+                                  {extWithDetails.timeout}s
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {selectedRecipe.recipe.sub_recipes &&
+                selectedRecipe.recipe.sub_recipes.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-medium text-text-standard mb-2">Sub Recipes</h4>
+                    <div className="space-y-3">
+                      {selectedRecipe.recipe.sub_recipes.map((subRecipe, index: number) => (
+                        <div
+                          key={index}
+                          className="bg-background-muted border border-border-subtle p-3 rounded-lg"
+                        >
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="font-medium text-text-standard">{subRecipe.name}</span>
+                            <span className="text-xs px-2 py-1 bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200 rounded">
+                              sub-recipe
+                            </span>
+                          </div>
+
+                          <div className="text-sm text-text-muted mb-2">
+                            <span className="font-medium">Path:</span>{' '}
+                            <code className="bg-background-default px-1 rounded font-mono text-xs">
+                              {subRecipe.path}
+                            </code>
+                          </div>
+
+                          {subRecipe.values && Object.keys(subRecipe.values).length > 0 && (
+                            <div className="text-xs text-text-muted mt-2">
+                              <span className="font-medium">Parameter Values:</span>
+                              <div className="mt-1 space-y-1">
+                                {Object.entries(subRecipe.values).map(([key, value]) => (
+                                  <div key={key} className="flex items-center gap-2">
+                                    <code className="bg-background-default px-1 rounded text-xs">
+                                      {key}
+                                    </code>
+                                    <span>=</span>
+                                    <code className="bg-background-default px-1 rounded text-xs">
+                                      {String(value)}
+                                    </code>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {subRecipe.description && (
+                            <p className="text-sm text-text-muted mt-2">{subRecipe.description}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+              {selectedRecipe.recipe.response && (
+                <div>
+                  <h4 className="text-sm font-medium text-text-standard mb-2">Response Schema</h4>
+                  <div className="bg-background-muted border border-border-subtle p-3 rounded-lg">
+                    <pre className="text-sm text-text-muted whitespace-pre-wrap font-mono">
+                      {
+                        (() => {
+                          const response = selectedRecipe.recipe.response;
+                          try {
+                            if (typeof response === 'string') {
+                              return response;
+                            }
+                            return JSON.stringify(response, null, 2);
+                          } catch {
+                            return String(response);
+                          }
+                        })() as string
+                      }
+                    </pre>
+                  </div>
+                </div>
+              )}
+
+              {selectedRecipe.recipe.goosehints && (
+                <div>
+                  <h4 className="text-sm font-medium text-text-standard mb-2">Goose Hints</h4>
+                  <div className="bg-background-muted border border-border-subtle p-3 rounded-lg">
+                    <pre className="text-sm text-text-muted whitespace-pre-wrap font-mono">
+                      {selectedRecipe.recipe.goosehints}
+                    </pre>
+                  </div>
+                </div>
+              )}
+
+              {selectedRecipe.recipe.context && selectedRecipe.recipe.context.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-medium text-text-standard mb-2">Context</h4>
+                  <div className="space-y-2">
+                    {selectedRecipe.recipe.context.map((contextItem, index) => (
+                      <div
+                        key={index}
+                        className="bg-background-muted border border-border-subtle p-2 rounded text-sm text-text-muted font-mono"
+                      >
+                        {contextItem}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {selectedRecipe.recipe.profile && (
+                <div>
+                  <h4 className="text-sm font-medium text-text-standard mb-2">Profile</h4>
+                  <div className="bg-background-muted border border-border-subtle p-3 rounded-lg">
+                    <span className="text-sm text-text-muted font-mono">
+                      {selectedRecipe.recipe.profile}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {selectedRecipe.recipe.mcps && (
+                <div>
+                  <h4 className="text-sm font-medium text-text-standard mb-2">
+                    Max Completion Tokens per Second
+                  </h4>
+                  <div className="bg-background-muted border border-border-subtle p-3 rounded-lg">
+                    <span className="text-sm text-text-muted font-mono">
+                      {selectedRecipe.recipe.mcps}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {selectedRecipe.recipe.author && (
+                <div>
+                  <h4 className="text-sm font-medium text-text-standard mb-2">Author</h4>
+                  <div className="bg-background-muted border border-border-subtle p-3 rounded-lg">
+                    {selectedRecipe.recipe.author.contact && (
+                      <div className="text-sm text-text-muted mb-1">
+                        <span className="font-medium">Contact:</span>{' '}
+                        {selectedRecipe.recipe.author.contact}
+                      </div>
+                    )}
+                    {selectedRecipe.recipe.author.metadata && (
+                      <div className="text-sm text-text-muted">
+                        <span className="font-medium">Metadata:</span>{' '}
+                        {selectedRecipe.recipe.author.metadata}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

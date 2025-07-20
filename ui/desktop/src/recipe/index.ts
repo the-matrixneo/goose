@@ -27,6 +27,33 @@ export interface Recipe {
   context?: string[];
   profile?: string;
   mcps?: number;
+  version?: string;
+  // Sub recipes support
+  sub_recipes?: Array<{
+    name: string;
+    path: string;
+    values?: Record<string, unknown>;
+    description?: string;
+  }>;
+  // Response schema - typically a JSON schema structure
+  response?:
+    | {
+        json_schema?: {
+          type?: string;
+          properties?: Record<
+            string,
+            {
+              type?: string;
+              description?: string;
+              items?: {
+                type?: string;
+              };
+            }
+          >;
+          required?: string[];
+        };
+      }
+    | string; // Can also be a string representation
   // Properties added for scheduled execution
   scheduledJobId?: string;
   isScheduledExecution?: boolean;
