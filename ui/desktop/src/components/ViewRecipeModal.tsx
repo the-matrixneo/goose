@@ -92,27 +92,30 @@ export default function ViewRecipeModal({ isOpen, onClose, config }: ViewRecipeM
     }
   }, [isOpen, getExtensions, recipeExtensions, extensionsLoaded]);
 
-  // Only auto-parse parameters from instructions if no parameters exist yet
-  // This prevents overwriting existing parameter configurations
+  // Auto-detect new parameters from instructions and prompt
+  // This adds new parameters without overwriting existing ones
   useEffect(() => {
-    // Only parse parameters if we don't have any existing parameters
-    if (parameters.length === 0) {
-      const instructionsParams = parseParametersFromInstructions(instructions);
-      const promptParams = parseParametersFromInstructions(prompt);
+    const instructionsParams = parseParametersFromInstructions(instructions);
+    const promptParams = parseParametersFromInstructions(prompt);
 
-      // Combine parameters, ensuring no duplicates by key
-      const allParams = [...instructionsParams];
-      promptParams.forEach((promptParam) => {
-        if (!allParams.some((param) => param.key === promptParam.key)) {
-          allParams.push(promptParam);
-        }
-      });
-
-      if (allParams.length > 0) {
-        setParameters(allParams);
+    // Combine all detected parameters, ensuring no duplicates by key
+    const detectedParams = [...instructionsParams];
+    promptParams.forEach((promptParam) => {
+      if (!detectedParams.some((param) => param.key === promptParam.key)) {
+        detectedParams.push(promptParam);
       }
+    });
+
+    // Only add parameters that don't already exist in our current parameters
+    const newParams = detectedParams.filter(
+      (detectedParam) =>
+        !parameters.some((existingParam) => existingParam.key === detectedParam.key)
+    );
+
+    if (newParams.length > 0) {
+      setParameters((prev) => [...prev, ...newParams]);
     }
-  }, [instructions, prompt, parameters.length]);
+  }, [instructions, prompt, parameters]);
 
   const getCurrentConfig = useCallback((): Recipe => {
     // Transform the internal parameters state into the desired output format.
