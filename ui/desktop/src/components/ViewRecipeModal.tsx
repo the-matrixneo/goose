@@ -63,7 +63,6 @@ export default function ViewRecipeModal({ isOpen, onClose, config }: ViewRecipeM
       setInstructions(config.instructions || '');
       setPrompt(config.prompt || '');
       setActivities(config.activities || []);
-      // Use the actual parameters from the config, not parsed from instructions
       setParameters(config.parameters || []);
     }
   }, [config]);
