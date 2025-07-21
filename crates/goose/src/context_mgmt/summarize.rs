@@ -4,8 +4,8 @@ use crate::prompt_template::render_global_file;
 use crate::providers::base::Provider;
 use crate::token_counter::{AsyncTokenCounter, TokenCounter};
 use anyhow::Result;
-use mcp_core::Role;
 use serde::Serialize;
+use rmcp::model::Role;
 use std::sync::Arc;
 
 // Constants for the summarization prompt and a follow-up user message.
@@ -331,8 +331,10 @@ mod tests {
     use crate::providers::base::{Provider, ProviderMetadata, ProviderUsage, Usage};
     use crate::providers::errors::ProviderError;
     use chrono::Utc;
-    use mcp_core::{tool::Tool, Role};
-    use mcp_core::{Content, TextContent, ToolCall};
+    use mcp_core::tool::Tool;
+    use mcp_core::ToolCall;
+    use rmcp::model::Role;
+    use rmcp::model::{AnnotateAble, Content, RawTextContent};
     use serde_json::json;
     use std::sync::Arc;
 
@@ -361,10 +363,12 @@ mod tests {
                 Message::new(
                     Role::Assistant,
                     Utc::now().timestamp(),
-                    vec![MessageContent::Text(TextContent {
-                        text: "Summarized content".to_string(),
-                        annotations: None,
-                    })],
+                    vec![MessageContent::Text(
+                        RawTextContent {
+                            text: "Summarized content".to_string(),
+                        }
+                        .no_annotation(),
+                    )],
                 ),
                 ProviderUsage::new("mock".to_string(), Usage::default()),
             ))
@@ -558,10 +562,12 @@ mod tests {
         let summarized_messages = vec![Message::new(
             Role::Assistant,
             Utc::now().timestamp(),
-            vec![MessageContent::Text(TextContent {
-                text: "Summary".to_string(),
-                annotations: None,
-            })],
+            vec![MessageContent::Text(
+                RawTextContent {
+                    text: "Summary".to_string(),
+                }
+                .no_annotation(),
+            )],
         )];
         let arguments = json!({
             "param1": "value1"
