@@ -437,9 +437,11 @@ fn print_markdown(content: &str, theme: Theme) {
 
 const INDENT: &str = "    ";
 
-fn get_tool_params_max_length(key: &str) -> usize {
+fn get_tool_params_max_length(key: Option<&str>) -> usize {
     // Special handling for text_instruction to show more content
-    if key == "text_instruction" {
+    if let Some(key) = key
+        && key == "text_instruction"
+    {
         200 // Allow longer display for text instructions
     } else {
         Config::global()
@@ -478,16 +480,11 @@ fn print_params(value: &Value, depth: usize, debug: bool) {
                         }
                     }
                     Value::String(s) => {
-                        let max_length = get_tool_params_max_length(key);
+                        let max_length = get_tool_params_max_length(Some(key));
 
                         if !debug && s.len() > max_length {
                             let preview = get_preview(key, s, max_length);
-                            println!(
-                                "{}{}: {}",
-                                indent,
-                                style(key).dim(),
-                                style(preview).green()
-                            );
+                            println!("{}{}: {}", indent, style(key).dim(), style(preview).green());
                         } else {
                             println!("{}{}: {}", indent, style(key).dim(), style(s).green());
                         }
@@ -511,7 +508,7 @@ fn print_params(value: &Value, depth: usize, debug: bool) {
             }
         }
         Value::String(s) => {
-            if !debug && s.len() > get_tool_params_max_length("value") {
+            if !debug && s.len() > get_tool_params_max_length(None) {
                 println!(
                     "{}{}",
                     indent,
