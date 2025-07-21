@@ -130,7 +130,7 @@ export default function ViewRecipeModal({ isOpen, onClose, config }: ViewRecipeM
     const formattedParameters = parameters.map((param) => {
       const formattedParam: Parameter = {
         key: param.key,
-        input_type: param.input_type || 'string', // Use actual input_type instead of hardcoded 'string'
+        input_type: param.input_type || 'string',
         requirement: param.requirement,
         description: param.description,
       };
