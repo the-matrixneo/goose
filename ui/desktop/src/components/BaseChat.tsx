@@ -42,7 +42,7 @@
  * while remaining flexible enough to support different UI contexts (Hub vs Pair).
  */
 
-import React, { useEffect, useContext, createContext, useRef, useMemo, useCallback } from 'react';
+import React, { useEffect, useContext, createContext, useRef, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { SearchView } from './conversation/SearchView';
 import { AgentHeader } from './AgentHeader';
@@ -249,27 +249,25 @@ function BaseChatContent({
   const sidecar = useSidecar();
 
   // Check if there are any messages with diff content
-  const hasDiffActions = useMemo(() => {
-    return filteredMessages.some((message) => {
-      const toolRequests = getToolRequests(message);
-      if (toolRequests.length === 0) return false;
+  const hasDiffActions = filteredMessages.some((message) => {
+    const toolRequests = getToolRequests(message);
+    if (toolRequests.length === 0) return false;
 
-      // Look for tool responses in subsequent messages
-      const messageIndex = messages.findIndex((msg) => msg.id === message.id);
-      if (messageIndex === -1) return false;
+    // Look for tool responses in subsequent messages
+    const messageIndex = messages.findIndex((msg) => msg.id === message.id);
+    if (messageIndex === -1) return false;
 
-      for (let i = messageIndex + 1; i < messages.length; i++) {
-        const responses = getToolResponses(messages[i]);
-        for (const response of responses) {
-          const matchingRequest = toolRequests.find((req) => req.id === response.id);
-          if (matchingRequest && hasDiffContent(response)) {
-            return true;
-          }
+    for (let i = messageIndex + 1; i < messages.length; i++) {
+      const responses = getToolResponses(messages[i]);
+      for (const response of responses) {
+        const matchingRequest = toolRequests.find((req) => req.id === response.id);
+        if (matchingRequest && hasDiffContent(response)) {
+          return true;
         }
       }
-      return false;
-    });
-  }, [filteredMessages, messages]);
+    }
+    return false;
+  });
 
   const showCollapsedSidecar = hasDiffActions && sidecar;
 

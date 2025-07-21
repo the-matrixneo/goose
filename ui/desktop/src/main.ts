@@ -619,8 +619,8 @@ const createChat = async (
           GOOSE_VERSION: gooseVersion,
           recipe: recipe,
           // For diffViewer, extract diffContent from recipeConfig and add it as a separate field
-          ...(viewType === 'diffViewer' && recipeConfig && 'diffContent' in recipeConfig
-            ? { diffContent: recipeConfig.diffContent }
+          ...(viewType === 'diffViewer' && recipe && 'diffContent' in recipe
+            ? { diffContent: recipe.diffContent }
             : {}),
         }),
       ],
@@ -677,8 +677,8 @@ const createChat = async (
     GOOSE_BASE_URL_SHARE: sharingUrl,
     recipe: recipe,
     // For diffViewer, extract diffContent from recipeConfig and add it as a separate field
-    ...(viewType === 'diffViewer' && recipeConfig && 'diffContent' in recipeConfig
-      ? { diffContent: recipeConfig.diffContent }
+    ...(viewType === 'diffViewer' && recipe && 'diffContent' in recipe
+      ? { diffContent: recipe.diffContent }
       : {}),
   };
 

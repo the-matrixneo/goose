@@ -8,14 +8,13 @@ use std::collections::HashSet;
 /// The content of the messages uses MCP types to avoid additional conversions
 /// when interacting with MCP servers.
 use chrono::Utc;
-use mcp_core::content::{Content, EmbeddedResource, ImageContent, TextContent};
 use mcp_core::handler::ToolResult;
 use mcp_core::tool::ToolCall;
 use rmcp::model::ResourceContents;
 use rmcp::model::Role;
 use rmcp::model::{
-    AnnotateAble, Content, ImageContent, PromptMessage, PromptMessageContent, PromptMessageRole,
-    RawContent, RawImageContent, RawTextContent, TextContent,
+    AnnotateAble, Content, EmbeddedResource, ImageContent, PromptMessage, PromptMessageContent,
+    PromptMessageRole, RawContent, RawImageContent, RawTextContent, TextContent,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -276,21 +275,21 @@ impl From<Content> for MessageContent {
                 MessageContent::Image(image.optional_annotate(content.annotations))
             }
             RawContent::Resource(resource) => {
-                let text = match &resource.resource {
+                match &resource.resource {
                     ResourceContents::TextResourceContents { uri, text, .. } => {
                         // For special URIs like goose://checkpoint, preserve as resource
                         if uri.starts_with("goose://") {
-                            MessageContent::EmbeddedResource(resource);
-                        } else
-                        {
-                            text.clone();
+                            MessageContent::EmbeddedResource(
+                                resource.optional_annotate(content.annotations),
+                            )
+                        } else {
+                            MessageContent::text(text.clone())
                         }
-                    },
-                    ResourceContents::BlobResourceContents { blob, .. } => {
-                        format!("[Binary content: {}]", blob.clone())
                     }
-                };
-                MessageContent::text(text)
+                    ResourceContents::BlobResourceContents { blob, .. } => {
+                        MessageContent::text(format!("[Binary content: {}]", blob.clone()))
+                    }
+                }
             }
             RawContent::Audio(_) => {
                 MessageContent::text("[Audio content: not supported]".to_string())
