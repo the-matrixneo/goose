@@ -39,6 +39,7 @@ use crate::agents::platform_tools::{
     PLATFORM_SEARCH_AVAILABLE_EXTENSIONS_TOOL_NAME,
 };
 use crate::agents::prompt_manager::PromptManager;
+use crate::token_counter::create_async_token_counter;
 use crate::agents::router_tool_selector::{
     create_tool_selector, RouterToolSelectionStrategy, RouterToolSelector,
 };
@@ -170,6 +171,29 @@ impl Agent {
         if let Some(monitor) = self.tool_monitor.lock().await.as_mut() {
             monitor.reset();
         }
+    }
+
+    /// Get the current token count for the given messages using proper agent context
+    pub async fn get_current_token_count(&self, messages: &[Message]) -> Result<usize, anyhow::Error> {
+        let provider = self.provider().await?;
+        let token_counter = create_async_token_counter()
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to create token counter: {}", e))?;
+        
+        // Build the proper system prompt with agent context
+        let prompt_manager = self.prompt_manager.lock().await;
+        let system_prompt = prompt_manager.build_system_prompt(
+            vec![], // Extensions info - could be populated if needed
+            self.frontend_instructions.lock().await.clone(),
+            serde_json::Value::Null, // No extension disable prompt
+            Some(&provider.get_model_config().model_name),
+            None, // No tool selection strategy
+        );
+        
+        let tools = self.list_tools(None).await;
+        let resources = vec![]; // Resources could be populated if available
+        
+        Ok(token_counter.count_everything(&system_prompt, messages, &tools, &resources))
     }
 
     /// Set the scheduler service for this agent
