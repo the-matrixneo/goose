@@ -45,7 +45,7 @@ export const useRecipeManager = (messages: Message[], locationState?: LocationSt
     }
 
     // Fallback to app config (from deeplinks)
-    const appRecipeConfig = window.appConfig.get('recipeConfig') as Recipe | null;
+    const appRecipeConfig = window.appConfig.get('recipe') as Recipe | null;
     if (appRecipeConfig) {
       return appRecipeConfig;
     }
@@ -69,7 +69,7 @@ export const useRecipeManager = (messages: Message[], locationState?: LocationSt
 
     // If we have a recipe from app config (deeplink), persist it
     // But only if the chat context doesn't explicitly have null (which indicates it was cleared)
-    const appRecipeConfig = window.appConfig.get('recipeConfig') as Recipe | null;
+    const appRecipeConfig = window.appConfig.get('recipe') as Recipe | null;
     if (appRecipeConfig && chatContext.chat.recipeConfig === undefined) {
       // Only set if recipeConfig is undefined, not if it's explicitly null
       chatContext.setRecipeConfig(appRecipeConfig);
@@ -209,16 +209,6 @@ export const useRecipeManager = (messages: Message[], locationState?: LocationSt
           throw new Error('No recipe data received');
         }
 
-        // Create a new window for the recipe editor
-        const recipeConfig = {
-          id: response.recipe.title || 'untitled',
-          title: response.recipe.title || 'Untitled Recipe',
-          description: response.recipe.description || '',
-          instructions: response.recipe.instructions || '',
-          activities: response.recipe.activities || [],
-          prompt: response.recipe.prompt || '',
-        };
-
         // Set a flag to prevent the current window from reacting to recipe config changes
         // This prevents navigation conflicts when creating new windows
         window.sessionStorage.setItem('ignoreRecipeConfigChanges', 'true');
@@ -229,7 +219,7 @@ export const useRecipeManager = (messages: Message[], locationState?: LocationSt
           undefined, // dir
           undefined, // version
           undefined, // resumeSessionId
-          recipeConfig, // recipe config
+          response.recipe, // recipe config
           'recipeEditor' // view type
         );
 

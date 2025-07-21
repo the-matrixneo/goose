@@ -6,6 +6,7 @@ use std::fmt;
 use crate::agents::extension::ExtensionConfig;
 use serde::de::Deserializer;
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 pub mod build_recipe;
 pub mod read_recipe_file_content;
@@ -67,7 +68,7 @@ fn default_version() -> String {
 ///     sub_recipes: None,
 /// };
 ///
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct Recipe {
     // Required fields
     #[serde(default = "default_version")]
@@ -110,7 +111,7 @@ pub struct Recipe {
     pub sub_recipes: Option<Vec<SubRecipe>>, // sub-recipes for the recipe
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct Author {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub contact: Option<String>, // creator/contact information of the recipe
@@ -119,7 +120,7 @@ pub struct Author {
     pub metadata: Option<String>, // any additional metadata for the author
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct Settings {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub goose_provider: Option<String>,
@@ -131,13 +132,13 @@ pub struct Settings {
     pub temperature: Option<f32>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct Response {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub json_schema: Option<serde_json::Value>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct SubRecipe {
     pub name: String,
     pub path: String,
@@ -145,6 +146,8 @@ pub struct SubRecipe {
     pub values: Option<HashMap<String, String>>,
     #[serde(default)]
     pub sequential_when_repeated: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
 }
 
 fn deserialize_value_map_as_string<'de, D>(
@@ -172,7 +175,7 @@ where
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum RecipeParameterRequirement {
     Required,
@@ -190,7 +193,7 @@ impl fmt::Display for RecipeParameterRequirement {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum RecipeParameterInputType {
     String,
@@ -198,6 +201,7 @@ pub enum RecipeParameterInputType {
     Boolean,
     Date,
     File,
+    Select,
 }
 
 impl fmt::Display for RecipeParameterInputType {
@@ -210,7 +214,7 @@ impl fmt::Display for RecipeParameterInputType {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct RecipeParameter {
     pub key: String,
     pub input_type: RecipeParameterInputType,
@@ -218,6 +222,8 @@ pub struct RecipeParameter {
     pub description: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub options: Option<Vec<String>>,
 }
 
 /// Builder for creating Recipe instances

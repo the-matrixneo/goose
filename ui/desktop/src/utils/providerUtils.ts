@@ -71,12 +71,10 @@ const substituteParameters = (text: string, params: Record<string, string>): str
  */
 export const updateSystemPromptWithParameters = async (
   recipeParameters: Record<string, string>,
-  recipeConfig?: { instructions?: string }
+  recipeConfig?: { instructions?: string | null }
 ): Promise<void> => {
   try {
-    // Use provided recipe config or fall back to app config
-    const config = recipeConfig || window.appConfig?.get?.('recipeConfig');
-    const originalInstructions = (config as { instructions?: string })?.instructions;
+    const originalInstructions = recipeConfig?.instructions;
 
     if (!originalInstructions) {
       return;
@@ -193,7 +191,7 @@ export const initializeSystem = async (
     await initializeAgent({ provider, model });
 
     // Get recipeConfig directly here
-    const recipeConfig = window.appConfig?.get?.('recipeConfig');
+    const recipeConfig = window.appConfig?.get?.('recipe');
     const botPrompt = (recipeConfig as { instructions?: string })?.instructions;
     const responseConfig = (recipeConfig as { response?: { json_schema?: unknown } })?.response;
 
