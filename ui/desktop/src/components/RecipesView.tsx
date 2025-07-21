@@ -21,7 +21,7 @@ import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { Skeleton } from './ui/skeleton';
 import { MainPanelLayout } from './Layout/MainPanelLayout';
-import { Recipe, decodeRecipe } from '../recipe';
+import { Recipe, decodeRecipe, generateDeepLink } from '../recipe';
 import { toastSuccess, toastError } from '../toasts';
 
 interface RecipesViewProps {
@@ -42,6 +42,7 @@ export default function RecipesView({ _onLoadRecipe }: RecipesViewProps = {}) {
   const [importRecipeName, setImportRecipeName] = useState('');
   const [importGlobal, setImportGlobal] = useState(true);
   const [importing, setImporting] = useState(false);
+  const [previewDeeplink, setPreviewDeeplink] = useState<string>('');
 
   // Create Recipe state
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -142,9 +143,18 @@ export default function RecipesView({ _onLoadRecipe }: RecipesViewProps = {}) {
     }
   };
 
-  const handlePreviewRecipe = (savedRecipe: SavedRecipe) => {
+  const handlePreviewRecipe = async (savedRecipe: SavedRecipe) => {
     setSelectedRecipe(savedRecipe);
     setShowPreview(true);
+
+    // Generate deeplink for preview
+    try {
+      const deeplink = await generateDeepLink(savedRecipe.recipe);
+      setPreviewDeeplink(deeplink);
+    } catch (error) {
+      console.error('Failed to generate deeplink for preview:', error);
+      setPreviewDeeplink('Error generating deeplink');
+    }
   };
 
   // Function to parse deeplink and extract recipe
@@ -555,12 +565,10 @@ Parameters you can use:
                       Copy this link to share with friends or paste directly in Chrome to open
                     </div>
                     <Button
-                      onClick={() => {
+                      onClick={async () => {
                         try {
-                          const recipeJson = JSON.stringify(selectedRecipe.recipe);
-                          const base64Config = window.btoa(recipeJson);
-                          const encodedConfig = encodeURIComponent(base64Config);
-                          const deeplink = `goose://recipe?config=${encodedConfig}`;
+                          const deeplink =
+                            previewDeeplink || (await generateDeepLink(selectedRecipe.recipe));
                           navigator.clipboard.writeText(deeplink);
                           toastSuccess({
                             title: 'Copied!',
@@ -582,12 +590,10 @@ Parameters you can use:
                     </Button>
                   </div>
                   <div
-                    onClick={() => {
+                    onClick={async () => {
                       try {
-                        const recipeJson = JSON.stringify(selectedRecipe.recipe);
-                        const base64Config = window.btoa(recipeJson);
-                        const encodedConfig = encodeURIComponent(base64Config);
-                        const deeplink = `goose://recipe?config=${encodedConfig}`;
+                        const deeplink =
+                          previewDeeplink || (await generateDeepLink(selectedRecipe.recipe));
                         navigator.clipboard.writeText(deeplink);
                         toastSuccess({
                           title: 'Copied!',
@@ -603,16 +609,7 @@ Parameters you can use:
                     }}
                     className="text-sm truncate font-mono cursor-pointer text-text-standard"
                   >
-                    {(() => {
-                      try {
-                        const recipeJson = JSON.stringify(selectedRecipe.recipe);
-                        const base64Config = window.btoa(recipeJson);
-                        const encodedConfig = encodeURIComponent(base64Config);
-                        return `goose://recipe?config=${encodedConfig}`;
-                      } catch {
-                        return 'Error generating deeplink';
-                      }
-                    })()}
+                    {previewDeeplink || 'Generating deeplink...'}
                   </div>
                 </div>
               </div>
@@ -767,7 +764,7 @@ Parameters you can use:
                               </span>
                             )}
                           </div>
-                          {extension.description && (
+                          {'description' in extension && extension.description && (
                             <p className="text-sm text-text-muted mb-2">{extension.description}</p>
                           )}
 

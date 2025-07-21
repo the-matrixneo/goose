@@ -196,7 +196,6 @@ export type ExtensionConfig = {
      * Whether this extension is bundled with Goose
      */
     bundled?: boolean | null;
-    description?: string | null;
     /**
      * Instructions for how to use these tools
      */
