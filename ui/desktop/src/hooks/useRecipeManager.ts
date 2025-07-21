@@ -103,13 +103,8 @@ export const useRecipeManager = (messages: Message[], locationState?: LocationSt
     return substitutedPrompt;
   };
 
-  // Pre-fill input with recipe prompt instead of auto-sending it
+  // Get the recipe's initial prompt (always return the actual prompt, don't modify based on conversation state)
   const initialPrompt = useMemo(() => {
-    // Don't show initial prompt if we already have messages (ongoing conversation)
-    if (messages.length > 0) {
-      return '';
-    }
-
     if (!recipeConfig?.prompt) return '';
 
     const hasRequiredParams = recipeConfig.parameters && recipeConfig.parameters.length > 0;
@@ -126,7 +121,7 @@ export const useRecipeManager = (messages: Message[], locationState?: LocationSt
 
     // Otherwise, we are waiting for parameters, so the input should be empty.
     return '';
-  }, [recipeConfig, recipeParameters, messages.length]);
+  }, [recipeConfig, recipeParameters]);
 
   // Handle parameter submission
   const handleParameterSubmit = async (inputValues: Record<string, string>) => {

@@ -485,7 +485,7 @@ function BaseChatContent({
             isLoading={isLoading}
             onStop={onStopGoose}
             commandHistory={commandHistory}
-            initialValue={_input || initialPrompt}
+            initialValue={_input || (messages.length === 0 ? initialPrompt : '')}
             setView={setView}
             numTokens={sessionTokenCount}
             inputTokens={sessionInputTokens || localInputTokens}
