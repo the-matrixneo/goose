@@ -207,7 +207,7 @@ function BaseChatContent({
     if (hasRecipeChanged) {
       setCurrentRecipeTitle(newTitle);
 
-      const isSwitchingBetweenRecipes = previousTitle && newTitle && previousTitle !== newTitle;
+      const isSwitchingBetweenRecipes = previousTitle && newTitle;
       const isInitialRecipeLoad = !previousTitle && newTitle && messages.length === 0;
       const hasExistingConversation = newTitle && messages.length > 0;
 
