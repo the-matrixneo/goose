@@ -437,11 +437,26 @@ fn print_markdown(content: &str, theme: Theme) {
 
 const INDENT: &str = "    ";
 
-fn get_tool_params_max_length() -> usize {
-    Config::global()
-        .get_param::<usize>("GOOSE_CLI_TOOL_PARAMS_TRUNCATION_MAX_LENGTH")
-        .ok()
-        .unwrap_or(40)
+fn get_tool_params_max_length(key: &str) -> usize {
+    // Special handling for text_instruction to show more content
+    if key == "text_instruction" {
+        200 // Allow longer display for text instructions
+    } else {
+        Config::global()
+            .get_param::<usize>("GOOSE_CLI_TOOL_PARAMS_TRUNCATION_MAX_LENGTH")
+            .ok()
+            .unwrap_or(40)
+    }
+}
+
+fn get_preview(key: &str, value: &str, max_length: usize) -> String {
+    match key {
+        "text_instruction" => {
+            let preview = &value[..max_length.saturating_sub(3)];
+            format!("{}...", preview)
+        }
+        _ => "...".to_string(),
+    }
 }
 
 fn print_params(value: &Value, depth: usize, debug: bool) {
@@ -463,26 +478,16 @@ fn print_params(value: &Value, depth: usize, debug: bool) {
                         }
                     }
                     Value::String(s) => {
-                        // Special handling for text_instruction to show more content
-                        let max_length = if key == "text_instruction" {
-                            200 // Allow longer display for text instructions
-                        } else {
-                            get_tool_params_max_length()
-                        };
+                        let max_length = get_tool_params_max_length(key);
 
                         if !debug && s.len() > max_length {
-                            // For text instructions, show a preview instead of just "..."
-                            if key == "text_instruction" {
-                                let preview = &s[..max_length.saturating_sub(3)];
-                                println!(
-                                    "{}{}: {}",
-                                    indent,
-                                    style(key).dim(),
-                                    style(format!("{}...", preview)).green()
-                                );
-                            } else {
-                                println!("{}{}: {}", indent, style(key).dim(), style("...").dim());
-                            }
+                            let preview = get_preview(key, s, max_length);
+                            println!(
+                                "{}{}: {}",
+                                indent,
+                                style(key).dim(),
+                                style(preview).green()
+                            );
                         } else {
                             println!("{}{}: {}", indent, style(key).dim(), style(s).green());
                         }
@@ -506,7 +511,7 @@ fn print_params(value: &Value, depth: usize, debug: bool) {
             }
         }
         Value::String(s) => {
-            if !debug && s.len() > get_tool_params_max_length() {
+            if !debug && s.len() > get_tool_params_max_length("value") {
                 println!(
                     "{}{}",
                     indent,
