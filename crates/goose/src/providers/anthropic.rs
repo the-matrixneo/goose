@@ -7,7 +7,6 @@ use reqwest::{Client, StatusCode};
 use serde_json::Value;
 use std::io;
 use std::sync::Arc;
-use std::time::Duration;
 use tokio::pin;
 
 use tokio_util::io::StreamReader;

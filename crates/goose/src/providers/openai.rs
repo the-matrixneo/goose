@@ -7,7 +7,6 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::io;
 use std::sync::Arc;
-use std::time::Duration;
 use tokio::pin;
 use tokio_stream::StreamExt;
 use tokio_util::codec::{FramedRead, LinesCodec};
@@ -26,7 +25,6 @@ use crate::message::Message;
 use crate::model::ModelConfig;
 use crate::providers::base::MessageStream;
 use crate::providers::formats::openai::response_to_streaming_message;
-use crate::providers::utils::handle_status_openai_compat;
 use mcp_core::tool::Tool;
 
 pub const OPEN_AI_DEFAULT_MODEL: &str = "gpt-4o";
@@ -237,7 +235,7 @@ impl Provider for OpenAiProvider {
         let payload = create_request(&self.model, system, messages, tools, &ImageFormat::OpenAi)?;
 
         // Make request
-        let response = handle_response_openai_compat(self.post(payload.clone()).await?).await?;
+        let response = self.post(payload.clone()).await?;
 
         // Parse response
         let message = response_to_message(response.clone())?;

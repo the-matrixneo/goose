@@ -241,7 +241,7 @@ impl GcpVertexAIProvider {
             if status == StatusCode::TOO_MANY_REQUESTS || status == *STATUS_API_OVERLOADED {
                 // Try to parse response for more detailed error info
                 let response_text = response.text().await.unwrap_or_default();
-                
+
                 if status == StatusCode::TOO_MANY_REQUESTS {
                     let cite_gcp_vertex_429 =
                         "See https://cloud.google.com/vertex-ai/generative-ai/docs/error-code-429";
