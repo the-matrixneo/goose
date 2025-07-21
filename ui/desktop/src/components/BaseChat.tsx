@@ -201,23 +201,25 @@ function BaseChatContent({
   // Reset recipe usage tracking when recipe changes
   useEffect(() => {
     const previousTitle = currentRecipeTitle;
+    const newTitle = recipeConfig?.title || null;
+    const hasRecipeChanged = newTitle !== currentRecipeTitle;
 
-    if (recipeConfig?.title !== currentRecipeTitle) {
-      setCurrentRecipeTitle(recipeConfig?.title || null);
+    if (hasRecipeChanged) {
+      setCurrentRecipeTitle(newTitle);
 
-      // Only reset usage if we're switching between different recipes
-      // Don't reset if we're going from no recipe to a recipe (initial load)
-      // or if we already have messages (ongoing conversation)
-      if (previousTitle && recipeConfig?.title && previousTitle !== recipeConfig.title) {
-        console.log('Switching from recipe:', previousTitle, 'to:', recipeConfig.title);
+      const isSwitchingBetweenRecipes = previousTitle && newTitle && previousTitle !== newTitle;
+      const isInitialRecipeLoad = !previousTitle && newTitle && messages.length === 0;
+      const hasExistingConversation = newTitle && messages.length > 0;
+
+      if (isSwitchingBetweenRecipes) {
+        console.log('Switching from recipe:', previousTitle, 'to:', newTitle);
         setHasStartedUsingRecipe(false);
         setMessages([]);
         setAncestorMessages([]);
-      } else if (!previousTitle && recipeConfig?.title && messages.length === 0) {
+      } else if (isInitialRecipeLoad) {
         setHasStartedUsingRecipe(false);
-        // Only clear messages if we don't have any yet
-      } else if (recipeConfig?.title && messages.length > 0) {
-        setHasStartedUsingRecipe(true); // Mark as started since we have messages
+      } else if (hasExistingConversation) {
+        setHasStartedUsingRecipe(true);
       }
     }
   }, [recipeConfig?.title, currentRecipeTitle, messages.length, setMessages, setAncestorMessages]);
