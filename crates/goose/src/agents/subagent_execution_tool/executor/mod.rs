@@ -16,10 +16,20 @@ use tokio::time::Instant;
 const EXECUTION_STATUS_COMPLETED: &str = "completed";
 const DEFAULT_MAX_WORKERS: usize = 10;
 
+/// Sets up cancellation handling for a task execution tracker
+async fn setup_cancellation_handling(
+    cancellation_token: tokio_util::sync::CancellationToken,
+    task_execution_tracker: Arc<TaskExecutionTracker>,
+) {
+    cancellation_token.cancelled().await;
+    task_execution_tracker.mark_cancelled();
+}
+
 pub async fn execute_single_task(
     task: &Task,
     notifier: mpsc::Sender<JsonRpcMessage>,
     task_config: TaskConfig,
+    cancellation_token: tokio_util::sync::CancellationToken,
 ) -> ExecutionResponse {
     let start_time = Instant::now();
     let task_execution_tracker = Arc::new(TaskExecutionTracker::new(
@@ -27,9 +37,22 @@ pub async fn execute_single_task(
         DisplayMode::SingleTaskOutput,
         notifier,
     ));
-    let result = process_task(task, task_execution_tracker.clone(), task_config).await;
 
-    // Complete the task in the tracker
+    let cancellation_future =
+        setup_cancellation_handling(cancellation_token, task_execution_tracker.clone());
+
+    let result = tokio::select! {
+        result = process_task(task, task_execution_tracker.clone(), task_config) => result,
+        _ = cancellation_future => {
+            crate::agents::subagent_execution_tool::task_types::TaskResult {
+                task_id: task.id.clone(),
+                status: crate::agents::subagent_execution_tool::task_types::TaskStatus::Failed,
+                data: None,
+                error: Some("Task execution cancelled".to_string()),
+            }
+        }
+    };
+
     task_execution_tracker
         .complete_task(&result.task_id, result.clone())
         .await;
@@ -48,12 +71,19 @@ pub async fn execute_tasks_in_parallel(
     tasks: Vec<Task>,
     notifier: mpsc::Sender<JsonRpcMessage>,
     task_config: TaskConfig,
+    cancellation_token: tokio_util::sync::CancellationToken,
 ) -> ExecutionResponse {
     let task_execution_tracker = Arc::new(TaskExecutionTracker::new(
         tasks.clone(),
         DisplayMode::MultipleTasksOutput,
         notifier,
     ));
+
+    tokio::spawn(setup_cancellation_handling(
+        cancellation_token,
+        task_execution_tracker.clone(),
+    ));
+
     let start_time = Instant::now();
     let task_count = tasks.len();
 

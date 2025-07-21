@@ -1169,6 +1169,8 @@ impl Session {
                     }
                 }
                 _ = tokio::signal::ctrl_c() => {
+                    self.agent.cancel_all_subagent_executions().await;
+
                     drop(stream);
                     if let Err(e) = self.handle_interrupted_messages(true).await {
                         eprintln!("Error handling interruption: {}", e);

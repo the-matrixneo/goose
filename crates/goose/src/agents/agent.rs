@@ -179,6 +179,10 @@ impl Agent {
         *scheduler_service = Some(scheduler);
     }
 
+    pub async fn cancel_all_subagent_executions(&self) {
+        self.tasks_manager.cancel_all_executions().await;
+    }
+
     /// Get a reference count clone to the provider
     pub async fn provider(&self) -> Result<Arc<dyn Provider>, anyhow::Error> {
         match &*self.provider.lock().await {

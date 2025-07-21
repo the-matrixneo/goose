@@ -31,7 +31,12 @@ async fn worker_loop(state: Arc<SharedState>, _worker_id: usize, task_config: Ta
         .await;
 
         if let Err(e) = state.result_sender.send(result).await {
-            tracing::error!("Worker failed to send result: {}", e);
+            let is_cancelled_channel_closed = state.task_execution_tracker.is_cancelled()
+                && e.to_string().contains("channel closed");
+
+            if !is_cancelled_channel_closed {
+                tracing::error!("Worker failed to send result: {}", e);
+            }
             break;
         }
     }

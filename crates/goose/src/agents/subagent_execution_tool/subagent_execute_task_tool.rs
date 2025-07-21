@@ -10,6 +10,7 @@ use crate::agents::{
 use mcp_core::protocol::JsonRpcMessage;
 use tokio::sync::mpsc;
 use tokio_stream;
+use tokio_util::sync::CancellationToken;
 
 pub const SUBAGENT_EXECUTE_TASK_TOOL_NAME: &str = "subagent__execute_task";
 pub fn create_subagent_execute_task_tool() -> Tool {
@@ -65,29 +66,41 @@ pub async fn run_tasks(
     tasks_manager: &TasksManager,
 ) -> ToolCallResult {
     let (notification_tx, notification_rx) = mpsc::channel::<JsonRpcMessage>(100);
+    let cancellation_token = CancellationToken::new();
+
+    // Register the execution with the tasks manager
+    tasks_manager
+        .register_execution(cancellation_token.clone())
+        .await;
 
     let tasks_manager_clone = tasks_manager.clone();
+    let cancellation_token_clone = cancellation_token.clone();
     let result_future = async move {
-        let execute_data_clone = execute_data.clone();
-        let execution_mode = execute_data_clone
+        let execution_mode = execute_data
             .get("execution_mode")
             .and_then(|v| serde_json::from_value::<ExecutionMode>(v.clone()).ok())
             .unwrap_or_default();
 
-        match execute_tasks(
-            execute_data,
-            execution_mode,
-            notification_tx,
-            task_config,
-            &tasks_manager_clone,
-        )
-        .await
-        {
-            Ok(result) => {
-                let output = serde_json::to_string(&result).unwrap();
-                Ok(vec![Content::text(output)])
+        tokio::select! {
+            result = execute_tasks(
+                execute_data,
+                execution_mode,
+                notification_tx,
+                task_config,
+                &tasks_manager_clone,
+                cancellation_token_clone.clone(),
+            ) => {
+                match result {
+                    Ok(result) => {
+                        let output = serde_json::to_string(&result).unwrap();
+                        Ok(vec![Content::text(output)])
+                    }
+                    Err(e) => Err(ToolError::ExecutionError(e.to_string())),
+                }
             }
-            Err(e) => Err(ToolError::ExecutionError(e.to_string())),
+            _ = cancellation_token_clone.cancelled() => {
+                Err(ToolError::ExecutionError("Task execution cancelled".to_string()))
+            }
         }
     };
 

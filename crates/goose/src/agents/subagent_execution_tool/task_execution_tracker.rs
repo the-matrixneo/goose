@@ -1,6 +1,7 @@
 use mcp_core::protocol::{JsonRpcMessage, JsonRpcNotification};
 use serde_json::json;
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
 use tokio::time::{sleep, Duration, Instant};
@@ -61,6 +62,7 @@ pub struct TaskExecutionTracker {
     last_refresh: Arc<RwLock<Instant>>,
     notifier: mpsc::Sender<JsonRpcMessage>,
     display_mode: DisplayMode,
+    is_cancelled: Arc<AtomicBool>,
 }
 
 impl TaskExecutionTracker {
@@ -92,6 +94,7 @@ impl TaskExecutionTracker {
             last_refresh: Arc::new(RwLock::new(Instant::now())),
             notifier,
             display_mode,
+            is_cancelled: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -162,7 +165,9 @@ impl TaskExecutionTracker {
                             })),
                         }))
                 {
-                    tracing::warn!("Failed to send live output notification: {}", e);
+                    if !self.should_suppress_error(&e) {
+                        tracing::warn!("Failed to send live output notification: {}", e);
+                    }
                 }
             }
             DisplayMode::MultipleTasksOutput => {
@@ -235,7 +240,9 @@ impl TaskExecutionTracker {
                 })),
             }))
         {
-            tracing::warn!("Failed to send tasks update notification: {}", e);
+            if !self.should_suppress_error(&e) {
+                tracing::warn!("Failed to send tasks update notification: {}", e);
+            }
         }
     }
 
@@ -296,10 +303,36 @@ impl TaskExecutionTracker {
                 })),
             }))
         {
-            tracing::warn!("Failed to send tasks complete notification: {}", e);
+            if !self.should_suppress_error(&e) {
+                tracing::warn!("Failed to send tasks complete notification: {}", e);
+            }
         }
 
         // Brief delay to ensure completion notification is processed
-        sleep(Duration::from_millis(COMPLETION_NOTIFICATION_DELAY_MS)).await;
+        if !self.is_cancelled() {
+            sleep(Duration::from_millis(COMPLETION_NOTIFICATION_DELAY_MS)).await;
+        }
+    }
+
+    fn is_channel_closed(
+        &self,
+        error: &tokio::sync::mpsc::error::TrySendError<JsonRpcMessage>,
+    ) -> bool {
+        matches!(error, tokio::sync::mpsc::error::TrySendError::Closed(_))
+    }
+
+    pub fn should_suppress_error(
+        &self,
+        error: &tokio::sync::mpsc::error::TrySendError<JsonRpcMessage>,
+    ) -> bool {
+        self.is_cancelled() && self.is_channel_closed(error)
+    }
+
+    pub fn is_cancelled(&self) -> bool {
+        self.is_cancelled.load(Ordering::SeqCst)
+    }
+
+    pub fn mark_cancelled(&self) {
+        self.is_cancelled.store(true, Ordering::SeqCst);
     }
 }
