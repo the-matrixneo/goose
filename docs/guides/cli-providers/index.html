@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://www.googletagmanager.com">
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZS5D6SB4ZJ"></script>
 <script>function gtag(){dataLayer.push(arguments)}window.dataLayer=window.dataLayer||[],gtag("js",new Date),gtag("config","G-ZS5D6SB4ZJ",{anonymize_ip:!0})</script><link rel="stylesheet" href="/goose/assets/css/styles.4f50fa0c.css">
-<script src="/goose/assets/js/runtime~main.111395cf.js" defer="defer"></script>
+<script src="/goose/assets/js/runtime~main.3ebb2951.js" defer="defer"></script>
 <script src="/goose/assets/js/main.3b075600.js" defer="defer"></script>
 </head>
 <body class="navigation-with-keyboard">
@@ -119,7 +119,7 @@
 <h3 class="anchor anchorWithStickyNavbar_LWe7" id="claude-code-configuration">Claude Code Configuration<a href="#claude-code-configuration" class="hash-link" aria-label="Direct link to Claude Code Configuration" title="Direct link to Claude Code Configuration">​</a></h3>
 <table><thead><tr><th>Environment Variable</th><th>Description</th><th>Default</th></tr></thead><tbody><tr><td><code>GOOSE_PROVIDER</code></td><td>Set to <code>claude-code</code> to use this provider</td><td>None</td></tr><tr><td><code>CLAUDE_CODE_COMMAND</code></td><td>Path to the Claude CLI command</td><td><code>claude</code></td></tr></tbody></table>
 <h3 class="anchor anchorWithStickyNavbar_LWe7" id="gemini-cli-configuration">Gemini CLI Configuration<a href="#gemini-cli-configuration" class="hash-link" aria-label="Direct link to Gemini CLI Configuration" title="Direct link to Gemini CLI Configuration">​</a></h3>
-<table><thead><tr><th>Environment Variable</th><th>Description</th><th>Default</th></tr></thead><tbody><tr><td><code>GOOSE_PROVIDER</code></td><td>Set to <code>gemini-cli</code> to use this provider</td><td>None</td></tr></tbody></table>
+<table><thead><tr><th>Environment Variable</th><th>Description</th><th>Default</th></tr></thead><tbody><tr><td><code>GOOSE_PROVIDER</code></td><td>Set to <code>gemini-cli</code> to use this provider</td><td>None</td></tr><tr><td><code>GEMINI_CLI_COMMAND</code></td><td>Path to the Gemini CLI command</td><td><code>gemini</code></td></tr></tbody></table>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="how-it-works">How It Works<a href="#how-it-works" class="hash-link" aria-label="Direct link to How It Works" title="Direct link to How It Works">​</a></h2>
 <h3 class="anchor anchorWithStickyNavbar_LWe7" id="system-prompt-filtering">System Prompt Filtering<a href="#system-prompt-filtering" class="hash-link" aria-label="Direct link to System Prompt Filtering" title="Direct link to System Prompt Filtering">​</a></h3>
 <p>Both CLI providers automatically filter out Goose&#x27;s extension information from system prompts since these CLI tools have their own tool ecosystems. This prevents conflicts and ensures clean interaction with the underlying CLI tools.</p>
