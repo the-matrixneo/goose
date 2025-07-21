@@ -321,7 +321,7 @@ impl TaskExecutionTracker {
         matches!(error, tokio::sync::mpsc::error::TrySendError::Closed(_))
     }
 
-    pub fn should_suppress_error(
+    fn should_suppress_error(
         &self,
         error: &tokio::sync::mpsc::error::TrySendError<JsonRpcMessage>,
     ) -> bool {
