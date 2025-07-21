@@ -1439,7 +1439,7 @@ impl Session {
         }
 
         // Calculate actual current token count from messages
-        let current_token_count = self.agent.get_current_token_count(&self.messages).await?;
+        let current_token_count = self.calculate_current_token_count().await?;
         
         output::display_context_usage(current_token_count, context_limit);
 
@@ -1466,6 +1466,32 @@ impl Session {
         Ok(())
     }
 
+    /// Calculate the current token count of the messages in memory
+    async fn calculate_current_token_count(&self) -> Result<usize> {
+        use goose::token_counter::create_async_token_counter;
+        
+        let token_counter = create_async_token_counter().await
+            .map_err(|e| anyhow::anyhow!("Failed to create token counter: {}", e))?;
+        
+        // Get tools from agent
+        let tools = self.agent.list_tools(None).await;
+        
+        // For now, use a simplified system prompt calculation
+        // In a real implementation, we'd want to access the agent's prompt manager
+        // but since it's private, we'll use an empty system prompt as approximation
+        let system_prompt = ""; // This is a simplification
+        
+        let resources = vec![]; // No direct way to get resources currently
+        
+        let token_count = token_counter.count_everything(
+            system_prompt,
+            &self.messages,
+            &tools,
+            &resources,
+        );
+        
+        Ok(token_count)
+    }
 
     /// Handle prompt command execution
     async fn handle_prompt_command(&mut self, opts: input::PromptCommandOptions) -> Result<()> {
