@@ -200,8 +200,9 @@ function BaseChatContent({
 
   // Reset recipe usage tracking when recipe changes
   useEffect(() => {
+    const previousTitle = currentRecipeTitle;
+
     if (recipeConfig?.title !== currentRecipeTitle) {
-      const previousTitle = currentRecipeTitle;
       setCurrentRecipeTitle(recipeConfig?.title || null);
 
       // Only reset usage if we're switching between different recipes
