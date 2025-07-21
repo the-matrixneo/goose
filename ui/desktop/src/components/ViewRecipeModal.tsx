@@ -99,17 +99,25 @@ export default function ViewRecipeModal({ isOpen, onClose, config }: ViewRecipeM
     const promptParams = parseParametersFromInstructions(prompt);
 
     // Combine all detected parameters, ensuring no duplicates by key
-    const detectedParams = [...instructionsParams];
-    promptParams.forEach((promptParam) => {
-      if (!detectedParams.some((param) => param.key === promptParam.key)) {
-        detectedParams.push(promptParam);
+    const detectedParamsMap = new Map<string, Parameter>();
+
+    // Add instruction parameters
+    instructionsParams.forEach((param) => {
+      detectedParamsMap.set(param.key, param);
+    });
+
+    // Add prompt parameters (won't overwrite existing keys)
+    promptParams.forEach((param) => {
+      if (!detectedParamsMap.has(param.key)) {
+        detectedParamsMap.set(param.key, param);
       }
     });
 
-    // Only add parameters that don't already exist in our current parameters
-    const newParams = detectedParams.filter(
-      (detectedParam) =>
-        !parameters.some((existingParam) => existingParam.key === detectedParam.key)
+    const existingParamKeys = new Set(parameters.map((param) => param.key));
+
+    // Only add parameters that don't already exist
+    const newParams = Array.from(detectedParamsMap.values()).filter(
+      (detectedParam) => !existingParamKeys.has(detectedParam.key)
     );
 
     if (newParams.length > 0) {
