@@ -167,6 +167,7 @@ impl GoogleDriveRouter {
             } else {
                 Arc::new(goose::keyring::SystemKeyringBackend)
             };
+        // Use factory to create keyring backend consistently
 
         // Create a credentials manager for storing tokens securely
         let credentials_manager = Arc::new(CredentialsManager::new(
