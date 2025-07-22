@@ -2,6 +2,7 @@ on:
   push:
     branches:
       - main
+      - jackamadeo/split-tests # For testing purposes
   pull_request:
     branches:
       - main
