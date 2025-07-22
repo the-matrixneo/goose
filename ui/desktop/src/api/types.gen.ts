@@ -397,7 +397,7 @@ export type ProvidersResponse = {
  * * `author` - Information about the Recipe's creator and metadata
  * * `parameters` - Additional parameters for the Recipe
  * * `response` - Response configuration including JSON schema validation
- *
+ * * `retry` - Retry configuration for automated validation and recovery
  * # Example
  *
  *
@@ -426,6 +426,7 @@ export type ProvidersResponse = {
  * parameters: None,
  * response: None,
  * sub_recipes: None,
+ * retry: None,
  * };
  *
  */
@@ -439,6 +440,7 @@ export type Recipe = {
     parameters?: Array<RecipeParameter> | null;
     prompt?: string | null;
     response?: Response | null;
+    retry?: RetryConfig | null;
     settings?: Settings | null;
     sub_recipes?: Array<SubRecipe> | null;
     title: string;
@@ -474,6 +476,32 @@ export type ResourceContents = {
 
 export type Response = {
     json_schema?: unknown;
+};
+
+/**
+ * Configuration for retry logic in recipe execution
+ */
+export type RetryConfig = {
+    /**
+     * List of success checks to validate recipe completion
+     */
+    checks: Array<SuccessCheck>;
+    /**
+     * Maximum number of retry attempts before giving up
+     */
+    max_retries: number;
+    /**
+     * Optional shell command to run on failure for cleanup
+     */
+    on_failure?: string | null;
+    /**
+     * Timeout in seconds for on_failure commands (default: 600 seconds)
+     */
+    on_failure_timeout_seconds?: number | null;
+    /**
+     * Timeout in seconds for individual shell commands (default: 300 seconds)
+     */
+    timeout_seconds?: number | null;
 };
 
 export type Role = string;
@@ -603,6 +631,17 @@ export type SubRecipe = {
     values?: {
         [key: string]: string;
     } | null;
+};
+
+/**
+ * Execute a shell command and check its exit status
+ */
+export type SuccessCheck = {
+    /**
+     * The shell command to execute
+     */
+    command: string;
+    type: 'Shell';
 };
 
 export type SummarizationRequested = {
