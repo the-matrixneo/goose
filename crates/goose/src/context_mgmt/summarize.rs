@@ -665,7 +665,7 @@ mod tests {
             *count += 1;
 
             // Fail if this looks like a one-shot request (contains the one-shot prompt content)
-            if system.contains("expert at summarizing conversation histories") {
+            if system.contains("Summary Generation Instructions") {
                 return Err(ProviderError::RateLimitExceeded(
                     "Simulated one-shot failure".to_string(),
                 ));
