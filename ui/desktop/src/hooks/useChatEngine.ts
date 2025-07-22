@@ -153,7 +153,8 @@ export const useChatEngine = ({
     return Math.ceil(text.length / 4);
   };
 
-  // Calculate token counts from messages
+  // Calculate token counts from messages - this is just for local display
+  // The actual token count that matters comes from sessionMetadata
   useEffect(() => {
     let inputTokens = 0;
     let outputTokens = 0;
@@ -185,6 +186,8 @@ export const useChatEngine = ({
     const fetchSessionTokens = async () => {
       try {
         const sessionDetails = await fetchSessionDetails(chat.id);
+        // Use the actual total tokens from the session metadata, which includes
+        // system prompt and tool overhead - this matches what CLI shows
         setSessionTokenCount(sessionDetails.metadata.total_tokens || 0);
         setSessionInputTokens(sessionDetails.metadata.accumulated_input_tokens || 0);
         setSessionOutputTokens(sessionDetails.metadata.accumulated_output_tokens || 0);
@@ -201,6 +204,8 @@ export const useChatEngine = ({
   useEffect(() => {
     console.log('Session metadata received:', sessionMetadata);
     if (sessionMetadata) {
+      // Use the actual total tokens from the session metadata, which includes
+      // system prompt and tool overhead - this matches what CLI shows
       setSessionTokenCount(sessionMetadata.totalTokens || 0);
       setSessionInputTokens(sessionMetadata.accumulatedInputTokens || 0);
       setSessionOutputTokens(sessionMetadata.accumulatedOutputTokens || 0);

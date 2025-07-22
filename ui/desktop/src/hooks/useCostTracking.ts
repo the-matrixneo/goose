@@ -44,18 +44,20 @@ export const useCostTracking = ({
       const prevCostInfo = getCostForModel(prevProviderRef.current, prevModelRef.current);
 
       if (prevCostInfo) {
-        const prevInputCost =
-          (sessionInputTokens || localInputTokens) * (prevCostInfo.input_token_cost || 0);
-        const prevOutputCost =
-          (sessionOutputTokens || localOutputTokens) * (prevCostInfo.output_token_cost || 0);
+        // Use accumulated tokens for cost calculation to match CLI behavior
+        const prevInputTokens = sessionMetadata?.accumulated_input_tokens || sessionInputTokens || localInputTokens;
+        const prevOutputTokens = sessionMetadata?.accumulated_output_tokens || sessionOutputTokens || localOutputTokens;
+        
+        const prevInputCost = prevInputTokens * (prevCostInfo.input_token_cost || 0);
+        const prevOutputCost = prevOutputTokens * (prevCostInfo.output_token_cost || 0);
         const prevTotalCost = prevInputCost + prevOutputCost;
 
         // Save the accumulated costs for this model
         setSessionCosts((prev) => ({
           ...prev,
           [prevKey]: {
-            inputTokens: sessionInputTokens || localInputTokens,
-            outputTokens: sessionOutputTokens || localOutputTokens,
+            inputTokens: prevInputTokens,
+            outputTokens: prevOutputTokens,
             totalCost: prevTotalCost,
           },
         }));

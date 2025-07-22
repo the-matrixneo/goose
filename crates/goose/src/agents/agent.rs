@@ -1375,6 +1375,29 @@ impl Agent {
 
         Ok(recipe)
     }
+
+    /// Calculate the current context usage including system prompt and tool overhead
+    /// This matches what the desktop app shows and what actually gets sent to the LLM
+    pub async fn calculate_current_context_usage(&self, messages: &[Message]) -> Result<usize> {
+        use crate::token_counter::create_async_token_counter;
+        
+        let token_counter = create_async_token_counter()
+            .await
+            .map_err(|e| anyhow!("Failed to create token counter: {}", e))?;
+
+        // Get the system prompt and tools using the same method as the agent's reply function
+        let (tools, _toolshim_tools, system_prompt) = self.prepare_tools_and_prompt().await?;
+
+        // Calculate the total tokens including all overhead
+        let total_tokens = token_counter.count_everything(
+            &system_prompt,
+            messages,
+            &tools,
+            &[], // No resources for now
+        );
+
+        Ok(total_tokens)
+    }
 }
 
 #[cfg(test)]

@@ -1417,13 +1417,21 @@ impl Session {
 
         match self.get_metadata() {
             Ok(metadata) => {
-                let total_tokens = metadata.total_tokens.unwrap_or(0) as usize;
+                // Use accumulated tokens for proper session-wide tracking, fallback to current tokens
+                let total_tokens = metadata.accumulated_total_tokens
+                    .or(metadata.total_tokens)
+                    .unwrap_or(0) as usize;
 
                 output::display_context_usage(total_tokens, context_limit);
 
                 if show_cost {
-                    let input_tokens = metadata.input_tokens.unwrap_or(0) as usize;
-                    let output_tokens = metadata.output_tokens.unwrap_or(0) as usize;
+                    // Use accumulated tokens for cost calculation to match desktop behavior
+                    let input_tokens = metadata.accumulated_input_tokens
+                        .or(metadata.input_tokens)
+                        .unwrap_or(0) as usize;
+                    let output_tokens = metadata.accumulated_output_tokens
+                        .or(metadata.output_tokens)
+                        .unwrap_or(0) as usize;
                     output::display_cost_usage(
                         &provider_name,
                         &model_config.model_name,
@@ -1434,11 +1442,23 @@ impl Session {
                 }
             }
             Err(_) => {
-                output::display_context_usage(0, context_limit);
+                // When no session metadata is available, calculate the actual context usage
+                // including system prompt and tool overhead, just like the desktop app
+                let total_tokens = self.calculate_current_context_usage().await?;
+                output::display_context_usage(total_tokens, context_limit);
             }
         }
 
         Ok(())
+    }
+
+    /// Calculate the current context usage including system prompt and tool overhead
+    /// This matches what the desktop app shows and what actually gets sent to the LLM
+    async fn calculate_current_context_usage(&self) -> Result<usize> {
+        // Use the agent's method to calculate the current context usage
+        let total_tokens = self.agent.calculate_current_context_usage(&self.messages).await?;
+
+        Ok(total_tokens)
     }
 
     /// Handle prompt command execution
