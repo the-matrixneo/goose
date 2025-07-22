@@ -15,7 +15,8 @@ import AnnouncementModal from './components/AnnouncementModal';
 import { generateSessionId } from './sessions';
 import ProviderGuard from './components/ProviderGuard';
 
-import Hub, { type ChatType } from './components/hub';
+import { ChatType } from './types/chat';
+import Hub from './components/hub';
 import Pair from './components/pair';
 import SettingsView, { SettingsViewOptions } from './components/settings/SettingsView';
 import SessionsView from './components/sessions/SessionsView';

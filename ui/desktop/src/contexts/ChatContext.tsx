@@ -1,5 +1,5 @@
 import React, { createContext, useContext, ReactNode } from 'react';
-import { ChatType } from '../components/BaseChat';
+import { ChatType } from '../types/chat';
 import { generateSessionId } from '../sessions';
 import { Recipe } from '../recipe';
 import { useDraftContext } from './DraftContext';
