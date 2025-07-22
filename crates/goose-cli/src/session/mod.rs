@@ -28,6 +28,7 @@ use anyhow::{Context, Result};
 use completion::GooseCompleter;
 use etcetera::{choose_app_strategy, AppStrategy};
 use goose::agents::extension::{Envs, ExtensionConfig};
+use goose::agents::types::RetryConfig;
 use goose::agents::{Agent, SessionConfig};
 use goose::config::Config;
 use goose::message::{Message, MessageContent};
@@ -35,9 +36,9 @@ use goose::providers::pricing::initialize_pricing_cache;
 use goose::session;
 use input::InputResult;
 use mcp_core::handler::ToolError;
-use mcp_core::prompt::PromptMessage;
 use mcp_core::protocol::JsonRpcMessage;
 use mcp_core::protocol::JsonRpcNotification;
+use rmcp::model::PromptMessage;
 
 use rand::{distributions::Alphanumeric, Rng};
 use rustyline::EditMode;
@@ -64,6 +65,7 @@ pub struct Session {
     scheduled_job_id: Option<String>, // ID of the scheduled job that triggered this session
     max_turns: Option<u32>,
     edit_mode: Option<EditMode>,
+    retry_config: Option<RetryConfig>,
 }
 
 // Cache structure for completion data
@@ -127,6 +129,7 @@ impl Session {
         scheduled_job_id: Option<String>,
         max_turns: Option<u32>,
         edit_mode: Option<EditMode>,
+        retry_config: Option<RetryConfig>,
     ) -> Self {
         let messages = if let Some(session_file) = &session_file {
             match session::read_messages(session_file) {
@@ -151,6 +154,7 @@ impl Session {
             scheduled_job_id,
             max_turns,
             edit_mode,
+            retry_config,
         }
     }
 
@@ -358,8 +362,7 @@ impl Session {
     }
 
     pub async fn get_prompt(&mut self, name: &str, arguments: Value) -> Result<Vec<PromptMessage>> {
-        let result = self.agent.get_prompt(name, arguments).await?;
-        Ok(result.messages)
+        Ok(self.agent.get_prompt(name, arguments).await?.messages)
     }
 
     /// Process a single message and get the response
@@ -853,6 +856,7 @@ impl Session {
                 schedule_id: self.scheduled_job_id.clone(),
                 execution_mode: None,
                 max_turns: self.max_turns,
+                retry_config: self.retry_config.clone(),
             }
         });
         let mut stream = self
@@ -1189,7 +1193,7 @@ impl Session {
         let tool_requests = self
             .messages
             .last()
-            .filter(|msg| msg.role == mcp_core::role::Role::Assistant)
+            .filter(|msg| msg.role == rmcp::model::Role::Assistant)
             .map_or(Vec::new(), |msg| {
                 msg.content
                     .iter()
@@ -1261,7 +1265,7 @@ impl Session {
         } else {
             // An interruption occurred outside of a tool request-response.
             if let Some(last_msg) = self.messages.last() {
-                if last_msg.role == mcp_core::role::Role::User {
+                if last_msg.role == rmcp::model::Role::User {
                     match last_msg.content.first() {
                         Some(MessageContent::ToolResponse(_)) => {
                             // Interruption occurred after a tool had completed but not assistant reply
@@ -1466,9 +1470,9 @@ impl Session {
                         let msg = Message::from(prompt_message);
                         // ensure we get a User - Assistant - User type pattern
                         let expected_role = if i % 2 == 0 {
-                            mcp_core::Role::User
+                            rmcp::model::Role::User
                         } else {
-                            mcp_core::Role::Assistant
+                            rmcp::model::Role::Assistant
                         };
 
                         if msg.role != expected_role {
@@ -1482,7 +1486,7 @@ impl Session {
                             break;
                         }
 
-                        if msg.role == mcp_core::Role::User {
+                        if msg.role == rmcp::model::Role::User {
                             output::render_message(&msg, self.debug);
                         }
                         self.push_message(msg);
