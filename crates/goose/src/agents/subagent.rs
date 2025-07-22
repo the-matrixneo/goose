@@ -154,14 +154,14 @@ impl SubAgent {
         }
     }
 
-    /// Process a message and generate a response using the subagent's provider
+    /// Process a message and generate a response using the subagent's provider - minimizes reply loop for fast task execution
     #[instrument(skip(self, message))]
     pub async fn reply_subagent(
         &self,
         message: String,
         task_config: TaskConfig,
     ) -> Result<Message, anyhow::Error> {
-        debug!("Processing message for subagent {}", self.id);
+        debug!("Processing message for subagent {} (simple mode)", self.id);
         self.send_mcp_notification("message_processing", &format!("Processing: {}", message))
             .await;
 
@@ -178,20 +178,6 @@ impl SubAgent {
             .as_ref()
             .ok_or_else(|| anyhow!("No extension manager configured for subagent"))?;
 
-        // Check if we've exceeded max turns
-        {
-            let turn_count = *self.turn_count.lock().await;
-            if let Some(max_turns) = self.config.max_turns {
-                if turn_count >= max_turns {
-                    self.set_status(SubAgentStatus::Completed(
-                        "Maximum turns exceeded".to_string(),
-                    ))
-                    .await;
-                    return Err(anyhow!("Maximum turns ({}) exceeded", max_turns));
-                }
-            }
-        }
-
         // Set status to processing
         self.set_status(SubAgentStatus::Processing).await;
 
@@ -200,17 +186,6 @@ impl SubAgent {
         {
             let mut conversation = self.conversation.lock().await;
             conversation.push(user_message.clone());
-        }
-
-        // Increment turn count
-        {
-            let mut turn_count = self.turn_count.lock().await;
-            *turn_count += 1;
-            self.send_mcp_notification(
-                "turn_progress",
-                &format!("Turn {}/{}", turn_count, self.config.max_turns.unwrap_or(0)),
-            )
-            .await;
         }
 
         // Get the current conversation for context
@@ -229,8 +204,13 @@ impl SubAgent {
         // Build system prompt using the template
         let system_prompt = self.build_system_prompt(&tools).await?;
 
-        // Generate response from provider
+        // Generate response from provider with loop for tool processing (max_turns iterations)
+        let mut loop_count = 0;
+        let max_turns = self.config.max_turns.unwrap_or(2);
+
         loop {
+            loop_count += 1;
+
             match Agent::generate_response_from_provider(
                 Arc::clone(provider),
                 &system_prompt,
@@ -255,7 +235,7 @@ impl SubAgent {
                         .collect();
 
                     // If there are no tool requests, we're done
-                    if tool_requests.is_empty() {
+                    if tool_requests.is_empty() || loop_count >= max_turns {
                         self.add_message(response.clone()).await;
 
                         // Send notification about response
@@ -264,9 +244,6 @@ impl SubAgent {
                             &format!("Responded: {}", response.as_concat_text()),
                         )
                         .await;
-
-                        // Add delay before completion to ensure all processing finishes
-                        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
                         // Set status back to ready and return the final response
                         self.set_status(SubAgentStatus::Completed("Completed!".to_string()))
@@ -330,8 +307,6 @@ impl SubAgent {
                             }
                         }
                     }
-
-                    // Continue the loop to get the next response from the provider
                 }
                 Err(ProviderError::ContextLengthExceeded(_)) => {
                     self.set_status(SubAgentStatus::Completed(
@@ -354,180 +329,6 @@ impl SubAgent {
                     error!("Error: {}", e);
                     break Ok(Message::assistant().with_text(format!("Ran into this error: {e}.\n\nPlease retry if you think this is a transient or recoverable error.")));
                 }
-            }
-        }
-    }
-
-    /// Process a message and generate a response using the subagent's provider (simple version - no tool processing loop)
-    #[instrument(skip(self, message))]
-    pub async fn reply_subagent_simple(
-        &self,
-        message: String,
-        task_config: TaskConfig,
-    ) -> Result<Message, anyhow::Error> {
-        debug!("Processing message for subagent {} (simple mode)", self.id);
-        self.send_mcp_notification("message_processing", &format!("Processing: {}", message))
-            .await;
-
-        // Get provider and extension manager from task config
-        let provider = self
-            .config
-            .provider
-            .as_ref()
-            .ok_or_else(|| anyhow!("No provider configured for subagent"))?;
-
-        let extension_manager = self
-            .config
-            .extension_manager
-            .as_ref()
-            .ok_or_else(|| anyhow!("No extension manager configured for subagent"))?;
-
-        // Set status to processing
-        self.set_status(SubAgentStatus::Processing).await;
-
-        // Add user message to conversation
-        let user_message = Message::user().with_text(message.clone());
-        {
-            let mut conversation = self.conversation.lock().await;
-            conversation.push(user_message.clone());
-        }
-
-        // Get the current conversation for context
-        let messages = self.get_conversation().await;
-
-        // Get tools based on whether we're using a recipe or inheriting from parent
-        let tools: Vec<Tool> = extension_manager
-            .read()
-            .await
-            .get_prefixed_tools(None)
-            .await
-            .unwrap_or_default();
-
-        let toolshim_tools: Vec<Tool> = vec![];
-
-        // Build system prompt using the template
-        let system_prompt = self.build_system_prompt(&tools).await?;
-
-        // Generate response from provider (single call, no loop)
-        match Agent::generate_response_from_provider(
-            Arc::clone(provider),
-            &system_prompt,
-            &messages,
-            &tools,
-            &toolshim_tools,
-        )
-        .await
-        {
-            Ok((response, _usage)) => {
-                // Process any tool calls in the response
-                let tool_requests: Vec<ToolRequest> = response
-                    .content
-                    .iter()
-                    .filter_map(|content| {
-                        if let MessageContent::ToolRequest(req) = content {
-                            Some(req.clone())
-                        } else {
-                            None
-                        }
-                    })
-                    .collect();
-
-                // If there are tool requests, process them and create a final response
-                if !tool_requests.is_empty() {
-                    // Add the assistant message with tool calls to the conversation
-                    let mut updated_messages = messages.clone();
-                    updated_messages.push(response.clone());
-
-                    // Process each tool request and create user response messages
-                    for request in &tool_requests {
-                        if let Ok(tool_call) = &request.tool_call {
-                            // Send notification about tool usage
-                            self.send_mcp_notification(
-                                "tool_usage",
-                                &format!("Using tool: {}", tool_call.name),
-                            )
-                            .await;
-
-                            // Handle platform tools or dispatch to extension manager
-                            let tool_result = match extension_manager
-                                .read()
-                                .await
-                                .dispatch_tool_call(tool_call.clone())
-                                .await
-                            {
-                                Ok(result) => result.result.await,
-                                Err(e) => Err(ToolError::ExecutionError(e.to_string())),
-                            };
-
-                            match tool_result {
-                                Ok(result) => {
-                                    // Create a user message with the tool response
-                                    let tool_response_message = Message::user()
-                                        .with_tool_response(request.id.clone(), Ok(result.clone()));
-                                    updated_messages.push(tool_response_message);
-
-                                    // Send notification about tool completion
-                                    self.send_mcp_notification(
-                                        "tool_completed",
-                                        &format!("Tool {} completed successfully", tool_call.name),
-                                    )
-                                    .await;
-                                }
-                                Err(e) => {
-                                    // Create a user message with the tool error
-                                    let tool_error_message = Message::user().with_tool_response(
-                                        request.id.clone(),
-                                        Err(ToolError::ExecutionError(e.to_string())),
-                                    );
-                                    updated_messages.push(tool_error_message);
-
-                                    // Send notification about tool error
-                                    self.send_mcp_notification(
-                                        "tool_error",
-                                        &format!("Tool {} error: {}", tool_call.name, e),
-                                    )
-                                    .await;
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    // No tool requests, just return the response
-                    self.add_message(response.clone()).await;
-
-                    // Send notification about response
-                    self.send_mcp_notification(
-                        "response_generated",
-                        &format!("Responded: {}", response.as_concat_text()),
-                    )
-                    .await;
-
-                    // Set status back to ready and return the final response
-                    self.set_status(SubAgentStatus::Completed("Completed!".to_string()))
-                        .await;
-                    Ok(response)
-                }
-            }
-            Err(ProviderError::ContextLengthExceeded(_)) => {
-                self.set_status(SubAgentStatus::Completed(
-                    "Context length exceeded".to_string(),
-                ))
-                .await;
-                Ok(Message::assistant().with_context_length_exceeded(
-                    "The context length of the model has been exceeded. Please start a new session and try again.",
-                ))
-            }
-            Err(ProviderError::RateLimitExceeded(_)) => {
-                self.set_status(SubAgentStatus::Completed("Rate limit exceeded".to_string()))
-                    .await;
-                Ok(Message::assistant()
-                    .with_text("Rate limit exceeded. Please try again later."))
-            }
-            Err(e) => {
-                self.set_status(SubAgentStatus::Completed(format!("Error: {}", e)))
-                    .await;
-                error!("Error: {}", e);
-                Ok(Message::assistant().with_text(format!("Ran into this error: {e}.\n\nPlease retry if you think this is a transient or recoverable error.")))
             }
         }
     }
