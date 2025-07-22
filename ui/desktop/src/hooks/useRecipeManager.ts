@@ -13,11 +13,10 @@ interface LocationState {
 export const useRecipeManager = (messages: Message[], locationState?: LocationState) => {
   const [isGeneratingRecipe, setIsGeneratingRecipe] = useState(false);
   const [isParameterModalOpen, setIsParameterModalOpen] = useState(false);
-  const [recipeParameters, setRecipeParameters] = useState<Record<string, string> | null>(null);
   const [readyForAutoUserPrompt, setReadyForAutoUserPrompt] = useState(false);
   const [recipeError, setRecipeError] = useState<string | null>(null);
 
-  // Get chat context to access persisted recipe
+  // Get chat context to access persisted recipe and parameters
   const chatContext = useChatContext();
 
   // Use a ref to capture the current messages for the event handler
@@ -52,6 +51,11 @@ export const useRecipeManager = (messages: Message[], locationState?: LocationSt
     }
     return null;
   }, [chatContext, locationState]);
+
+  // Get recipe parameters from chat context
+  const recipeParameters = useMemo(() => {
+    return chatContext?.chat.recipeParameters || null;
+  }, [chatContext?.chat.recipeParameters]);
 
   // Effect to persist recipe config to chat context when it changes
   useEffect(() => {
@@ -99,7 +103,7 @@ export const useRecipeManager = (messages: Message[], locationState?: LocationSt
     return substitutedPrompt;
   };
 
-  // Pre-fill input with recipe prompt instead of auto-sending it
+  // Get the recipe's initial prompt (always return the actual prompt, don't modify based on conversation state)
   const initialPrompt = useMemo(() => {
     if (!recipeConfig?.prompt) return '';
 
@@ -121,12 +125,15 @@ export const useRecipeManager = (messages: Message[], locationState?: LocationSt
 
   // Handle parameter submission
   const handleParameterSubmit = async (inputValues: Record<string, string>) => {
-    setRecipeParameters(inputValues);
+    // Store parameters in chat context instead of local state
+    if (chatContext?.setRecipeParameters) {
+      chatContext.setRecipeParameters(inputValues);
+    }
     setIsParameterModalOpen(false);
 
     // Update the system prompt with parameter-substituted instructions
     try {
-      await updateSystemPromptWithParameters(inputValues);
+      await updateSystemPromptWithParameters(inputValues, recipeConfig || undefined);
     } catch (error) {
       console.error('Failed to update system prompt with parameters:', error);
     }

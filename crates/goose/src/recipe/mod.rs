@@ -143,6 +143,10 @@ pub struct SubRecipe {
     pub path: String,
     #[serde(default, deserialize_with = "deserialize_value_map_as_string")]
     pub values: Option<HashMap<String, String>>,
+    #[serde(default)]
+    pub sequential_when_repeated: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
 }
 
 fn deserialize_value_map_as_string<'de, D>(
@@ -196,6 +200,7 @@ pub enum RecipeParameterInputType {
     Boolean,
     Date,
     File,
+    Select,
 }
 
 impl fmt::Display for RecipeParameterInputType {
@@ -216,6 +221,8 @@ pub struct RecipeParameter {
     pub description: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub options: Option<Vec<String>>,
 }
 
 /// Builder for creating Recipe instances

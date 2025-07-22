@@ -66,19 +66,12 @@ import { useSessionContinuation } from '../hooks/useSessionContinuation';
 import { useFileDrop } from '../hooks/useFileDrop';
 import { useCostTracking } from '../hooks/useCostTracking';
 import { Message } from '../types/message';
-import { Recipe } from '../recipe';
 
 // Context for sharing current model info
 const CurrentModelContext = createContext<{ model: string; mode: string } | null>(null);
 export const useCurrentModelInfo = () => useContext(CurrentModelContext);
 
-export interface ChatType {
-  id: string;
-  title: string;
-  messageHistoryIndex: number;
-  messages: Message[];
-  recipeConfig?: Recipe | null; // Add recipe configuration to chat state
-}
+import { ChatType } from '../types/chat';
 
 interface BaseChatProps {
   chat: ChatType;
@@ -202,17 +195,29 @@ function BaseChatContent({
 
   // Reset recipe usage tracking when recipe changes
   useEffect(() => {
-    if (recipeConfig?.title !== currentRecipeTitle) {
-      setCurrentRecipeTitle(recipeConfig?.title || null);
-      setHasStartedUsingRecipe(false);
+    const previousTitle = currentRecipeTitle;
+    const newTitle = recipeConfig?.title || null;
+    const hasRecipeChanged = newTitle !== currentRecipeTitle;
 
-      // Clear existing messages when a new recipe is loaded
-      if (recipeConfig?.title && recipeConfig.title !== currentRecipeTitle) {
+    if (hasRecipeChanged) {
+      setCurrentRecipeTitle(newTitle);
+
+      const isSwitchingBetweenRecipes = previousTitle && newTitle;
+      const isInitialRecipeLoad = !previousTitle && newTitle && messages.length === 0;
+      const hasExistingConversation = newTitle && messages.length > 0;
+
+      if (isSwitchingBetweenRecipes) {
+        console.log('Switching from recipe:', previousTitle, 'to:', newTitle);
+        setHasStartedUsingRecipe(false);
         setMessages([]);
         setAncestorMessages([]);
+      } else if (isInitialRecipeLoad) {
+        setHasStartedUsingRecipe(false);
+      } else if (hasExistingConversation) {
+        setHasStartedUsingRecipe(true);
       }
     }
-  }, [recipeConfig?.title, currentRecipeTitle, setMessages, setAncestorMessages]);
+  }, [recipeConfig?.title, currentRecipeTitle, messages.length, setMessages, setAncestorMessages]);
 
   // Handle recipe auto-execution
   useEffect(() => {
@@ -509,7 +514,7 @@ function BaseChatContent({
             isLoading={isLoading}
             onStop={onStopGoose}
             commandHistory={commandHistory}
-            initialValue={_input || initialPrompt}
+            initialValue={_input || (messages.length === 0 ? initialPrompt : '')}
             setView={setView}
             numTokens={sessionTokenCount}
             inputTokens={sessionInputTokens || localInputTokens}

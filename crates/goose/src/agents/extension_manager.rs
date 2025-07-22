@@ -241,6 +241,7 @@ impl ExtensionManager {
             ExtensionConfig::Builtin {
                 name,
                 display_name: _,
+                description: _,
                 timeout,
                 bundled: _,
             } => {

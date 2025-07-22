@@ -14,7 +14,7 @@ import {
   getTextContent,
   TextContent,
 } from '../types/message';
-import { ChatType } from '../components/hub';
+import { ChatType } from '../types/chat';
 
 // Helper function to determine if a message is a user message
 const isUserMessage = (message: Message): boolean => {
