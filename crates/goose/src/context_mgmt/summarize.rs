@@ -4,8 +4,8 @@ use crate::prompt_template::render_global_file;
 use crate::providers::base::Provider;
 use crate::token_counter::{AsyncTokenCounter, TokenCounter};
 use anyhow::Result;
-use serde::Serialize;
 use rmcp::model::Role;
+use serde::Serialize;
 use std::sync::Arc;
 
 // Constants for the summarization prompt and a follow-up user message.
