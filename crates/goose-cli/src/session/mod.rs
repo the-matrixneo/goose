@@ -1438,17 +1438,19 @@ impl Session {
             );
         }
 
-        // Calculate actual current token count from messages
+        // Calculate actual current token count from messages - this is always up-to-date
         let current_token_count = self.calculate_current_token_count().await?;
         
         output::display_context_usage(current_token_count, context_limit);
 
         if show_cost {
-            // For cost display, try to use metadata if available, otherwise fall back to current count
+            // For cost display, also use metadata if available for accumulated totals
+            // but the current token count is always the most accurate for the current state
             match self.get_metadata() {
                 Ok(metadata) => {
-                    let input_tokens = metadata.input_tokens.unwrap_or(0) as usize;
-                    let output_tokens = metadata.output_tokens.unwrap_or(0) as usize;
+                    // Use accumulated totals from metadata if available, otherwise fall back to current count
+                    let input_tokens = metadata.accumulated_input_tokens.unwrap_or(0) as usize;
+                    let output_tokens = metadata.accumulated_output_tokens.unwrap_or(0) as usize;
                     output::display_cost_usage(
                         &provider_name,
                         &model_config.model_name,
@@ -1466,29 +1468,23 @@ impl Session {
         Ok(())
     }
 
-    /// Calculate the current token count of the messages in memory
+    /// Calculate the current token count of the session messages in memory
+    /// This only counts the actual conversation messages, not system prompts or tools
+    /// Returns 0 at the start of a session when there are no messages
     async fn calculate_current_token_count(&self) -> Result<usize> {
+        // If no messages, return 0 (clean start)
+        if self.messages.is_empty() {
+            return Ok(0);
+        }
+        
         use goose::token_counter::create_async_token_counter;
         
         let token_counter = create_async_token_counter().await
             .map_err(|e| anyhow::anyhow!("Failed to create token counter: {}", e))?;
         
-        // Get tools from agent
-        let tools = self.agent.list_tools(None).await;
-        
-        // For now, use a simplified system prompt calculation
-        // In a real implementation, we'd want to access the agent's prompt manager
-        // but since it's private, we'll use an empty system prompt as approximation
-        let system_prompt = ""; // This is a simplification
-        
-        let resources = vec![]; // No direct way to get resources currently
-        
-        let token_count = token_counter.count_everything(
-            system_prompt,
-            &self.messages,
-            &tools,
-            &resources,
-        );
+        // Only count the session messages without system prompt or tools
+        // This gives us a clean count of just the conversation content
+        let token_count = token_counter.count_chat_tokens("", &self.messages, &[]);
         
         Ok(token_count)
     }

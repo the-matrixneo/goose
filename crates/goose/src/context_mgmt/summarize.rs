@@ -676,10 +676,12 @@ mod tests {
                 Message::new(
                     Role::Assistant,
                     Utc::now().timestamp(),
-                    vec![MessageContent::Text(TextContent {
-                        text: "Chunked summary".to_string(),
-                        annotations: None,
-                    })],
+                    vec![MessageContent::Text(
+                        RawTextContent {
+                            text: "Chunked summary".to_string(),
+                        }
+                        .no_annotation(),
+                    )],
                 ),
                 ProviderUsage::new("mock".to_string(), Usage::default()),
             ))
