@@ -167,6 +167,9 @@ export interface UseMessageStreamHelpers {
 
   /** Session metadata including token counts */
   sessionMetadata: SessionMetadata | null;
+
+  /** Clear error state */
+  setError: (error: Error | undefined) => void;
 }
 
 /**
@@ -690,5 +693,6 @@ export function useMessageStream({
     notifications,
     currentModelInfo,
     sessionMetadata,
+    setError,
   };
 }
