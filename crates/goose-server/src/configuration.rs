@@ -24,18 +24,28 @@ impl Settings {
 
     fn load_and_validate() -> Result<Self, ConfigError> {
         // Start with default configuration
-        let config = Config::builder()
+        let mut config = Config::builder()
             // Server defaults
             .set_default("host", default_host())?
-            .set_default("port", default_port())?
-            // Layer on the environment variables
-            .add_source(
-                Environment::with_prefix("GOOSE")
-                    .prefix_separator("_")
-                    .separator("__")
-                    .try_parsing(true),
-            )
-            .build()?;
+            .set_default("port", default_port())?;
+
+        // Check for GOOSE_PORT first
+        if let Ok(port) = std::env::var("GOOSE_PORT") {
+            if let Ok(port_num) = port.parse::<u16>() {
+                config = config.set_override("port", port_num)?;
+            }
+        }
+
+        // Layer on the environment variables
+        config = config.add_source(
+            Environment::with_prefix("GOOSE")
+                .prefix_separator("_")
+                .separator("__")
+                .try_parsing(true),
+        );
+
+        // Build the config
+        let config = config.build()?;
 
         // Try to deserialize the configuration
         let result: Result<Self, config::ConfigError> = config.try_deserialize();

@@ -141,6 +141,7 @@ copy-binary-windows:
 run-ui:
     @just release-binary
     @echo "Running UI..."
+    codesign --force --deep --sign - ./ui/desktop/src/bin/goosed
     cd ui/desktop && npm install && npm run start-gui
 
 run-ui-only:

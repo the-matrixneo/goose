@@ -1,311 +1,45 @@
+/// <reference lib="dom" />
 import React, { useState, createContext, useContext, useEffect } from 'react';
-import { X, FileDiff, SquareSplitHorizontal, BetweenHorizontalStart, Palette, RefreshCw, Square as StopIcon, ExternalLink } from 'lucide-react';
+//import { X, FileDiff, SquareSplitHorizontal, BetweenHorizontalStart, Palette, RefreshCw, Square as StopIcon, ExternalLink } from 'lucide-react';
+import {
+  X,
+  SquareSplitHorizontal,
+  BetweenHorizontalStart,
+  RefreshCw,
+  Square as StopIcon,
+  ExternalLink,
+} from 'lucide-react';
 import { Button } from './ui/button';
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/Tooltip';
 import { useWindowManager } from '../hooks/useWindowManager';
 import PenpotCanvas from './PenpotCanvas';
+import { SidecarContextType, SidecarView } from '../types/sidecar';
 
-interface SidecarView {
-  id: string;
-  title: string;
-  icon: React.ReactNode;
-  content: React.ReactNode;
-  fileName?: string; // Optional fileName for diff viewer
-}
-
-interface SidecarContextType {
-  activeView: string | null;
-  views: SidecarView[];
-  showView: (view: SidecarView) => void;
-  hideView: () => void;
-  showDiffViewer: (diffContent: string, fileName?: string) => void;
-  hideDiffViewer: () => void;
-  showPenpotDesigner: (projectId?: string, fileId?: string, initialDesign?: string) => void;
-  hidePenpotDesigner: () => void;
+// Declare global Event and EventListener types
+declare global {
+  type CustomEventMap = {
+    'penpot-docker-state-change': CustomEvent<{
+      status: 'stopped' | 'starting' | 'running' | 'error';
+    }>;
+  };
 }
 
 const SidecarContext = createContext<SidecarContextType | null>(null);
 
 export const useSidecar = () => {
   const context = useContext(SidecarContext);
-  // Return null if no context (allows optional usage)
   return context;
 };
 
 interface SidecarProviderProps {
   children: React.ReactNode;
-  showSidecar?: boolean; // Control whether sidecar should be visible
-}
-
-// Monaco Editor Diff Component
-function MonacoDiffViewer({ diffContent, _fileName }: { diffContent: string; _fileName: string }) {
-  const [viewMode, setViewMode] = useState<'split' | 'unified'>('unified');
-  const [parsedDiff, setParsedDiff] = useState<{
-    beforeLines: Array<{
-      content: string;
-      lineNumber: number;
-      type: 'context' | 'removed' | 'added';
-    }>;
-    afterLines: Array<{
-      content: string;
-      lineNumber: number;
-      type: 'context' | 'removed' | 'added';
-    }>;
-    unifiedLines: Array<{
-      content: string;
-      beforeLineNumber: number | null;
-      afterLineNumber: number | null;
-      type: 'context' | 'removed' | 'added';
-    }>;
-  }>({ beforeLines: [], afterLines: [], unifiedLines: [] });
-
-  React.useEffect(() => {
-    // Parse unified diff format into before/after with line numbers
-    const lines = diffContent.split('\n');
-    const beforeLines: Array<{
-      content: string;
-      lineNumber: number;
-      type: 'context' | 'removed' | 'added';
-    }> = [];
-    const afterLines: Array<{
-      content: string;
-      lineNumber: number;
-      type: 'context' | 'removed' | 'added';
-    }> = [];
-    const unifiedLines: Array<{
-      content: string;
-      beforeLineNumber: number | null;
-      afterLineNumber: number | null;
-      type: 'context' | 'removed' | 'added';
-    }> = [];
-
-    let beforeLineNum = 1;
-    let afterLineNum = 1;
-    let inHunk = false;
-
-    for (const line of lines) {
-      if (line.startsWith('@@')) {
-        inHunk = true;
-        const match = line.match(/@@ -(\d+),?\d* \+(\d+),?\d* @@/);
-        if (match) {
-          beforeLineNum = parseInt(match[1]);
-          afterLineNum = parseInt(match[2]);
-        }
-        continue;
-      }
-
-      if (!inHunk) continue;
-
-      if (line.startsWith('-')) {
-        // Removed line - only in before
-        const content = line.substring(1);
-        beforeLines.push({ content, lineNumber: beforeLineNum, type: 'removed' });
-        unifiedLines.push({
-          content,
-          beforeLineNumber: beforeLineNum,
-          afterLineNumber: null,
-          type: 'removed',
-        });
-        beforeLineNum++;
-      } else if (line.startsWith('+')) {
-        // Added line - only in after
-        const content = line.substring(1);
-        afterLines.push({ content, lineNumber: afterLineNum, type: 'added' });
-        unifiedLines.push({
-          content,
-          beforeLineNumber: null,
-          afterLineNumber: afterLineNum,
-          type: 'added',
-        });
-        afterLineNum++;
-      } else if (line.startsWith(' ')) {
-        // Context line - in both
-        const content = line.substring(1);
-        beforeLines.push({ content, lineNumber: beforeLineNum, type: 'context' });
-        afterLines.push({ content, lineNumber: afterLineNum, type: 'context' });
-        unifiedLines.push({
-          content,
-          beforeLineNumber: beforeLineNum,
-          afterLineNumber: afterLineNum,
-          type: 'context',
-        });
-        beforeLineNum++;
-        afterLineNum++;
-      }
-    }
-
-    setParsedDiff({ beforeLines, afterLines, unifiedLines });
-  }, [diffContent, _fileName]); // Include _fileName in dependencies to satisfy TypeScript
-
-  const renderDiffLine = (
-    line: { content: string; lineNumber: number; type: 'context' | 'removed' | 'added' },
-    side: 'before' | 'after'
-  ) => {
-    const getLineStyle = () => {
-      switch (line.type) {
-        case 'removed':
-          return 'bg-red-500/10 border-l-2 border-red-500';
-        case 'added':
-          return 'bg-green-500/10 border-l-2 border-green-500';
-        case 'context':
-        default:
-          return 'bg-transparent';
-      }
-    };
-
-    const getTextColor = () => {
-      switch (line.type) {
-        case 'removed':
-          return 'text-red-500';
-        case 'added':
-          return 'text-green-500';
-        case 'context':
-        default:
-          return 'text-textStandard';
-      }
-    };
-
-    const getLinePrefix = () => {
-      switch (line.type) {
-        case 'removed':
-          return '-';
-        case 'added':
-          return '+';
-        case 'context':
-        default:
-          return ' ';
-      }
-    };
-
-    return (
-      <div
-        key={`${side}-${line.lineNumber}`}
-        className={`flex font-mono text-xs ${getLineStyle()}`}
-      >
-        <div className="w-12 text-textSubtle text-right pr-2 py-1 select-none flex-shrink-0">
-          {line.lineNumber}
-        </div>
-        <div className="w-4 text-textSubtle text-center py-1 select-none flex-shrink-0">
-          {getLinePrefix()}
-        </div>
-        <div className={`flex-1 py-1 pr-4 ${getTextColor()}`}>
-          <code>{line.content || ' '}</code>
-        </div>
-      </div>
-    );
-  };
-
-  const renderUnifiedLine = (
-    line: {
-      content: string;
-      beforeLineNumber: number | null;
-      afterLineNumber: number | null;
-      type: 'context' | 'removed' | 'added';
-    },
-    index: number
-  ) => {
-    const getLineStyle = () => {
-      switch (line.type) {
-        case 'removed':
-          return 'bg-red-500/10 border-l-2 border-red-500';
-        case 'added':
-          return 'bg-green-500/10 border-l-2 border-green-500';
-        case 'context':
-        default:
-          return 'bg-transparent';
-      }
-    };
-
-    const getTextColor = () => {
-      switch (line.type) {
-        case 'removed':
-          return 'text-red-500';
-        case 'added':
-          return 'text-green-500';
-        case 'context':
-        default:
-          return 'text-textStandard';
-      }
-    };
-
-    const getLinePrefix = () => {
-      switch (line.type) {
-        case 'removed':
-          return '-';
-        case 'added':
-          return '+';
-        case 'context':
-        default:
-          return ' ';
-      }
-    };
-
-    return (
-      <div key={`unified-${index}`} className={`flex font-mono text-xs ${getLineStyle()}`}>
-        <div className="w-12 text-textSubtle text-right pr-1 py-1 select-none flex-shrink-0">
-          {line.beforeLineNumber || ''}
-        </div>
-        <div className="w-12 text-textSubtle text-right pr-2 py-1 select-none flex-shrink-0">
-          {line.afterLineNumber || ''}
-        </div>
-        <div className="w-4 text-textSubtle text-center py-1 select-none flex-shrink-0">
-          {getLinePrefix()}
-        </div>
-        <div className={`flex-1 py-1 pr-4 ${getTextColor()}`}>
-          <code>{line.content || ' '}</code>
-        </div>
-      </div>
-    );
-  };
-
-  // Expose the view mode controls to parent
-  useEffect(() => {
-    // Store the setViewMode function in a way the parent can access it
-    (
-      window as unknown as {
-        diffViewerControls?: { viewMode: string; setViewMode: (mode: 'split' | 'unified') => void };
-      }
-    ).diffViewerControls = { viewMode, setViewMode };
-  }, [viewMode, setViewMode]);
-
-  return (
-    <div className="h-full flex flex-col bg-background-default ">
-      {viewMode === 'split' ? (
-        /* Split Diff Content */
-        <div className="flex-1 overflow-auto flex">
-          {/* Before (Left Side) */}
-          <div className="flex-1 border-r border-borderSubtle">
-            <div className="py-2  text-textStandard text-xs font-mono text-center border-b-1 border-borderSubtle">
-              Before
-            </div>
-            <div>{parsedDiff.beforeLines.map((line) => renderDiffLine(line, 'before'))}</div>
-          </div>
-
-          {/* After (Right Side) */}
-          <div className="flex-1">
-            <div className="py-2  text-textStandard text-xs font-mono text-center border-b-1 border-borderSubtle">
-              After
-            </div>
-            <div>{parsedDiff.afterLines.map((line) => renderDiffLine(line, 'after'))}</div>
-          </div>
-        </div>
-      ) : (
-        /* Unified Diff Content */
-        <div className="flex-1 overflow-hidden">
-          <div className="h-full overflow-auto pb-(--radius-2xl)">
-            {parsedDiff.unifiedLines.map((line, index) => renderUnifiedLine(line, index))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
+  showSidecar?: boolean;
 }
 
 export function SidecarProvider({ children, showSidecar = true }: SidecarProviderProps) {
   const [activeView, setActiveView] = useState<string | null>(null);
   const [views, setViews] = useState<SidecarView[]>([]);
 
-  // Import and use the window manager hook
   const { toggleWindow } = useWindowManager({
     expandPercentage: 100,
     maxWidthForExpansion: 2200,
@@ -321,7 +55,6 @@ export function SidecarProvider({ children, showSidecar = true }: SidecarProvide
       return [...prev, view];
     });
 
-    // Expand window when showing sidecar
     await toggleWindow();
     setActiveView(view.id);
   };
@@ -330,29 +63,10 @@ export function SidecarProvider({ children, showSidecar = true }: SidecarProvide
     setActiveView(null);
   };
 
-  const showDiffViewer = (content: string, fileName = 'File') => {
-    const diffView: SidecarView = {
-      id: 'diff',
-      title: 'Diff Viewer',
-      icon: <FileDiff size={16} />,
-      content: <MonacoDiffViewer diffContent={content} _fileName={fileName} />,
-      fileName: fileName, // Store fileName for header display
-    };
-    showView(diffView);
-  };
-
-  const hideDiffViewer = () => {
-    setViews((prev) => prev.filter((v) => v.id !== 'diff'));
-    if (activeView === 'diff') {
-      setActiveView(null);
-    }
-  };
-
   const showPenpotDesigner = (projectId?: string, fileId?: string, initialDesign?: string) => {
     const penpotView: SidecarView = {
       id: 'penpot',
       title: 'Penpot Designer',
-      icon: <Palette size={16} />,
       content: (
         <PenpotCanvas
           projectId={projectId}
@@ -360,15 +74,12 @@ export function SidecarProvider({ children, showSidecar = true }: SidecarProvide
           initialDesign={initialDesign}
           onDesignChange={(design) => {
             console.log('Design changed:', design);
-            // Here you could emit events or save the design
           }}
           onExport={(format) => {
             console.log('Exporting as:', format);
-            // Handle export functionality
           }}
         />
       ),
-      fileName: projectId ? `Project: ${projectId}` : 'New Design',
     };
     showView(penpotView);
   };
@@ -380,31 +91,38 @@ export function SidecarProvider({ children, showSidecar = true }: SidecarProvide
     }
   };
 
+  const showDiffViewer = (diffContent: string, fileName: string) => {
+    const diffView: SidecarView = {
+      id: 'diff',
+      title: `Diff: ${fileName}`,
+      content: (
+        <div className="flex-1 overflow-auto p-4 font-mono whitespace-pre">{diffContent}</div>
+      ),
+    };
+    showView(diffView);
+  };
+
   const contextValue: SidecarContextType = {
     activeView,
     views,
     showView,
     hideView,
-    showDiffViewer,
-    hideDiffViewer,
     showPenpotDesigner,
     hidePenpotDesigner,
+    showDiffViewer,
   };
 
-  // Don't render sidecar if showSidecar is false
   if (!showSidecar) {
     return <SidecarContext.Provider value={contextValue}>{children}</SidecarContext.Provider>;
   }
 
-  // Just provide context, layout will be handled by MainPanelLayout
   return <SidecarContext.Provider value={contextValue}>{children}</SidecarContext.Provider>;
 }
 
-// Separate Sidecar component that can be used as a sibling
 export function Sidecar({ className = '' }: { className?: string }) {
   const sidecar = useSidecar();
   const [viewMode, setViewMode] = useState<'split' | 'unified'>('unified');
-  
+
   // Docker state for Penpot - we'll need to access this from the PenpotCanvas component
   const [dockerState, setDockerState] = useState<{
     status: 'stopped' | 'starting' | 'running' | 'error';
@@ -442,13 +160,16 @@ export function Sidecar({ className = '' }: { className?: string }) {
 
   // Listen for Docker state changes from PenpotCanvas
   useEffect(() => {
-    const handleDockerStateChange = (event: CustomEvent) => {
-      setDockerState(event.detail);
-    };
+    type DockerStateEvent = CustomEvent<{ status: 'stopped' | 'starting' | 'running' | 'error' }>;
 
-    window.addEventListener('penpot-docker-state-change', handleDockerStateChange as EventListener);
+    const handleDockerStateChange = ((e: Event) => {
+      const customEvent = e as DockerStateEvent;
+      setDockerState(customEvent.detail);
+    }) satisfies EventListener;
+
+    window.addEventListener('penpot-docker-state-change', handleDockerStateChange);
     return () => {
-      window.removeEventListener('penpot-docker-state-change', handleDockerStateChange as EventListener);
+      window.removeEventListener('penpot-docker-state-change', handleDockerStateChange);
     };
   }, []);
 
@@ -461,9 +182,9 @@ export function Sidecar({ className = '' }: { className?: string }) {
     window.dispatchEvent(new CustomEvent('penpot-stop-container'));
   };
 
-  const handleStartPenpot = () => {
-    window.dispatchEvent(new CustomEvent('penpot-start-container'));
-  };
+  // const handleStartPenpot = () => {
+  //   window.dispatchEvent(new CustomEvent('penpot-start-container'));
+  // };
 
   const handleOpenInBrowser = () => {
     window.dispatchEvent(new CustomEvent('penpot-open-browser'));
@@ -488,29 +209,37 @@ export function Sidecar({ className = '' }: { className?: string }) {
     >
       {currentView && (
         <>
-          {/* Sidecar Header */}
-          <div className="flex items-center justify-between p-4 border-b border-borderSubtle flex-shrink-0 flex-grow-0">
-            <div className="flex items-center space-x-2">
-              {currentView.icon}
-              <div className="flex flex-col">
-                <span className="text-textStandard font-medium">{currentView.title}</span>
-                {currentView.fileName && (
-                  <span className="text-xs font-mono text-text-muted">{currentView.fileName}</span>
-                )}
-              </div>
+          <div className="flex items-center justify-between p-4 border-b border-borderSubtle">
+            <div className="flex items-center space-x-3">
+              <div
+                className={`w-3 h-3 rounded-full ${
+                  dockerState.status === 'running'
+                    ? 'bg-green-500'
+                    : dockerState.status === 'starting'
+                      ? 'bg-yellow-500'
+                      : dockerState.status === 'error'
+                        ? 'bg-red-500'
+                        : 'bg-gray-500'
+                }`}
+              />
+              <span className="text-textStandard font-medium">{currentView.title}</span>
             </div>
-
             <div className="flex items-center space-x-2">
               {/* Docker Status Indicator - Only show for Penpot */}
               {isPenpotDesigner && (
                 <div className="flex items-center space-x-2">
-                  <div className={`w-2 h-2 rounded-full ${
-                    dockerState.status === 'running' ? 'bg-green-500' :
-                    dockerState.status === 'starting' ? 'bg-yellow-500' :
-                    dockerState.status === 'error' ? 'bg-red-500' :
-                    'bg-gray-500'
-                  }`} />
-                  
+                  <div
+                    className={`w-2 h-2 rounded-full ${
+                      dockerState.status === 'running'
+                        ? 'bg-green-500'
+                        : dockerState.status === 'starting'
+                          ? 'bg-yellow-500'
+                          : dockerState.status === 'error'
+                            ? 'bg-red-500'
+                            : 'bg-gray-500'
+                    }`}
+                  />
+
                   {/* Docker Control Buttons */}
                   {dockerState.status === 'running' && (
                     <>
@@ -611,14 +340,13 @@ export function Sidecar({ className = '' }: { className?: string }) {
                 </div>
               )}
 
-              {/* Close Button */}
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={hideView}
-                    className="text-textSubtle hover:text-textStandard cursor-pointer focus:outline-none focus:ring-2 focus:ring-borderProminent focus:ring-offset-1"
+                    className="text-textSubtle hover:text-textStandard"
                   >
                     <X size={16} />
                   </Button>
@@ -628,10 +356,7 @@ export function Sidecar({ className = '' }: { className?: string }) {
             </div>
           </div>
 
-          {/* Sidecar Content */}
-          <div className="flex-1  border-4 overflow-hidden border-background-default border-t-0 rounded-b-2xl">
-            {currentView.content}
-          </div>
+          <div className="flex-1 overflow-hidden">{currentView.content}</div>
         </>
       )}
     </div>

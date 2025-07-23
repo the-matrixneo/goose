@@ -23,6 +23,7 @@ import { NotificationEvent } from '../hooks/useMessageStream';
 import { FileDiff } from 'lucide-react';
 import { useSidecar } from './SidecarLayout';
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/Tooltip';
+import { SidecarContextType } from '../types/sidecar';
 
 interface GooseMessageProps {
   // messages up to this index are presumed to be "history" from a resumed session, this is used to track older tool confirmation requests
@@ -268,8 +269,8 @@ export default function GooseMessage({
                           : null;
                       const args = toolCall?.arguments as Record<string, never>;
                       const fileName = args?.path ? String(args.path) : 'File';
-
-                      sidecar.showDiffViewer(diffContent, fileName);
+                      const sidecarContext = sidecar as SidecarContextType;
+                      sidecarContext.showDiffViewer(diffContent, fileName);
                     }
                   }
                 }}

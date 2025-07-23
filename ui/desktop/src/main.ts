@@ -1612,7 +1612,7 @@ app.whenReady().then(async () => {
       responseHeaders: {
         ...details.responseHeaders,
         'Content-Security-Policy':
-          "default-src 'self';" +
+          "default-src 'self' http://localhost:3449;" +
           // Allow inline styles since we use them in our React components
           "style-src 'self' 'unsafe-inline';" +
           // Scripts from our app and inline scripts (for theme initialization)
@@ -1620,17 +1620,17 @@ app.whenReady().then(async () => {
           // Images from our app and data: URLs (for base64 images)
           "img-src 'self' data: https:;" +
           // Connect to our local API and specific external services
-          "connect-src 'self' http://127.0.0.1:* http://localhost:* https://api.github.com https://github.com https://objects.githubusercontent.com;" +
+          "connect-src 'self' http://127.0.0.1:* http://localhost:* https://api.github.com https://github.com https://objects.githubusercontent.com http://localhost:3449;" +
           // Don't allow any plugins
           "object-src 'none';" +
           // Don't allow any frames
-          "frame-src 'self' http://localhost:9001 http://127.0.0.1:9001;" +
+          "frame-src 'self' http://localhost:9001 http://127.0.0.1:9001 http://localhost:3449;" +
           // Font sources - allow self, data URLs, and external fonts
           "font-src 'self' data: https:;" +
           // Media sources - allow microphone
           "media-src 'self' mediastream:;" +
-          // Form actions
-          "form-action 'none';" +
+          // Allow form submissions to localhost:3449
+          "form-action 'self' http://localhost:3449;" +
           // Base URI restriction
           "base-uri 'self';" +
           // Manifest files
@@ -2115,7 +2115,7 @@ app.whenReady().then(async () => {
   ipcMain.handle('penpot-api-call', async (_event, options) => {
     try {
       console.log('Making Penpot API call:', options.url);
-      
+
       // Validate the URL is for Penpot
       const parsedUrl = new URL(options.url);
       if (parsedUrl.hostname !== 'design.penpot.app') {
@@ -2162,20 +2162,20 @@ app.whenReady().then(async () => {
   ipcMain.handle('docker-command', async (_event, command: string) => {
     try {
       console.log('Executing Docker command:', command);
-      
+
       return new Promise((resolve) => {
         // Use full path to docker to avoid PATH issues
         const dockerPath = '/usr/local/bin/docker';
-        
+
         // Parse command more carefully to handle quotes and complex arguments
         const parts = [];
         let current = '';
         let inQuotes = false;
         let quoteChar = '';
-        
+
         for (let i = 0; i < command.length; i++) {
           const char = command[i];
-          
+
           if ((char === '"' || char === "'") && !inQuotes) {
             inQuotes = true;
             quoteChar = char;
@@ -2191,56 +2191,56 @@ app.whenReady().then(async () => {
             current += char;
           }
         }
-        
+
         if (current.trim()) {
           parts.push(current.trim());
         }
-        
+
         // Remove 'docker' from the beginning and use our docker path
         const args = parts.slice(1);
-        
+
         console.log('Docker args:', args);
-        
+
         const dockerProcess = spawn(dockerPath, args, {
           stdio: ['pipe', 'pipe', 'pipe'],
           env: {
             ...process.env,
-            PATH: '/usr/local/bin:/usr/bin:/bin:' + (process.env.PATH || '')
-          }
+            PATH: '/usr/local/bin:/usr/bin:/bin:' + (process.env.PATH || ''),
+          },
         });
-        
+
         let output = '';
         let errorOutput = '';
-        
+
         dockerProcess.stdout.on('data', (data) => {
           output += data.toString();
         });
-        
+
         dockerProcess.stderr.on('data', (data) => {
           errorOutput += data.toString();
         });
-        
+
         dockerProcess.on('close', (code) => {
           const success = code === 0;
           console.log(`Docker command completed with code ${code}`);
           console.log('Output:', output);
           if (errorOutput) console.log('Error:', errorOutput);
-          
+
           resolve({
             success,
             output: output.trim(),
             error: errorOutput.trim(),
-            exitCode: code
+            exitCode: code,
           });
         });
-        
+
         dockerProcess.on('error', (error) => {
           console.error('Docker command error:', error);
           resolve({
             success: false,
             output: '',
             error: error.message,
-            exitCode: -1
+            exitCode: -1,
           });
         });
       });
@@ -2250,7 +2250,7 @@ app.whenReady().then(async () => {
         success: false,
         output: '',
         error: error instanceof Error ? error.message : 'Unknown error',
-        exitCode: -1
+        exitCode: -1,
       };
     }
   });

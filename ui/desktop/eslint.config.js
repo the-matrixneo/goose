@@ -65,12 +65,15 @@ module.exports = [
         clearInterval: 'readonly',
         setInterval: 'readonly',
         CustomEvent: 'readonly',
+        Event: 'readonly',
+        EventListener: 'readonly',
         HTMLElement: 'readonly',
         HTMLInputElement: 'readonly',
         HTMLTextAreaElement: 'readonly',
         HTMLButtonElement: 'readonly',
         HTMLDivElement: 'readonly',
         HTMLCanvasElement: 'readonly',
+        HTMLIFrameElement: 'readonly',
         File: 'readonly',
         FileList: 'readonly',
         FileReader: 'readonly',
@@ -84,6 +87,7 @@ module.exports = [
         HeadersInit: 'readonly',
         KeyboardEvent: 'readonly',
         MouseEvent: 'readonly', // Add MouseEvent
+        MessageEvent: 'readonly',
         Node: 'readonly', // Add Node
         React: 'readonly',
         handleAction: 'readonly',
