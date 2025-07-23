@@ -407,6 +407,9 @@ mod tests {
     use mcp_core::tool::Tool;
 
     #[derive(Clone)]
+    struct EchoTool;
+
+    #[derive(Clone)]
     struct MockProvider {
         model_config: ModelConfig,
     }

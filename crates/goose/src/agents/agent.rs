@@ -1381,6 +1381,278 @@ impl Agent {
 mod tests {
     use super::*;
     use crate::recipe::Response;
+    use futures::StreamExt;
+    use mcp_core::tool::Tool;
+    use serde_json::Value;
+    use std::sync::Arc;
+
+    #[derive(Clone)]
+    struct MockProvider {
+        model_config: crate::model::ModelConfig,
+    }
+
+    impl MockProvider {
+        fn new(model_config: crate::model::ModelConfig) -> Self {
+            Self { model_config }
+        }
+
+        fn parse_commands(&self, text: &str) -> Vec<(String, String)> {
+            text.lines()
+                .filter_map(|line| {
+                    let line = line.trim();
+                    if let Some(colon_pos) = line.find(':') {
+                        let verb = line[..colon_pos].trim().to_string();
+                        let param = line[colon_pos + 1..].trim().to_string();
+                        Some((verb, param))
+                    } else {
+                        None
+                    }
+                })
+                .collect()
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl Provider for MockProvider {
+        fn metadata() -> crate::providers::base::ProviderMetadata {
+            crate::providers::base::ProviderMetadata::empty()
+        }
+
+        async fn complete(
+            &self,
+            _system: &str,
+            messages: &[Message],
+            tools: &[Tool],
+        ) -> anyhow::Result<(Message, crate::providers::base::ProviderUsage), ProviderError>
+        {
+            let last_message = messages
+                .last()
+                .and_then(|m| m.content.first())
+                .and_then(|c| match c {
+                    crate::message::MessageContent::Text(text) => Some(text.text.as_str()),
+                    _ => None,
+                })
+                .unwrap_or("");
+
+            let commands = self.parse_commands(last_message);
+
+            if commands.is_empty() {
+                return Ok((
+                    Message::assistant().with_text("No commands found in message"),
+                    crate::providers::base::ProviderUsage::new(
+                        "mock".to_string(),
+                        crate::providers::base::Usage::default(),
+                    ),
+                ));
+            }
+
+            let mut tool_calls = Vec::new();
+            let mut response_text = Vec::new();
+
+            for (verb, param) in commands.iter() {
+                match verb.as_str() {
+                    "say" => {
+                        response_text.push(param.clone());
+                    }
+                    "echo" => {
+                        if tools.iter().any(|t| t.name == "echo") {
+                            tool_calls.push(mcp_core::tool::ToolCall {
+                                name: "echo".to_string(),
+                                arguments: serde_json::json!({"text": param}),
+                            });
+                        }
+                    }
+                    _ => {
+                        response_text.push(format!("Unknown command: {}", verb));
+                    }
+                }
+            }
+
+            let message = if tool_calls.is_empty() {
+                Message::assistant().with_text(&response_text.join("\n"))
+            } else {
+                let text = if response_text.is_empty() {
+                    "Calling tools".to_string()
+                } else {
+                    response_text.join("\n")
+                };
+                let mut msg = Message::assistant().with_text(&text);
+
+                // Add each tool call as a ToolRequest in the message content
+                for tool_call in tool_calls {
+                    msg = msg.with_tool_request(tool_call.name.clone(), Ok(tool_call));
+                }
+
+                msg
+            };
+
+            Ok((
+                message,
+                crate::providers::base::ProviderUsage::new(
+                    "mock".to_string(),
+                    crate::providers::base::Usage::default(),
+                ),
+            ))
+        }
+
+        fn get_model_config(&self) -> crate::model::ModelConfig {
+            self.model_config.clone()
+        }
+    }
+
+    async fn call_agent_reply(messages: Vec<Message>) -> Vec<AgentEvent> {
+        let mock_model_config = crate::model::ModelConfig::new("test-model".to_string());
+        let mock_provider = Arc::new(MockProvider::new(mock_model_config));
+
+        let agent = Agent::new();
+        let _ = agent.update_provider(mock_provider).await;
+
+        let echo_tool = Tool {
+            name: "echo".to_string(),
+            description: "Echoes back the input text".to_string(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "text": {
+                        "type": "string",
+                        "description": "Text to echo back"
+                    }
+                },
+                "required": ["text"]
+            }),
+            annotations: None,
+        };
+
+        let frontend_extension = ExtensionConfig::Frontend {
+            name: "test_frontend".to_string(),
+            tools: vec![echo_tool],
+            instructions: Some("Test frontend tools".to_string()),
+            bundled: Some(false),
+        };
+
+        let _ = agent.add_extension(frontend_extension).await;
+
+        let session_config = SessionConfig {
+            id: crate::session::Identifier::Name("test-session".to_string()),
+            working_dir: std::path::PathBuf::from("test-working-dir"),
+            schedule_id: None,
+            execution_mode: None,
+            max_turns: None,
+            retry_config: None,
+        };
+
+        let mut stream = agent
+            .reply(&messages, Some(session_config), None)
+            .await
+            .unwrap();
+        let mut events = Vec::new();
+
+        while let Some(event_result) = stream.next().await {
+            match event_result {
+                Ok(event) => events.push(event),
+                Err(e) => panic!("Agent error: {:?}", e),
+            }
+        }
+
+        events
+    }
+
+    #[tokio::test]
+    async fn test_say_command() {
+        let events = call_agent_reply(vec![Message::user().with_text("say: Hello World!")]).await;
+
+        assert!(!events.is_empty());
+        // Should have at least one message event
+        assert!(events.iter().any(|e| matches!(e, AgentEvent::Message(_))));
+    }
+
+    #[tokio::test]
+    async fn test_single_echo() {
+        let events = call_agent_reply(vec![Message::user().with_text("echo: test message")]).await;
+
+        assert!(!events.is_empty());
+        // Should have message events including tool calls and results
+        let message_events: Vec<_> = events
+            .iter()
+            .filter_map(|e| match e {
+                AgentEvent::Message(msg) => Some(msg),
+                _ => None,
+            })
+            .collect();
+
+        assert!(!message_events.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_duplicate_echo_calls() {
+        let events =
+            call_agent_reply(vec![Message::user().with_text("echo: first\necho: second")]).await;
+
+        assert!(!events.is_empty());
+
+        // Count tool calls in the assistant messages
+        let tool_call_count = events
+            .iter()
+            .filter_map(|e| match e {
+                AgentEvent::Message(msg) => {
+                    if msg.role == rmcp::model::Role::Assistant {
+                        // Count ToolRequest content items
+                        Some(
+                            msg.content
+                                .iter()
+                                .filter(|c| {
+                                    matches!(c, crate::message::MessageContent::ToolRequest(_))
+                                })
+                                .count(),
+                        )
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            })
+            .sum::<usize>();
+
+        // Should have 2 tool calls
+        assert_eq!(
+            tool_call_count, 2,
+            "Expected 2 tool calls but got {}",
+            tool_call_count
+        );
+    }
+
+    #[tokio::test]
+    async fn test_mixed_commands() {
+        let events = call_agent_reply(vec![
+            Message::user().with_text("say: Hello\necho: World\nsay: Goodbye")
+        ])
+        .await;
+
+        assert!(!events.is_empty());
+
+        // Should have both text responses and tool calls
+        let message_events: Vec<_> = events
+            .iter()
+            .filter_map(|e| match e {
+                AgentEvent::Message(msg) => Some(msg),
+                _ => None,
+            })
+            .collect();
+
+        assert!(!message_events.is_empty());
+
+        // Should have at least one tool call for the echo command
+        let has_tool_calls = message_events.iter().any(|msg| {
+            msg.content
+                .iter()
+                .any(|c| matches!(c, crate::message::MessageContent::ToolRequest(_)))
+        });
+
+        assert!(
+            has_tool_calls,
+            "Expected to find tool calls in the response"
+        );
+    }
 
     #[tokio::test]
     async fn test_add_final_output_tool() -> Result<()> {
