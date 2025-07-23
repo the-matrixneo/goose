@@ -1,5 +1,5 @@
 import React, { useState, createContext, useContext, useEffect } from 'react';
-import { X, FileDiff, SquareSplitHorizontal, BetweenHorizontalStart, Palette } from 'lucide-react';
+import { X, FileDiff, SquareSplitHorizontal, BetweenHorizontalStart, Palette, RefreshCw, Square as StopIcon, ExternalLink } from 'lucide-react';
 import { Button } from './ui/button';
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/Tooltip';
 import { useWindowManager } from '../hooks/useWindowManager';
@@ -404,6 +404,11 @@ export function SidecarProvider({ children, showSidecar = true }: SidecarProvide
 export function Sidecar({ className = '' }: { className?: string }) {
   const sidecar = useSidecar();
   const [viewMode, setViewMode] = useState<'split' | 'unified'>('unified');
+  
+  // Docker state for Penpot - we'll need to access this from the PenpotCanvas component
+  const [dockerState, setDockerState] = useState<{
+    status: 'stopped' | 'starting' | 'running' | 'error';
+  }>({ status: 'stopped' });
 
   // Update the diff viewer when view mode changes
   useEffect(() => {
@@ -435,6 +440,35 @@ export function Sidecar({ className = '' }: { className?: string }) {
     }
   }, [viewMode, sidecar]);
 
+  // Listen for Docker state changes from PenpotCanvas
+  useEffect(() => {
+    const handleDockerStateChange = (event: CustomEvent) => {
+      setDockerState(event.detail);
+    };
+
+    window.addEventListener('penpot-docker-state-change', handleDockerStateChange as EventListener);
+    return () => {
+      window.removeEventListener('penpot-docker-state-change', handleDockerStateChange as EventListener);
+    };
+  }, []);
+
+  // Docker control functions
+  const handleRefreshPenpot = () => {
+    window.dispatchEvent(new CustomEvent('penpot-refresh-canvas'));
+  };
+
+  const handleStopPenpot = () => {
+    window.dispatchEvent(new CustomEvent('penpot-stop-container'));
+  };
+
+  const handleStartPenpot = () => {
+    window.dispatchEvent(new CustomEvent('penpot-start-container'));
+  };
+
+  const handleOpenInBrowser = () => {
+    window.dispatchEvent(new CustomEvent('penpot-open-browser'));
+  };
+
   if (!sidecar) return null;
 
   const { activeView, views, hideView } = sidecar;
@@ -443,12 +477,14 @@ export function Sidecar({ className = '' }: { className?: string }) {
 
   if (!isVisible) return null;
 
-  // Check if current view is diff viewer
+  // Check if current view is diff viewer or penpot
   const isDiffViewer = currentView.id === 'diff';
+  const isPenpotDesigner = currentView.id === 'penpot';
 
   return (
     <div
-      className={`bg-background-default overflow-hidden rounded-2xl flex flex-col m-5 ${className}`}
+      className={`bg-background-default overflow-hidden rounded-2xl flex flex-col m-5 h-full ${className}`}
+      style={{ height: 'calc(100% - 40px)' }}
     >
       {currentView && (
         <>
@@ -465,6 +501,71 @@ export function Sidecar({ className = '' }: { className?: string }) {
             </div>
 
             <div className="flex items-center space-x-2">
+              {/* Docker Status Indicator - Only show for Penpot */}
+              {isPenpotDesigner && (
+                <div className="flex items-center space-x-2">
+                  <div className={`w-2 h-2 rounded-full ${
+                    dockerState.status === 'running' ? 'bg-green-500' :
+                    dockerState.status === 'starting' ? 'bg-yellow-500' :
+                    dockerState.status === 'error' ? 'bg-red-500' :
+                    'bg-gray-500'
+                  }`} />
+                  
+                  {/* Docker Control Buttons */}
+                  {dockerState.status === 'running' && (
+                    <>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleRefreshPenpot}
+                            className="p-1 h-8 w-8"
+                          >
+                            <RefreshCw size={14} />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" sideOffset={8}>
+                          Refresh Canvas
+                        </TooltipContent>
+                      </Tooltip>
+
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleStopPenpot}
+                            className="p-1 h-8 w-8"
+                          >
+                            <StopIcon size={14} />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" sideOffset={8}>
+                          Stop Container
+                        </TooltipContent>
+                      </Tooltip>
+
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleOpenInBrowser}
+                            className="p-1 h-8 w-8"
+                          >
+                            <ExternalLink size={14} />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" sideOffset={8}>
+                          Open in Browser
+                        </TooltipContent>
+                      </Tooltip>
+                    </>
+                  )}
+                </div>
+              )}
+
               {/* View Mode Toggle - Only show for diff viewer */}
               {isDiffViewer && (
                 <div className="flex items-center space-x-1 bg-background-muted rounded-lg p-1">

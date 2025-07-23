@@ -71,6 +71,44 @@ function PenpotCanvas({
   const [penpotUrl, setPenpotUrl] = useState<string>('http://localhost:9001');
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
+  // Emit Docker state changes to sidecar header
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('penpot-docker-state-change', {
+      detail: { status: dockerState.status }
+    }));
+  }, [dockerState.status]);
+
+  // Listen for control events from sidecar header
+  useEffect(() => {
+    const handleRefreshCanvas = () => {
+      refreshPenpotCanvas();
+    };
+
+    const handleStopContainer = () => {
+      stopPenpotContainer();
+    };
+
+    const handleStartContainer = () => {
+      startPenpotContainer();
+    };
+
+    const handleOpenBrowser = () => {
+      window.open(penpotUrl, '_blank');
+    };
+
+    window.addEventListener('penpot-refresh-canvas', handleRefreshCanvas);
+    window.addEventListener('penpot-stop-container', handleStopContainer);
+    window.addEventListener('penpot-start-container', handleStartContainer);
+    window.addEventListener('penpot-open-browser', handleOpenBrowser);
+
+    return () => {
+      window.removeEventListener('penpot-refresh-canvas', handleRefreshCanvas);
+      window.removeEventListener('penpot-stop-container', handleStopContainer);
+      window.removeEventListener('penpot-start-container', handleStartContainer);
+      window.removeEventListener('penpot-open-browser', handleOpenBrowser);
+    };
+  }, [penpotUrl]);
+
   // Docker management functions
   const checkDockerStatus = async () => {
     try {
@@ -927,172 +965,28 @@ function PenpotCanvas({
   };
 
   return (
-    <div className="h-full flex flex-col bg-background-default">
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-borderSubtle bg-background-muted">
-        <div className="flex items-center space-x-2">
-          <Palette size={20} className="text-primary" />
-          <h2 className="text-lg font-semibold text-textStandard">Penpot Integration</h2>
-        </div>
-        
-        <div className="flex items-center space-x-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setIntegrationMode('docker')}
-            className={integrationMode === 'docker' ? 'bg-background-muted' : ''}
-          >
-            <Terminal size={14} className="mr-1" />
-            Docker Canvas
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setIntegrationMode('dashboard')}
-            className={integrationMode === 'dashboard' ? 'bg-background-muted' : ''}
-          >
-            <ExternalLink size={14} className="mr-1" />
-            Quick Access
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setIntegrationMode('local')}
-            className={integrationMode === 'local' ? 'bg-background-muted' : ''}
-          >
-            <FolderOpen size={14} className="mr-1" />
-            My Projects
-          </Button>
-        </div>
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 p-4 flex flex-col">
-        {integrationMode === 'docker' && (
-          <div className="space-y-6 flex-1 flex flex-col">
-            {/* Docker Control Panel */}
-            <div className={`bg-background-muted rounded-lg border border-borderSubtle flex-shrink-0 ${
-              dockerState.status === 'running' ? 'p-3' : 'p-6'
-            }`}>
-              <div className={`flex items-center justify-between ${
-                dockerState.status === 'running' ? 'mb-0' : 'mb-4'
-              }`}>
-                <div className="flex items-center space-x-3">
-                  <div className={`w-3 h-3 rounded-full ${
-                    dockerState.status === 'running' ? 'bg-green-500' :
-                    dockerState.status === 'starting' ? 'bg-yellow-500' :
-                    dockerState.status === 'error' ? 'bg-red-500' :
-                    'bg-gray-500'
-                  }`} />
-                  <h4 className={`font-semibold text-textStandard ${
-                    dockerState.status === 'running' ? 'text-sm' : ''
-                  }`}>
-                    {dockerState.status === 'running' ? 'Running' : `Penpot Container: ${dockerState.status.charAt(0).toUpperCase() + dockerState.status.slice(1)}`}
-                  </h4>
-                  {dockerState.status === 'running' && (
-                    <span className="text-xs text-textSubtle">
-                      <a href={penpotUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{penpotUrl}</a>
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center space-x-2">
-                  {dockerState.status === 'running' && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={refreshPenpotCanvas}
-                    >
-                      <RefreshCw size={14} className="mr-1" />
-                      Refresh
-                    </Button>
-                  )}
-                  {dockerState.status === 'stopped' || dockerState.status === 'error' ? (
-                    <Button
-                      onClick={startPenpotContainer}
-                      disabled={dockerState.status === 'starting'}
-                    >
-                      <Play size={14} className="mr-1" />
-                      {dockerState.status === 'starting' ? 'Starting...' : 'Start Penpot'}
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="outline"
-                      onClick={stopPenpotContainer}
-                      disabled={dockerState.status === 'stopped'}
-                    >
-                      <StopIcon size={14} className="mr-1" />
-                      Stop
-                    </Button>
-                  )}
-                </div>
-              </div>
-
-              {dockerState.status !== 'running' && (
-                <div className="text-sm text-textSubtle">
-                  <p>🎉 Penpot is running at: <a href={penpotUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{penpotUrl}</a></p>
-                  <p>Container ID: {dockerState.containerId}</p>
-                  <p>Port: {dockerState.port}</p>
-                </div>
-              )}
-
-              {errorMessage && dockerState.status !== 'running' && (
-                <div className="mt-4 p-3 bg-yellow-100 dark:bg-yellow-800/50 rounded text-sm whitespace-pre-wrap">
-                  {errorMessage}
-                </div>
-              )}
-            </div>
-
+    <div className="h-full flex flex-col bg-background-default overflow-hidden">
+      {/* Docker Canvas Content - Direct Display */}
+      <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col">
             {/* Embedded Penpot Canvas */}
             {dockerState.status === 'running' && (
-              <div className="bg-background-muted rounded-lg border border-borderSubtle overflow-hidden flex-1 flex flex-col">
-                <div className="flex items-center justify-between p-3 border-b border-borderSubtle bg-background-subtle flex-shrink-0">
-                  <div className="flex items-center space-x-2">
-                    <Palette size={16} className="text-primary" />
-                    <span className="text-sm font-medium text-textStandard">Penpot Design Canvas</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={openPenpotInRenderer}
-                    >
-                      <ExternalLink size={14} className="mr-1" />
-                      Open in Renderer
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => window.open(penpotUrl, '_blank')}
-                    >
-                      <ExternalLink size={14} className="mr-1" />
-                      Open in Browser
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={refreshPenpotCanvas}
-                    >
-                      <RefreshCw size={14} />
-                    </Button>
-                  </div>
-                </div>
-                <div className="relative flex-1">
-                  {/* Embedded Penpot iframe */}
-                  <iframe
-                    ref={iframeRef}
-                    src={penpotUrl}
-                    className="w-full h-full border-0"
-                    title="Penpot Design Canvas"
-                    allow="camera; microphone; fullscreen; display-capture"
-                    sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation allow-top-navigation-by-user-activation"
-                  />
-                  
-                  {/* Loading overlay */}
-                  <div className="absolute inset-0 bg-background-default flex items-center justify-center pointer-events-none opacity-0 transition-opacity duration-300" id="penpot-loading">
-                    <div className="text-center">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-                      <p className="text-textSubtle text-sm">Loading Penpot canvas...</p>
-                    </div>
+              <div className="flex-1 flex flex-col">
+                {/* Embedded Penpot iframe - Full Height */}
+                <iframe
+                  ref={iframeRef}
+                  src={penpotUrl}
+                  className="w-full h-full border-0"
+                  title="Penpot Design Canvas"
+                  allow="camera; microphone; fullscreen; display-capture"
+                  sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation allow-top-navigation-by-user-activation"
+                />
+                
+                {/* Loading overlay */}
+                <div className="absolute inset-0 bg-background-default flex items-center justify-center pointer-events-none opacity-0 transition-opacity duration-300" id="penpot-loading">
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                    <p className="text-textSubtle text-sm">Loading Penpot canvas...</p>
                   </div>
                 </div>
               </div>
@@ -1100,7 +994,7 @@ function PenpotCanvas({
 
             {/* Docker Setup Instructions */}
             {dockerState.status === 'stopped' && (
-              <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+              <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800 flex-1 flex flex-col justify-center m-4">
                 <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">🐳 Docker Setup Required</h4>
                 <p className="text-blue-800 dark:text-blue-200 text-sm mb-3">
                   To use the embedded Penpot canvas, you need Docker installed:
@@ -1108,7 +1002,7 @@ function PenpotCanvas({
                 <ol className="text-blue-800 dark:text-blue-200 text-sm space-y-1 ml-4 mb-3">
                   <li>1. Install <a href="https://www.docker.com/products/docker-desktop/" target="_blank" rel="noopener noreferrer" className="underline">Docker Desktop</a></li>
                   <li>2. Make sure Docker is running</li>
-                  <li>3. Click "Start Penpot" above</li>
+                  <li>3. Click "Start Penpot" in the header above</li>
                   <li>4. Wait for the container to start (may take a few minutes on first run)</li>
                 </ol>
                 <div className="text-xs text-blue-700 dark:text-blue-300">
@@ -1119,298 +1013,7 @@ function PenpotCanvas({
                 </div>
               </div>
             )}
-
-
-          </div>
-        )}
-
-        {integrationMode === 'dashboard' && (
-          <div className="space-y-6">
-            <div className="text-center">
-              <h3 className="text-xl font-semibold text-textStandard mb-2">Quick Access to Penpot</h3>
-              <p className="text-textSubtle mb-6">Open Penpot directly in a new tab to start designing</p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-background-muted p-6 rounded-lg border border-borderSubtle">
-                <div className="flex items-center mb-3">
-                  <FolderOpen size={24} className="text-primary mr-2" />
-                  <h4 className="font-semibold text-textStandard">Dashboard</h4>
-                </div>
-                <p className="text-textSubtle text-sm mb-4">Access your projects and teams</p>
-                <Button onClick={openPenpotDashboard} className="w-full">
-                  <ExternalLink size={16} className="mr-2" />
-                  Open Dashboard
-                </Button>
-              </div>
-
-              <div className="bg-background-muted p-6 rounded-lg border border-borderSubtle">
-                <div className="flex items-center mb-3">
-                  <Plus size={24} className="text-primary mr-2" />
-                  <h4 className="font-semibold text-textStandard">New Project</h4>
-                </div>
-                <p className="text-textSubtle text-sm mb-4">Create a new design project</p>
-                <Button onClick={createNewProject} className="w-full">
-                  <Plus size={16} className="mr-2" />
-                  Create Project
-                </Button>
-              </div>
-            </div>
-
-            {/* Template Quick Access */}
-            <div className="bg-background-muted p-6 rounded-lg border border-borderSubtle">
-              <h4 className="font-semibold text-textStandard mb-4">Start with Templates</h4>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => openPenpotWithTemplate('mobile-app')}
-                  className="text-xs"
-                >
-                  📱 Mobile App
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => openPenpotWithTemplate('website')}
-                  className="text-xs"
-                >
-                  🌐 Website
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => openPenpotWithTemplate('dashboard')}
-                  className="text-xs"
-                >
-                  📊 Dashboard
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => openPenpotWithTemplate('presentation')}
-                  className="text-xs"
-                >
-                  📋 Presentation
-                </Button>
-              </div>
-            </div>
-
-            {/* Access Token Configuration */}
-            <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
-              <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">🔑 Access Token Configuration</h4>
-              <p className="text-blue-800 dark:text-blue-200 text-sm mb-3">
-                Enter your Penpot access token to use the API without browser login:
-              </p>
-              <div className="space-y-3">
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="password"
-                    placeholder="Enter your Penpot access token..."
-                    value={penpotToken}
-                    onChange={(e) => setPenpotToken(e.target.value)}
-                    className="flex-1 px-3 py-2 text-sm border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => saveToken(penpotToken)}
-                    disabled={!penpotToken}
-                  >
-                    Save
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setPenpotToken('');
-                      saveToken('');
-                      setIsTokenValid(null);
-                    }}
-                  >
-                    Clear
-                  </Button>
-                </div>
-                {isTokenValid !== null && (
-                  <div className={`text-xs p-2 rounded ${
-                    isTokenValid 
-                      ? 'bg-green-100 text-green-800' 
-                      : 'bg-red-100 text-red-800'
-                  }`}>
-                    {isTokenValid ? '✅ Token is valid' : '❌ Token is invalid or expired'}
-                  </div>
-                )}
-                <div className="text-xs text-blue-700 dark:text-blue-300">
-                  <strong>How to get your access token:</strong><br/>
-                  1. Go to Penpot → Profile Settings → Access Tokens<br/>
-                  2. Create a new token<br/>
-                  3. Copy and paste it above
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg border border-yellow-200 dark:border-yellow-800">
-              <h4 className="font-semibold text-yellow-900 dark:text-yellow-100 mb-2">🔧 API Testing</h4>
-              <p className="text-yellow-800 dark:text-yellow-200 text-sm mb-3">
-                Test the Penpot API connection and fetch your teams automatically:
-              </p>
-              <div className="flex flex-wrap gap-2 mb-3">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={testPenpotAPI}
-                  disabled={isLoading || !penpotToken}
-                >
-                  {isLoading ? 'Testing...' : 'Test API'}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={fetchPenpotTeams}
-                  disabled={isLoading || !penpotToken}
-                >
-                  {isLoading ? 'Fetching...' : 'Fetch Teams'}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={exploreAPI}
-                  disabled={isLoading}
-                >
-                  {isLoading ? 'Exploring...' : 'Explore API'}
-                </Button>
-              </div>
-              {errorMessage && (
-                <div className="text-xs p-2 bg-yellow-100 dark:bg-yellow-800/50 rounded whitespace-pre-wrap">
-                  {errorMessage}
-                </div>
-              )}
-            </div>
-
-            <div className="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg border border-yellow-200 dark:border-yellow-800">
-              <h4 className="font-semibold text-yellow-900 dark:text-yellow-100 mb-2">⚠️ API Limitation</h4>
-              <p className="text-yellow-800 dark:text-yellow-200 text-sm mb-2">
-                Penpot's API is protected by Cloudflare and blocks direct integration. However, you can:
-              </p>
-              <ul className="text-yellow-800 dark:text-yellow-200 text-sm space-y-1 ml-4">
-                <li>• Use the "My Projects" tab to track your frequently used projects</li>
-                <li>• Open projects directly in Penpot with one click</li>
-                <li>• Export your project list for backup</li>
-                <li>• Test the API above to see current status</li>
-              </ul>
-            </div>
-          </div>
-        )}
-
-        {integrationMode === 'local' && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-xl font-semibold text-textStandard mb-2">My Penpot Projects</h3>
-                <p className="text-textSubtle">Track and quickly access your frequently used projects</p>
-              </div>
-              <div className="flex space-x-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={exportProjectData}
-                  disabled={localProjects.length === 0}
-                >
-                  <Download size={14} className="mr-1" />
-                  Export
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={addCustomProject}
-                >
-                  <Plus size={14} className="mr-1" />
-                  Add Project
-                </Button>
-              </div>
-            </div>
-
-            {localProjects.length > 0 ? (
-              <div className="space-y-3">
-                {localProjects
-                  .sort((a, b) => new Date(b.lastAccessed).getTime() - new Date(a.lastAccessed).getTime())
-                  .map((project) => (
-                    <div 
-                      key={project.id}
-                      className="flex items-center justify-between p-4 bg-background-muted rounded-lg border border-borderSubtle hover:bg-background-subtle cursor-pointer"
-                      onClick={() => window.open(project.url, '_blank')}
-                    >
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-2">
-                          <h5 className="font-medium text-textStandard">{project.name}</h5>
-                          <span className={`px-2 py-1 text-xs rounded ${
-                            project.type === 'team' ? 'bg-blue-100 text-blue-800' :
-                            project.type === 'dashboard' ? 'bg-green-100 text-green-800' :
-                            'bg-purple-100 text-purple-800'
-                          }`}>
-                            {project.type}
-                          </span>
-                        </div>
-                        <p className="text-xs text-textSubtle">
-                          ID: {project.id} 
-                          {project.team_id && ` • Team: ${project.team_id}`}
-                          {' • Last accessed: ' + new Date(project.lastAccessed).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            window.open(project.url, '_blank');
-                          }}
-                        >
-                          <ExternalLink size={14} />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            removeProject(project.id);
-                          }}
-                          className="text-red-500 hover:text-red-700"
-                        >
-                          ×
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            ) : (
-              <div className="text-center py-12">
-                <Palette size={48} className="text-textSubtle mx-auto mb-4" />
-                <h4 className="text-lg font-medium text-textStandard mb-2">No Projects Yet</h4>
-                <p className="text-textSubtle mb-4">Add your Penpot projects to quickly access them from Goose</p>
-                <Button onClick={addCustomProject}>
-                  <Plus size={16} className="mr-2" />
-                  Add Your First Project
-                </Button>
-              </div>
-            )}
-
-            <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
-              <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">💡 How to Add Projects</h4>
-              <ol className="text-blue-800 dark:text-blue-200 text-sm space-y-1 ml-4">
-                <li>1. Copy the full URL from your Penpot browser tab</li>
-                <li>2. Click "Add Project" and paste the URL</li>
-                <li>3. Give it a memorable name</li>
-                <li>4. Supports: workspace URLs, dashboard URLs with team-id, or just project IDs</li>
-              </ol>
-              <div className="mt-3 p-2 bg-blue-100 dark:bg-blue-800/50 rounded text-xs">
-                <strong>Example URLs:</strong><br/>
-                • https://design.penpot.app/#/workspace/abc123<br/>
-                • https://design.penpot.app/#/dashboard/recent?team-id=xyz456<br/>
-                • Or just: abc123
-              </div>
-            </div>
-          </div>
-        )}
+        </div>
       </div>
     </div>
   );
