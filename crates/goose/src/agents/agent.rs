@@ -1504,7 +1504,7 @@ mod tests {
         let mock_model_config = crate::model::ModelConfig::new("test-model".to_string());
         let mock_provider = Arc::new(MockProvider::new(mock_model_config));
 
-        let agent = Agent::new();
+        let agent = Arc::new(Agent::new());
         let _ = agent.update_provider(mock_provider).await;
 
         let echo_tool = Tool {
@@ -1537,7 +1537,7 @@ mod tests {
             working_dir: std::path::PathBuf::from("test-working-dir"),
             schedule_id: None,
             execution_mode: None,
-            max_turns: None,
+            max_turns: Some(5),
             retry_config: None,
         };
 
@@ -1546,6 +1546,23 @@ mod tests {
             .await
             .unwrap();
         let mut events = Vec::new();
+
+        let agent_for_mock = agent.clone();
+
+        tokio::spawn(async move {
+            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+            // Send mock responses for any tool calls
+            for i in 1..=2 {
+                let tool_id = format!("call_{}", i);
+                let mock_result = Ok(vec![rmcp::model::Content::text(&format!(
+                    "Echo: test response {}",
+                    i
+                ))]);
+                agent_for_mock
+                    .handle_tool_result(tool_id, mock_result)
+                    .await;
+            }
+        });
 
         while let Some(event_result) = stream.next().await {
             match event_result {
