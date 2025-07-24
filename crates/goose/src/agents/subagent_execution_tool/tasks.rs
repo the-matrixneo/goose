@@ -8,6 +8,7 @@ use tokio_util::sync::CancellationToken;
 
 use crate::agents::subagent_execution_tool::task_execution_tracker::TaskExecutionTracker;
 use crate::agents::subagent_execution_tool::task_types::{Task, TaskResult, TaskStatus};
+use crate::agents::subagent_execution_tool::utils::strip_ansi_codes;
 use crate::agents::subagent_handler::run_complete_subagent_task;
 use crate::agents::subagent_task_config::TaskConfig;
 
@@ -70,7 +71,7 @@ async fn get_task_result(
         if success {
             process_output(stdout_output)
         } else {
-            Err(format!("Command failed:\n{}", stderr_output))
+            Err(format!("Command failed:\n{}", &stderr_output))
         }
     }
 }
@@ -224,6 +225,7 @@ fn spawn_output_reader(
         let mut buffer = String::new();
         let mut lines = BufReader::new(reader).lines();
         while let Ok(Some(line)) = lines.next_line().await {
+            let line = strip_ansi_codes(&line);
             buffer.push_str(&line);
             buffer.push('\n');
 
