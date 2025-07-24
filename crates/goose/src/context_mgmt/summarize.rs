@@ -1,5 +1,5 @@
 use super::common::{get_messages_token_counts, get_messages_token_counts_async};
-use crate::message::{Message, MessageContent};
+use crate::message::{Message};
 use crate::prompt_template::render_global_file;
 use crate::providers::base::Provider;
 use crate::token_counter::{AsyncTokenCounter, TokenCounter};
