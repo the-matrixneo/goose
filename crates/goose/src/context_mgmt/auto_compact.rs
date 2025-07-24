@@ -21,10 +21,146 @@ pub struct AutoCompactResult {
     pub tokens_after: Option<usize>,
 }
 
+/// Result of checking if compaction is needed
+#[derive(Debug)]
+pub struct CompactionCheckResult {
+    /// Whether compaction is needed
+    pub needs_compaction: bool,
+    /// Current token count
+    pub current_tokens: usize,
+    /// Context limit being used
+    pub context_limit: usize,
+    /// Current usage ratio (0.0 to 1.0)
+    pub usage_ratio: f64,
+    /// Remaining tokens before compaction threshold
+    pub remaining_tokens: usize,
+    /// Percentage until compaction threshold (0.0 to 100.0)
+    pub percentage_until_compaction: f64,
+}
+
+/// Check if messages need compaction without performing the compaction
+///
+/// This function analyzes the current token usage and returns detailed information
+/// about whether compaction is needed and how close we are to the threshold.
+///
+/// # Arguments
+/// * `agent` - The agent to use for context management
+/// * `messages` - The current message history
+/// * `threshold_override` - Optional threshold override (defaults to GOOSE_AUTO_COMPACT_THRESHOLD config)
+///
+/// # Returns
+/// * `CompactionCheckResult` containing detailed information about compaction needs
+pub async fn check_compaction_needed(
+    agent: &Agent,
+    messages: &[Message],
+    threshold_override: Option<f64>,
+) -> Result<CompactionCheckResult> {
+    // Get threshold from config or use override
+    let config = Config::global();
+    let threshold = threshold_override.unwrap_or_else(|| {
+        config
+            .get_param::<f64>("GOOSE_AUTO_COMPACT_THRESHOLD")
+            .unwrap_or(0.3) // Default to 30%
+    });
+
+    // Get provider and token counter
+    let provider = agent.provider().await?;
+    let token_counter = create_async_token_counter()
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to create token counter: {}", e))?;
+
+    // Calculate current token usage
+    let token_counts = get_messages_token_counts_async(&token_counter, messages);
+    let current_tokens: usize = token_counts.iter().sum();
+    let context_limit = estimate_target_context_limit(provider);
+
+    // Calculate usage ratio
+    let usage_ratio = current_tokens as f64 / context_limit as f64;
+
+    // Calculate threshold token count and remaining tokens
+    let threshold_tokens = (context_limit as f64 * threshold) as usize;
+    let remaining_tokens = threshold_tokens.saturating_sub(current_tokens);
+
+    // Calculate percentage until compaction (how much more we can use before hitting threshold)
+    let percentage_until_compaction = if usage_ratio < threshold {
+        (threshold - usage_ratio) * 100.0
+    } else {
+        0.0
+    };
+
+    // Check if compaction is needed (disabled if threshold is invalid)
+    let needs_compaction = if threshold <= 0.0 || threshold >= 1.0 {
+        false
+    } else {
+        usage_ratio > threshold
+    };
+
+    debug!(
+        "Compaction check: {} / {} tokens ({:.1}%), threshold: {:.1}%, needs compaction: {}",
+        current_tokens,
+        context_limit,
+        usage_ratio * 100.0,
+        threshold * 100.0,
+        needs_compaction
+    );
+
+    Ok(CompactionCheckResult {
+        needs_compaction,
+        current_tokens,
+        context_limit,
+        usage_ratio,
+        remaining_tokens,
+        percentage_until_compaction,
+    })
+}
+
+/// Perform compaction on messages
+///
+/// This function performs the actual compaction using the agent's summarization
+/// capabilities. It assumes compaction is needed and should be called after
+/// `check_compaction_needed` confirms it's necessary.
+///
+/// # Arguments
+/// * `agent` - The agent to use for context management
+/// * `messages` - The current message history to compact
+///
+/// # Returns
+/// * Tuple of (compacted_messages, tokens_before, tokens_after)
+pub async fn perform_compaction(
+    agent: &Agent,
+    messages: &[Message],
+) -> Result<(Vec<Message>, usize, usize)> {
+    // Get token counter to measure before/after
+    let token_counter = create_async_token_counter()
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to create token counter: {}", e))?;
+
+    // Calculate tokens before compaction
+    let token_counts_before = get_messages_token_counts_async(&token_counter, messages);
+    let tokens_before: usize = token_counts_before.iter().sum();
+
+    info!("Performing compaction on {} tokens", tokens_before);
+
+    // Perform compaction
+    let (compacted_messages, compacted_token_counts) = agent.summarize_context(messages).await?;
+    let tokens_after: usize = compacted_token_counts.iter().sum();
+
+    info!(
+        "Compaction complete: {} tokens -> {} tokens ({:.1}% reduction)",
+        tokens_before,
+        tokens_after,
+        (1.0 - (tokens_after as f64 / tokens_before as f64)) * 100.0
+    );
+
+    Ok((compacted_messages, tokens_before, tokens_after))
+}
+
 /// Check if messages need compaction and compact them if necessary
 ///
-/// This function checks the current token usage against a configurable threshold
-/// and automatically compacts the messages using the summarization algorithm if needed.
+/// This is a convenience wrapper function that combines checking and compaction.
+/// It uses the separate `check_compaction_needed` and `perform_compaction` functions
+/// internally to provide the same interface as before while allowing for better
+/// separation of concerns.
 ///
 /// # Arguments
 /// * `agent` - The agent to use for context management
@@ -38,52 +174,14 @@ pub async fn check_and_compact_messages(
     messages: &[Message],
     threshold_override: Option<f64>,
 ) -> Result<AutoCompactResult> {
-    // Get threshold from config or use override
-    let config = Config::global();
-    let threshold = threshold_override.unwrap_or_else(|| {
-        config
-            .get_param::<f64>("GOOSE_AUTO_COMPACT_THRESHOLD")
-            .unwrap_or(0.3) // Default to 30%
-    });
+    // First check if compaction is needed
+    let check_result = check_compaction_needed(agent, messages, threshold_override).await?;
 
-    // Check if auto-compaction is disabled
-    if threshold <= 0.0 || threshold >= 1.0 {
-        debug!("Auto-compaction disabled (threshold: {})", threshold);
-        return Ok(AutoCompactResult {
-            compacted: false,
-            messages: messages.to_vec(),
-            tokens_before: None,
-            tokens_after: None,
-        });
-    }
-
-    // Get provider and token counter
-    let provider = agent.provider().await?;
-    let token_counter = create_async_token_counter()
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to create token counter: {}", e))?;
-
-    // Calculate current token usage
-    let token_counts = get_messages_token_counts_async(&token_counter, messages);
-    let total_tokens: usize = token_counts.iter().sum();
-    let context_limit = estimate_target_context_limit(provider);
-
-    // Calculate usage ratio
-    let usage_ratio = total_tokens as f64 / context_limit as f64;
-
-    debug!(
-        "Context usage: {} / {} ({:.1}%)",
-        total_tokens,
-        context_limit,
-        usage_ratio * 100.0
-    );
-
-    // Check if compaction is needed
-    if usage_ratio <= threshold {
+    // If no compaction is needed, return early
+    if !check_result.needs_compaction {
         debug!(
-            "No compaction needed (usage: {:.1}% <= threshold: {:.1}%)",
-            usage_ratio * 100.0,
-            threshold * 100.0
+            "No compaction needed (usage: {:.1}% <= threshold)",
+            check_result.usage_ratio * 100.0
         );
         return Ok(AutoCompactResult {
             compacted: false,
@@ -94,26 +192,18 @@ pub async fn check_and_compact_messages(
     }
 
     info!(
-        "Auto-compacting messages (usage: {:.1}% > threshold: {:.1}%)",
-        usage_ratio * 100.0,
-        threshold * 100.0
+        "Auto-compacting messages (usage: {:.1}%)",
+        check_result.usage_ratio * 100.0
     );
 
-    // Perform compaction
-    let (compacted_messages, compacted_token_counts) = agent.summarize_context(messages).await?;
-    let tokens_after: usize = compacted_token_counts.iter().sum();
-
-    info!(
-        "Compaction complete: {} tokens -> {} tokens ({:.1}% reduction)",
-        total_tokens,
-        tokens_after,
-        (1.0 - (tokens_after as f64 / total_tokens as f64)) * 100.0
-    );
+    // Perform the compaction
+    let (compacted_messages, tokens_before, tokens_after) =
+        perform_compaction(agent, messages).await?;
 
     Ok(AutoCompactResult {
         compacted: true,
         messages: compacted_messages,
-        tokens_before: Some(total_tokens),
+        tokens_before: Some(tokens_before),
         tokens_after: Some(tokens_after),
     })
 }
@@ -177,6 +267,85 @@ mod tests {
             Utc::now().timestamp(),
             vec![MessageContent::text(text.to_string())],
         )
+    }
+
+    #[tokio::test]
+    async fn test_check_compaction_needed() {
+        let mock_provider = Arc::new(MockProvider {
+            model_config: ModelConfig::new("test-model".to_string())
+                .with_context_limit(100_000.into()),
+        });
+
+        let agent = Agent::new();
+        let _ = agent.update_provider(mock_provider).await;
+
+        // Create small messages that won't trigger compaction
+        let messages = vec![create_test_message("Hello"), create_test_message("World")];
+
+        let result = check_compaction_needed(&agent, &messages, Some(0.3))
+            .await
+            .unwrap();
+
+        assert!(!result.needs_compaction);
+        assert!(result.current_tokens > 0);
+        assert!(result.context_limit > 0);
+        assert!(result.usage_ratio < 0.3);
+        assert!(result.remaining_tokens > 0);
+        assert!(result.percentage_until_compaction > 0.0);
+    }
+
+    #[tokio::test]
+    async fn test_check_compaction_needed_disabled() {
+        let mock_provider = Arc::new(MockProvider {
+            model_config: ModelConfig::new("test-model".to_string())
+                .with_context_limit(100_000.into()),
+        });
+
+        let agent = Agent::new();
+        let _ = agent.update_provider(mock_provider).await;
+
+        let messages = vec![create_test_message("Hello")];
+
+        // Test with threshold 0 (disabled)
+        let result = check_compaction_needed(&agent, &messages, Some(0.0))
+            .await
+            .unwrap();
+
+        assert!(!result.needs_compaction);
+
+        // Test with threshold 1.0 (disabled)
+        let result = check_compaction_needed(&agent, &messages, Some(1.0))
+            .await
+            .unwrap();
+
+        assert!(!result.needs_compaction);
+    }
+
+    #[tokio::test]
+    async fn test_perform_compaction() {
+        let mock_provider = Arc::new(MockProvider {
+            model_config: ModelConfig::new("test-model".to_string())
+                .with_context_limit(50_000.into()),
+        });
+
+        let agent = Agent::new();
+        let _ = agent.update_provider(mock_provider).await;
+
+        // Create some messages to compact
+        let messages = vec![
+            create_test_message("First message"),
+            create_test_message("Second message"),
+            create_test_message("Third message"),
+        ];
+
+        let (compacted_messages, tokens_before, tokens_after) =
+            perform_compaction(&agent, &messages).await.unwrap();
+
+        assert!(tokens_before > 0);
+        assert!(tokens_after > 0);
+        // Note: The mock provider returns a fixed summary, which might not always be smaller
+        // In real usage, compaction should reduce tokens, but for testing we just verify it works
+        assert!(!compacted_messages.is_empty());
     }
 
     #[tokio::test]
