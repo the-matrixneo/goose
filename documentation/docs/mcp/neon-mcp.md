@@ -1,6 +1,6 @@
 ---
-title: GitHub Extension
-description: Add GitHub MCP Server as a Goose Extension
+title: Neon Extension
+description: Add Neon MCP Server as a Goose Extension
 ---
 
 import Tabs from '@theme/Tabs';
