@@ -50,6 +50,7 @@ use tokio::sync::{mpsc, Mutex, RwLock};
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info, instrument};
 
+use super::developer_tools;
 use super::final_output_tool::FinalOutputTool;
 use super::platform_tools;
 use super::router_tools;
@@ -78,6 +79,7 @@ pub struct Agent {
     pub(super) mcp_tx: Mutex<mpsc::Sender<JsonRpcMessage>>,
     pub(super) mcp_notification_rx: Arc<Mutex<mpsc::Receiver<JsonRpcMessage>>>,
     pub(super) retry_manager: RetryManager,
+    pub(super) developer_tools_state: Arc<Mutex<developer_tools::DeveloperToolsState>>,
 }
 
 #[derive(Clone, Debug)]
@@ -158,6 +160,9 @@ impl Agent {
             mcp_tx: Mutex::new(mcp_tx),
             mcp_notification_rx: Arc::new(Mutex::new(mcp_rx)),
             retry_manager,
+            developer_tools_state: Arc::new(
+                Mutex::new(developer_tools::DeveloperToolsState::new()),
+            ),
         }
     }
 
@@ -401,6 +406,15 @@ impl Agent {
                 }
             };
             ToolCallResult::from(Ok(selected_tools))
+        } else if tool_call.name.starts_with("developer__") {
+            // Handle developer tools directly in-process
+            match self
+                .handle_developer_tool_call(&tool_call.name, tool_call.arguments)
+                .await
+            {
+                Ok(result) => ToolCallResult::from(Ok(result)),
+                Err(e) => ToolCallResult::from(Err(e)),
+            }
         } else {
             // Clone the result to ensure no references to extension_manager are returned
             let result = extension_manager
