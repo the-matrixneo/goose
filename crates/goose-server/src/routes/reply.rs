@@ -11,7 +11,6 @@ use bytes::Bytes;
 use futures::{stream::StreamExt, Stream};
 use goose::{
     agents::{AgentEvent, SessionConfig},
-    context_mgmt::auto_compact::check_and_compact_messages,
     message::{push_message, Message},
     permission::permission_confirmation::PrincipalType,
 };
@@ -160,36 +159,8 @@ async fn reply_handler(
             retry_config: None,
         };
 
-        // Check and compact messages if needed before calling reply
-        let mut messages_to_process = messages.clone();
-        let compact_result = check_and_compact_messages(&agent, &messages_to_process, None).await;
-        if let Ok(result) = compact_result {
-            if result.compacted {
-                messages_to_process = result.messages;
-
-                // Notify client of compaction
-                let msg = if let (Some(before), Some(after)) =
-                    (result.tokens_before, result.tokens_after)
-                {
-                    format!(
-                        "Auto-compacted context: {} → {} tokens ({:.0}% reduction)",
-                        before,
-                        after,
-                        (1.0 - (after as f64 / before as f64)) * 100.0
-                    )
-                } else {
-                    "Auto-compacted context to prevent overflow".to_string()
-                };
-
-                let _ = stream_event(
-                    MessageEvent::Message {
-                        message: Message::assistant().with_text(&msg),
-                    },
-                    &task_tx,
-                )
-                .await;
-            }
-        }
+        // Messages will be auto-compacted in agent.reply() if needed
+        let messages_to_process = messages.clone();
 
         let mut stream = match agent
             .reply(
