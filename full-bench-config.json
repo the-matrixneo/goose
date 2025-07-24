@@ -1,0 +1,91 @@
+{
+  "models": [
+    {
+      "provider": "databricks",
+      "name": "goose",
+      "parallel_safe": false,
+      "tool_shim": {
+        "use_tool_shim": false,
+        "tool_shim_model": null
+      }
+    }
+  ],
+  "evals": [
+    {
+      "selector": "core:developer:simple_repo_clone_test",
+      "post_process_cmd": null,
+      "parallel_safe": false
+    },
+    {
+      "selector": "core:developer:create_file",
+      "post_process_cmd": null,
+      "parallel_safe": false
+    },
+    {
+      "selector": "core:developer:list_files",
+      "post_process_cmd": null,
+      "parallel_safe": false
+    },
+    {
+      "selector": "core:computercontroller:script",
+      "post_process_cmd": null,
+      "parallel_safe": false
+    },
+    {
+      "selector": "core:computercontroller:web_scrape",
+      "post_process_cmd": null,
+      "parallel_safe": false
+    },
+    {
+      "selector": "core:developer_image:image",
+      "post_process_cmd": null,
+      "parallel_safe": false
+    },
+    {
+      "selector": "core:developer_search_replace:search_replace",
+      "post_process_cmd": null,
+      "parallel_safe": false
+    },
+    {
+      "selector": "core:example",
+      "post_process_cmd": null,
+      "parallel_safe": false
+    },
+    {
+      "selector": "core:memory:save_fact",
+      "post_process_cmd": null,
+      "parallel_safe": false
+    },
+    {
+      "selector": "vibes:blog_summary",
+      "post_process_cmd": null,
+      "parallel_safe": false
+    },
+    {
+      "selector": "vibes:flappy_bird",
+      "post_process_cmd": null,
+      "parallel_safe": false
+    },
+    {
+      "selector": "vibes:goose_wiki",
+      "post_process_cmd": null,
+      "parallel_safe": false
+    },
+    {
+      "selector": "vibes:restaurant_research",
+      "post_process_cmd": null,
+      "parallel_safe": false
+    },
+    {
+      "selector": "vibes:squirrel_census",
+      "post_process_cmd": null,
+      "parallel_safe": false
+    }
+  ],
+  "include_dirs": [],
+  "repeat": 1,
+  "run_id": "autocompact-full-bench",
+  "eval_result_filename": "eval-results.json",
+  "run_summary_filename": "run-results-summary.json",
+  "env_file": null
+}

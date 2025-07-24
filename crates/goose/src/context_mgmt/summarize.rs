@@ -50,63 +50,7 @@ async fn summarize_combined_messages(
     Ok(vec![response])
 }
 
-/// Preprocesses the messages to handle edge cases involving tool responses.
-///
-/// This function separates messages into two groups:
-/// 1. Messages to be summarized (`preprocessed_messages`)
-/// 2. Messages to be temporarily removed (`removed_messages`), which include:
-///    - The last tool response message.
-///    - The corresponding tool request message that immediately precedes the last tool response message (if present).
-///
-/// The function only considers the last tool response message and its pair for removal.
-fn preprocess_messages(messages: &[Message]) -> (Vec<Message>, Vec<Message>) {
-    let mut preprocessed_messages = messages.to_owned();
-    let mut removed_messages = Vec::new();
 
-    if let Some((last_index, last_message)) = messages.iter().enumerate().rev().find(|(_, m)| {
-        m.content
-            .iter()
-            .any(|c| matches!(c, MessageContent::ToolResponse(_)))
-    }) {
-        // Check for the corresponding tool request message
-        if last_index > 0 {
-            if let Some(previous_message) = messages.get(last_index - 1) {
-                if previous_message
-                    .content
-                    .iter()
-                    .any(|c| matches!(c, MessageContent::ToolRequest(_)))
-                {
-                    // Add the tool request message to removed_messages
-                    removed_messages.push(previous_message.clone());
-                }
-            }
-        }
-        // Add the last tool response message to removed_messages
-        removed_messages.push(last_message.clone());
-
-        // Calculate the correct start index for removal
-        let start_index = last_index + 1 - removed_messages.len();
-
-        // Remove the tool response and its paired tool request from preprocessed_messages
-        preprocessed_messages.drain(start_index..=last_index);
-    }
-
-    (preprocessed_messages, removed_messages)
-}
-
-/// Reinserts removed messages into the summarized output.
-///
-/// This function appends messages that were temporarily removed during preprocessing
-/// back into the summarized message list. This ensures that important context,
-/// such as tool responses, is not lost.
-fn reintegrate_removed_messages(
-    summarized_messages: &[Message],
-    removed_messages: &[Message],
-) -> Vec<Message> {
-    let mut final_messages = summarized_messages.to_owned();
-    final_messages.extend_from_slice(removed_messages);
-    final_messages
-}
 
 // Summarization steps:
 //    Using a single tailored prompt, summarize the entire conversation history.
@@ -316,10 +260,8 @@ mod tests {
     use crate::providers::errors::ProviderError;
     use chrono::Utc;
     use mcp_core::tool::Tool;
-    use mcp_core::ToolCall;
     use rmcp::model::Role;
-    use rmcp::model::{AnnotateAble, Content, RawTextContent};
-    use serde_json::json;
+    use rmcp::model::{AnnotateAble, RawTextContent};
     use std::sync::Arc;
 
     #[derive(Clone)]
@@ -379,24 +321,7 @@ mod tests {
         Message::new(role, 0, vec![MessageContent::text(text.to_string())])
     }
 
-    fn set_up_tool_request_message(id: &str, tool_call: ToolCall) -> Message {
-        Message::new(
-            Role::Assistant,
-            0,
-            vec![MessageContent::tool_request(id.to_string(), Ok(tool_call))],
-        )
-    }
 
-    fn set_up_tool_response_message(id: &str, tool_response: Vec<Content>) -> Message {
-        Message::new(
-            Role::User,
-            0,
-            vec![MessageContent::tool_response(
-                id.to_string(),
-                Ok(tool_response),
-            )],
-        )
-    }
 
     #[tokio::test]
     async fn test_summarize_messages_single_chunk() {
@@ -499,76 +424,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
-    async fn test_preprocess_messages_without_tool_response() {
-        let messages = create_test_messages();
-        let (preprocessed_messages, removed_messages) = preprocess_messages(&messages);
 
-        assert_eq!(
-            preprocessed_messages.len(),
-            3,
-            "Only the user message should remain after preprocessing."
-        );
-        assert_eq!(
-            removed_messages.len(),
-            0,
-            "The tool request and tool response messages should be removed."
-        );
-    }
-
-    #[tokio::test]
-    async fn test_preprocess_messages_with_tool_response() {
-        let arguments = json!({
-            "param1": "value1"
-        });
-        let messages = vec![
-            set_up_text_message("Message 1", Role::User),
-            set_up_tool_request_message("id", ToolCall::new("tool_name", json!(arguments))),
-            set_up_tool_response_message("id", vec![Content::text("tool done")]),
-        ];
-
-        let (preprocessed_messages, removed_messages) = preprocess_messages(&messages);
-
-        assert_eq!(
-            preprocessed_messages.len(),
-            1,
-            "Only the user message should remain after preprocessing."
-        );
-        assert_eq!(
-            removed_messages.len(),
-            2,
-            "The tool request and tool response messages should be removed."
-        );
-    }
-
-    #[tokio::test]
-    async fn test_reintegrate_removed_messages() {
-        let summarized_messages = vec![Message::new(
-            Role::Assistant,
-            Utc::now().timestamp(),
-            vec![MessageContent::Text(
-                RawTextContent {
-                    text: "Summary".to_string(),
-                }
-                .no_annotation(),
-            )],
-        )];
-        let arguments = json!({
-            "param1": "value1"
-        });
-        let removed_messages = vec![
-            set_up_tool_request_message("id", ToolCall::new("tool_name", json!(arguments))),
-            set_up_tool_response_message("id", vec![Content::text("tool done")]),
-        ];
-
-        let final_messages = reintegrate_removed_messages(&summarized_messages, &removed_messages);
-
-        assert_eq!(
-            final_messages.len(),
-            3,
-            "The final message list should include the summary and removed messages."
-        );
-    }
 
     #[tokio::test]
     async fn test_summarize_messages_uses_oneshot_for_small_context() {
