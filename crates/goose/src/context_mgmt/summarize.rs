@@ -1,5 +1,5 @@
 use super::common::{get_messages_token_counts, get_messages_token_counts_async};
-use crate::message::{Message};
+use crate::message::Message;
 use crate::prompt_template::render_global_file;
 use crate::providers::base::Provider;
 use crate::token_counter::{AsyncTokenCounter, TokenCounter};
@@ -49,8 +49,6 @@ async fn summarize_combined_messages(
     // Return the summary as the new accumulated summary.
     Ok(vec![response])
 }
-
-
 
 // Summarization steps:
 //    Using a single tailored prompt, summarize the entire conversation history.
@@ -321,8 +319,6 @@ mod tests {
         Message::new(role, 0, vec![MessageContent::text(text.to_string())])
     }
 
-
-
     #[tokio::test]
     async fn test_summarize_messages_single_chunk() {
         let provider = create_mock_provider();
@@ -423,8 +419,6 @@ mod tests {
             "Token counts should be empty for an empty input."
         );
     }
-
-
 
     #[tokio::test]
     async fn test_summarize_messages_uses_oneshot_for_small_context() {
