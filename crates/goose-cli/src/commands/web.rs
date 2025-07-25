@@ -629,6 +629,30 @@ async fn process_message_streaming(
                             }
                         }
                     }
+                    Ok(AgentEvent::HistoryReplaced(new_messages)) => {
+                        // Replace the session's message history with the compacted messages
+                        {
+                            let mut session_msgs = session_messages.lock().await;
+                            *session_msgs = new_messages;
+                        }
+
+                        // Persist the updated messages to the JSONL file
+                        let current_messages = {
+                            let session_msgs = session_messages.lock().await;
+                            session_msgs.clone()
+                        };
+
+                        if let Err(e) = session::persist_messages(
+                            &session_file,
+                            &current_messages,
+                            None, // No provider needed for persisting
+                            working_dir.clone(),
+                        )
+                        .await
+                        {
+                            error!("Failed to persist compacted messages: {}", e);
+                        }
+                    }
                     Ok(AgentEvent::McpNotification(_notification)) => {
                         // Handle MCP notifications if needed
                         // For now, we'll just log them

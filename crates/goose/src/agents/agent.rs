@@ -86,6 +86,7 @@ pub enum AgentEvent {
     Message(Message),
     McpNotification((String, JsonRpcMessage)),
     ModelChange { model: String, mode: String },
+    HistoryReplaced(Vec<Message>),
 }
 
 impl Default for Agent {
@@ -747,9 +748,13 @@ impl Agent {
                 "Auto-compacted context to reduce token usage".to_string()
             };
 
-            // Yield compaction notification as first event
+            // Create a new AgentEvent type to signal message history replacement
             return Ok(Box::pin(async_stream::try_stream! {
                 yield AgentEvent::Message(Message::assistant().with_text(compaction_msg));
+                
+                // Yield a special event to indicate the session should replace its message history
+                // with the compacted messages
+                yield AgentEvent::HistoryReplaced(messages.clone());
 
                 // Continue with normal reply processing using compacted messages
                 let mut reply_stream = self.reply_internal(&messages, session, cancel_token).await?;

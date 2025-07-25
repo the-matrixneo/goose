@@ -470,7 +470,7 @@ mod tests {
     async fn test_auto_compact_respects_config() {
         let mock_provider = Arc::new(MockProvider {
             model_config: ModelConfig::new("test-model".to_string())
-                .with_context_limit(50_000.into()), // Realistic context limit that won't underflow
+                .with_context_limit(30_000.into()), // Smaller context limit to make threshold easier to hit
         });
 
         let agent = Agent::new();
@@ -478,11 +478,15 @@ mod tests {
 
         // Create enough messages to trigger compaction with low threshold
         let mut messages = Vec::new();
-        // Need to create more messages since we have a 27k usable token limit
-        // 10% of 27k = 2.7k tokens
-        for i in 0..150 {
+        // With 30k context limit, after overhead we have ~27k usable tokens
+        // 10% of 27k = 2.7k tokens, so we need messages that exceed that
+        for i in 0..200 {
             messages.push(create_test_message(&format!(
-                "Message {} with enough content to ensure we exceed 10% of the context limit. Adding more content.",
+                "Message {} with enough content to ensure we exceed 10% of the context limit. \
+                 Adding more content to increase token count substantially. This message contains \
+                 multiple sentences to increase the token count. We need to ensure that our total \
+                 token usage exceeds 10% of the available context limit after accounting for \
+                 system prompt and tools overhead.",
                 i
             )));
         }

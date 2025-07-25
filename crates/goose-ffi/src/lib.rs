@@ -270,6 +270,10 @@ pub unsafe extern "C" fn goose_agent_send_message(
                     // Model change events are informational, just continue
                 }
 
+                Ok(AgentEvent::HistoryReplaced(_)) => {
+                    // Handle history replacement events if needed
+                    // For FFI, we don't need to do anything special
+                }
                 Err(e) => {
                     full_response.push_str(&format!("\nError in message stream: {}", e));
                 }

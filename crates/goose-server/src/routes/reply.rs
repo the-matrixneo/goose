@@ -222,6 +222,12 @@ async fn reply_handler(
                                             break;
                                         }
                                     }
+                                    Ok(Some(Ok(AgentEvent::HistoryReplaced(new_messages)))) => {
+                                        // Replace the message history with the compacted messages
+                                        all_messages = new_messages;
+                                        // Note: We don't send this as a stream event since it's an internal operation
+                                        // The client will see the compaction notification message that was sent before this event
+                                    }
                                     Ok(Some(Ok(AgentEvent::ModelChange { model, mode }))) => {
                                         if let Err(e) = stream_event(MessageEvent::ModelChange { model, mode }, &tx).await {
                                             tracing::error!("Error sending model change through channel: {}", e);
