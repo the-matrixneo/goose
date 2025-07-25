@@ -5,9 +5,6 @@ description: Add Neon MCP Server as a Goose Extension
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
-import YouTubeShortEmbed from '@site/src/components/YouTubeShortEmbed';
-import CLIStreamExtensionInstructions from '@site/src/components/CLIStreamExtensionInstructions';
-import { PanelLeft } from 'lucide-react';
 import CLIExtensionInstructions from '@site/src/components/CLIExtensionInstructions';
 import GooseDesktopInstaller from '@site/src/components/GooseDesktopInstaller';
 
