@@ -7,7 +7,7 @@ use crate::recipes::print_recipe::print_recipe_info;
 use crate::recipes::recipe::load_recipe;
 use crate::recipes::search_recipe::retrieve_recipe_file;
 use crate::{
-    cli::{InputConfig, RecipeInfo},
+    cli::main::{InputConfig, RecipeInfo},
     session::SessionSettings,
 };
 

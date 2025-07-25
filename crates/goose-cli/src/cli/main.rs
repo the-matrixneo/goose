@@ -1,9 +1,9 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 
-use goose::config::Config;
+use goose::config::{Config, ExtensionConfig};
 
-use super::{extract_identifier, parse_key_val, Identifier, InputConfig};
+use super::{extract_identifier, parse_key_val, Identifier};
 use crate::commands::bench::agent_generator;
 use crate::commands::configure::handle_configure;
 use crate::commands::info::handle_info;
@@ -810,7 +810,7 @@ pub async fn cli() -> Result<()> {
                     }
                     let (input_config, recipe_info) = extract_recipe_info_from_cli(
                         recipe_name.clone(),
-                        params,
+                        params.clone(),
                         additional_sub_recipes,
                     )?;
                     (input_config, Some(recipe_info))
@@ -853,8 +853,9 @@ pub async fn cli() -> Result<()> {
                             scheduled_job_id,
                             interactive,
                             quiet,
-                            sub_recipes,
-                            final_output_response,
+                            sub_recipes: recipe_info.as_ref().and_then(|r| r.sub_recipes.clone()),
+                            final_output_response: recipe_info.as_ref().and_then(|r| r.final_output_response.clone()),
+                            retry_config: recipe_info.as_ref().and_then(|r| r.retry_config.clone()),
                         })
                         .await;
 
@@ -891,7 +892,9 @@ pub async fn cli() -> Result<()> {
                     builtins,
                     extensions_override: input_config.extensions_override,
                     additional_system_prompt: input_config.additional_system_prompt,
-                    settings: session_settings,
+                    settings: recipe_info
+                        .as_ref()
+                        .and_then(|r| r.session_settings.clone()),
                     provider,
                     model,
                     debug,

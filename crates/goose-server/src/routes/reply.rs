@@ -243,7 +243,7 @@ async fn reply_handler(
         );
 
         let agent = match state.get_agent().await {
-            Ok(agent) =>  {
+            Ok(agent) => {
                 let provider = agent.provider().await;
                 match provider {
                     Ok(_) => agent,
@@ -254,14 +254,14 @@ async fn reply_handler(
                             },
                             &tx,
                         )
-                            .await;
+                        .await;
                         let _ = stream_event(
                             MessageEvent::Finish {
                                 reason: "error".to_string(),
                             },
                             &tx,
                         )
-                            .await;
+                        .await;
 
                         // Track failed session and recipe execution
                         track_failed_session(
@@ -288,7 +288,7 @@ async fn reply_handler(
                         return;
                     }
                 }
-            },
+            }
             Err(_) => {
                 let _ = stream_event(
                     MessageEvent::Error {
@@ -511,7 +511,7 @@ async fn reply_handler(
             )
             .await;
         }
-    });
+    }));
 
     Ok(SseResponse::new(stream))
 }
@@ -684,6 +684,8 @@ mod tests {
                         session_id: Some("test-session".to_string()),
                         session_working_dir: "test-working-dir".to_string(),
                         scheduled_job_id: None,
+                        recipe_name: None,
+                        recipe_version: None,
                     })
                     .unwrap(),
                 ))
