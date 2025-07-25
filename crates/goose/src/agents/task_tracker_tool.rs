@@ -57,7 +57,8 @@ impl TaskTracker {
                 - "to do": Task has been added but not started
                 - "wip": Task is currently being worked on
                 - "done": Task has been completed
-            "#}.to_string(),
+            "#}
+            .to_string(),
             object!({
                 "type": "object",
                 "properties": {
@@ -71,8 +72,9 @@ impl TaskTracker {
                         "description": "Task description (required for add, wip, done actions)"
                     }
                 }
-            })
-        ).annotate(ToolAnnotations {
+            }),
+        )
+        .annotate(ToolAnnotations {
             title: Some("Task Tracker".to_string()),
             read_only_hint: Some(false),
             destructive_hint: Some(false),
@@ -205,9 +207,12 @@ mod tests {
             }))
             .await
             .unwrap();
-        
+
         if let Some(text) = result[0].as_text() {
-            assert_eq!(text.text.as_str(), "Added task: \"Write unit tests\" [to do]");
+            assert_eq!(
+                text.text.as_str(),
+                "Added task: \"Write unit tests\" [to do]"
+            );
         } else {
             panic!("Expected text content");
         }
@@ -224,7 +229,7 @@ mod tests {
     #[tokio::test]
     async fn test_mark_task_wip() {
         let tracker = TaskTracker::new();
-        
+
         // Add task first
         tracker
             .execute(json!({
@@ -242,9 +247,12 @@ mod tests {
             }))
             .await
             .unwrap();
-        
+
         if let Some(text) = result[0].as_text() {
-            assert_eq!(text.text.as_str(), "Marked task as work in progress: \"Fix bug\" [wip]");
+            assert_eq!(
+                text.text.as_str(),
+                "Marked task as work in progress: \"Fix bug\" [wip]"
+            );
         } else {
             panic!("Expected text content");
         }
@@ -253,7 +261,7 @@ mod tests {
     #[tokio::test]
     async fn test_mark_task_done() {
         let tracker = TaskTracker::new();
-        
+
         // Add task first
         tracker
             .execute(json!({
@@ -271,9 +279,12 @@ mod tests {
             }))
             .await
             .unwrap();
-        
+
         if let Some(text) = result[0].as_text() {
-            assert_eq!(text.text.as_str(), "Marked task as completed: \"Review PR\" [done]");
+            assert_eq!(
+                text.text.as_str(),
+                "Marked task as completed: \"Review PR\" [done]"
+            );
         } else {
             panic!("Expected text content");
         }
@@ -282,7 +293,7 @@ mod tests {
     #[tokio::test]
     async fn test_clear_tasks() {
         let tracker = TaskTracker::new();
-        
+
         // Add some tasks
         tracker
             .execute(json!({
@@ -306,7 +317,7 @@ mod tests {
             }))
             .await
             .unwrap();
-        
+
         if let Some(text) = result[0].as_text() {
             assert_eq!(text.text.as_str(), "Cleared 2 tasks.");
         } else {
@@ -325,13 +336,13 @@ mod tests {
     #[tokio::test]
     async fn test_error_missing_task() {
         let tracker = TaskTracker::new();
-        
+
         let result = tracker
             .execute(json!({
                 "action": "add"
             }))
             .await;
-        
+
         assert!(result.is_err());
         if let Err(ToolError::InvalidParameters(msg)) = result {
             assert_eq!(msg, "Task description required for 'add' action");
@@ -341,14 +352,14 @@ mod tests {
     #[tokio::test]
     async fn test_error_task_not_found() {
         let tracker = TaskTracker::new();
-        
+
         let result = tracker
             .execute(json!({
                 "action": "wip",
                 "task": "Non-existent task"
             }))
             .await;
-        
+
         assert!(result.is_err());
         if let Err(ToolError::InvalidParameters(msg)) = result {
             assert_eq!(msg, "Task not found: \"Non-existent task\"");

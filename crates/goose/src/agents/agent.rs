@@ -629,7 +629,7 @@ impl Agent {
                 prefixed_tools.push(final_output_tool.tool());
             }
             prefixed_tools.push(subagent_execute_task_tool::create_subagent_execute_task_tool());
-            
+
             // Add task tracker tool
             prefixed_tools.push(TaskTracker::tool());
         }
