@@ -2,7 +2,7 @@ use anyhow::Result;
 use chrono::{DateTime, TimeZone, Utc};
 use futures::stream::{FuturesUnordered, StreamExt};
 use futures::{future, FutureExt};
-use mcp_core::protocol::GetPromptResult;
+use rmcp::model::GetPromptResult;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::sync::LazyLock;
@@ -832,10 +832,10 @@ mod tests {
     use mcp_client::client::Error;
     use mcp_client::client::McpClientTrait;
     use mcp_core::protocol::{
-        CallToolResult, GetPromptResult, InitializeResult, ListPromptsResult, ListResourcesResult,
-        ListToolsResult, ReadResourceResult,
+        CallToolResult, InitializeResult, ListPromptsResult, ListResourcesResult, ListToolsResult,
+        ReadResourceResult,
     };
-    use rmcp::model::JsonRpcMessage;
+    use rmcp::model::{GetPromptResult, ServerNotification};
     use serde_json::json;
     use tokio::sync::mpsc;
 
@@ -891,7 +891,7 @@ mod tests {
             Err(Error::NotInitialized)
         }
 
-        async fn subscribe(&self) -> mpsc::Receiver<JsonRpcMessage> {
+        async fn subscribe(&self) -> mpsc::Receiver<ServerNotification> {
             mpsc::channel(1).1
         }
     }
