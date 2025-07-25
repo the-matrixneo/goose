@@ -240,8 +240,7 @@ mod tests {
         providers::errors::ProviderError,
     };
     use chrono::Utc;
-    use mcp_core::tool::Tool;
-    use rmcp::model::{AnnotateAble, RawTextContent, Role};
+    use rmcp::model::{AnnotateAble, RawTextContent, Role, Tool};
     use std::sync::Arc;
 
     #[derive(Clone)]
