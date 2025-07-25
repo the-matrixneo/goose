@@ -1139,7 +1139,7 @@ impl Session {
                         Some(Ok(AgentEvent::HistoryReplaced(new_messages))) => {
                             // Replace the session's message history with the compacted messages
                             self.messages = new_messages;
-                            
+
                             // Persist the updated messages to the session file
                             if let Some(session_file) = &self.session_file {
                                 let provider = self.agent.provider().await.ok();
