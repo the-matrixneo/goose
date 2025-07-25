@@ -104,6 +104,27 @@ pub async fn check_compaction_needed(
         needs_compaction
     );
 
+    // Add detailed logging to help debug the issue
+    eprintln!("DEBUG COMPACTION CHECK:");
+    eprintln!("  Messages count: {}", messages.len());
+    eprintln!("  Current tokens: {}", current_tokens);
+    eprintln!("  Context limit: {}", context_limit);
+    eprintln!("  Usage ratio: {:.1}%", usage_ratio * 100.0);
+    eprintln!("  Threshold: {:.1}%", threshold * 100.0);
+    eprintln!("  Needs compaction: {}", needs_compaction);
+    eprintln!("  Token counts per message: {:?}", token_counts);
+    
+    // Log first few characters of each message for debugging
+    // for (i, msg) in messages.iter().enumerate() {
+    //     let content_preview = msg.as_concat_text();
+    //     let preview = if content_preview.len() > 100 {
+    //         format!("{}...", &content_preview[..100])
+    //     } else {
+    //         content_preview
+    //     };
+    //     eprintln!("  Message {}: {} tokens, content: {:?}", i, token_counts[i], preview);
+    // }
+
     Ok(CompactionCheckResult {
         needs_compaction,
         current_tokens,
