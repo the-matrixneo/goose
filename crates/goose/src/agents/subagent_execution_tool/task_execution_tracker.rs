@@ -3,7 +3,7 @@ use rmcp::object;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
-use tokio::time::{Duration, Instant};
+use tokio::time::{sleep, Duration, Instant};
 use tokio_util::sync::CancellationToken;
 
 use crate::agents::subagent_execution_tool::notification_events::{
@@ -12,6 +12,7 @@ use crate::agents::subagent_execution_tool::notification_events::{
 };
 use crate::agents::subagent_execution_tool::task_types::{Task, TaskInfo, TaskResult, TaskStatus};
 use crate::agents::subagent_execution_tool::utils::{count_by_status, get_task_name};
+use crate::utils::is_token_cancelled;
 use serde_json::Value;
 use tokio::sync::mpsc::Sender;
 
@@ -22,6 +23,7 @@ pub enum DisplayMode {
 }
 
 const THROTTLE_INTERVAL_MS: u64 = 250;
+const COMPLETION_NOTIFICATION_DELAY_MS: u64 = 500;
 
 fn format_task_metadata(task_info: &TaskInfo) -> String {
     if let Some(params) = task_info.task.get_command_parameters() {
@@ -40,18 +42,8 @@ fn format_task_metadata(task_info: &TaskInfo) -> String {
             })
             .collect::<Vec<_>>()
             .join(",")
-    } else if task_info.task.task_type == "text_instruction" {
-        // For text_instruction tasks, extract and display the instruction
-        if let Some(text_instruction) = task_info.task.get_text_instruction() {
-            // Truncate long instructions to keep the display clean
-            if text_instruction.len() > 80 {
-                format!("instruction={}...", &text_instruction[..77])
-            } else {
-                format!("instruction={}", text_instruction)
-            }
-        } else {
-            String::new()
-        }
+    } else if let Some(text_instruction) = task_info.task.get_text_instruction() {
+        format!("instruction={}", text_instruction)
     } else {
         String::new()
     }
@@ -100,9 +92,7 @@ impl TaskExecutionTracker {
     }
 
     fn is_cancelled(&self) -> bool {
-        self.cancellation_token
-            .as_ref()
-            .is_some_and(|t| t.is_cancelled())
+        is_token_cancelled(&self.cancellation_token)
     }
 
     fn log_notification_error(
@@ -309,7 +299,8 @@ impl TaskExecutionTracker {
             .collect();
 
         let event = TaskExecutionNotificationEvent::tasks_complete(stats, failed_tasks);
-
         self.try_send_notification(event, "tasks complete");
+        // Wait for the notification to be recieved and displayed before clearing the tasks
+        sleep(Duration::from_millis(COMPLETION_NOTIFICATION_DELAY_MS)).await;
     }
 }

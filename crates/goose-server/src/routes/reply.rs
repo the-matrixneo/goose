@@ -417,7 +417,6 @@ mod tests {
             errors::ProviderError,
         },
     };
-    use mcp_core::tool::Tool;
 
     #[derive(Clone)]
     struct MockProvider {
@@ -434,7 +433,7 @@ mod tests {
             &self,
             _system: &str,
             _messages: &[Message],
-            _tools: &[Tool],
+            _tools: &[rmcp::model::Tool],
         ) -> anyhow::Result<(Message, ProviderUsage), ProviderError> {
             Ok((
                 Message::assistant().with_text("Mock response"),

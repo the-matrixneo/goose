@@ -43,8 +43,10 @@ use crate::providers::errors::ProviderError;
 use crate::recipe::{Author, Recipe, Response, Settings, SubRecipe};
 use crate::scheduler_trait::SchedulerTrait;
 use crate::tool_monitor::{ToolCall, ToolMonitor};
-use mcp_core::{protocol::GetPromptResult, tool::Tool, ToolError, ToolResult};
+use crate::utils::is_token_cancelled;
+use mcp_core::{protocol::GetPromptResult, ToolError, ToolResult};
 use regex::Regex;
+use rmcp::model::Tool;
 use rmcp::model::{Content, JsonRpcMessage, Prompt};
 use serde_json::Value;
 use tokio::sync::{mpsc, Mutex, RwLock};
@@ -76,8 +78,6 @@ pub struct Agent {
     pub(super) tool_monitor: Arc<Mutex<Option<ToolMonitor>>>,
     pub(super) router_tool_selector: Mutex<Option<Arc<Box<dyn RouterToolSelector>>>>,
     pub(super) scheduler_service: Mutex<Option<Arc<dyn SchedulerTrait>>>,
-    pub(super) mcp_tx: Mutex<mpsc::Sender<JsonRpcMessage>>,
-    pub(super) mcp_notification_rx: Arc<Mutex<mpsc::Receiver<JsonRpcMessage>>>,
     pub(super) retry_manager: RetryManager,
 }
 
@@ -134,8 +134,6 @@ impl Agent {
         // Create channels with buffer size 32 (adjust if needed)
         let (confirm_tx, confirm_rx) = mpsc::channel(32);
         let (tool_tx, tool_rx) = mpsc::channel(32);
-        // Add MCP notification channel
-        let (mcp_tx, mcp_rx) = mpsc::channel(100);
 
         let tool_monitor = Arc::new(Mutex::new(None));
         let retry_manager = RetryManager::with_tool_monitor(tool_monitor.clone());
@@ -156,9 +154,6 @@ impl Agent {
             tool_monitor,
             router_tool_selector: Mutex::new(None),
             scheduler_service: Mutex::new(None),
-            // Initialize with MCP notification support
-            mcp_tx: Mutex::new(mcp_tx),
-            mcp_notification_rx: Arc::new(Mutex::new(mcp_rx)),
             retry_manager,
         }
     }
@@ -344,9 +339,8 @@ impl Agent {
                 .await
         } else if tool_call.name == SUBAGENT_EXECUTE_TASK_TOOL_NAME {
             let provider = self.provider().await.ok();
-            let mcp_tx = self.mcp_tx.lock().await.clone();
 
-            let task_config = TaskConfig::new(provider, mcp_tx);
+            let task_config = TaskConfig::new(provider);
             subagent_execute_task_tool::run_tasks(
                 tool_call.arguments.clone(),
                 task_config,
@@ -548,10 +542,10 @@ impl Agent {
                 let mut frontend_tools = self.frontend_tools.lock().await;
                 for tool in tools {
                     let frontend_tool = FrontendTool {
-                        name: tool.name.clone(),
+                        name: tool.name.to_string(),
                         tool: tool.clone(),
                     };
-                    frontend_tools.insert(tool.name.clone(), frontend_tool);
+                    frontend_tools.insert(tool.name.to_string(), frontend_tool);
                 }
                 // Store instructions if provided, using "frontend" as the key
                 let mut frontend_instructions = self.frontend_instructions.lock().await;
@@ -803,7 +797,7 @@ impl Agent {
                 });
 
             loop {
-                if cancel_token.as_ref().is_some_and(|t| t.is_cancelled()) {
+                if is_token_cancelled(&cancel_token) {
                     break;
                 }
 
@@ -825,24 +819,6 @@ impl Agent {
                     break;
                 }
 
-                // Handle MCP notifications from subagents
-                let mcp_notifications = self.get_mcp_notifications().await;
-                for notification in mcp_notifications {
-                    if let JsonRpcMessage::Notification(notif) = &notification {
-                        if let Some(data) = notif.notification.params.get("data") {
-                            if let (Some(subagent_id), Some(_message)) = (
-                                data.get("subagent_id").and_then(|v| v.as_str()),
-                                data.get("message").and_then(|v| v.as_str()),
-                            ) {
-                                yield AgentEvent::McpNotification((
-                                    subagent_id.to_string(),
-                                    notification.clone(),
-                                ));
-                            }
-                        }
-                    }
-                }
-
                 let mut stream = Self::stream_response_from_provider(
                     self.provider().await?,
                     &system_prompt,
@@ -857,7 +833,7 @@ impl Agent {
                 let mut tools_updated = false;
 
                 while let Some(next) = stream.next().await {
-                    if cancel_token.as_ref().is_some_and(|t| t.is_cancelled()) {
+                    if is_token_cancelled(&cancel_token) {
                         break;
                     }
 
@@ -1029,7 +1005,7 @@ impl Agent {
                                     let mut all_install_successful = true;
 
                                     while let Some((request_id, item)) = combined.next().await {
-                                        if cancel_token.as_ref().is_some_and(|t| t.is_cancelled()) {
+                                        if is_token_cancelled(&cancel_token) {
                                             break;
                                         }
                                         match item {
@@ -1137,18 +1113,6 @@ impl Agent {
     pub async fn extend_system_prompt(&self, instruction: String) {
         let mut prompt_manager = self.prompt_manager.lock().await;
         prompt_manager.add_system_prompt_extra(instruction);
-    }
-
-    /// Get MCP notifications from subagents
-    pub async fn get_mcp_notifications(&self) -> Vec<JsonRpcMessage> {
-        let mut notifications = Vec::new();
-        let mut rx = self.mcp_notification_rx.lock().await;
-
-        while let Ok(notification) = rx.try_recv() {
-            notifications.push(notification);
-        }
-
-        notifications
     }
 
     pub async fn update_provider(&self, provider: Arc<dyn Provider>) -> Result<()> {
@@ -1273,7 +1237,10 @@ impl Agent {
             .map(|tool| {
                 ToolInfo::new(
                     &tool.name,
-                    &tool.description,
+                    tool.description
+                        .as_ref()
+                        .map(|d| d.as_ref())
+                        .unwrap_or_default(),
                     get_parameter_names(&tool),
                     None,
                 )
