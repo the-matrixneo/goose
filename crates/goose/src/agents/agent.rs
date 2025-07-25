@@ -745,7 +745,7 @@ impl Agent {
             // Create a new AgentEvent type to signal message history replacement
             return Ok(Box::pin(async_stream::try_stream! {
                 yield AgentEvent::Message(Message::assistant().with_text(compaction_msg));
-                
+
                 // Yield a special event to indicate the session should replace its message history
                 // with the compacted messages
                 yield AgentEvent::HistoryReplaced(messages.clone());

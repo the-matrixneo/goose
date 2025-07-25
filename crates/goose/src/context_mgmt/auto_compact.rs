@@ -113,7 +113,7 @@ pub async fn check_compaction_needed(
     eprintln!("  Threshold: {:.1}%", threshold * 100.0);
     eprintln!("  Needs compaction: {}", needs_compaction);
     eprintln!("  Token counts per message: {:?}", token_counts);
-    
+
     // Log first few characters of each message for debugging
     // for (i, msg) in messages.iter().enumerate() {
     //     let content_preview = msg.as_concat_text();
