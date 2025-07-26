@@ -42,16 +42,27 @@ impl TaskTracker {
         Tool::new(
             TASK_TRACKER_TOOL_NAME.to_string(),
             indoc! {r#"
-                Track tasks for the current session.
+                Use the task tracker to keep state of what you have to do, especially for large complex tasks.
+                Use this when starting an activity or resuming or shifting activities
+                This is an ESSENTIAL tool for breaking down your work into chunks and ensuring it is completed 
+                Check the list often, and update it (one by one) as you complete tasks
+
+                When starting out, you SHOULD plan your tasks in advance in very short description for each 
+                
+                use wip action when you start on one task at a time and done action when finished with it 
                 
                 By default (no parameters), returns a list of all tasks with their status.
+
+                for example, 
+                    user: "build me a time machine". 
+                    task list: "establish a view of quantum physics", "solve causality paradoxes", "research negative energy", "test time machine" 
                 
                 Actions:
                 - No action (default): List all tasks with their current status
                 - "add": Add a new task (status will be "to do")
                 - "wip": Mark a task as work in progress
-                - "done": Mark a task as completed
-                - "clear": Clear all tasks from the list
+                - "done": Mark a task as completed IMPORTANT:do this as soon as finished
+                - "clear": Clear all tasks from the list if you are all done and ready to start fresh
                 
                 Task statuses:
                 - "to do": Task has been added but not started
