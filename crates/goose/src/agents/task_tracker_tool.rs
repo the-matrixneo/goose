@@ -59,7 +59,7 @@ impl TaskTracker {
                 
                 Actions:
                 - No action (default): List all tasks with their current status
-                - "add": Add a new task (status will be "to do")
+                - "add": Add a new task or multiple tasks (status will be "to do"). For multiple tasks, provide a comma-separated list.
                 - "wip": Mark a task as work in progress
                 - "done": Mark a task as completed IMPORTANT:do this as soon as finished
                 - "clear": Clear all tasks from the list if you are all done and ready to start fresh
@@ -68,6 +68,8 @@ impl TaskTracker {
                 - "to do": Task has been added but not started
                 - "wip": Task is currently being worked on
                 - "done": Task has been completed
+                
+                Note: Task descriptions must be 200 characters or less. Keep them concise!
             "#}
             .to_string(),
             object!({
@@ -80,7 +82,7 @@ impl TaskTracker {
                     },
                     "task": {
                         "type": "string",
-                        "description": "Task description (required for add, wip, done actions)"
+                        "description": "Task description (required for add, wip, done actions). For add, can be comma-separated list."
                     }
                 }
             }),
@@ -117,12 +119,63 @@ impl TaskTracker {
             }
             Some("add") => {
                 if let Some(task_str) = task {
-                    let mut tasks = self.tasks.lock().await;
-                    tasks.insert(task_str.to_string(), TaskStatus::Todo);
-                    Ok(vec![Content::text(format!(
-                        "Added task: \"{}\" [to do]",
-                        task_str
-                    ))])
+                    // Check if it's a comma-separated list
+                    let task_items: Vec<&str> = task_str.split(',').map(|s| s.trim()).collect();
+
+                    if task_items.len() > 1 {
+                        // Multiple tasks
+                        let mut tasks = self.tasks.lock().await;
+                        let mut added_tasks = Vec::new();
+                        let mut errors = Vec::new();
+
+                        for (i, task_item) in task_items.iter().enumerate() {
+                            if task_item.is_empty() {
+                                continue; // Skip empty items
+                            }
+                            if task_item.len() > 200 {
+                                errors.push(format!("Task {} is too long ({} chars). Please make it shorter (max 200 chars)", 
+                                    i + 1, task_item.len()));
+                            } else {
+                                tasks.insert(task_item.to_string(), TaskStatus::Todo);
+                                added_tasks.push(*task_item);
+                            }
+                        }
+
+                        if !errors.is_empty() {
+                            return Err(ToolError::InvalidParameters(errors.join("\n")));
+                        }
+
+                        if added_tasks.is_empty() {
+                            Err(ToolError::InvalidParameters(
+                                "No valid tasks provided".to_string(),
+                            ))
+                        } else {
+                            Ok(vec![Content::text(format!(
+                                "Added {} tasks:\n{}",
+                                added_tasks.len(),
+                                added_tasks
+                                    .iter()
+                                    .map(|t| format!("- {} [to do]", t))
+                                    .collect::<Vec<_>>()
+                                    .join("\n")
+                            ))])
+                        }
+                    } else {
+                        // Single task
+                        if task_str.len() > 200 {
+                            Err(ToolError::InvalidParameters(format!(
+                                "Task description is too long ({} characters). Please make it shorter (max 200 chars)",
+                                task_str.len()
+                            )))
+                        } else {
+                            let mut tasks = self.tasks.lock().await;
+                            tasks.insert(task_str.to_string(), TaskStatus::Todo);
+                            Ok(vec![Content::text(format!(
+                                "Added task: \"{}\" [to do]",
+                                task_str
+                            ))])
+                        }
+                    }
                 } else {
                     Err(ToolError::InvalidParameters(
                         "Task description required for 'add' action".to_string(),
@@ -357,6 +410,77 @@ mod tests {
         assert!(result.is_err());
         if let Err(ToolError::InvalidParameters(msg)) = result {
             assert_eq!(msg, "Task description required for 'add' action");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_add_multiple_tasks_comma_separated() {
+        let tracker = TaskTracker::new();
+        let result = tracker
+            .execute(json!({
+                "action": "add",
+                "task": "Task 1, Task 2, Task 3"
+            }))
+            .await
+            .unwrap();
+
+        if let Some(text) = result[0].as_text() {
+            assert!(text.text.contains("Added 3 tasks:"));
+            assert!(text.text.contains("- Task 1 [to do]"));
+            assert!(text.text.contains("- Task 2 [to do]"));
+            assert!(text.text.contains("- Task 3 [to do]"));
+        } else {
+            panic!("Expected text content");
+        }
+
+        // Verify all tasks were added
+        let list_result = tracker.execute(json!({})).await.unwrap();
+        if let Some(text) = list_result[0].as_text() {
+            assert!(text.text.contains("Task 1 [to do]"));
+            assert!(text.text.contains("Task 2 [to do]"));
+            assert!(text.text.contains("Task 3 [to do]"));
+        } else {
+            panic!("Expected text content");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_add_task_too_long() {
+        let tracker = TaskTracker::new();
+        let long_task = "a".repeat(201);
+
+        let result = tracker
+            .execute(json!({
+                "action": "add",
+                "task": long_task
+            }))
+            .await;
+
+        assert!(result.is_err());
+        if let Err(ToolError::InvalidParameters(msg)) = result {
+            assert!(msg.contains("too long"));
+            assert!(msg.contains("201 characters"));
+            assert!(msg.contains("max 200 chars"));
+        }
+    }
+
+    #[tokio::test]
+    async fn test_add_multiple_tasks_with_long_task() {
+        let tracker = TaskTracker::new();
+        let long_task = "b".repeat(250);
+
+        let result = tracker
+            .execute(json!({
+                "action": "add",
+                "task": format!("Short task, {}, Another short task", long_task)
+            }))
+            .await;
+
+        assert!(result.is_err());
+        if let Err(ToolError::InvalidParameters(msg)) = result {
+            assert!(msg.contains("Task 2 is too long"));
+            assert!(msg.contains("250"));
+            assert!(msg.contains("max 200 chars"));
         }
     }
 
