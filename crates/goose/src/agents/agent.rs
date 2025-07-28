@@ -717,7 +717,7 @@ impl Agent {
         cancel_token: Option<CancellationToken>,
     ) -> Result<BoxStream<'_, Result<AgentEvent>>> {
         let (mut messages, issues) =
-        ConversationFixer::fix_conversation(Vec::from(unfixed_messages));
+            ConversationFixer::fix_conversation(Vec::from(unfixed_messages));
         if !issues.is_empty() {
             tracing::warn!(
                 "Conversation issue fixed: {}",
