@@ -6,7 +6,7 @@ use crate::{
     token_counter::create_async_token_counter,
 };
 use anyhow::Result;
-use tracing::{debug, info};
+use tracing::{debug, warn, info};
 
 /// Result of auto-compaction check
 #[derive(Debug)]
@@ -60,7 +60,7 @@ pub async fn check_compaction_needed(
     let threshold = threshold_override.unwrap_or_else(|| {
         config
             .get_param::<f64>("GOOSE_AUTO_COMPACT_THRESHOLD")
-            .unwrap_or(0.3) // Default to 30%
+            .unwrap_or(0.00001) // Default to 30%
     });
 
     // Get provider and token counter
@@ -158,9 +158,8 @@ pub async fn perform_compaction(
 /// Check if messages need compaction and compact them if necessary
 ///
 /// This is a convenience wrapper function that combines checking and compaction.
-/// It uses the separate `check_compaction_needed` and `perform_compaction` functions
-/// internally to provide the same interface as before while allowing for better
-/// separation of concerns.
+/// If the most recent message is a user message, it will be preserved by removing it
+/// before compaction and adding it back afterwards.
 ///
 /// # Arguments
 /// * `agent` - The agent to use for context management
@@ -180,8 +179,9 @@ pub async fn check_and_compact_messages(
     // If no compaction is needed, return early
     if !check_result.needs_compaction {
         debug!(
-            "No compaction needed (usage: {:.1}% <= threshold)",
-            check_result.usage_ratio * 100.0
+            "No compaction needed (usage: {:.1}% <= {:.1}% threshold)",
+            check_result.usage_ratio * 100.0,
+            check_result.percentage_until_compaction
         );
         return Ok(AutoCompactResult {
             compacted: false,
@@ -196,9 +196,27 @@ pub async fn check_and_compact_messages(
         check_result.usage_ratio * 100.0
     );
 
-    // Perform the compaction
-    let (compacted_messages, tokens_before, tokens_after) =
-        perform_compaction(agent, messages).await?;
+    // Check if the most recent message is a user message
+    let (messages_to_compact, preserved_user_message) = 
+        if let Some(last_message) = messages.last() {
+            if matches!(last_message.role, rmcp::model::Role::User) {
+                // Remove the last user message before auto-compaction
+                (&messages[..messages.len() - 1], Some(last_message.clone()))
+            } else {
+                (messages, None)
+            }
+        } else {
+            (messages, None)
+        };
+
+    // Perform the compaction on messages excluding the preserved user message
+    let (mut compacted_messages, tokens_before, tokens_after) =
+        perform_compaction(agent, messages_to_compact).await?;
+
+    // Add back the preserved user message if it exists
+    if let Some(user_message) = preserved_user_message {
+        compacted_messages.push(user_message);
+    }
 
     Ok(AutoCompactResult {
         compacted: true,
