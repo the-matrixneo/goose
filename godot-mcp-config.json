@@ -1,0 +1,9 @@
+{
+  "type": "stdio",
+  "name": "godot-mcp",
+  "cmd": "node",
+  "args": ["/Users/dkatz/git/goose2/Godot-MCP/server/dist/index.js"],
+  "description": "Godot MCP server for interacting with Godot Engine projects",
+  "timeout": 300,
+  "bundled": false
+}
