@@ -87,24 +87,33 @@ pub fn collect_missing_secrets(requirements: &[SecretRequirement]) -> Result<()>
     }
 
     println!(
-        "🔐 This recipe requires {} secret(s) that are not yet configured:",
+        "🔐 This recipe uses {} secret(s) that are not yet configured (press ESC to skip any that are optional):",
         missing_secrets.len()
     );
 
     for req in &missing_secrets {
         println!("\n📋 Extension: {}", req.extension_name);
-        println!("🔑 Required secret: {}", req.key);
+        println!("🔑 Secret: {}", req.key);
 
-        let value = cliclack::password(format!("Enter {} ({})", req.key, req.description()))
-            .mask('▪')
-            .interact()?;
+        let value = cliclack::password(format!(
+            "Enter {} ({}) - press ESC to skip",
+            req.key,
+            req.description()
+        ))
+        .mask('▪')
+        .interact()
+        .unwrap_or_else(|_| String::new());
 
-        config.set_secret(&req.key, Value::String(value))?;
-        println!("✅ Secret stored securely for {}", req.extension_name);
+        if !value.trim().is_empty() {
+            config.set_secret(&req.key, Value::String(value))?;
+            println!("✅ Secret stored securely for {}", req.extension_name);
+        } else {
+            println!("⏭️  Skipped {} for {}", req.key, req.extension_name);
+        }
     }
 
     if !missing_secrets.is_empty() {
-        println!("\n🎉 All secrets have been configured! Recipe execution will now continue.");
+        println!("\n🎉 Secret collection complete! Recipe execution will now continue.");
     }
 
     Ok(())
