@@ -6,7 +6,7 @@ use crate::{
     token_counter::create_async_token_counter,
 };
 use anyhow::Result;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 /// Result of auto-compaction check
 #[derive(Debug)]
