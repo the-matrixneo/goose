@@ -42,6 +42,33 @@ pub fn discover_recipe_secrets(recipe: &Recipe) -> Vec<SecretRequirement> {
     discover_recipe_secrets_recursive(recipe, &mut visited_recipes)
 }
 
+/// Extract secrets from a list of extensions
+fn extract_secrets_from_extensions(
+    extensions: &[ExtensionConfig],
+    seen_keys: &mut HashSet<String>,
+) -> Vec<SecretRequirement> {
+    let mut secrets = Vec::new();
+
+    for ext in extensions {
+        let (extension_name, env_keys) = match ext {
+            ExtensionConfig::Sse { name, env_keys, .. } => (name, env_keys),
+            ExtensionConfig::Stdio { name, env_keys, .. } => (name, env_keys),
+            ExtensionConfig::StreamableHttp { name, env_keys, .. } => (name, env_keys),
+            ExtensionConfig::Builtin { name, .. } => (name, &Vec::new()),
+            ExtensionConfig::Frontend { name, .. } => (name, &Vec::new()),
+        };
+
+        for key in env_keys {
+            if seen_keys.insert(key.clone()) {
+                let secret_req = SecretRequirement::new(extension_name.clone(), key.clone());
+                secrets.push(secret_req);
+            }
+        }
+    }
+
+    secrets
+}
+
 /// Internal recursive function (depth-first search) to discover secrets nested in sub-recipes
 /// This is future-proofing for a time when we have more than one-level of sub-recipe nesting
 fn discover_recipe_secrets_recursive(
@@ -52,22 +79,7 @@ fn discover_recipe_secrets_recursive(
     let mut seen_keys = HashSet::new();
 
     if let Some(extensions) = &recipe.extensions {
-        for ext in extensions {
-            let (extension_name, env_keys) = match ext {
-                ExtensionConfig::Sse { name, env_keys, .. } => (name, env_keys),
-                ExtensionConfig::Stdio { name, env_keys, .. } => (name, env_keys),
-                ExtensionConfig::StreamableHttp { name, env_keys, .. } => (name, env_keys),
-                ExtensionConfig::Builtin { name, .. } => (name, &Vec::new()),
-                ExtensionConfig::Frontend { name, .. } => (name, &Vec::new()),
-            };
-
-            for key in env_keys {
-                if seen_keys.insert(key.clone()) {
-                    let secret_req = SecretRequirement::new(extension_name.clone(), key.clone());
-                    secrets.push(secret_req);
-                }
-            }
-        }
+        secrets.extend(extract_secrets_from_extensions(extensions, &mut seen_keys));
     }
 
     if let Some(sub_recipes) = &recipe.sub_recipes {
@@ -396,7 +408,7 @@ mod tests {
         fn test_collect_missing_secrets_with_existing_secrets() {
             let config = Config::global();
 
-            config
+             config
                 .set_secret("API_KEY", Value::String("existing_key".to_string()))
                 .unwrap();
 
