@@ -446,45 +446,73 @@ impl super::TelemetryBackend for OtlpProvider {
             ])
             .build();
 
-        use opentelemetry_otlp::{WithExportConfig, WithTonicConfig};
+        use opentelemetry_otlp::{WithExportConfig, WithHttpConfig, WithTonicConfig};
 
         let endpoint = config.get_endpoint().ok_or(
             "OTLP provider requires GOOSE_TELEMETRY_ENDPOINT or OTEL_EXPORTER_OTLP_ENDPOINT",
         )?;
 
-        let mut otlp_exporter_builder = opentelemetry_otlp::SpanExporter::builder()
-            .with_tonic()
-            .with_endpoint(endpoint.clone());
+        // Check if HTTP protocol is explicitly requested
+        let use_http = std::env::var("GOOSE_TELEMETRY_PROTOCOL")
+            .map(|p| p.to_lowercase() == "http")
+            .unwrap_or(false);
 
-        if let Some(api_key) = &config.api_key {
-            use tonic::metadata::{MetadataMap, MetadataValue};
+        let otlp_trace_exporter = if use_http {
+            eprintln!("🌐 OTLP: Using HTTP/protobuf protocol");
+            let mut builder = opentelemetry_otlp::SpanExporter::builder()
+                .with_http()
+                .with_endpoint(format!("{}/v1/traces", endpoint.trim_end_matches('/')));
 
-            let mut metadata = MetadataMap::new();
+            if let Some(api_key) = &config.api_key {
+                use std::collections::HashMap;
 
-            let header_name = std::env::var("GOOSE_TELEMETRY_AUTH_HEADER")
-                .unwrap_or_else(|_| "x-api-key".to_string());
+                let mut headers = HashMap::new();
 
-            let metadata_value = MetadataValue::try_from(api_key.as_str())
-                .map_err(|e| format!("Invalid API key format: {}", e))?;
+                let header_name = std::env::var("GOOSE_TELEMETRY_AUTH_HEADER")
+                    .unwrap_or_else(|_| "x-api-key".to_string());
 
-            match header_name.as_str() {
-                "x-api-key" => metadata.insert("x-api-key", metadata_value),
-                "authorization" => metadata.insert("authorization", metadata_value),
-                "x-honeycomb-team" => metadata.insert("x-honeycomb-team", metadata_value),
-                "x-otlp-api-key" => metadata.insert("x-otlp-api-key", metadata_value),
-                _ => {
-                    let key = tonic::metadata::MetadataKey::from_bytes(header_name.as_bytes())
-                        .map_err(|e| format!("Invalid header name '{}': {}", header_name, e))?;
-                    metadata.insert(key, metadata_value)
-                }
-            };
+                headers.insert(header_name, api_key.clone());
 
-            otlp_exporter_builder = otlp_exporter_builder.with_metadata(metadata);
+                builder = builder.with_headers(headers);
+                tracing::info!("OTLP provider configured with API key authentication");
+            }
 
-            tracing::info!("OTLP provider configured with API key authentication");
-        }
+            builder.build()?
+        } else {
+            eprintln!("🚀 OTLP: Using gRPC protocol (default)");
+            let mut builder = opentelemetry_otlp::SpanExporter::builder()
+                .with_tonic()
+                .with_endpoint(endpoint.clone());
 
-        let otlp_trace_exporter = otlp_exporter_builder.build()?;
+            if let Some(api_key) = &config.api_key {
+                use tonic::metadata::{MetadataMap, MetadataValue};
+
+                let mut metadata = MetadataMap::new();
+
+                let header_name = std::env::var("GOOSE_TELEMETRY_AUTH_HEADER")
+                    .unwrap_or_else(|_| "x-api-key".to_string());
+
+                let metadata_value = MetadataValue::try_from(api_key.as_str())
+                    .map_err(|e| format!("Invalid API key format: {}", e))?;
+
+                match header_name.as_str() {
+                    "x-api-key" => metadata.insert("x-api-key", metadata_value),
+                    "authorization" => metadata.insert("authorization", metadata_value),
+                    "x-honeycomb-team" => metadata.insert("x-honeycomb-team", metadata_value),
+                    "x-otlp-api-key" => metadata.insert("x-otlp-api-key", metadata_value),
+                    _ => {
+                        let key = tonic::metadata::MetadataKey::from_bytes(header_name.as_bytes())
+                            .map_err(|e| format!("Invalid header name '{}': {}", header_name, e))?;
+                        metadata.insert(key, metadata_value)
+                    }
+                };
+
+                builder = builder.with_metadata(metadata);
+                tracing::info!("OTLP provider configured with API key authentication");
+            }
+
+            builder.build()?
+        };
 
         let tracer_provider = SdkTracerProvider::builder()
             .with_resource(resource.clone())
@@ -493,37 +521,58 @@ impl super::TelemetryBackend for OtlpProvider {
 
         self.tracer_provider = Some(tracer_provider);
 
-        let mut otlp_metrics_builder = opentelemetry_otlp::MetricExporter::builder()
-            .with_tonic()
-            .with_endpoint(endpoint.clone());
+        let otlp_metrics_exporter = if use_http {
+            let mut builder = opentelemetry_otlp::MetricExporter::builder()
+                .with_http()
+                .with_endpoint(format!("{}/v1/metrics", endpoint.trim_end_matches('/')));
 
-        if let Some(api_key) = &config.api_key {
-            use tonic::metadata::{MetadataMap, MetadataValue};
+            if let Some(api_key) = &config.api_key {
+                use std::collections::HashMap;
 
-            let mut metadata = MetadataMap::new();
+                let mut headers = HashMap::new();
 
-            let header_name = std::env::var("GOOSE_TELEMETRY_AUTH_HEADER")
-                .unwrap_or_else(|_| "x-api-key".to_string());
+                let header_name = std::env::var("GOOSE_TELEMETRY_AUTH_HEADER")
+                    .unwrap_or_else(|_| "x-api-key".to_string());
 
-            let metadata_value = MetadataValue::try_from(api_key.as_str())
-                .map_err(|e| format!("Invalid API key format: {}", e))?;
+                headers.insert(header_name, api_key.clone());
 
-            match header_name.as_str() {
-                "x-api-key" => metadata.insert("x-api-key", metadata_value),
-                "authorization" => metadata.insert("authorization", metadata_value),
-                "x-honeycomb-team" => metadata.insert("x-honeycomb-team", metadata_value),
-                "x-otlp-api-key" => metadata.insert("x-otlp-api-key", metadata_value),
-                _ => {
-                    let key = tonic::metadata::MetadataKey::from_bytes(header_name.as_bytes())
-                        .map_err(|e| format!("Invalid header name '{}': {}", header_name, e))?;
-                    metadata.insert(key, metadata_value)
-                }
-            };
+                builder = builder.with_headers(headers);
+            }
 
-            otlp_metrics_builder = otlp_metrics_builder.with_metadata(metadata);
-        }
+            builder.build()?
+        } else {
+            let mut builder = opentelemetry_otlp::MetricExporter::builder()
+                .with_tonic()
+                .with_endpoint(endpoint.clone());
 
-        let otlp_metrics_exporter = otlp_metrics_builder.build()?;
+            if let Some(api_key) = &config.api_key {
+                use tonic::metadata::{MetadataMap, MetadataValue};
+
+                let mut metadata = MetadataMap::new();
+
+                let header_name = std::env::var("GOOSE_TELEMETRY_AUTH_HEADER")
+                    .unwrap_or_else(|_| "x-api-key".to_string());
+
+                let metadata_value = MetadataValue::try_from(api_key.as_str())
+                    .map_err(|e| format!("Invalid API key format: {}", e))?;
+
+                match header_name.as_str() {
+                    "x-api-key" => metadata.insert("x-api-key", metadata_value),
+                    "authorization" => metadata.insert("authorization", metadata_value),
+                    "x-honeycomb-team" => metadata.insert("x-honeycomb-team", metadata_value),
+                    "x-otlp-api-key" => metadata.insert("x-otlp-api-key", metadata_value),
+                    _ => {
+                        let key = tonic::metadata::MetadataKey::from_bytes(header_name.as_bytes())
+                            .map_err(|e| format!("Invalid header name '{}': {}", header_name, e))?;
+                        metadata.insert(key, metadata_value)
+                    }
+                };
+
+                builder = builder.with_metadata(metadata);
+            }
+
+            builder.build()?
+        };
 
         let meter_provider = SdkMeterProvider::builder()
             .with_resource(resource)
