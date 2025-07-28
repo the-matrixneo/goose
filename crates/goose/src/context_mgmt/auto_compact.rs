@@ -6,7 +6,7 @@ use crate::{
     token_counter::create_async_token_counter,
 };
 use anyhow::Result;
-use tracing::{debug, warn, info};
+use tracing::{debug, info, warn};
 
 /// Result of auto-compaction check
 #[derive(Debug)]
@@ -197,17 +197,17 @@ pub async fn check_and_compact_messages(
     );
 
     // Check if the most recent message is a user message
-    let (messages_to_compact, preserved_user_message) = 
-        if let Some(last_message) = messages.last() {
-            if matches!(last_message.role, rmcp::model::Role::User) {
-                // Remove the last user message before auto-compaction
-                (&messages[..messages.len() - 1], Some(last_message.clone()))
-            } else {
-                (messages, None)
-            }
+    let (messages_to_compact, preserved_user_message) = if let Some(last_message) = messages.last()
+    {
+        if matches!(last_message.role, rmcp::model::Role::User) {
+            // Remove the last user message before auto-compaction
+            (&messages[..messages.len() - 1], Some(last_message.clone()))
         } else {
             (messages, None)
-        };
+        }
+    } else {
+        (messages, None)
+    };
 
     // Perform the compaction on messages excluding the preserved user message
     let (mut compacted_messages, tokens_before, tokens_after) =
