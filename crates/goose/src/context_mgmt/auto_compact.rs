@@ -60,7 +60,7 @@ pub async fn check_compaction_needed(
     let threshold = threshold_override.unwrap_or_else(|| {
         config
             .get_param::<f64>("GOOSE_AUTO_COMPACT_THRESHOLD")
-            .unwrap_or(0.00001) // Default to 30%
+            .unwrap_or(0.3) // Default to 30%
     });
 
     // Get provider and token counter
