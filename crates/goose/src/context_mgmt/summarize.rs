@@ -257,11 +257,9 @@ mod tests {
     use crate::providers::base::{Provider, ProviderMetadata, ProviderUsage, Usage};
     use crate::providers::errors::ProviderError;
     use chrono::Utc;
-    use mcp_core::ToolCall;
     use rmcp::model::Role;
     use rmcp::model::Tool;
-    use rmcp::model::{AnnotateAble, Content, RawTextContent};
-    use serde_json::json;
+    use rmcp::model::{AnnotateAble, RawTextContent};
     use std::sync::Arc;
 
     #[derive(Clone)]
@@ -500,8 +498,8 @@ mod tests {
             let mut count = self.call_count.lock().unwrap();
             *count += 1;
 
-            // Fail if this looks like a one-shot request (contains the one-shot prompt content)
-            if system.contains("Summary Generation Instructions") {
+            // Fail if this looks like a one-shot request
+            if system.contains("reasoning in `<analysis>` tags") {
                 return Err(ProviderError::RateLimitExceeded(
                     "Simulated one-shot failure".to_string(),
                 ));
