@@ -42,8 +42,9 @@ impl TaskTracker {
         Tool::new(
             TASK_TRACKER_TOOL_NAME.to_string(),
             indoc! {r#"
-                Use the task tracker to keep state of what you have to do, especially for large complex tasks.
-                Use this when starting an activity or resuming or shifting activities
+                The task tracker tool will help you keep track of tasks
+                ALWAYS to use this when starting an activity or resuming or shifting activities
+                ALWAYS check the task tracker tasks, and update it
                 This is an ESSENTIAL tool for breaking down your work into chunks and ensuring it is completed 
                 Check the list often, and update it (one by one) as you complete tasks
 
