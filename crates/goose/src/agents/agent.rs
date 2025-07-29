@@ -161,16 +161,6 @@ impl Agent {
         *tool_monitor = Some(ToolMonitor::new(max_repetitions));
     }
 
-    pub async fn get_tool_stats(&self) -> Option<HashMap<String, u32>> {
-        let tool_monitor = self.tool_monitor.lock().await;
-        tool_monitor.as_ref().map(|monitor| monitor.get_stats())
-    }
-
-    pub async fn reset_tool_monitor(&self) {
-        if let Some(monitor) = self.tool_monitor.lock().await.as_mut() {
-            monitor.reset();
-        }
-    }
 
     /// Reset the retry attempts counter to 0
     pub async fn reset_retry_attempts(&self) {
@@ -229,24 +219,6 @@ impl Agent {
     /// Get a reference to a frontend tool
     pub async fn get_frontend_tool(&self, name: &str) -> Option<FrontendTool> {
         self.frontend_tools.lock().await.get(name).cloned()
-    }
-
-    /// Get all tools from all clients with proper prefixing
-    pub async fn get_prefixed_tools(&self) -> ExtensionResult<Vec<Tool>> {
-        let mut tools = self
-            .extension_manager
-            .read()
-            .await
-            .get_prefixed_tools(None)
-            .await?;
-
-        // Add frontend tools directly - they don't need prefixing since they're already uniquely named
-        let frontend_tools = self.frontend_tools.lock().await;
-        for frontend_tool in frontend_tools.values() {
-            tools.push(frontend_tool.tool.clone());
-        }
-
-        Ok(tools)
     }
 
     pub async fn add_final_output_tool(&self, response: Response) {
