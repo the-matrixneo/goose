@@ -3,7 +3,7 @@ use anyhow::Ok;
 use crate::message::Message;
 use crate::token_counter::create_async_token_counter;
 
-use crate::context_mgmt::summarize::summarize_messages_async;
+use crate::context_mgmt::summarize::summarize_messages;
 use crate::context_mgmt::truncate::{truncate_messages, OldestFirstTruncation};
 use crate::context_mgmt::{estimate_target_context_limit, get_messages_token_counts_async};
 
@@ -58,9 +58,16 @@ impl Agent {
             .map_err(|e| anyhow::anyhow!("Failed to create token counter: {}", e))?;
         let target_context_limit = estimate_target_context_limit(provider.clone());
 
-        let (mut new_messages, mut new_token_counts) =
-            summarize_messages_async(provider, messages, &token_counter, target_context_limit)
-                .await?;
+        // Convert AsyncTokenCounter to TokenCounter for the simplified function
+        let sync_token_counter = crate::token_counter::TokenCounter::new();
+
+        let (mut new_messages, mut new_token_counts) = summarize_messages(
+            provider,
+            messages,
+            &sync_token_counter,
+            target_context_limit,
+        )
+        .await?;
 
         // If the summarized messages only contains one message, it means no tool request and response message in the summarized messages,
         // Add an assistant message to the summarized messages to ensure the assistant's response is included in the context.
