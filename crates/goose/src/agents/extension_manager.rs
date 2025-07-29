@@ -36,10 +36,10 @@ type McpClientBox = Arc<Mutex<Box<dyn McpClientTrait>>>;
 
 /// Manages Goose extensions / MCP clients and their interactions
 pub struct ExtensionManager {
-    clients: HashMap<String, McpClientBox>,
-    instructions: HashMap<String, String>,
-    resource_capable_extensions: HashSet<String>,
-    temp_dirs: HashMap<String, tempfile::TempDir>,
+    clients: Mutex<HashMap<String, McpClientBox>>,
+    instructions: Mutex<HashMap<String, String>>,
+    resource_capable_extensions: Mutex<HashSet<String>>,
+    temp_dirs: Mutex<HashMap<String, tempfile::TempDir>>,
 }
 
 /// A flattened representation of a resource used by the agent to prepare inference
@@ -107,20 +107,20 @@ impl ExtensionManager {
     /// Create a new ExtensionManager instance
     pub fn new() -> Self {
         Self {
-            clients: HashMap::new(),
-            instructions: HashMap::new(),
-            resource_capable_extensions: HashSet::new(),
-            temp_dirs: HashMap::new(),
+            clients: Mutex::new(HashMap::new()),
+            instructions: Mutex::new(HashMap::new()),
+            resource_capable_extensions: Mutex::new(HashSet::new()),
+            temp_dirs: Mutex::new(HashMap::new()),
         }
     }
 
-    pub fn supports_resources(&self) -> bool {
-        !self.resource_capable_extensions.is_empty()
+    pub async fn supports_resources(&self) -> bool {
+        !self.resource_capable_extensions.lock().await.is_empty()
     }
 
     /// Add a new MCP extension based on the provided client type
     // TODO IMPORTANT need to ensure this times out if the extension command is broken!
-    pub async fn add_extension(&mut self, config: ExtensionConfig) -> ExtensionResult<()> {
+    pub async fn add_extension(&self, config: ExtensionConfig) -> ExtensionResult<()> {
         let config_name = config.key().to_string();
         let sanitized_name = normalize(config_name.clone());
 
@@ -351,7 +351,10 @@ impl ExtensionManager {
                     .await?,
                 );
 
-                self.temp_dirs.insert(sanitized_name.clone(), temp_dir);
+                self.temp_dirs
+                    .lock()
+                    .await
+                    .insert(sanitized_name.clone(), temp_dir);
 
                 client
             }
@@ -361,49 +364,62 @@ impl ExtensionManager {
         let info = client.get_info();
         if let Some(instructions) = info.and_then(|info| info.instructions.as_ref()) {
             self.instructions
+                .lock()
+                .await
                 .insert(sanitized_name.clone(), instructions.clone());
         }
 
         if let Some(_resources) = info.and_then(|info| info.capabilities.resources.as_ref()) {
             self.resource_capable_extensions
+                .lock()
+                .await
                 .insert(sanitized_name.clone());
         }
 
-        self.add_client(sanitized_name, client);
+        self.add_client(sanitized_name, client).await;
         Ok(())
     }
 
-    pub fn add_client(&mut self, client_name: String, client: Box<dyn McpClientTrait>) {
+    pub async fn add_client(&self, client_name: String, client: Box<dyn McpClientTrait>) {
         let sanitized_name = normalize(client_name);
         self.clients
+            .lock()
+            .await
             .insert(sanitized_name, Arc::new(Mutex::new(client)));
     }
 
     /// Get extensions info
     pub async fn get_extensions_info(&self) -> Vec<ExtensionInfo> {
-        self.clients
+        let clients = self.clients.lock().await;
+        let instructions = self.instructions.lock().await;
+        let resource_capable_extensions = self.resource_capable_extensions.lock().await;
+
+        clients
             .keys()
             .map(|name| {
-                let instructions = self.instructions.get(name).cloned().unwrap_or_default();
-                let has_resources = self.resource_capable_extensions.contains(name);
+                let instructions = instructions.get(name).cloned().unwrap_or_default();
+                let has_resources = resource_capable_extensions.contains(name);
                 ExtensionInfo::new(name, &instructions, has_resources)
             })
             .collect()
     }
 
     /// Get aggregated usage statistics
-    pub async fn remove_extension(&mut self, name: &str) -> ExtensionResult<()> {
+    pub async fn remove_extension(&self, name: &str) -> ExtensionResult<()> {
         let sanitized_name = normalize(name.to_string());
 
-        self.clients.remove(&sanitized_name);
-        self.instructions.remove(&sanitized_name);
-        self.resource_capable_extensions.remove(&sanitized_name);
-        self.temp_dirs.remove(&sanitized_name);
+        self.clients.lock().await.remove(&sanitized_name);
+        self.instructions.lock().await.remove(&sanitized_name);
+        self.resource_capable_extensions
+            .lock()
+            .await
+            .remove(&sanitized_name);
+        self.temp_dirs.lock().await.remove(&sanitized_name);
         Ok(())
     }
 
     pub async fn suggest_disable_extensions_prompt(&self) -> Value {
-        let enabled_extensions_count = self.clients.len();
+        let enabled_extensions_count = self.clients.lock().await.len();
 
         let total_tools = self
             .get_prefixed_tools(None)
@@ -435,7 +451,7 @@ impl ExtensionManager {
     }
 
     pub async fn list_extensions(&self) -> ExtensionResult<Vec<String>> {
-        Ok(self.clients.keys().cloned().collect())
+        Ok(self.clients.lock().await.keys().cloned().collect())
     }
 
     /// Get all tools from all clients with proper prefixing
@@ -444,7 +460,8 @@ impl ExtensionManager {
         extension_name: Option<String>,
     ) -> ExtensionResult<Vec<Tool>> {
         // Filter clients based on the provided extension_name or include all if None
-        let filtered_clients = self.clients.iter().filter(|(name, _)| {
+        let clients = self.clients.lock().await;
+        let filtered_clients = clients.iter().filter(|(name, _)| {
             if let Some(ref name_filter) = extension_name {
                 *name == name_filter
             } else {
@@ -512,11 +529,12 @@ impl ExtensionManager {
     }
 
     /// Find and return a reference to the appropriate client for a tool call
-    fn get_client_for_tool(&self, prefixed_name: &str) -> Option<(&str, McpClientBox)> {
-        self.clients
+    async fn get_client_for_tool(&self, prefixed_name: &str) -> Option<(String, McpClientBox)> {
+        let clients = self.clients.lock().await;
+        clients
             .iter()
             .find(|(key, _)| prefixed_name.starts_with(*key))
-            .map(|(name, client)| (name.as_str(), Arc::clone(client)))
+            .map(|(name, client)| (name.clone(), Arc::clone(client)))
     }
 
     // Function that gets executed for read_resource tool
@@ -555,8 +573,8 @@ impl ExtensionManager {
         }
 
         // None of the extensions had the resource so we raise an error
-        let available_extensions = self
-            .clients
+        let clients = self.clients.lock().await;
+        let available_extensions = clients
             .keys()
             .map(|s| s.as_str())
             .collect::<Vec<&str>>()
@@ -575,8 +593,8 @@ impl ExtensionManager {
         extension_name: &str,
         cancellation_token: CancellationToken,
     ) -> Result<Vec<Content>, ToolError> {
-        let available_extensions = self
-            .clients
+        let clients = self.clients.lock().await;
+        let available_extensions = clients
             .keys()
             .map(|s| s.as_str())
             .collect::<Vec<&str>>()
@@ -586,8 +604,7 @@ impl ExtensionManager {
             extension_name, available_extensions
         );
 
-        let client = self
-            .clients
+        let client = clients
             .get(extension_name)
             .ok_or(ToolError::InvalidParameters(error_msg))?;
 
@@ -616,7 +633,8 @@ impl ExtensionManager {
         extension_name: &str,
         cancellation_token: CancellationToken,
     ) -> Result<Vec<Content>, ToolError> {
-        let client = self.clients.get(extension_name).ok_or_else(|| {
+        let clients = self.clients.lock().await;
+        let client = clients.get(extension_name).ok_or_else(|| {
             ToolError::InvalidParameters(format!("Extension {} is not valid", extension_name))
         })?;
 
@@ -707,12 +725,13 @@ impl ExtensionManager {
         // Dispatch tool call based on the prefix naming convention
         let (client_name, client) = self
             .get_client_for_tool(&tool_call.name)
+            .await
             .ok_or_else(|| ToolError::NotFound(tool_call.name.clone()))?;
 
         // rsplit returns the iterator in reverse, tool_name is then at 0
         let tool_name = tool_call
             .name
-            .strip_prefix(client_name)
+            .strip_prefix(&client_name)
             .and_then(|s| s.strip_prefix("__"))
             .ok_or_else(|| ToolError::NotFound(tool_call.name.clone()))?
             .to_string();
@@ -741,7 +760,8 @@ impl ExtensionManager {
         extension_name: &str,
         cancellation_token: CancellationToken,
     ) -> Result<Vec<Prompt>, ToolError> {
-        let client = self.clients.get(extension_name).ok_or_else(|| {
+        let clients = self.clients.lock().await;
+        let client = clients.get(extension_name).ok_or_else(|| {
             ToolError::InvalidParameters(format!("Extension {} is not valid", extension_name))
         })?;
 
@@ -812,8 +832,8 @@ impl ExtensionManager {
         arguments: Value,
         cancellation_token: CancellationToken,
     ) -> Result<GetPromptResult> {
-        let client = self
-            .clients
+        let clients = self.clients.lock().await;
+        let client = clients
             .get(extension_name)
             .ok_or_else(|| anyhow::anyhow!("Extension {} not found", extension_name))?;
 
@@ -869,7 +889,7 @@ impl ExtensionManager {
         }
 
         // Get currently enabled extensions that can be disabled
-        let enabled_extensions: Vec<String> = self.clients.keys().cloned().collect();
+        let enabled_extensions: Vec<String> = self.clients.lock().await.keys().cloned().collect();
 
         // Build output string
         if !disabled_extensions.is_empty() {
