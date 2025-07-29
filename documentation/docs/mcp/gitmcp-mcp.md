@@ -1,5 +1,5 @@
 ---
-title: Git Extension
+title: GitMCP Extension
 description: Add Git MCP Server as a Goose Extension
 ---
 
@@ -56,7 +56,7 @@ This tutorial covers how to add the [Git MCP Server](https://github.com/idosal/g
 
 ## Example Usage
 
-In this example, Goose uses GitMCP to pull real-time documentation from the openai/whisper GitHub repository, explore how the speech-to-text model works, and surface accurate setup instructions and command-line usage—all directly from the source.
+In this example, Goose uses GitMCP to pull real-time documentation from the `openai/whisper` GitHub repository, explore how the speech-to-text model works, and surface accurate setup instructions and command-line usage—all directly from the source.
 
 <Tabs groupId="interface">
   <TabItem value="ui" label="Goose Desktop" default>
@@ -74,19 +74,19 @@ In this example, Goose uses GitMCP to pull real-time documentation from the open
 </Tabs>
 
 ### Goose Prompt
+```
+  Can you help me understand how the OpenAI Whisper speech-to-text model works?
 
-Can you help me understand how the OpenAI Whisper speech-to-text model works?
+  Use the GitHub repository `openai/whisper` to find accurate information.
 
-Use the GitHub repository `openai/whisper` to find accurate information.
+  Please:
+  - Summarize what the model does and its key features
+  - Show an example of how to run it from the command line
+  - Explain what files or models are needed to get started
+  - Include any useful code snippets or setup instructions you find in the repo
 
-Please:
-- Summarize what the model does and its key features
-- Show an example of how to run it from the command line
-- Explain what files or models are needed to get started
-- Include any useful code snippets or setup instructions you find in the repo
-
-Give me the response in a Markdown guide format.
-
+  Give me the response in a Markdown guide format.
+```
 ### Goose Output
 
 :::note Desktop

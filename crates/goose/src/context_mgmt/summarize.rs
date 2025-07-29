@@ -31,8 +31,8 @@ pub async fn summarize_messages(
         messages: messages_text,
     };
 
-    // Render the detailed summarization prompt
-    let system_prompt = render_global_file("summarize_oneshot.md", &context)?;
+    // Render the one-shot summarization prompt
+    let system_prompt = render_global_file("summarize_oneshot_short.md", &context)?;
 
     // Create a simple user message requesting summarization
     let user_message = Message::user()
