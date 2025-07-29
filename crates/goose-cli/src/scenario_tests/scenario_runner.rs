@@ -8,6 +8,7 @@ use anyhow::Result;
 use goose::agents::Agent;
 use goose::message::Message;
 use goose::model::ModelConfig;
+use goose::providers::errors::ProviderError;
 use goose::providers::{create, testprovider::TestProvider};
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
@@ -17,8 +18,12 @@ pub const SCENARIO_TESTS_DIR: &str = "src/scenario_tests";
 
 #[derive(Debug, Clone)]
 pub struct ScenarioResult {
+    pub provider_name: String,
     pub messages: Vec<Message>,
+    /// Any error that occurred during the scenario execution
     pub error: Option<String>,
+    /// Any provider error thrown by the actual provide
+    pub provider_error: Option<ProviderError>,
 }
 
 impl ScenarioResult {
@@ -74,7 +79,7 @@ where
     let excluded_providers: HashSet<_> = providers_to_skip
         .into_iter()
         .flatten()
-        .map(|name| name.to_lowercase())
+        .map(|name| name.to_lowercase().replace(" ", "_"))
         .collect();
 
     let all_configs = get_provider_configs();
@@ -226,8 +231,10 @@ where
     }
 
     let result = ScenarioResult {
+        provider_name: factory_name.clone(),
         messages: updated_messages,
         error,
+        provider_error: session.last_error.clone(),
     };
 
     validator(&result)?;

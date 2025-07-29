@@ -39,6 +39,7 @@ use mcp_core::handler::ToolError;
 use rmcp::model::PromptMessage;
 use rmcp::model::ServerNotification;
 
+use goose::providers::errors::ProviderError;
 use rand::{distributions::Alphanumeric, Rng};
 use rustyline::EditMode;
 use serde_json::Value;
@@ -66,6 +67,7 @@ pub struct Session {
     max_turns: Option<u32>,
     edit_mode: Option<EditMode>,
     retry_config: Option<RetryConfig>,
+    pub last_error: Option<ProviderError>,
 }
 
 // Cache structure for completion data
@@ -152,6 +154,7 @@ impl Session {
             max_turns,
             edit_mode,
             retry_config,
+            last_error: None,
         }
     }
 
@@ -866,6 +869,7 @@ impl Session {
             .await?;
 
         let mut progress_bars = output::McpSpinners::new();
+        self.last_error = None;
 
         use futures::StreamExt;
         loop {
@@ -1147,6 +1151,9 @@ impl Session {
                             }
                         }
                         Some(Err(e)) => {
+                            if let Some(provider_error) = e.downcast_ref::<ProviderError>() {
+                                self.last_error = Some(provider_error.clone());
+                            }
                             eprintln!("Error: {}", e);
                             cancel_token_clone.cancel();
                             drop(stream);

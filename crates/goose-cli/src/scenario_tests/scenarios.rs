@@ -8,6 +8,7 @@ mod tests {
     use crate::scenario_tests::scenario_runner::run_scenario;
     use anyhow::Result;
     use goose::message::Message;
+    use goose::providers::errors::ProviderError;
 
     #[tokio::test]
     async fn test_what_is_your_name() -> Result<()> {
@@ -88,14 +89,23 @@ mod tests {
                 let large_message = "hello ".repeat(context_length + 100);
                 Message::user().with_text(&large_message)
             }),
-            Some(&["OpenAI"]),
+            Some(&["OpenAI", "Azure_OpenAI"]),
             |result| {
                 // this is unfortunate; we don't seem to actually catch the errors in this path,
                 // but instead eat it:
                 assert_eq!(
                     result.messages.len(),
-                    0,
+                    1,
                     "Expected no messages due to compaction"
+                );
+                assert!(
+                    matches!(
+                        result.provider_error,
+                        Some(ProviderError::ContextLengthExceeded(_))
+                    ),
+                    "{}: Expected ContextLengthExceeded, got: {:?}",
+                    result.provider_name,
+                    result.provider_error
                 );
                 Ok(())
             },
