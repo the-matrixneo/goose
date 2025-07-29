@@ -58,35 +58,25 @@ impl Agent {
             .map_err(|e| anyhow::anyhow!("Failed to create token counter: {}", e))?;
         let target_context_limit = estimate_target_context_limit(provider.clone());
 
-        // Convert AsyncTokenCounter to TokenCounter for the simplified function
-        let sync_token_counter = crate::token_counter::TokenCounter::new();
+        let summary_result = summarize_messages(provider.clone(), messages).await?;
 
-        let (mut new_messages, mut new_token_counts) = summarize_messages(
-            provider,
-            messages,
-            &sync_token_counter,
-            target_context_limit,
-        )
-        .await?;
+        let (mut new_messages, mut new_token_counts) = match summary_result {
+            Some((summary_message, token_count)) => (vec![summary_message], vec![token_count]),
+            None => {
+                // No summary was generated (empty input)
+                tracing::warn!("Summarization failed. Returning empty messages.");
+                return Ok((vec![], vec![]));
+            }
+        };
 
-        // If the summarized messages only contains one message, it means no tool request and response message in the summarized messages,
         // Add an assistant message to the summarized messages to ensure the assistant's response is included in the context.
         if new_messages.len() == 1 {
             let assistant_message = Message::assistant().with_text(
-                "I had run into a context length exceeded error so I summarized our conversation.",
+                "I ran into a context length exceeded error so I summarized our conversation.",
             );
-            let assistant_tokens =
-                token_counter.count_chat_tokens("", &[assistant_message.clone()], &[]);
-
-            let current_total: usize = new_token_counts.iter().sum();
-            if current_total + assistant_tokens <= target_context_limit {
-                new_messages.push(assistant_message);
-                new_token_counts.push(assistant_tokens);
-            } else {
-                // If we can't fit the assistant message, at least log what happened
-                tracing::warn!("Cannot add summarization notice message due to context limits. Current: {}, Assistant: {}, Limit: {}", 
-                              current_total, assistant_tokens, target_context_limit);
-            }
+            let assistant_message_tokens: usize = 14;
+            new_messages.push(assistant_message);
+            new_token_counts.push(assistant_message_tokens);
         }
 
         Ok((new_messages, new_token_counts))

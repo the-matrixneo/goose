@@ -1,8 +1,6 @@
-use super::common::get_messages_token_counts;
 use crate::message::Message;
 use crate::prompt_template::render_global_file;
 use crate::providers::base::Provider;
-use crate::token_counter::TokenCounter;
 use anyhow::Result;
 use rmcp::model::Role;
 use serde::Serialize;
@@ -17,11 +15,9 @@ struct SummarizeContext {
 pub async fn summarize_messages(
     provider: Arc<dyn Provider>,
     messages: &[Message],
-    token_counter: &TokenCounter,
-    _context_limit: usize,
-) -> Result<(Vec<Message>, Vec<usize>), anyhow::Error> {
+) -> Result<Option<(Message, usize)>, anyhow::Error> {
     if messages.is_empty() {
-        return Ok((vec![], vec![]));
+        return Ok(None);
     }
 
     // Format all messages as a single string for the summarization prompt
@@ -44,20 +40,18 @@ pub async fn summarize_messages(
     let summarization_request = vec![user_message];
 
     // Send the request to the provider and fetch the response
-    let mut response = provider
+    let (mut response, provider_usage) = provider
         .complete(&system_prompt, &summarization_request, &[])
-        .await?
-        .0;
+        .await?;
 
     // Set role to user as it will be used in following conversation as user content
     response.role = Role::User;
 
-    let final_summary = vec![response];
+    // Get the token count from the provider usage for the output tokens
+    // For now, we'll use the output tokens as an approximation for the summary token count
+    let token_count = provider_usage.usage.output_tokens.unwrap_or(0) as usize;
 
-    Ok((
-        final_summary.clone(),
-        get_messages_token_counts(token_counter, &final_summary),
-    ))
+    Ok(Some((response, token_count)))
 }
 
 #[cfg(test)]
@@ -133,65 +127,39 @@ mod tests {
     #[tokio::test]
     async fn test_summarize_messages_basic() {
         let provider = create_mock_provider();
-        let token_counter = TokenCounter::new();
-        let context_limit = 10_000;
         let messages = create_test_messages();
 
-        let result = summarize_messages(
-            Arc::clone(&provider),
-            &messages,
-            &token_counter,
-            context_limit,
-        )
-        .await;
+        let result = summarize_messages(Arc::clone(&provider), &messages).await;
 
         assert!(result.is_ok(), "The function should return Ok.");
-        let (summarized_messages, token_counts) = result.unwrap();
+        let summary_result = result.unwrap();
+
+        assert!(
+            summary_result.is_some(),
+            "The summary should contain a result."
+        );
+        let (summarized_message, _token_count) = summary_result.unwrap();
 
         assert_eq!(
-            summarized_messages.len(),
-            1,
-            "The summary should contain one message."
-        );
-        assert_eq!(
-            summarized_messages[0].role,
+            summarized_message.role,
             Role::User,
             "The summarized message should be from the user."
-        );
-
-        assert_eq!(
-            token_counts.len(),
-            1,
-            "Token counts should match the number of summarized messages."
         );
     }
 
     #[tokio::test]
     async fn test_summarize_messages_empty_input() {
         let provider = create_mock_provider();
-        let token_counter = TokenCounter::new();
-        let context_limit = 10_000;
         let messages: Vec<Message> = Vec::new();
 
-        let result = summarize_messages(
-            Arc::clone(&provider),
-            &messages,
-            &token_counter,
-            context_limit,
-        )
-        .await;
+        let result = summarize_messages(Arc::clone(&provider), &messages).await;
 
         assert!(result.is_ok(), "The function should return Ok.");
-        let (summarized_messages, token_counts) = result.unwrap();
+        let summary_result = result.unwrap();
 
-        assert_eq!(
-            summarized_messages.len(),
-            0,
-            "The summary should be empty for an empty input."
-        );
         assert!(
-            token_counts.is_empty(),
-            "Token counts should be empty for an empty input."
+            summary_result.is_none(),
+            "The summary should be None for empty input."
         );
     }
 }
