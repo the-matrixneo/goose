@@ -543,22 +543,49 @@ impl Config {
     /// - The value cannot be deserialized into the requested type
     /// - There is an error reading the config file
     pub fn get_param<T: for<'de> Deserialize<'de>>(&self, key: &str) -> Result<T, ConfigError> {
-        // First check environment variables (convert to uppercase)
-        let env_key = key.to_uppercase();
-        if let Ok(val) = env::var(&env_key) {
-            // Parse the environment variable value into a serde_json::Value
-            let value: Value = match serde_json::from_str(&val) {
-                Ok(json_value) => json_value,
-                Err(_) => {
-                    warn!(
-                        "Failed to parse environment variable {}='{}' as JSON. \
-                         Treating as string. For numbers, use valid JSON format (e.g., '0.01' not '.01')",
-                        env_key, val
-                    );
-                    Value::String(val)
-                }
-            };
-            return Ok(serde_json::from_value(value)?);
+        self.get_param_with_env_override(key, true)
+    }
+
+    /// Get a configuration value with optional environment variable override.
+    ///
+    /// This allows callers to control whether environment variables should override
+    /// config file values. Useful for testing scenarios where you want to ignore
+    /// environment variables.
+    ///
+    /// # Arguments
+    ///
+    /// * `key` - The configuration key to look up
+    /// * `allow_env_override` - Whether to check environment variables first
+    ///
+    /// # Errors
+    ///
+    /// Returns a ConfigError if:
+    /// - The key doesn't exist in either environment or config file
+    /// - The value cannot be deserialized into the requested type
+    /// - There is an error reading the config file
+    pub fn get_param_with_env_override<T: for<'de> Deserialize<'de>>(
+        &self,
+        key: &str,
+        allow_env_override: bool,
+    ) -> Result<T, ConfigError> {
+        // First check environment variables if allowed (convert to uppercase)
+        if allow_env_override {
+            let env_key = key.to_uppercase();
+            if let Ok(val) = env::var(&env_key) {
+                // Parse the environment variable value into a serde_json::Value
+                let value: Value = match serde_json::from_str(&val) {
+                    Ok(json_value) => json_value,
+                    Err(_) => {
+                        warn!(
+                            "Failed to parse environment variable {}='{}' as JSON. \
+                             Treating as string. For numbers, use valid JSON format (e.g., '0.01' not '.01')",
+                            env_key, val
+                        );
+                        Value::String(val)
+                    }
+                };
+                return Ok(serde_json::from_value(value)?);
+            }
         }
 
         // Load current values from file

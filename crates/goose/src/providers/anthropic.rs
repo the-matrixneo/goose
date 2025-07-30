@@ -179,7 +179,8 @@ impl Provider for AnthropicProvider {
         headers.insert("x-api-key", self.api_key.parse().unwrap());
         headers.insert("anthropic-version", ANTHROPIC_API_VERSION.parse().unwrap());
 
-        let is_thinking_enabled = std::env::var("CLAUDE_THINKING_ENABLED").is_ok();
+        let config = crate::config::Config::global();
+        let is_thinking_enabled = config.get_param::<String>("CLAUDE_THINKING_ENABLED").is_ok();
         if self.model.model_name.starts_with("claude-3-7-sonnet-") && is_thinking_enabled {
             // https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking#extended-output-capabilities-beta
             headers.insert("anthropic-beta", "output-128k-2025-02-19".parse().unwrap());
@@ -262,7 +263,8 @@ impl Provider for AnthropicProvider {
         headers.insert("x-api-key", self.api_key.parse().unwrap());
         headers.insert("anthropic-version", ANTHROPIC_API_VERSION.parse().unwrap());
 
-        let is_thinking_enabled = std::env::var("CLAUDE_THINKING_ENABLED").is_ok();
+        let config = crate::config::Config::global();
+        let is_thinking_enabled = config.get_param::<String>("CLAUDE_THINKING_ENABLED").is_ok();
         if self.model.model_name.starts_with("claude-3-7-sonnet-") && is_thinking_enabled {
             // https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking#extended-output-capabilities-beta
             headers.insert("anthropic-beta", "output-128k-2025-02-19".parse().unwrap());

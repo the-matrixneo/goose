@@ -293,8 +293,10 @@ impl EmbeddingCapable for OpenAiProvider {
             return Ok(vec![]);
         }
 
-        // Get embedding model from env var or use default
-        let embedding_model = std::env::var("GOOSE_EMBEDDING_MODEL")
+        // Get embedding model from config or use default
+        let config = crate::config::Config::global();
+        let embedding_model = config
+            .get_param::<String>("GOOSE_EMBEDDING_MODEL")
             .unwrap_or_else(|_| "text-embedding-3-small".to_string());
 
         let request = EmbeddingRequest {
