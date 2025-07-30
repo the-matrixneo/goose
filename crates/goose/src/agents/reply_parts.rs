@@ -48,16 +48,22 @@ impl Agent {
         };
 
         // Get tools from extension manager
-        let mut tools = match tool_selection_strategy {
-            Some(RouterToolSelectionStrategy::Vector) => {
-                self.list_tools_for_router(Some(RouterToolSelectionStrategy::Vector))
-                    .await
+        // Check if router is disabled for recipe execution first
+        let mut tools = if *self.router_disabled_override.lock().await {
+            // If router is disabled, use regular tools
+            self.list_tools(None).await
+        } else {
+            match tool_selection_strategy {
+                Some(RouterToolSelectionStrategy::Vector) => {
+                    self.list_tools_for_router(Some(RouterToolSelectionStrategy::Vector))
+                        .await
+                }
+                Some(RouterToolSelectionStrategy::Llm) => {
+                    self.list_tools_for_router(Some(RouterToolSelectionStrategy::Llm))
+                        .await
+                }
+                _ => self.list_tools(None).await,
             }
-            Some(RouterToolSelectionStrategy::Llm) => {
-                self.list_tools_for_router(Some(RouterToolSelectionStrategy::Llm))
-                    .await
-            }
-            _ => self.list_tools(None).await,
         };
         // Add frontend tools
         let frontend_tools = self.frontend_tools.lock().await;

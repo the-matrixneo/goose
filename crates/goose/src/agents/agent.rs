@@ -69,7 +69,7 @@ pub struct ReplyContext {
     pub system_prompt: String,
     pub goose_mode: String,
     pub initial_messages: Vec<Message>,
-    pub config: &'static Config,
+    pub max_turns: u32,
 }
 
 /// Result of processing tool requests
@@ -97,6 +97,7 @@ pub struct Agent {
     pub(super) tool_result_rx: ToolResultReceiver,
     pub(super) tool_monitor: Arc<Mutex<Option<ToolMonitor>>>,
     pub(super) router_tool_selector: Mutex<Option<Arc<Box<dyn RouterToolSelector>>>>,
+    pub(super) router_disabled_override: Mutex<bool>,
     pub(super) scheduler_service: Mutex<Option<Arc<dyn SchedulerTrait>>>,
     pub(super) retry_manager: RetryManager,
 }
@@ -172,6 +173,7 @@ impl Agent {
             tool_result_rx: Arc::new(Mutex::new(tool_rx)),
             tool_monitor,
             router_tool_selector: Mutex::new(None),
+            router_disabled_override: Mutex::new(false),
             scheduler_service: Mutex::new(None),
             retry_manager,
         }
@@ -234,6 +236,14 @@ impl Agent {
 
         let (tools, toolshim_tools, system_prompt) = self.prepare_tools_and_prompt().await?;
         let goose_mode = Self::determine_goose_mode(session.as_ref(), config);
+        let max_turns = session
+            .as_ref()
+            .and_then(|s| s.max_turns)
+            .unwrap_or_else(|| {
+                config
+                    .get_param("GOOSE_MAX_TURNS")
+                    .unwrap_or(DEFAULT_MAX_TURNS)
+            });
 
         Ok(ReplyContext {
             messages,
@@ -243,6 +253,7 @@ impl Agent {
             goose_mode,
             initial_messages,
             config,
+            max_turns,
         })
     }
 
@@ -334,6 +345,13 @@ impl Agent {
     pub async fn set_scheduler(&self, scheduler: Arc<dyn SchedulerTrait>) {
         let mut scheduler_service = self.scheduler_service.lock().await;
         *scheduler_service = Some(scheduler);
+    }
+
+    /// Disable router tool selector for recipe execution
+    /// This prevents the router from being reinitialized even if config changes
+    pub async fn disable_router_for_recipe(&self) {
+        *self.router_disabled_override.lock().await = true;
+        *self.router_tool_selector.lock().await = None;
     }
 
     /// Get a reference count clone to the provider
@@ -750,6 +768,11 @@ impl Agent {
         &self,
         strategy: Option<RouterToolSelectionStrategy>,
     ) -> Vec<Tool> {
+        // If router is disabled for recipe execution, return empty list
+        if *self.router_disabled_override.lock().await {
+            return vec![];
+        }
+
         let mut prefixed_tools = vec![];
         match strategy {
             Some(RouterToolSelectionStrategy::Vector) => {
@@ -842,7 +865,7 @@ impl Agent {
             mut system_prompt,
             goose_mode,
             initial_messages,
-            config,
+            max_turns,
         } = context;
 
         let reply_span = tracing::Span::current();
@@ -859,12 +882,6 @@ impl Agent {
         Ok(Box::pin(async_stream::try_stream! {
             let _ = reply_span.enter();
             let mut turns_taken = 0u32;
-            let max_turns = session
-                .as_ref()
-                .and_then(|s| s.max_turns)
-                .unwrap_or_else(|| {
-                    config.get_param("GOOSE_MAX_TURNS").unwrap_or(DEFAULT_MAX_TURNS)
-                });
 
             loop {
                 if is_token_cancelled(&cancel_token) {
@@ -1151,6 +1168,11 @@ impl Agent {
         provider: Option<Arc<dyn Provider>>,
         reindex_all: Option<bool>,
     ) -> Result<()> {
+        // Check if router is disabled for recipe execution
+        if *self.router_disabled_override.lock().await {
+            return Ok(());
+        }
+
         let config = Config::global();
         let _extension_manager = self.extension_manager.read().await;
         let provider = match provider {
