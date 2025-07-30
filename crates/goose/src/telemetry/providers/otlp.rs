@@ -477,6 +477,9 @@ impl super::TelemetryBackend for OtlpProvider {
                 tracing::info!("OTLP provider configured with API key authentication");
             }
 
+            // Use default HTTP client for protobuf format
+            eprintln!("🔧 OTLP: Trace exporter endpoint: {}/v1/traces", endpoint.trim_end_matches('/'));
+
             builder.build()?
         } else {
             eprintln!("🚀 OTLP: Using gRPC protocol (default)");
@@ -539,6 +542,9 @@ impl super::TelemetryBackend for OtlpProvider {
                 builder = builder.with_headers(headers);
             }
 
+            // Use default HTTP client for protobuf format
+            eprintln!("🔧 OTLP: Metrics exporter endpoint: {}/v1/metrics", endpoint.trim_end_matches('/'));
+
             builder.build()?
         } else {
             let mut builder = opentelemetry_otlp::MetricExporter::builder()
@@ -578,7 +584,7 @@ impl super::TelemetryBackend for OtlpProvider {
             .with_resource(resource)
             .with_reader(
                 PeriodicReader::builder(otlp_metrics_exporter)
-                    .with_interval(Duration::from_secs(30))
+                    .with_interval(Duration::from_secs(1))  // Very short interval for immediate export
                     .build(),
             )
             .build();
@@ -649,16 +655,50 @@ impl super::TelemetryBackend for OtlpProvider {
             }
         }
 
+        // Let the standard OTLP library handle the export
+        eprintln!("✅ OTLP: Event recorded successfully (will be exported periodically by PeriodicReader)");
+
         Ok(())
     }
 
     async fn shutdown(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         if self.initialized {
-            eprintln!("🛑 OTLP: Shutting down and flushing spans...");
+            eprintln!("🛑 OTLP: Shutting down telemetry provider...");
 
-            if let Some(tracer_provider) = &self.tracer_provider {
-                let _flush_results = tracer_provider.force_flush();
-                eprintln!("✅ OTLP: Spans flushed successfully");
+            // Use proper async context for shutdown flush
+            if let Ok(handle) = tokio::runtime::Handle::try_current() {
+                eprintln!("✅ OTLP: Found active Tokio runtime for shutdown flush");
+                
+                if let Some(tracer_provider) = &self.tracer_provider {
+                    eprintln!("🔄 OTLP: Shutdown flushing traces with runtime context...");
+                    let tracer_provider = tracer_provider.clone();
+                    let result = handle.spawn(async move {
+                        tracer_provider.force_flush()
+                    }).await;
+                    
+                    match result {
+                        Ok(Ok(_)) => eprintln!("✅ OTLP: Shutdown traces flush successful"),
+                        Ok(Err(e)) => eprintln!("❌ OTLP: Shutdown traces flush error: {:?}", e),
+                        Err(e) => eprintln!("❌ OTLP: Shutdown traces spawn error: {:?}", e),
+                    }
+                }
+
+                if let Some(meter_provider) = &self.meter_provider {
+                    eprintln!("🔄 OTLP: Shutdown flushing metrics with runtime context...");
+                    let meter_provider = meter_provider.clone();
+                    let result = handle.spawn(async move {
+                        meter_provider.force_flush()
+                    }).await;
+                    
+                    match result {
+                        Ok(Ok(_)) => eprintln!("✅ OTLP: Shutdown metrics flush successful"),
+                        Ok(Err(e)) => eprintln!("❌ OTLP: Shutdown metrics flush error: {:?}", e),
+                        Err(e) => eprintln!("❌ OTLP: Shutdown metrics spawn error: {:?}", e),
+                    }
+                }
+            } else {
+                eprintln!("⚠️ OTLP: No active Tokio runtime for shutdown flush");
+                eprintln!("   (This is expected during shutdown - data should have been exported periodically)");
             }
 
             eprintln!("✅ OTLP: Shutdown complete");
