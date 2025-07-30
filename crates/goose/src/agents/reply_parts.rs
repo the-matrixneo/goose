@@ -48,7 +48,6 @@ impl Agent {
         };
 
         // Get tools from extension manager
-        // Check if router is disabled for recipe execution first
         let mut tools = if *self.router_disabled_override.lock().await {
             // If router is disabled, use regular tools
             self.list_tools(None).await

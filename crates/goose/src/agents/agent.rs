@@ -69,7 +69,7 @@ pub struct ReplyContext {
     pub system_prompt: String,
     pub goose_mode: String,
     pub initial_messages: Vec<Message>,
-    pub max_turns: u32,
+    pub config: &'static Config,
 }
 
 /// Result of processing tool requests
@@ -236,14 +236,6 @@ impl Agent {
 
         let (tools, toolshim_tools, system_prompt) = self.prepare_tools_and_prompt().await?;
         let goose_mode = Self::determine_goose_mode(session.as_ref(), config);
-        let max_turns = session
-            .as_ref()
-            .and_then(|s| s.max_turns)
-            .unwrap_or_else(|| {
-                config
-                    .get_param("GOOSE_MAX_TURNS")
-                    .unwrap_or(DEFAULT_MAX_TURNS)
-            });
 
         Ok(ReplyContext {
             messages,
@@ -253,7 +245,6 @@ impl Agent {
             goose_mode,
             initial_messages,
             config,
-            max_turns,
         })
     }
 
@@ -347,8 +338,6 @@ impl Agent {
         *scheduler_service = Some(scheduler);
     }
 
-    /// Disable router tool selector for recipe execution
-    /// This prevents the router from being reinitialized even if config changes
     pub async fn disable_router_for_recipe(&self) {
         *self.router_disabled_override.lock().await = true;
         *self.router_tool_selector.lock().await = None;
@@ -495,7 +484,7 @@ impl Agent {
             || tool_call.name == ROUTER_LLM_SEARCH_TOOL_NAME
         {
             let selector = self.router_tool_selector.lock().await.clone();
-            let mut selected_tools = match selector.as_ref() {
+            let selected_tools = match selector.as_ref() {
                 Some(selector) => match selector.select_tools(tool_call.arguments.clone()).await {
                     Ok(tools) => tools,
                     Err(e) => {
@@ -517,18 +506,6 @@ impl Agent {
                     )
                 }
             };
-
-            // Append final_output tool if present (for structured output recipes, [Issue #3700](https://github.com/block/goose/issues/3700)
-            if let Some(final_output_tool) = self.final_output_tool.lock().await.as_ref() {
-                let tool = final_output_tool.tool();
-                let tool_content = Content::text(format!(
-                    "Tool: {}\nDescription: {}\nSchema: {}",
-                    tool.name,
-                    tool.description.unwrap_or_default(),
-                    serde_json::to_string_pretty(&tool.input_schema).unwrap_or_default()
-                ));
-                selected_tools.push(tool_content);
-            }
 
             ToolCallResult::from(Ok(selected_tools))
         } else {
@@ -768,7 +745,6 @@ impl Agent {
         &self,
         strategy: Option<RouterToolSelectionStrategy>,
     ) -> Vec<Tool> {
-        // If router is disabled for recipe execution, return empty list
         if *self.router_disabled_override.lock().await {
             return vec![];
         }
@@ -865,7 +841,7 @@ impl Agent {
             mut system_prompt,
             goose_mode,
             initial_messages,
-            max_turns,
+            config,
         } = context;
 
         let reply_span = tracing::Span::current();
@@ -882,6 +858,12 @@ impl Agent {
         Ok(Box::pin(async_stream::try_stream! {
             let _ = reply_span.enter();
             let mut turns_taken = 0u32;
+            let max_turns = session
+                .as_ref()
+                .and_then(|s| s.max_turns)
+                .unwrap_or_else(|| {
+                    config.get_param("GOOSE_MAX_TURNS").unwrap_or(DEFAULT_MAX_TURNS)
+                });
 
             loop {
                 if is_token_cancelled(&cancel_token) {
@@ -1168,7 +1150,6 @@ impl Agent {
         provider: Option<Arc<dyn Provider>>,
         reindex_all: Option<bool>,
     ) -> Result<()> {
-        // Check if router is disabled for recipe execution
         if *self.router_disabled_override.lock().await {
             return Ok(());
         }
