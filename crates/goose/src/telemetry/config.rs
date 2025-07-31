@@ -4,7 +4,6 @@ use std::env;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum TelemetryProvider {
-    Datadog,
     Otlp,
     #[default]
     Console,
@@ -16,7 +15,6 @@ impl std::str::FromStr for TelemetryProvider {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "datadog" => Ok(TelemetryProvider::Datadog),
             "otlp" => Ok(TelemetryProvider::Otlp),
             "console" => Ok(TelemetryProvider::Console),
             "file" => Ok(TelemetryProvider::File),
@@ -117,11 +115,6 @@ impl TelemetryConfig {
         }
 
         match self.provider {
-            TelemetryProvider::Datadog => {
-                if self.api_key.is_none() {
-                    return Err("Datadog provider requires GOOSE_TELEMETRY_API_KEY".to_string());
-                }
-            }
             TelemetryProvider::Otlp => {
                 if self.endpoint.is_none() {
                     return Err("OTLP provider requires GOOSE_TELEMETRY_ENDPOINT or OTEL_EXPORTER_OTLP_ENDPOINT".to_string());
@@ -142,7 +135,6 @@ impl TelemetryConfig {
 
     pub fn get_endpoint(&self) -> Option<String> {
         match self.provider {
-            TelemetryProvider::Datadog => self.endpoint.clone(),
             TelemetryProvider::Otlp => self.endpoint.clone(),
             TelemetryProvider::File => self.endpoint.clone(),
             TelemetryProvider::Console => None,
@@ -159,10 +151,6 @@ mod tests {
 
     #[test]
     fn test_telemetry_provider_parsing() {
-        assert_eq!(
-            "datadog".parse::<TelemetryProvider>().unwrap(),
-            TelemetryProvider::Datadog
-        );
         assert_eq!(
             "otlp".parse::<TelemetryProvider>().unwrap(),
             TelemetryProvider::Otlp
@@ -195,17 +183,17 @@ mod tests {
         assert!(!config.enabled);
 
         env::set_var("GOOSE_TELEMETRY_ENABLED", "true");
-        env::set_var("GOOSE_TELEMETRY_PROVIDER", "datadog");
-        env::set_var("GOOSE_TELEMETRY_API_KEY", "test-key");
+        env::set_var("GOOSE_TELEMETRY_PROVIDER", "otlp");
+        env::set_var("GOOSE_TELEMETRY_ENDPOINT", "http://localhost:4317");
 
         let config = TelemetryConfig::from_env();
         assert!(config.enabled);
-        assert_eq!(config.provider, TelemetryProvider::Datadog);
-        assert_eq!(config.api_key, Some("test-key".to_string()));
+        assert_eq!(config.provider, TelemetryProvider::Otlp);
+        assert_eq!(config.endpoint, Some("http://localhost:4317".to_string()));
 
         env::remove_var("GOOSE_TELEMETRY_ENABLED");
         env::remove_var("GOOSE_TELEMETRY_PROVIDER");
-        env::remove_var("GOOSE_TELEMETRY_API_KEY");
+        env::remove_var("GOOSE_TELEMETRY_ENDPOINT");
     }
 
     #[test]
@@ -215,14 +203,7 @@ mod tests {
         assert!(config.validate().is_ok());
 
         config.enabled = true;
-        config.provider = TelemetryProvider::Datadog;
-        assert!(config.validate().is_err());
-
-        config.api_key = Some("test-key".to_string());
-        assert!(config.validate().is_ok());
-
         config.provider = TelemetryProvider::Otlp;
-        config.api_key = None;
         assert!(config.validate().is_err());
 
         config.endpoint = Some("http://localhost:4317".to_string());

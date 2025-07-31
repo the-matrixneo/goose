@@ -1,5 +1,4 @@
 mod config;
-mod datadog_metrics;
 mod environment;
 mod events;
 mod macros;

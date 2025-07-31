@@ -3293,7 +3293,6 @@ dependencies = [
  "nanoid",
  "once_cell",
  "opentelemetry",
- "opentelemetry-datadog",
  "opentelemetry-otlp",
  "opentelemetry-semantic-conventions",
  "opentelemetry-stdout",
@@ -5810,26 +5809,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "opentelemetry-datadog"
-version = "0.18.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9f313abaf8192afe5b239582626cd1dc60065e46cf05f396ff8b2116da1f2de3"
-dependencies = [
- "ahash",
- "http 1.2.0",
- "indexmap 2.7.1",
- "itoa",
- "opentelemetry",
- "opentelemetry-http",
- "opentelemetry-semantic-conventions",
- "opentelemetry_sdk",
- "rmp",
- "ryu",
- "thiserror 2.0.12",
- "url",
-]
-
-[[package]]
 name = "opentelemetry-http"
 version = "0.30.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7003,17 +6982,6 @@ dependencies = [
  "quote",
  "serde_json",
  "syn 2.0.99",
-]
-
-[[package]]
-name = "rmp"
-version = "0.8.14"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "228ed7c16fa39782c3b3468e974aec2795e9089153cd08ee2e9aefb3613334c4"
-dependencies = [
- "byteorder",
- "num-traits",
- "paste",
 ]
 
 [[package]]

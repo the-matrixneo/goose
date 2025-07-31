@@ -93,7 +93,6 @@ arrow = "52.2"
 # OpenTelemetry telemetry
 opentelemetry = "0.30"
 opentelemetry-otlp = { version = "0.30", features = ["http-proto", "grpc-tonic"] }
-opentelemetry-datadog = "0.18"
 opentelemetry-stdout = "0.30"
 opentelemetry_sdk = { version = "0.30", features = ["rt-tokio"] }
 opentelemetry-semantic-conventions = "0.30"
