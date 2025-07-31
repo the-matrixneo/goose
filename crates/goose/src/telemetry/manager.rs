@@ -41,14 +41,20 @@ impl TelemetryManager {
         if manager.enabled {
             match manager.initialize().await {
                 Ok(()) => {
-                    eprintln!("🔧 Telemetry initialized successfully with provider: {:?}", config.provider);
+                    eprintln!(
+                        "🔧 Telemetry initialized successfully with provider: {:?}",
+                        config.provider
+                    );
                     tracing::info!(
                         "Telemetry initialized successfully with provider: {:?}",
                         config.provider
                     );
                 }
                 Err(e) => {
-                    eprintln!("❌ Failed to initialize telemetry: {}. Continuing without telemetry.", e);
+                    eprintln!(
+                        "❌ Failed to initialize telemetry: {}. Continuing without telemetry.",
+                        e
+                    );
                     tracing::warn!(
                         "Failed to initialize telemetry: {}. Continuing without telemetry.",
                         e
