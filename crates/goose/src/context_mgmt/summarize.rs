@@ -1,3 +1,4 @@
+use super::common::{get_messages_token_counts, get_messages_token_counts_async};
 use crate::message::Message;
 use crate::prompt_template::render_global_file;
 use crate::providers::base::Provider;
@@ -32,7 +33,7 @@ pub async fn summarize_messages(
     };
 
     // Render the one-shot summarization prompt
-    let system_prompt = render_global_file("summarize_oneshot_short.md", &context)?;
+    let system_prompt = render_global_file("summarize_oneshot.md", &context)?;
 
     // Create a simple user message requesting summarization
     let user_message = Message::user()
@@ -104,12 +105,12 @@ mod tests {
         }
     }
 
-    fn create_mock_provider() -> Arc<dyn Provider> {
-        let mock_model_config =
-            ModelConfig::new("test-model".to_string()).with_context_limit(200_000.into());
-        Arc::new(MockProvider {
+    fn create_mock_provider() -> Result<Arc<dyn Provider>> {
+        let mock_model_config = ModelConfig::new("test-model")?.with_context_limit(200_000.into());
+
+        Ok(Arc::new(MockProvider {
             model_config: mock_model_config,
-        })
+        }))
     }
 
     fn create_test_messages() -> Vec<Message> {
@@ -161,5 +162,92 @@ mod tests {
             summary_result.is_none(),
             "The summary should be None for empty input."
         );
+        assert_eq!(
+            summarized_messages[0].role,
+            Role::User,
+            "Summary should be from user role for context."
+        );
+        assert_eq!(
+            token_counts.len(),
+            1,
+            "Should have token count for the summary."
+        );
+    }
+
+    #[tokio::test]
+    async fn test_summarize_messages_chunked_direct_call() {
+        let provider = create_mock_provider().expect("failed to create mock provider");
+        let token_counter = TokenCounter::new();
+        let context_limit = 10_000; // Higher limit to avoid underflow
+        let messages = create_test_messages();
+
+        let result = summarize_messages_chunked(
+            Arc::clone(&provider),
+            &messages,
+            &token_counter,
+            context_limit,
+        )
+        .await;
+
+        assert!(
+            result.is_ok(),
+            "Chunked summarization should work directly."
+        );
+        let (summarized_messages, token_counts) = result.unwrap();
+
+        assert_eq!(
+            summarized_messages.len(),
+            1,
+            "Chunked should return a single final summary."
+        );
+        assert_eq!(
+            summarized_messages[0].role,
+            Role::User,
+            "Summary should be from user role for context."
+        );
+        assert_eq!(
+            token_counts.len(),
+            1,
+            "Should have token count for the summary."
+        );
+    }
+
+    #[tokio::test]
+    async fn test_absolute_token_threshold_calculation() {
+        let provider = create_mock_provider().expect("failed to create mock provider");
+        let token_counter = TokenCounter::new();
+
+        // Test with a context limit where absolute token calculation matters
+        let context_limit = 10_000;
+        let system_prompt_overhead = 1000;
+        let response_overhead = 4000;
+        let safety_buffer = 1000;
+        let max_message_tokens =
+            context_limit - system_prompt_overhead - response_overhead - safety_buffer; // 4000 tokens
+
+        // Create messages that are just under the absolute threshold
+        let mut large_messages = Vec::new();
+        let base_message = set_up_text_message("x".repeat(50).as_str(), Role::User);
+
+        // Add enough messages to approach but not exceed the absolute threshold
+        let message_tokens = token_counter.count_tokens(&format!("{:?}", base_message));
+        let num_messages = (max_message_tokens / message_tokens).saturating_sub(1);
+
+        for i in 0..num_messages {
+            large_messages.push(set_up_text_message(&format!("Message {}", i), Role::User));
+        }
+
+        let result = summarize_messages(
+            Arc::clone(&provider),
+            &large_messages,
+        )
+        .await;
+
+        assert!(
+            result.is_ok(),
+            "Should handle absolute threshold calculation correctly."
+        );
+        let (summarized_messages, _) = result.unwrap();
+        assert_eq!(summarized_messages.len(), 1, "Should produce a summary.");
     }
 }

@@ -1,7 +1,7 @@
 use super::utils::verify_secret_key;
 use crate::state::AppState;
 use axum::{
-    extract::State,
+    extract::{DefaultBodyLimit, State},
     http::{self, HeaderMap, StatusCode},
     response::IntoResponse,
     routing::post,
@@ -400,9 +400,15 @@ async fn submit_tool_result(
 
 pub fn routes(state: Arc<AppState>) -> Router {
     Router::new()
-        .route("/reply", post(reply_handler))
+        .route(
+            "/reply",
+            post(reply_handler).layer(DefaultBodyLimit::max(50 * 1024 * 1024)),
+        )
         .route("/confirm", post(confirm_permission))
-        .route("/tool_result", post(submit_tool_result))
+        .route(
+            "/tool_result",
+            post(submit_tool_result).layer(DefaultBodyLimit::max(10 * 1024 * 1024)),
+        )
         .with_state(state)
 }
 
@@ -454,7 +460,7 @@ mod tests {
 
         #[tokio::test]
         async fn test_reply_endpoint() {
-            let mock_model_config = ModelConfig::new("test-model".to_string());
+            let mock_model_config = ModelConfig::new("test-model").unwrap();
             let mock_provider = Arc::new(MockProvider {
                 model_config: mock_model_config,
             });
