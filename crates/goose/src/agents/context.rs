@@ -53,15 +53,18 @@ impl Agent {
         messages: &[Message], // last message is a user msg that led to assistant message with_context_length_exceeded
     ) -> Result<(Vec<Message>, Vec<usize>), anyhow::Error> {
         let provider = self.provider().await?;
-        let token_counter = create_async_token_counter()
+        let _token_counter = create_async_token_counter()
             .await
             .map_err(|e| anyhow::anyhow!("Failed to create token counter: {}", e))?;
-        let target_context_limit = estimate_target_context_limit(provider.clone());
+        let _target_context_limit = estimate_target_context_limit(provider.clone());
 
         let summary_result = summarize_messages(provider.clone(), messages).await?;
 
         let (mut new_messages, mut new_token_counts) = match summary_result {
-            Some((summary_message, token_count)) => (vec![summary_message], vec![token_count]),
+            Some((summary_message, input_tokens, output_tokens)) => {
+                // For token counting purposes, we use the total tokens (input + output)
+                (vec![summary_message], vec![input_tokens + output_tokens])
+            }
             None => {
                 // No summary was generated (empty input)
                 tracing::warn!("Summarization failed. Returning empty messages.");
