@@ -1,4 +1,3 @@
-use super::common::{get_messages_token_counts, get_messages_token_counts_async};
 use crate::message::Message;
 use crate::prompt_template::render_global_file;
 use crate::providers::base::Provider;
@@ -16,7 +15,7 @@ struct SummarizeContext {
 pub async fn summarize_messages(
     provider: Arc<dyn Provider>,
     messages: &[Message],
-) -> Result<Option<(Message, usize)>, anyhow::Error> {
+) -> Result<Option<(Message, usize, usize)>, anyhow::Error> {
     if messages.is_empty() {
         return Ok(None);
     }
@@ -50,9 +49,10 @@ pub async fn summarize_messages(
 
     // Get the token count from the provider usage for the output tokens
     // For now, we'll use the output tokens as an approximation for the summary token count
-    let token_count = provider_usage.usage.output_tokens.unwrap_or(0) as usize;
+    let input_tokens = provider_usage.usage.input_tokens.unwrap_or(0) as usize;
+    let output_tokens = provider_usage.usage.output_tokens.unwrap_or(0) as usize;
 
-    Ok(Some((response, token_count)))
+    Ok(Some((response, input_tokens, output_tokens)))
 }
 
 #[cfg(test)]
