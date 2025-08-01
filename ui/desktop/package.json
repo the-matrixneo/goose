@@ -1,7 +1,7 @@
 {
   "name": "goose-app",
   "productName": "Goose",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Goose App",
   "engines": {
     "node": "^22.9.0"
@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit",
     "generate-api": "openapi-ts",
     "start-gui": "npm run generate-api && electron-forge start",
+    "start-gui-debug": "npm run generate-api && electron-forge start -- --inspect=9229",
     "start": "cd ../.. && just run-ui",
     "start:test-error": "GOOSE_TEST_ERROR=true electron-forge start",
     "package": "electron-forge package",
