@@ -10,16 +10,18 @@ use goose::agents::{extension::Envs, ExtensionConfig};
 use goose::config::extensions::name_to_key;
 use goose::config::permission::PermissionLevel;
 use goose::config::{
-    Config, ConfigError, ExperimentManager, ExtensionConfigManager, ExtensionEntry,
-    PermissionManager,
+    Config, ConfigError, CustomProviderConfig, CustomProviderManager, ExperimentManager,
+    ExtensionConfigManager, ExtensionEntry, PermissionManager,
 };
 use goose::message::Message;
+use goose::providers::custom::{AnthropicCompatibleConfig, OpenAICompatibleConfig};
 use goose::providers::{create, providers};
 use rmcp::model::{Tool, ToolAnnotations};
 use rmcp::object;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::error::Error;
+use uuid::Uuid;
 
 use crate::recipes::github_recipe::GOOSE_RECIPE_GITHUB_REPO_CONFIG_KEY;
 
@@ -221,6 +223,11 @@ pub async fn handle_configure() -> Result<(), Box<dyn Error>> {
                 "Configure Providers",
                 "Change provider or update credentials",
             )
+            .item(
+                "custom_providers",
+                "Custom Providers",
+                "Add OpenAI or Anthropic compatible APIs",
+            )
             .item("add", "Add Extension", "Connect to a new extension")
             .item(
                 "toggle",
@@ -241,6 +248,7 @@ pub async fn handle_configure() -> Result<(), Box<dyn Error>> {
             "remove" => remove_extension_dialog(),
             "settings" => configure_settings_dialog().await.and(Ok(())),
             "providers" => configure_provider_dialog().await.and(Ok(())),
+            "custom_providers" => configure_custom_provider_dialog(),
             _ => unreachable!(),
         }
     }
@@ -1599,6 +1607,151 @@ pub async fn handle_openrouter_auth() -> Result<(), Box<dyn Error>> {
             eprintln!("Authentication failed: {}", e);
             return Err(e.into());
         }
+    }
+
+    Ok(())
+}
+
+pub fn configure_custom_provider_dialog() -> Result<(), Box<dyn Error>> {
+    let action = cliclack::select("What would you like to do?")
+        .item(
+            "add",
+            "Add A Custom Provider",
+            "Add a new OpenAI/Anthropic compatible Provider",
+        )
+        .item(
+            "remove",
+            "Remove Custom Provider",
+            "Remove an existing custom provider",
+        )
+        .interact()?;
+
+    match action {
+        "add" => {
+            let provider_type = cliclack::select("What type of API is this?")
+                .item(
+                    "openai_compatible",
+                    "OpenAI Compatible",
+                    "Uses OpenAI API format",
+                )
+                .item(
+                    "anthropic_compatible",
+                    "Anthropic Compatible",
+                    "Uses Anthropic API format",
+                )
+                .interact()?;
+
+            let display_name: String = cliclack::input("What should we call this provider?")
+                .placeholder("Your Provider Name")
+                .validate(|input: &String| {
+                    if input.is_empty() {
+                        Err("Please enter a name")
+                    } else {
+                        Ok(())
+                    }
+                })
+                .interact()?;
+
+            let api_url: String = cliclack::input("Provider API URL:")
+                .placeholder("https://api.example.com/v1/messages")
+                .validate(|input: &String| {
+                    if !input.starts_with("http://") && !input.starts_with("https://") {
+                        Err("Inputed URL must start with either http:// or https://")
+                    } else {
+                        Ok(())
+                    }
+                })
+                .interact()?;
+
+            let api_key: String = cliclack::password("API key:").mask('▪').interact()?;
+
+            let models_input: String = cliclack::input("Available models (seperate with commas):")
+                .placeholder("model-a, model-b, model-c")
+                .validate(|input: &String| {
+                    if input.trim().is_empty() {
+                        Err("Please enter at least one model name")
+                    } else {
+                        Ok(())
+                    }
+                })
+                .interact()?;
+
+            let models: Vec<String> = models_input
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect();
+
+            // gen uuid for added provider
+            let id = format!(
+                "custom_{}_{}",
+                provider_type,
+                Uuid::new_v4().to_string().split('-').next().unwrap()
+            );
+
+            // api-key -> keyring
+            let config = Config::global();
+            let api_key_name = format!("{}_API_KEY", id.to_uppercase());
+            config.set_secret(&api_key_name, Value::String(api_key))?;
+
+            let display_name_clone = display_name.clone();
+
+            // create final provider config
+            let provider_config = match provider_type {
+                "openai_compatible" => {
+                    CustomProviderConfig::OpenAICompatible(OpenAICompatibleConfig {
+                        id: id.clone(),
+                        display_name: display_name_clone,
+                        api_url,
+                        api_key: api_key_name,
+                        models,
+                        enabled: true,
+                    })
+                }
+                "anthropic_compatible" => {
+                    CustomProviderConfig::AnthropicCompatible(AnthropicCompatibleConfig {
+                        id: id.clone(),
+                        display_name: display_name_clone,
+                        api_url,
+                        api_key: api_key_name,
+                        models,
+                        enabled: true,
+                    })
+                }
+                _ => unreachable!(),
+            };
+
+            CustomProviderManager::set(provider_config)?;
+
+            cliclack::outro(format!("Custom provider added: {}", display_name))?;
+        }
+        "remove" => {
+            let custom_providers = CustomProviderManager::get_all()?;
+            if custom_providers.is_empty() {
+                cliclack::outro("No custom providers added just yet.")?;
+                return Ok(());
+            }
+
+            let provider_items: Vec<_> = custom_providers
+                .iter()
+                .map(|p| (p.id(), p.display_name(), "Custom provider"))
+                .collect();
+
+            let selected_id = cliclack::select("Which custom provider would you like to remove?")
+                .items(&provider_items)
+                .interact()?;
+
+            // TODO: remove api-key from keyring
+
+            let config = Config::global();
+            let api_key_name = format!("{}_API_KEY", selected_id.to_uppercase());
+            let _ = config.delete_secret(&api_key_name);
+
+            CustomProviderManager::remove(selected_id)?;
+
+            cliclack::outro(format!("Removed custom provider: {}", selected_id))?;
+        }
+        _ => unreachable!(),
     }
 
     Ok(())

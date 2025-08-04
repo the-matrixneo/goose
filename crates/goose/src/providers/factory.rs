@@ -6,6 +6,7 @@ use super::{
     base::{Provider, ProviderMetadata},
     bedrock::BedrockProvider,
     claude_code::ClaudeCodeProvider,
+    custom::{AnthropicCompatibleProvider, OpenAICompatibleProvider},
     databricks::DatabricksProvider,
     gcpvertexai::GcpVertexAIProvider,
     gemini_cli::GeminiCliProvider,
@@ -21,6 +22,7 @@ use super::{
     venice::VeniceProvider,
     xai::XaiProvider,
 };
+use crate::config::{CustomProviderConfig, CustomProviderManager};
 use crate::model::ModelConfig;
 use anyhow::Result;
 
@@ -71,6 +73,12 @@ pub fn create(name: &str, model: ModelConfig) -> Result<Arc<dyn Provider>> {
 
         return create_lead_worker_from_env(name, &model, &lead_model_name);
     }
+
+    // check if its is a custom provider first
+    if let Ok(Some(custom_config)) = CustomProviderManager::get(name) {
+        return create_custom_provider(custom_config, model);
+    }
+
     create_provider(name, model)
 }
 
@@ -144,6 +152,20 @@ fn create_lead_worker_from_env(
         failure_threshold,
         fallback_turns,
     )))
+}
+
+fn create_custom_provider(
+    custom_config: CustomProviderConfig,
+    model: ModelConfig,
+) -> Result<Arc<dyn Provider>> {
+    match custom_config {
+        CustomProviderConfig::OpenAICompatible(config) => {
+            Ok(Arc::new(OpenAICompatibleProvider::from_env(config, model)?))
+        }
+        CustomProviderConfig::AnthropicCompatible(config) => Ok(Arc::new(
+            AnthropicCompatibleProvider::from_env(config, model)?,
+        )),
+    }
 }
 
 fn create_provider(name: &str, model: ModelConfig) -> Result<Arc<dyn Provider>> {

@@ -4,6 +4,7 @@ pub mod azureauth;
 pub mod base;
 pub mod bedrock;
 pub mod claude_code;
+pub mod custom;
 pub mod databricks;
 pub mod embedding;
 pub mod errors;

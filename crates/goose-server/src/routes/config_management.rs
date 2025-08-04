@@ -8,11 +8,10 @@ use axum::{
 };
 use etcetera::{choose_app_strategy, AppStrategy};
 use goose::config::APP_STRATEGY;
-use goose::config::{extensions::name_to_key, PermissionManager};
 use goose::config::{Config, ConfigError};
 use goose::config::{ExtensionConfigManager, ExtensionEntry};
 use goose::model::ModelConfig;
-use goose::providers::base::ProviderMetadata;
+use goose::providers::base::{ConfigKey, ModelInfo, ProviderMetadata};
 use goose::providers::pricing::{
     get_all_pricing, get_model_pricing, parse_model_id, refresh_pricing,
 };
@@ -24,6 +23,7 @@ use serde_json::Value;
 use serde_yaml;
 use std::{collections::HashMap, sync::Arc};
 use utoipa::ToSchema;
+use uuid::Uuid;
 
 #[derive(Serialize, ToSchema)]
 pub struct ExtensionResponse {
@@ -78,6 +78,15 @@ pub struct ToolPermission {
 #[derive(Deserialize, ToSchema)]
 pub struct UpsertPermissionsQuery {
     pub tool_permissions: Vec<ToolPermission>,
+}
+
+#[derive(Deserialize, ToSchema)]
+pub struct CreateCustomProviderRequest {
+    pub provider_type: String,
+    pub display_name: String,
+    pub api_url: String,
+    pub api_key: String,
+    pub models: Vec<String>,
 }
 
 #[utoipa::path(
@@ -229,7 +238,7 @@ pub async fn add_extension(
 
     let extensions =
         ExtensionConfigManager::get_all().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    let key = name_to_key(&extension_query.name);
+    let key = goose::config::extensions::name_to_key(&extension_query.name);
 
     let is_update = extensions.iter().any(|e| e.config.key() == key);
 
@@ -264,7 +273,7 @@ pub async fn remove_extension(
 ) -> Result<Json<String>, StatusCode> {
     verify_secret_key(&headers, &state)?;
 
-    let key = name_to_key(&name);
+    let key = goose::config::extensions::name_to_key(&name);
     match ExtensionConfigManager::remove(&key) {
         Ok(_) => Ok(Json(format!("Removed extension {}", name))),
         Err(_) => Err(StatusCode::NOT_FOUND),
@@ -308,7 +317,7 @@ pub async fn providers(
 
     let providers_metadata = get_providers();
 
-    let providers_response: Vec<ProviderDetails> = providers_metadata
+    let mut providers_response: Vec<ProviderDetails> = providers_metadata
         .into_iter()
         .map(|metadata| {
             let is_configured = check_provider_configured(&metadata);
@@ -320,6 +329,92 @@ pub async fn providers(
             }
         })
         .collect();
+
+    if let Ok(custom_providers) = goose::config::CustomProviderManager::get_all() {
+        for custom_provider in custom_providers {
+            if custom_provider.is_enabled() {
+                let models: Vec<ModelInfo> = custom_provider
+                    .models()
+                    .iter()
+                    .map(|model_name| ModelInfo::new(model_name.clone(), 128000))
+                    .collect();
+
+                let config_keys = match &custom_provider {
+                    goose::config::CustomProviderConfig::OpenAICompatible(config) => {
+                        vec![
+                            ConfigKey::new(
+                                &format!("{}_API_URL", config.id.to_uppercase()),
+                                true,
+                                false,
+                                Some(&config.api_url),
+                            ),
+                            ConfigKey::new(
+                                &format!("{}_API_KEY", config.id.to_uppercase()),
+                                true,
+                                true,
+                                None,
+                            ),
+                            ConfigKey::new(
+                                &format!("{}_MODELS", config.id.to_uppercase()),
+                                false,
+                                false,
+                                Some(&config.models.join(",")),
+                            ),
+                        ]
+                    }
+                    goose::config::CustomProviderConfig::AnthropicCompatible(config) => {
+                        vec![
+                            ConfigKey::new(
+                                &format!("{}_API_URL", config.id.to_uppercase()),
+                                true,
+                                false,
+                                Some(&config.api_url),
+                            ),
+                            ConfigKey::new(
+                                &format!("{}_API_KEY", config.id.to_uppercase()),
+                                true,
+                                true,
+                                None,
+                            ),
+                            ConfigKey::new(
+                                &format!("{}_MODELS", config.id.to_uppercase()),
+                                false,
+                                false,
+                                Some(&config.models.join(",")),
+                            ),
+                        ]
+                    }
+                };
+
+                let metadata = ProviderMetadata {
+                    name: custom_provider.id().to_string(),
+                    display_name: custom_provider.display_name().to_string(),
+                    description: format!(
+                        "Custom {} compatible provider",
+                        match &custom_provider {
+                            goose::config::CustomProviderConfig::OpenAICompatible(_) => "OpenAI",
+                            goose::config::CustomProviderConfig::AnthropicCompatible(_) =>
+                                "Anthropic",
+                        }
+                    ),
+                    default_model: custom_provider
+                        .models()
+                        .first()
+                        .cloned()
+                        .unwrap_or_default(),
+                    known_models: models,
+                    model_doc_link: String::new(),
+                    config_keys,
+                };
+
+                providers_response.push(ProviderDetails {
+                    name: custom_provider.id().to_string(),
+                    metadata,
+                    is_configured: true,
+                });
+            }
+        }
+    }
 
     Ok(Json(providers_response))
 }
@@ -493,7 +588,7 @@ pub async fn upsert_permissions(
 ) -> Result<Json<String>, StatusCode> {
     verify_secret_key(&headers, &state)?;
 
-    let mut permission_manager = PermissionManager::default();
+    let mut permission_manager = goose::config::PermissionManager::default();
 
     for tool_permission in &query.tool_permissions {
         permission_manager.update_user_permission(
@@ -639,6 +734,105 @@ pub async fn get_current_model(
     })))
 }
 
+#[utoipa::path(
+    post,
+    path = "/config/custom-providers",
+    request_body = CreateCustomProviderRequest,
+    responses(
+        (status = 200, description = "Custom provider created successfully", body = String),
+        (status = 400, description = "Invalid request"),
+        (status = 500, description = "Internal server error")
+    )
+)]
+pub async fn create_custom_provider(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(request): Json<CreateCustomProviderRequest>,
+) -> Result<Json<String>, StatusCode> {
+    verify_secret_key(&headers, &state)?;
+
+    // gen uuid for added provider
+    let id = format!(
+        "custom_{}_{}",
+        request.provider_type,
+        Uuid::new_v4().to_string().split('-').next().unwrap()
+    );
+
+    // key naming convention
+    let api_key_name = format!(
+        "{}_API_KEY",
+        request
+            .display_name
+            .to_uppercase()
+            .replace(" ", "_")
+            .replace("-", "_")
+    );
+
+    // api-key -> keyring
+    let config = Config::global();
+    config
+        .set_secret(
+            &api_key_name,
+            serde_json::Value::String(request.api_key.clone()),
+        )
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    // create final provider config
+    let provider_config = match request.provider_type.as_str() {
+        "openai_compatible" => goose::config::CustomProviderConfig::OpenAICompatible(
+            goose::providers::custom::OpenAICompatibleConfig {
+                id: id.clone(),
+                display_name: request.display_name,
+                api_url: request.api_url,
+                api_key: api_key_name,
+                models: request.models,
+                enabled: true,
+            },
+        ),
+        "anthropic_compatible" => goose::config::CustomProviderConfig::AnthropicCompatible(
+            goose::providers::custom::AnthropicCompatibleConfig {
+                id: id.clone(),
+                display_name: request.display_name,
+                api_url: request.api_url,
+                api_key: api_key_name,
+                models: request.models,
+                enabled: true,
+            },
+        ),
+        _ => return Err(StatusCode::BAD_REQUEST),
+    };
+
+    goose::config::CustomProviderManager::set(provider_config)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    Ok(Json(format!("Custom provider added - ID: {}", id)))
+}
+
+#[utoipa::path(
+    delete,
+    path = "/config/custom-providers/{id}",
+    responses(
+        (status = 200, description = "Custom provider removed successfully", body = String),
+        (status = 404, description = "Provider not found"),
+        (status = 500, description = "Internal server error")
+    )
+)]
+pub async fn remove_custom_provider(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> Result<Json<String>, StatusCode> {
+    verify_secret_key(&headers, &state)?;
+
+    let config = Config::global();
+    let api_key_name = format!("{}_API_KEY", id.to_uppercase());
+    let _ = config.delete_secret(&api_key_name);
+
+    goose::config::CustomProviderManager::remove(&id).map_err(|_| StatusCode::NOT_FOUND)?;
+
+    Ok(Json(format!("Removed custom provider: {}", id)))
+}
+
 pub fn routes(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/config", get(read_all_config))
@@ -656,6 +850,11 @@ pub fn routes(state: Arc<AppState>) -> Router {
         .route("/config/validate", get(validate_config))
         .route("/config/permissions", post(upsert_permissions))
         .route("/config/current-model", get(get_current_model))
+        .route("/config/custom-providers", post(create_custom_provider))
+        .route(
+            "/config/custom-providers/{id}",
+            delete(remove_custom_provider),
+        )
         .with_state(state)
 }
 
