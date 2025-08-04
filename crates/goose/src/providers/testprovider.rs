@@ -147,8 +147,8 @@ impl Provider for TestProvider {
                 Ok((record.output.message.clone(), record.output.usage.clone()))
             } else {
                 Err(ProviderError::ExecutionError(format!(
-                    "No recorded response found for input hash: {}",
-                    hash
+                    "No recorded response found for input hash: {} in {}",
+                    hash, self.file_path
                 )))
             }
         }
