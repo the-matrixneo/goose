@@ -89,7 +89,7 @@ mod tests {
                 let large_message = "hello ".repeat(context_length + 100);
                 Message::user().with_text(&large_message)
             }),
-            Some(&["OpenAI", "Azure_OpenAI"]),
+            Some(&["OpenAI", "Azure_OpenAI", "Google"]),
             |result| {
                 // this is unfortunate; we don't seem to actually catch the errors in this path,
                 // but instead eat it:
