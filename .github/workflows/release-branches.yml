@@ -3,6 +3,12 @@ name: Build Goose Release Candidate
 on:
   pull_request:
 
+# Permissions needed for AWS OIDC authentication in called workflows
+permissions:
+  id-token: write   # Required for AWS OIDC authentication in called workflow
+  contents: write   # Required for creating releases and by actions/checkout
+  actions: read     # May be needed for some workflows
+
 jobs:
   bundle-desktop:
     if: startsWith(github.head_ref, 'release/')
@@ -12,6 +18,8 @@ jobs:
       contents: read
     with:
       signing: true
+    secrets:
+      OSX_CODESIGN_ROLE: ${{ secrets.OSX_CODESIGN_ROLE }}
 
   comment-on-pr:
     needs: bundle-desktop
