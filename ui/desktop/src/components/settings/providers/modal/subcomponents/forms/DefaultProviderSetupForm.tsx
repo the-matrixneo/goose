@@ -40,8 +40,7 @@ export default function DefaultProviderSetupForm({
         const configResponse = await read(configKey, parameter.secret || false);
 
         if (configResponse) {
-          // Use the value from the config provider
-          newValues[parameter.name] = String(configResponse);
+          newValues[parameter.name] = parameter.secret ? 'true' : String(configResponse);
         } else if (
           parameter.default !== undefined &&
           parameter.default !== null &&
@@ -93,8 +92,16 @@ export default function DefaultProviderSetupForm({
       return `Default: ${parameter.default}`;
     }
 
-    // Otherwise, use the parameter name as a hint
-    return parameter.name.toUpperCase();
+    const name = parameter.name.toLowerCase();
+    if (name.includes('api_key')) return 'Your API key';
+    if (name.includes('api_url') || name.includes('host')) return 'https://api.example.com';
+    if (name.includes('models')) return 'model-a, model-b';
+
+    return parameter.name
+      .replace(/_/g, ' ')
+      .replace(/([A-Z])/g, ' $1')
+      .replace(/^./, (str) => str.toUpperCase())
+      .trim();
   };
 
   // helper for custom labels
