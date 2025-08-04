@@ -65,12 +65,17 @@ impl TestProvider {
         Ok(())
     }
 
-    fn hash_input(messages: &[Message]) -> String {
+    fn messages_to_string_for_hash(messages: &[Message]) -> String {
         let stable_messages: Vec<_> = messages
             .iter()
             .map(|msg| (msg.role.clone(), msg.content.clone()))
             .collect();
         let serialized = serde_json::to_string(&stable_messages).unwrap_or_default();
+        serialized
+    }
+
+    fn hash_input(messages: &[Message], debug: bool) -> String {
+        let serialized = Self::messages_to_string_for_hash(messages);
         let mut hasher = Sha256::new();
         hasher.update(serialized.as_bytes());
         format!("{:x}", hasher.finalize())
@@ -147,8 +152,10 @@ impl Provider for TestProvider {
                 Ok((record.output.message.clone(), record.output.usage.clone()))
             } else {
                 Err(ProviderError::ExecutionError(format!(
-                    "No recorded response found for input hash: {} in {}",
-                    hash, self.file_path
+                    "No recorded response found for input hash: {} in {}\nmessages: {}",
+                    hash,
+                    self.file_path,
+                    Self::messages_to_string_for_hash(messages)
                 )))
             }
         }
