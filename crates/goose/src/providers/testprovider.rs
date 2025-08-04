@@ -74,7 +74,7 @@ impl TestProvider {
         serialized
     }
 
-    fn hash_input(messages: &[Message], debug: bool) -> String {
+    fn hash_input(messages: &[Message]) -> String {
         let serialized = Self::messages_to_string_for_hash(messages);
         let mut hasher = Sha256::new();
         hasher.update(serialized.as_bytes());
