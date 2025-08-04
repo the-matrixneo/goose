@@ -33,7 +33,20 @@ async fn toolshim_postprocess(
 
 impl Agent {
     /// Prepares tools and system prompt for a provider request
+<<<<<<< Updated upstream
     pub async fn prepare_tools_and_prompt(&self) -> anyhow::Result<(Vec<Tool>, Vec<Tool>, String)> {
+||||||| Stash base
+    pub(crate) async fn prepare_tools_and_prompt(
+        &self,
+    ) -> anyhow::Result<(Vec<Tool>, Vec<Tool>, String)> {
+=======
+    pub(crate) async fn prepare_tools_and_prompt(
+        &self,
+    ) -> anyhow::Result<(Vec<Tool>, Vec<Tool>, String)> {
+        tracing::info!("🔧 Agent::prepare_tools_and_prompt called - about to fetch tools from extensions");
+        let calling_context = std::backtrace::Backtrace::capture();
+        tracing::info!("📋 Call stack for prepare_tools_and_prompt:\n{}", calling_context);
+>>>>>>> Stashed changes
         // Get tool selection strategy from config
         let tool_selection_strategy = self
             .tool_route_manager
@@ -41,19 +54,28 @@ impl Agent {
             .await;
 
         // Get tools from extension manager
+        tracing::info!("🎯 Tool selection strategy: {:?}", tool_selection_strategy);
         let mut tools = match tool_selection_strategy {
             Some(RouterToolSelectionStrategy::Vector) => {
+                tracing::info!("📊 Using Vector tool selection strategy for router");
                 self.list_tools_for_router(Some(RouterToolSelectionStrategy::Vector))
                     .await
             }
             Some(RouterToolSelectionStrategy::Llm) => {
+                tracing::info!("🤖 Using LLM tool selection strategy for router");
                 self.list_tools_for_router(Some(RouterToolSelectionStrategy::Llm))
                     .await
             }
-            _ => self.list_tools(None).await,
+            _ => {
+                tracing::info!("⚡ Using default tool selection - calling agent.list_tools(None) which will trigger MCP list_tools calls");
+                self.list_tools(None).await
+            },
         };
+        tracing::info!("✅ prepare_tools_and_prompt retrieved {} tools from extensions", tools.len());
         // Add frontend tools
         let frontend_tools = self.frontend_tools.lock().await;
+        let frontend_count = frontend_tools.len();
+        tracing::info!("🎨 Adding {} frontend tools to the {} extension tools", frontend_count, tools.len());
         for frontend_tool in frontend_tools.values() {
             tools.push(frontend_tool.tool.clone());
         }

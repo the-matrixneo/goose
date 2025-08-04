@@ -161,9 +161,16 @@ impl OAuthFlow {
             .send()
             .await?;
 
+        let status = resp.status();
+        let response_headers: Vec<(String, String)> = resp.headers().iter()
+            .map(|(k, v)| (k.to_string(), v.to_str().unwrap_or("<invalid utf8>").to_string()))
+            .collect();
+        tracing::info!("Received registration response with status: {}", status);
+        tracing::info!("Registration response headers: {:?}", response_headers);
+
         if !resp.status().is_success() {
-            let status = resp.status();
             let err_text = resp.text().await?;
+            tracing::error!("Client registration failed: {} - {}", status, err_text);
             return Err(anyhow::anyhow!(
                 "Failed to register client: {} - {}",
                 status,
@@ -171,7 +178,9 @@ impl OAuthFlow {
             ));
         }
 
-        let registration_response: ClientRegistrationResponse = resp.json().await?;
+        let response_text = resp.text().await?;
+        tracing::info!("Registration response body: {}", response_text);
+        let registration_response: ClientRegistrationResponse = serde_json::from_str(&response_text)?;
 
         tracing::info!(
             "Client registered successfully with ID: {}",
@@ -221,15 +230,26 @@ impl OAuthFlow {
             .send()
             .await?;
 
+        let status = resp.status();
+        let response_headers: Vec<(String, String)> = resp.headers().iter()
+            .map(|(k, v)| (k.to_string(), v.to_str().unwrap_or("<invalid utf8>").to_string()))
+            .collect();
+        tracing::info!("Token exchange response status: {}", status);
+        tracing::info!("Token exchange response headers: {:?}", response_headers);
+
         if !resp.status().is_success() {
             let err_text = resp.text().await?;
+            tracing::error!("Token exchange failed with status {}: {}", status, err_text);
             return Err(anyhow::anyhow!(
                 "Failed to exchange code for token: {}",
                 err_text
             ));
         }
 
-        let token_response: Value = resp.json().await?;
+        let response_text = resp.text().await?;
+        tracing::info!("Token response body: {}", response_text);
+        let token_response: Value = serde_json::from_str(&response_text)?;
+        tracing::info!("Parsed token response: {:?}", token_response);
 
         let access_token = token_response
             .get("access_token")
@@ -347,34 +367,62 @@ async fn get_oauth_endpoints(
     for path in discovery_paths {
         match base_url.join(path) {
             Ok(discovery_url) => {
-                tracing::debug!("Trying OAuth discovery at: {}", discovery_url);
+                tracing::info!("Trying OAuth discovery at: {}", discovery_url);
 
                 match client.get(discovery_url.clone()).send().await {
                     Ok(resp) if resp.status().is_success() => {
-                        match resp.json::<Value>().await {
-                            Ok(oidc_config) => {
-                                // Try to parse the OAuth configuration
-                                match parse_oauth_config(oidc_config) {
-                                    Ok(endpoints) => {
-                                        tracing::info!(
-                                            "Successfully discovered OAuth endpoints at: {}",
-                                            discovery_url
-                                        );
-                                        return Ok(endpoints);
+                        let status = resp.status();
+                        let response_headers: Vec<(String, String)> = resp.headers().iter()
+                            .map(|(k, v)| (k.to_string(), v.to_str().unwrap_or("<invalid utf8>").to_string()))
+                            .collect();
+                        tracing::info!("Received successful response from {} with status: {}", discovery_url, status);
+                        tracing::info!("Response headers from {}: {:?}", discovery_url, response_headers);
+                        
+                        match resp.text().await {
+                            Ok(response_body) => {
+                                tracing::info!("Raw response body from {}: {}", discovery_url, response_body);
+                                match serde_json::from_str::<Value>(&response_body) {
+                                    Ok(oidc_config) => {
+                                        tracing::info!("Successfully parsed OAuth discovery JSON from {}: {:?}", discovery_url, oidc_config);
+                                        // Try to parse the OAuth configuration
+                                        match parse_oauth_config(oidc_config) {
+                                            Ok(endpoints) => {
+                                                tracing::info!(
+                                                    "Successfully discovered OAuth endpoints at: {}",
+                                                    discovery_url
+                                                );
+                                                tracing::info!("Authorization endpoint: {}", endpoints.authorization_endpoint);
+                                                tracing::info!("Token endpoint: {}", endpoints.token_endpoint);
+                                                if let Some(ref reg_ep) = endpoints.registration_endpoint {
+                                                    tracing::info!("Registration endpoint: {}", reg_ep);
+                                                }
+                                                return Ok(endpoints);
+                                            }
+                                            Err(e) => {
+                                                tracing::warn!(
+                                                    "Invalid OAuth config at {}: {}. Response was: {}",
+                                                    discovery_url,
+                                                    e,
+                                                    response_body
+                                                );
+                                                last_error = Some(e);
+                                            }
+                                        }
                                     }
                                     Err(e) => {
-                                        tracing::debug!(
-                                            "Invalid OAuth config at {}: {}",
+                                        tracing::warn!(
+                                            "Failed to parse JSON response from {}: {}. Raw response was: {}",
                                             discovery_url,
-                                            e
+                                            e,
+                                            response_body
                                         );
-                                        last_error = Some(e);
+                                        last_error = Some(e.into());
                                     }
                                 }
                             }
                             Err(e) => {
-                                tracing::debug!(
-                                    "Failed to parse JSON from {}: {}",
+                                tracing::warn!(
+                                    "Failed to read response body from {}: {}",
                                     discovery_url,
                                     e
                                 );
@@ -383,16 +431,29 @@ async fn get_oauth_endpoints(
                         }
                     }
                     Ok(resp) => {
-                        tracing::debug!("HTTP {} from {}", resp.status(), discovery_url);
+                        let status = resp.status();
+                        let response_headers: Vec<(String, String)> = resp.headers().iter()
+                            .map(|(k, v)| (k.to_string(), v.to_str().unwrap_or("<invalid utf8>").to_string()))
+                            .collect();
+                        tracing::info!("HTTP {} from {} (not successful). Headers: {:?}", status, discovery_url, response_headers);
+                        
+                        match resp.text().await {
+                            Ok(error_body) => {
+                                tracing::info!("Error response body from {}: {}", discovery_url, error_body);
+                            }
+                            Err(e) => {
+                                tracing::info!("Could not read error response body from {}: {}", discovery_url, e);
+                            }
+                        }
                     }
                     Err(e) => {
-                        tracing::debug!("Request failed to {}: {}", discovery_url, e);
+                        tracing::info!("Network request failed to {}: {}", discovery_url, e);
                         last_error = Some(e.into());
                     }
                 }
             }
             Err(e) => {
-                tracing::debug!("Invalid discovery URL {}{}: {}", host, path, e);
+                tracing::warn!("Invalid discovery URL {}{}: {}", host, path, e);
             }
         }
     }

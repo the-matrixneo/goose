@@ -658,6 +658,10 @@ impl Agent {
     }
 
     pub async fn list_tools(&self, extension_name: Option<String>) -> Vec<Tool> {
+        tracing::info!("🚀 Agent::list_tools called with extension_name: {:?}", extension_name);
+        let calling_context = std::backtrace::Backtrace::capture();
+        tracing::info!("📋 Call stack for Agent::list_tools:\n{}", calling_context);
+        
         let extension_manager = self.extension_manager.read().await;
         let mut prefixed_tools = extension_manager
             .get_prefixed_tools(extension_name.clone())
@@ -833,7 +837,73 @@ impl Agent {
             config,
         } = context;
         let reply_span = tracing::Span::current();
+<<<<<<< Updated upstream
         self.reset_retry_attempts().await;
+||||||| Stash base
+
+        // Load settings from config
+        let config = Config::global();
+
+        // Setup tools and prompt
+        let (mut tools, mut toolshim_tools, mut system_prompt) =
+            self.prepare_tools_and_prompt().await?;
+
+        // Get goose_mode from config, but override with execution_mode if provided in session config
+        let mut goose_mode = config.get_param("GOOSE_MODE").unwrap_or("auto".to_string());
+
+        // If this is a scheduled job with an execution_mode, override the goose_mode
+        if let Some(session_config) = &session {
+            if let Some(execution_mode) = &session_config.execution_mode {
+                // Map "foreground" to "auto" and "background" to "chat"
+                goose_mode = match execution_mode.as_str() {
+                    "foreground" => "auto".to_string(),
+                    "background" => "chat".to_string(),
+                    _ => goose_mode,
+                };
+                tracing::info!(
+                    "Using execution_mode '{}' which maps to goose_mode '{}'",
+                    execution_mode,
+                    goose_mode
+                );
+            }
+        }
+
+        let (tools_with_readonly_annotation, tools_without_annotation) =
+            Self::categorize_tools_by_annotation(&tools);
+=======
+
+        // Load settings from config
+        let config = Config::global();
+
+        // Setup tools and prompt
+        tracing::info!("🎯 Agent::reply starting - about to call prepare_tools_and_prompt() which will list all MCP tools");
+        let (mut tools, mut toolshim_tools, mut system_prompt) =
+            self.prepare_tools_and_prompt().await?;
+        tracing::info!("🎉 Agent::reply received {} tools and {} toolshim tools from prepare_tools_and_prompt", tools.len(), toolshim_tools.len());
+
+        // Get goose_mode from config, but override with execution_mode if provided in session config
+        let mut goose_mode = config.get_param("GOOSE_MODE").unwrap_or("auto".to_string());
+
+        // If this is a scheduled job with an execution_mode, override the goose_mode
+        if let Some(session_config) = &session {
+            if let Some(execution_mode) = &session_config.execution_mode {
+                // Map "foreground" to "auto" and "background" to "chat"
+                goose_mode = match execution_mode.as_str() {
+                    "foreground" => "auto".to_string(),
+                    "background" => "chat".to_string(),
+                    _ => goose_mode,
+                };
+                tracing::info!(
+                    "Using execution_mode '{}' which maps to goose_mode '{}'",
+                    execution_mode,
+                    goose_mode
+                );
+            }
+        }
+
+        let (tools_with_readonly_annotation, tools_without_annotation) =
+            Self::categorize_tools_by_annotation(&tools);
+>>>>>>> Stashed changes
 
         if let Some(content) = messages
             .last()

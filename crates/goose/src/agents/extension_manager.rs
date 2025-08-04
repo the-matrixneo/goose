@@ -441,6 +441,9 @@ impl ExtensionManager {
         &self,
         extension_name: Option<String>,
     ) -> ExtensionResult<Vec<Tool>> {
+        tracing::info!("🔧 ExtensionManager::get_prefixed_tools called with extension_name: {:?}", extension_name);
+        let calling_context = std::backtrace::Backtrace::capture();
+        tracing::info!("📋 Call stack for ExtensionManager::get_prefixed_tools:\n{}", calling_context);
         // Filter clients based on the provided extension_name or include all if None
         let filtered_clients = self.clients.iter().filter(|(name, _)| {
             if let Some(ref name_filter) = extension_name {
@@ -455,9 +458,12 @@ impl ExtensionManager {
             let client = client.clone();
 
             task::spawn(async move {
+                tracing::info!("📞 About to call list_tools() on MCP client for extension: {}", name);
                 let mut tools = Vec::new();
                 let client_guard = client.lock().await;
+                tracing::info!("🔒 Acquired client lock for extension: {}, calling client_guard.list_tools(None)", name);
                 let mut client_tools = client_guard.list_tools(None).await?;
+                tracing::info!("✅ Received {} tools from MCP extension: {}", client_tools.tools.len(), name);
 
                 loop {
                     for tool in client_tools.tools {
