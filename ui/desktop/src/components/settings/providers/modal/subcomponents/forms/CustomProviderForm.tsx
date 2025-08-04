@@ -3,6 +3,7 @@ import { Input } from '../../../../../ui/input';
 import { Select } from '../../../../../ui/Select';
 import { Button } from '../../../../../ui/button';
 import { SecureStorageNotice } from '../SecureStorageNotice';
+import { Checkbox } from '../../../../../ui/checkbox';
 
 interface CustomProviderFormProps {
   onSubmit: (data: {
@@ -21,7 +22,17 @@ export default function CustomProviderForm({ onSubmit, onCancel }: CustomProvide
   const [apiUrl, setApiUrl] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [models, setModels] = useState('');
+  const [isLocalModel, setIsLocalModel] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+
+  const handleLocalModels = (checked: boolean) => {
+    setIsLocalModel(checked);
+    if (checked) {
+      setApiKey('notrequired');
+    } else {
+      setApiKey('');
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,7 +40,7 @@ export default function CustomProviderForm({ onSubmit, onCancel }: CustomProvide
     const errors: Record<string, string> = {};
     if (!displayName) errors.displayName = 'Display name is required';
     if (!apiUrl) errors.apiUrl = 'API URL is required';
-    if (!apiKey) errors.apiKey = 'API key is required';
+    if (!isLocalModel && !apiKey) errors.apiKey = 'API key is required';
     if (!models) errors.models = 'At least one model is required';
 
     if (Object.keys(errors).length > 0) {
@@ -112,7 +123,7 @@ export default function CustomProviderForm({ onSubmit, onCancel }: CustomProvide
       <div>
         <label className="block text-sm font-medium text-white mb-1">
           API Key
-          <span className="text-red-500 ml-1">*</span>
+          {!isLocalModel && <span className="text-red-500 ml-1">*</span>}
         </label>
         <Input
           type="password"
@@ -120,10 +131,21 @@ export default function CustomProviderForm({ onSubmit, onCancel }: CustomProvide
           onChange={(e) => setApiKey(e.target.value)}
           placeholder="Your API key"
           className={validationErrors.apiKey ? 'border-red-500' : ''}
+          disabled={isLocalModel}
         />
         {validationErrors.apiKey && (
           <p className="text-red-500 text-sm mt-1">{validationErrors.apiKey}</p>
         )}
+
+        <div className="flex items-center space-x-2 mt-2">
+          <Checkbox id="local-model" checked={isLocalModel} onCheckedChange={handleLocalModels} />
+          <label
+            htmlFor="local-model"
+            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-gray-400"
+          >
+            This is a local model (no auth required)
+          </label>
+        </div>
       </div>
 
       <div>
