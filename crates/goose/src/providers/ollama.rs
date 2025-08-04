@@ -54,9 +54,6 @@ impl OllamaProvider {
     }
 
     pub fn from_custom_config(model: ModelConfig, config: CustomProviderConfig) -> Result<Self> {
-        use reqwest::Client;
-        use std::time::Duration;
-
         let timeout = Duration::from_secs(config.timeout_seconds.unwrap_or(OLLAMA_TIMEOUT));
         let client = Client::builder().timeout(timeout).build()?;
 

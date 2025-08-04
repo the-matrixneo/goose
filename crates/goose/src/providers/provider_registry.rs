@@ -5,7 +5,7 @@ use std::sync::Arc;
 use super::base::{Provider, ProviderMetadata};
 use crate::model::ModelConfig;
 
-type ProviderConstructor = fn(ModelConfig) -> Result<Arc<dyn Provider>>;
+type ProviderConstructor = Box<dyn Fn(ModelConfig) -> Result<Arc<dyn Provider>> + Send + Sync>;
 
 struct ProviderEntry {
     metadata: ProviderMetadata,
@@ -34,7 +34,7 @@ impl ProviderRegistry {
             name,
             ProviderEntry {
                 metadata,
-                constructor: move |model| Ok(Arc::new(constructor(model)?)),
+                constructor: Box::new(move |model| Ok(Arc::new(constructor(model)?))),
             },
         );
     }
