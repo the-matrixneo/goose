@@ -23,9 +23,10 @@ impl ProviderRegistry {
         }
     }
 
-    pub fn register<P>(&mut self, constructor: fn(ModelConfig) -> Result<P>)
+    pub fn register<P, F>(&mut self, constructor: F)
     where
         P: Provider + 'static,
+        F: Fn(ModelConfig) -> Result<P> + Send + Sync + 'static,
     {
         let metadata = P::metadata();
         let name = metadata.name.clone();

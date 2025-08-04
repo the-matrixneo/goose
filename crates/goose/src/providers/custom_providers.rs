@@ -15,7 +15,7 @@ pub enum ProviderEngine {
     Ollama,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CustomProviderConfig {
     pub name: String,
     pub engine: ProviderEngine,
@@ -57,12 +57,12 @@ pub fn register_custom_providers(registry: &mut ProviderRegistry, dir: &Path) ->
         match config.engine {
             ProviderEngine::OpenAI => {
                 registry.register(move |model: ModelConfig| {
-                    OpenAiProvider::from_custom_config(model, config)
+                    OpenAiProvider::from_custom_config(model, config.clone())
                 });
             }
             ProviderEngine::Ollama => {
                 registry.register(move |model: ModelConfig| {
-                    OllamaProvider::from_custom_config(model, config)
+                    OllamaProvider::from_custom_config(model, config.clone())
                 });
             }
         }
