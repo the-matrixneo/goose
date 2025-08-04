@@ -658,40 +658,113 @@ impl Agent {
     }
 
     pub async fn list_tools(&self, extension_name: Option<String>) -> Vec<Tool> {
+        let start_time = std::time::Instant::now();
+        
+        // Log call stack to track what triggered this agent list_tools call
+        let backtrace = std::backtrace::Backtrace::capture();
+        tracing::info!("📋 [AGENT] list_tools called with extension_name: {:?}", extension_name);
+        tracing::info!("📋 [AGENT] Call stack for agent list_tools:\n{}", backtrace);
+        
+        let extension_manager_start = std::time::Instant::now();
         let extension_manager = self.extension_manager.read().await;
+        let extension_manager_lock_time = extension_manager_start.elapsed();
+        
+        if extension_manager_lock_time.as_millis() > 5 {
+            tracing::warn!("⚠️ [AGENT] Extension manager lock took {}ms", extension_manager_lock_time.as_millis());
+        }
+        
+        tracing::info!("📋 [AGENT] Getting prefixed tools from extension manager...");
+        let mcp_tools_start = std::time::Instant::now();
         let mut prefixed_tools = extension_manager
             .get_prefixed_tools(extension_name.clone())
             .await
             .unwrap_or_default();
+        let mcp_tools_time = mcp_tools_start.elapsed();
+        
+        tracing::info!("📋 [AGENT] Retrieved {} MCP tools in {}ms", 
+                      prefixed_tools.len(), mcp_tools_time.as_millis());
 
+        let mut platform_tools_added = 0;
         if extension_name.is_none() || extension_name.as_deref() == Some("platform") {
+            tracing::info!("📋 [AGENT] Adding platform tools...");
+            let platform_start = std::time::Instant::now();
+            
             // Add platform tools
-            prefixed_tools.extend([
+            let platform_tools_to_add = [
                 platform_tools::search_available_extensions_tool(),
                 platform_tools::manage_extensions_tool(),
                 platform_tools::manage_schedule_tool(),
-            ]);
+            ];
+            platform_tools_added += platform_tools_to_add.len();
+            prefixed_tools.extend(platform_tools_to_add);
 
             // Dynamic task tool
             prefixed_tools.push(create_dynamic_task_tool());
+            platform_tools_added += 1;
 
             // Add resource tools if supported
             if extension_manager.supports_resources() {
-                prefixed_tools.extend([
+                let resource_tools = [
                     platform_tools::read_resource_tool(),
                     platform_tools::list_resources_tool(),
-                ]);
+                ];
+                platform_tools_added += resource_tools.len();
+                prefixed_tools.extend(resource_tools);
+                tracing::info!("📋 [AGENT] Added resource tools (resources supported)");
+            } else {
+                tracing::info!("📋 [AGENT] Skipped resource tools (resources not supported)");
             }
+            
+            let platform_time = platform_start.elapsed();
+            tracing::info!("📋 [AGENT] Added {} platform tools in {}ms", 
+                          platform_tools_added, platform_time.as_millis());
         }
 
+        let mut additional_tools_added = 0;
         if extension_name.is_none() {
+            tracing::info!("📋 [AGENT] Adding sub-recipe and final output tools...");
+            let additional_start = std::time::Instant::now();
+            
             let sub_recipe_manager = self.sub_recipe_manager.lock().await;
+            let sub_recipe_count = sub_recipe_manager.sub_recipe_tools.len();
             prefixed_tools.extend(sub_recipe_manager.sub_recipe_tools.values().cloned());
+            additional_tools_added += sub_recipe_count;
+            
+            tracing::info!("📋 [AGENT] Added {} sub-recipe tools", sub_recipe_count);
 
             if let Some(final_output_tool) = self.final_output_tool.lock().await.as_ref() {
                 prefixed_tools.push(final_output_tool.tool());
+                additional_tools_added += 1;
+                tracing::info!("📋 [AGENT] Added final output tool");
+            } else {
+                tracing::info!("📋 [AGENT] No final output tool to add");
             }
+            
             prefixed_tools.push(subagent_execute_task_tool::create_subagent_execute_task_tool());
+            additional_tools_added += 1;
+            
+            let additional_time = additional_start.elapsed();
+            tracing::info!("📋 [AGENT] Added {} additional tools in {}ms", 
+                          additional_tools_added, additional_time.as_millis());
+        }
+        
+        let total_time = start_time.elapsed();
+        let total_tools = prefixed_tools.len();
+        let mcp_tools_count = total_tools - platform_tools_added - additional_tools_added;
+        
+        tracing::info!("📋 [AGENT] ✅ list_tools completed in {}ms: {} total tools ({} MCP + {} platform + {} additional)", 
+                      total_time.as_millis(), total_tools, mcp_tools_count, platform_tools_added, additional_tools_added);
+        
+        // Log tool names for debugging (only first few to avoid spam)
+        if total_tools > 0 {
+            let tool_names: Vec<String> = prefixed_tools.iter()
+                .take(10)
+                .map(|tool| tool.name.to_string())
+                .collect();
+            let show_count = std::cmp::min(10, total_tools);
+            tracing::info!("📋 [AGENT] First {} tool names: {:?}{}", 
+                          show_count, tool_names, 
+                          if total_tools > 10 { " ..." } else { "" });
         }
 
         prefixed_tools

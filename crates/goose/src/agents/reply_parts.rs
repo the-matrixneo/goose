@@ -34,31 +34,69 @@ async fn toolshim_postprocess(
 impl Agent {
     /// Prepares tools and system prompt for a provider request
     pub async fn prepare_tools_and_prompt(&self) -> anyhow::Result<(Vec<Tool>, Vec<Tool>, String)> {
+        let start_time = std::time::Instant::now();
+        let backtrace = std::backtrace::Backtrace::force_capture();
+        let caller_info = backtrace
+            .to_string()
+            .lines()
+            .filter(|line| line.contains("goose") && !line.contains("prepare_tools_and_prompt"))
+            .take(3)
+            .collect::<Vec<_>>()
+            .join(" -> ");
+        
+        tracing::info!("🔍 [PREPARE] Starting tool preparation and prompt building");
+        tracing::info!("🔍 [PREPARE] Called from: {}", if caller_info.is_empty() { "unknown" } else { &caller_info });
+
         // Get tool selection strategy from config
+        let strategy_start = std::time::Instant::now();
         let tool_selection_strategy = self
             .tool_route_manager
             .get_router_tool_selection_strategy()
             .await;
+        let strategy_time = strategy_start.elapsed();
+        
+        tracing::info!("🔍 [PREPARE] Tool selection strategy determined in {}ms: {:?}", 
+                      strategy_time.as_millis(), tool_selection_strategy);
 
         // Get tools from extension manager
+        let tools_start = std::time::Instant::now();
         let mut tools = match tool_selection_strategy {
             Some(RouterToolSelectionStrategy::Vector) => {
+                tracing::info!("🔍 [PREPARE] Using Vector tool selection strategy");
                 self.list_tools_for_router(Some(RouterToolSelectionStrategy::Vector))
                     .await
             }
             Some(RouterToolSelectionStrategy::Llm) => {
+                tracing::info!("🔍 [PREPARE] Using LLM tool selection strategy");
                 self.list_tools_for_router(Some(RouterToolSelectionStrategy::Llm))
                     .await
             }
-            _ => self.list_tools(None).await,
+            _ => {
+                tracing::info!("🔍 [PREPARE] Using default tool selection (no router)");
+                self.list_tools(None).await
+            }
         };
+        let tools_time = tools_start.elapsed();
+        let initial_tool_count = tools.len();
+        
+        tracing::info!("🔍 [PREPARE] Retrieved {} tools from extension manager in {}ms", 
+                      initial_tool_count, tools_time.as_millis());
+
         // Add frontend tools
+        let frontend_start = std::time::Instant::now();
         let frontend_tools = self.frontend_tools.lock().await;
+        let frontend_count = frontend_tools.len();
         for frontend_tool in frontend_tools.values() {
             tools.push(frontend_tool.tool.clone());
         }
+        drop(frontend_tools); // Release lock early
+        let frontend_time = frontend_start.elapsed();
+        
+        tracing::info!("🔍 [PREPARE] Added {} frontend tools in {}ms, total tools: {}", 
+                      frontend_count, frontend_time.as_millis(), tools.len());
 
         // Prepare system prompt
+        let prompt_start = std::time::Instant::now();
         let extension_manager = self.extension_manager.read().await;
         let extensions_info = extension_manager.get_extensions_info().await;
 
@@ -75,17 +113,38 @@ impl Agent {
             Some(model_name),
             tool_selection_strategy,
         );
+        drop(prompt_manager); // Release lock early
+        drop(extension_manager); // Release lock early
+        let prompt_time = prompt_start.elapsed();
+        
+        tracing::info!("🔍 [PREPARE] Built system prompt in {}ms, model: {}", 
+                      prompt_time.as_millis(), model_name);
 
         // Handle toolshim if enabled
+        let toolshim_start = std::time::Instant::now();
         let mut toolshim_tools = vec![];
         if model_config.toolshim {
+            tracing::info!("🔍 [PREPARE] Toolshim enabled - modifying system prompt and copying tools");
             // If tool interpretation is enabled, modify the system prompt
             system_prompt = modify_system_prompt_for_tool_json(&system_prompt, &tools);
             // Make a copy of tools before emptying
             toolshim_tools = tools.clone();
             // Empty the tools vector for provider completion
             tools = vec![];
+            tracing::info!("🔍 [PREPARE] Toolshim setup: {} tools moved to toolshim_tools, provider tools emptied", 
+                          toolshim_tools.len());
+        } else {
+            tracing::info!("🔍 [PREPARE] Toolshim disabled - using tools directly with provider");
         }
+        let toolshim_time = toolshim_start.elapsed();
+        
+        let total_time = start_time.elapsed();
+        tracing::info!("🔍 [PREPARE] ✅ Tool preparation completed in {}ms total", total_time.as_millis());
+        tracing::info!("🔍 [PREPARE] Final result: {} provider tools, {} toolshim tools, system_prompt length: {}", 
+                      tools.len(), toolshim_tools.len(), system_prompt.len());
+        tracing::info!("🔍 [PREPARE] Timing breakdown: strategy={}ms, tools={}ms, frontend={}ms, prompt={}ms, toolshim={}ms", 
+                      strategy_time.as_millis(), tools_time.as_millis(), frontend_time.as_millis(), 
+                      prompt_time.as_millis(), toolshim_time.as_millis());
 
         Ok((tools, toolshim_tools, system_prompt))
     }

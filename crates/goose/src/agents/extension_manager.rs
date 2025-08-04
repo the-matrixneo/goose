@@ -224,11 +224,12 @@ impl ExtensionManager {
                     );
                 }
                 let client = reqwest::Client::builder()
-                    .default_headers(default_headers)
+                    .default_headers(default_headers.clone())
                     .build()
                     .map_err(|_| {
                         ExtensionError::ConfigError("could not construct http client".to_string())
                     })?;
+                    
                 let transport = StreamableHttpClientTransport::with_client(
                     client,
                     StreamableHttpClientTransportConfig {
@@ -236,13 +237,121 @@ impl ExtensionManager {
                         ..Default::default()
                     },
                 );
-                let client = McpClient::connect(
+                
+                // Try initial connection
+                let client_result = McpClient::connect(
                     transport,
                     Duration::from_secs(
                         timeout.unwrap_or(crate::config::DEFAULT_EXTENSION_TIMEOUT),
                     ),
                 )
-                .await?;
+                .await;
+                
+                // Check if it's a 401 error and try OAuth authentication
+                let client = match client_result {
+                    Ok(client) => client,
+                    Err(error) => {
+                        let error_str = error.to_string();
+                        let error_debug = format!("{:?}", error);
+                        tracing::info!("🔧 [MCP] Initial connection failed: {}", error_str);
+                        tracing::info!("🔧 [MCP] Error details: {}", error_debug);
+                        
+                        // Check for 401 Unauthorized in multiple ways, plus known OAuth endpoints
+                        let is_401_error = error_str.contains("401") && error_str.contains("Unauthorized") ||
+                                          error_debug.contains("401") && error_debug.contains("Unauthorized") ||
+                                          error_str.contains("401 Unauthorized") ||
+                                          error_debug.contains("401 Unauthorized");
+                                          
+                        // Special case: For known OAuth-requiring endpoints that fail with ConnectionClosed,
+                        // attempt OAuth authentication as they likely need it
+                        let is_oauth_endpoint = uri.contains("mcp.notion.com") || 
+                                               uri.contains("notion.com") ||
+                                               uri.contains("oauth") ||
+                                               (uri.starts_with("https://") && 
+                                                (error_str.contains("ConnectionClosed") || error_str.contains("initialize response")));
+                        
+                        let should_try_oauth = is_401_error || 
+                                              (is_oauth_endpoint && 
+                                               (error_str.contains("ConnectionClosed") || 
+                                                error_str.contains("connection closed") ||
+                                                error_str.contains("initialize response") ||
+                                                error_str.contains("InitializeError")));
+                        
+                        if should_try_oauth {
+                            if is_401_error {
+                                tracing::info!("🔐 [AUTH] Detected 401 Unauthorized, attempting OAuth authentication for: {}", uri);
+                            } else {
+                                tracing::info!("🔐 [AUTH] OAuth endpoint failed with ConnectionClosed, attempting OAuth authentication for: {}", uri);
+                            }
+                            
+                            // Create OAuth config from MCP endpoint
+                            match mcp_client::ServiceConfig::from_mcp_endpoint(uri) {
+                                Ok(oauth_config) => {
+                                    tracing::info!("🔐 [AUTH] Created OAuth config for host: {}", oauth_config.oauth_host);
+                                    
+                                    // Attempt OAuth authentication
+                                    match mcp_client::authenticate_service(oauth_config, uri).await {
+                                        Ok(access_token) => {
+                                            tracing::info!("🔐 [AUTH] ✅ OAuth authentication successful, retrying connection with token");
+                                            
+                                            // Add Authorization header with the token
+                                            let mut oauth_headers = default_headers;
+                                            oauth_headers.insert(
+                                                HeaderName::from_static("authorization"),
+                                                format!("Bearer {}", access_token).parse().unwrap()
+                                            );
+                                            
+                                            let oauth_client = reqwest::Client::builder()
+                                                .default_headers(oauth_headers)
+                                                .build()
+                                                .map_err(|_| {
+                                                    ExtensionError::ConfigError("could not construct oauth http client".to_string())
+                                                })?;
+                                                
+                                            let oauth_transport = StreamableHttpClientTransport::with_client(
+                                                oauth_client,
+                                                StreamableHttpClientTransportConfig {
+                                                    uri: uri.clone().into(),
+                                                    ..Default::default()
+                                                },
+                                            );
+                                            
+                                            // Retry connection with OAuth token
+                                            McpClient::connect(
+                                                oauth_transport,
+                                                Duration::from_secs(
+                                                    timeout.unwrap_or(crate::config::DEFAULT_EXTENSION_TIMEOUT),
+                                                ),
+                                            )
+                                            .await?
+                                        }
+                                        Err(oauth_error) => {
+                                            tracing::error!("🔐 [AUTH] ❌ OAuth authentication failed: {}", oauth_error);
+                                            return Err(ExtensionError::ConfigError(format!(
+                                                "OAuth authentication failed for {}: {}", 
+                                                uri, oauth_error
+                                            )));
+                                        }
+                                    }
+                                }
+                                Err(config_error) => {
+                                    tracing::error!("🔐 [AUTH] ❌ Failed to create OAuth config: {}", config_error);
+                                    return Err(ExtensionError::ConfigError(format!(
+                                        "Failed to create OAuth config for {}: {}", 
+                                        uri, config_error
+                                    )));
+                                }
+                            }
+                        } else {
+                            tracing::warn!("🔧 [MCP] Error doesn't match OAuth patterns, not attempting OAuth");
+                            tracing::warn!("🔧 [MCP] URI: {}", uri);
+                            tracing::warn!("🔧 [MCP] Error string: '{}'", error_str);  
+                            tracing::warn!("🔧 [MCP] Error debug: '{}'", error_debug);
+                            tracing::warn!("🔧 [MCP] is_401_error: {}, is_oauth_endpoint: {}", is_401_error, is_oauth_endpoint);
+                            return Err(error.into());
+                        }
+                    }
+                };
                 Box::new(client)
             }
             ExtensionConfig::Stdio {
@@ -441,6 +550,16 @@ impl ExtensionManager {
         &self,
         extension_name: Option<String>,
     ) -> ExtensionResult<Vec<Tool>> {
+        let start_time = std::time::Instant::now();
+        
+        // Log call stack to track what triggered this MCP list_tools call
+        let backtrace = std::backtrace::Backtrace::capture();
+        tracing::info!("🔧 [MCP] get_prefixed_tools called with extension_name: {:?}", extension_name);
+        tracing::info!("🔧 [MCP] Call stack for MCP list_tools:\n{}", backtrace);
+        
+        let total_clients = self.clients.len();
+        tracing::info!("🔧 [MCP] Processing {} total MCP clients", total_clients);
+        
         // Filter clients based on the provided extension_name or include all if None
         let filtered_clients = self.clients.iter().filter(|(name, _)| {
             if let Some(ref name_filter) = extension_name {
@@ -449,20 +568,46 @@ impl ExtensionManager {
                 true
             }
         });
+        
+        let filtered_clients_vec: Vec<_> = filtered_clients.collect();
+        let filtered_count = filtered_clients_vec.len();
+        let client_names: Vec<String> = filtered_clients_vec.iter()
+            .map(|(name, _)| (*name).clone())
+            .collect();
+        
+        tracing::info!("🔧 [MCP] Filtered to {} clients: {:?}", filtered_count, client_names);
 
-        let client_futures = filtered_clients.map(|(name, client)| {
+        let client_futures = filtered_clients_vec.into_iter().map(|(name, client)| {
             let name = name.clone();
             let client = client.clone();
 
             task::spawn(async move {
+                let client_start = std::time::Instant::now();
+                tracing::info!("🔧 [MCP] Starting list_tools for client: {}", name);
+                
                 let mut tools = Vec::new();
+                let client_lock_start = std::time::Instant::now();
                 let client_guard = client.lock().await;
+                let client_lock_time = client_lock_start.elapsed();
+                
+                if client_lock_time.as_millis() > 10 {
+                    tracing::warn!("⚠️ [MCP] Client lock took {}ms for {}", client_lock_time.as_millis(), name);
+                }
+                
                 let mut client_tools = client_guard.list_tools(None).await?;
+                let mut page_count = 1;
+                let mut total_tools_for_client = 0;
 
                 loop {
+                    let tools_in_page = client_tools.tools.len();
+                    total_tools_for_client += tools_in_page;
+                    
+                    tracing::info!("🔧 [MCP] Client {} page {}: {} tools", name, page_count, tools_in_page);
+                    
                     for tool in client_tools.tools {
+                        let prefixed_name = format!("{}__{}", name, tool.name);
                         tools.push(Tool {
-                            name: format!("{}__{}", name, tool.name).into(),
+                            name: prefixed_name.into(),
                             description: tool.description,
                             input_schema: tool.input_schema,
                             annotations: tool.annotations,
@@ -474,25 +619,49 @@ impl ExtensionManager {
                         break;
                     }
 
+                    page_count += 1;
                     client_tools = client_guard.list_tools(client_tools.next_cursor).await?;
                 }
+                
+                let client_time = client_start.elapsed();
+                tracing::info!("🔧 [MCP] Completed list_tools for client {} in {}ms: {} total tools across {} pages", 
+                              name, client_time.as_millis(), total_tools_for_client, page_count);
 
                 Ok::<Vec<Tool>, ExtensionError>(tools)
             })
         });
 
         // Collect all results concurrently
+        let concurrent_start = std::time::Instant::now();
         let results = future::join_all(client_futures).await;
+        let concurrent_time = concurrent_start.elapsed();
+        
+        tracing::info!("🔧 [MCP] Concurrent list_tools completed in {}ms for {} clients", 
+                      concurrent_time.as_millis(), filtered_count);
 
         // Aggregate tools and handle errors
         let mut tools = Vec::new();
+        let mut successful_clients = 0;
         for result in results {
             match result {
-                Ok(Ok(client_tools)) => tools.extend(client_tools),
-                Ok(Err(err)) => return Err(err),
-                Err(join_err) => return Err(ExtensionError::from(join_err)),
+                Ok(Ok(client_tools)) => {
+                    tools.extend(client_tools);
+                    successful_clients += 1;
+                },
+                Ok(Err(err)) => {
+                    tracing::error!("🔧 [MCP] ❌ MCP client error: {}", err);
+                    return Err(err);
+                },
+                Err(join_err) => {
+                    tracing::error!("🔧 [MCP] ❌ Task join error: {}", join_err);
+                    return Err(ExtensionError::from(join_err));
+                },
             }
         }
+        
+        let total_time = start_time.elapsed();
+        tracing::info!("🔧 [MCP] ✅ get_prefixed_tools completed in {}ms: {} tools from {}/{} clients", 
+                      total_time.as_millis(), tools.len(), successful_clients, filtered_count);
 
         Ok(tools)
     }

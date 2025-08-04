@@ -21,7 +21,7 @@ struct TokenData {
     refresh_token: Option<String>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 struct ClientRegistrationRequest {
     redirect_uris: Vec<String>,
     token_endpoint_auth_method: String,
@@ -153,6 +153,10 @@ impl OAuthFlow {
 
         tracing::info!("Registering dynamic client with OAuth server...");
 
+        let registration_start = std::time::Instant::now();
+        tracing::info!("🔐 [AUTH] Starting client registration at: {}", registration_endpoint);
+        tracing::info!("🔐 [AUTH] Registration request: {:?}", registration_request);
+        
         let client = reqwest::Client::new();
         let resp = client
             .post(registration_endpoint)
@@ -161,9 +165,13 @@ impl OAuthFlow {
             .send()
             .await?;
 
+        let registration_time = registration_start.elapsed();
+        
         if !resp.status().is_success() {
             let status = resp.status();
             let err_text = resp.text().await?;
+            tracing::error!("🔐 [AUTH] ❌ Client registration failed in {}ms: {} - {}", 
+                           registration_time.as_millis(), status, err_text);
             return Err(anyhow::anyhow!(
                 "Failed to register client: {} - {}",
                 status,
@@ -174,8 +182,8 @@ impl OAuthFlow {
         let registration_response: ClientRegistrationResponse = resp.json().await?;
 
         tracing::info!(
-            "Client registered successfully with ID: {}",
-            registration_response.client_id
+            "🔐 [AUTH] ✅ Client registered successfully in {}ms with ID: {}",
+            registration_time.as_millis(), registration_response.client_id
         );
         Ok(registration_response.client_id)
     }
@@ -213,6 +221,12 @@ impl OAuthFlow {
             ("resource", resource), // RFC 8707 Resource Parameter
         ];
 
+        let token_start = std::time::Instant::now();
+        tracing::info!("🔐 [AUTH] Starting token exchange at: {}", self.endpoints.token_endpoint);
+        tracing::info!("🔐 [AUTH] Token request params: client_id={}, resource={}", 
+                      params.iter().find(|(k, _)| *k == "client_id").map(|(_, v)| *v).unwrap_or("none"),
+                      params.iter().find(|(k, _)| *k == "resource").map(|(_, v)| *v).unwrap_or("none"));
+        
         let client = reqwest::Client::new();
         let resp = client
             .post(&self.endpoints.token_endpoint)
@@ -221,8 +235,12 @@ impl OAuthFlow {
             .send()
             .await?;
 
+        let token_time = token_start.elapsed();
+        
         if !resp.status().is_success() {
             let err_text = resp.text().await?;
+            tracing::error!("🔐 [AUTH] ❌ Token exchange failed in {}ms: {}", 
+                           token_time.as_millis(), err_text);
             return Err(anyhow::anyhow!(
                 "Failed to exchange code for token: {}",
                 err_text
@@ -230,6 +248,7 @@ impl OAuthFlow {
         }
 
         let token_response: Value = resp.json().await?;
+        tracing::info!("🔐 [AUTH] Token response received in {}ms", token_time.as_millis());
 
         let access_token = token_response
             .get("access_token")
@@ -241,6 +260,9 @@ impl OAuthFlow {
             .get("refresh_token")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
+        
+        tracing::info!("🔐 [AUTH] ✅ Token exchange successful in {}ms, access_token length: {}, has_refresh_token: {}", 
+                      token_time.as_millis(), access_token.len(), refresh_token.is_some());
 
         Ok(TokenData {
             access_token,
@@ -344,55 +366,72 @@ async fn get_oauth_endpoints(
     let mut last_error = None;
 
     // Try each discovery path until one works
-    for path in discovery_paths {
+    let discovery_start = std::time::Instant::now();
+    tracing::info!("🔐 [AUTH] Starting OAuth discovery for host: {}", host);
+    tracing::info!("🔐 [AUTH] Trying {} discovery paths: {:?}", discovery_paths.len(), discovery_paths);
+    
+    for (attempt, path) in discovery_paths.iter().enumerate() {
+        let path_start = std::time::Instant::now();
         match base_url.join(path) {
             Ok(discovery_url) => {
-                tracing::debug!("Trying OAuth discovery at: {}", discovery_url);
+                tracing::info!("🔐 [AUTH] Attempt {}/{}: Trying OAuth discovery at: {}", 
+                              attempt + 1, discovery_paths.len(), discovery_url);
 
                 match client.get(discovery_url.clone()).send().await {
                     Ok(resp) if resp.status().is_success() => {
+                        let response_time = path_start.elapsed();
+                        tracing::info!("🔐 [AUTH] Success response from {} in {}ms, status: {}", 
+                                      discovery_url, response_time.as_millis(), resp.status());
+                        
                         match resp.json::<Value>().await {
                             Ok(oidc_config) => {
+                                tracing::info!("🔐 [AUTH] Parsed OAuth config JSON from {}", discovery_url);
+                                
                                 // Try to parse the OAuth configuration
-                                match parse_oauth_config(oidc_config) {
+                                match parse_oauth_config(oidc_config.clone()) {
                                     Ok(endpoints) => {
+                                        let total_time = discovery_start.elapsed();
                                         tracing::info!(
-                                            "Successfully discovered OAuth endpoints at: {}",
-                                            discovery_url
+                                            "🔐 [AUTH] ✅ Successfully discovered OAuth endpoints at {} in {}ms total (attempt {}/{})",
+                                            discovery_url, total_time.as_millis(), attempt + 1, discovery_paths.len()
                                         );
+                                        tracing::info!("🔐 [AUTH] Endpoints: auth={}, token={}", 
+                                                      endpoints.authorization_endpoint, endpoints.token_endpoint);
                                         return Ok(endpoints);
                                     }
                                     Err(e) => {
-                                        tracing::debug!(
-                                            "Invalid OAuth config at {}: {}",
-                                            discovery_url,
-                                            e
+                                        tracing::warn!(
+                                            "🔐 [AUTH] ❌ Invalid OAuth config at {} ({}ms): {}. Config: {:?}",
+                                            discovery_url, path_start.elapsed().as_millis(), e, oidc_config
                                         );
                                         last_error = Some(e);
                                     }
                                 }
                             }
                             Err(e) => {
-                                tracing::debug!(
-                                    "Failed to parse JSON from {}: {}",
-                                    discovery_url,
-                                    e
+                                tracing::warn!(
+                                    "🔐 [AUTH] ❌ Failed to parse JSON from {} ({}ms): {}",
+                                    discovery_url, path_start.elapsed().as_millis(), e
                                 );
                                 last_error = Some(e.into());
                             }
                         }
                     }
                     Ok(resp) => {
-                        tracing::debug!("HTTP {} from {}", resp.status(), discovery_url);
+                        let response_time = path_start.elapsed();
+                        tracing::warn!("🔐 [AUTH] ❌ HTTP {} from {} in {}ms", 
+                                      resp.status(), discovery_url, response_time.as_millis());
                     }
                     Err(e) => {
-                        tracing::debug!("Request failed to {}: {}", discovery_url, e);
+                        let response_time = path_start.elapsed();
+                        tracing::warn!("🔐 [AUTH] ❌ Request failed to {} in {}ms: {}", 
+                                      discovery_url, response_time.as_millis(), e);
                         last_error = Some(e.into());
                     }
                 }
             }
             Err(e) => {
-                tracing::debug!("Invalid discovery URL {}{}: {}", host, path, e);
+                tracing::warn!("🔐 [AUTH] ❌ Invalid discovery URL {}{}: {}", host, path, e);
             }
         }
     }

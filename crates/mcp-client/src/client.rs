@@ -204,10 +204,19 @@ impl McpClientTrait for McpClient {
     }
 
     async fn list_tools(&self, cursor: Option<String>) -> Result<ListToolsResult, Error> {
-        let res = self
-            .client
-            .lock()
-            .await
+        let start_time = std::time::Instant::now();
+        tracing::info!("📤 [REQUEST] Starting tools/list request with cursor: {:?}", cursor);
+        
+        let client_lock_start = std::time::Instant::now();
+        let client = self.client.lock().await;
+        let client_lock_time = client_lock_start.elapsed();
+        
+        if client_lock_time.as_millis() > 10 {
+            tracing::warn!("⚠️ [REQUEST] Client lock took {}ms for tools/list", client_lock_time.as_millis());
+        }
+        
+        let request_start = std::time::Instant::now();
+        let res = client
             .send_request_with_option(
                 ClientRequest::ListToolsRequest(ListToolsRequest {
                     params: Some(PaginatedRequestParam { cursor }),
@@ -219,8 +228,30 @@ impl McpClientTrait for McpClient {
             .await?
             .await_response()
             .await?;
+        
+        let request_time = request_start.elapsed();
+        let total_time = start_time.elapsed();
+        
+        tracing::info!("📥 [RESPONSE] Received tools/list response in {}ms (request: {}ms, total: {}ms)", 
+                      request_time.as_millis(), request_time.as_millis(), total_time.as_millis());
+        
         match res {
-            ServerResult::ListToolsResult(result) => Ok(result),
+            ServerResult::ListToolsResult(result) => {
+                // Special logging for tools/list responses to debug empty arrays
+                let tool_count = result.tools.len();
+                tracing::info!("🔧 [RESPONSE] tools/list returned {} tools", tool_count);
+                
+                if tool_count == 0 {
+                    tracing::warn!("⚠️ [RESPONSE] tools/list returned EMPTY array! Full result: {:?}", result);
+                } else {
+                    let tool_names: Vec<String> = result.tools.iter()
+                        .map(|tool| tool.name.to_string())
+                        .collect();
+                    tracing::info!("🔧 [RESPONSE] tools/list tool names: {:?}", tool_names);
+                }
+                
+                Ok(result)
+            },
             _ => Err(ServiceError::UnexpectedResponse),
         }
     }
