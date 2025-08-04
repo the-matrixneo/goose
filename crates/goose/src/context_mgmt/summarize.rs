@@ -1,6 +1,7 @@
 use crate::message::Message;
 use crate::prompt_template::render_global_file;
 use crate::providers::base::Provider;
+use crate::token_counter::create_async_token_counter;
 use anyhow::Result;
 use rmcp::model::Role;
 use serde::Serialize;
@@ -47,10 +48,27 @@ pub async fn summarize_messages(
     // Set role to user as it will be used in following conversation as user content
     response.role = Role::User;
 
-    // Get the token count from the provider usage for the output tokens
-    // For now, we'll use the output tokens as an approximation for the summary token count
-    let input_tokens = provider_usage.usage.input_tokens.unwrap_or(0) as usize;
-    let output_tokens = provider_usage.usage.output_tokens.unwrap_or(0) as usize;
+    // Get the token count from the provider usage, with token counter as fallback
+    let (input_tokens, output_tokens) = if provider_usage.usage.input_tokens.is_some() && provider_usage.usage.output_tokens.is_some() {
+        // Use provider usage if available
+        (
+            provider_usage.usage.input_tokens.unwrap() as usize,
+            provider_usage.usage.output_tokens.unwrap() as usize,
+        )
+    } else {
+        // Fallback to token counter when provider usage is not available
+        let token_counter = create_async_token_counter().await
+            .map_err(|e| anyhow::anyhow!("Failed to create token counter: {}", e))?;
+        
+        let input_count = token_counter.count_chat_tokens(&system_prompt, &summarization_request, &[]);
+        let response_text = response.content.iter()
+            .map(|c| format!("{}", c))
+            .collect::<Vec<_>>()
+            .join(" ");
+        let output_count = token_counter.count_tokens(&response_text);
+        
+        (input_count, output_count)
+    };
 
     Ok(Some((response, input_tokens, output_tokens)))
 }

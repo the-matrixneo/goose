@@ -53,11 +53,6 @@ impl Agent {
         messages: &[Message], // last message is a user msg that led to assistant message with_context_length_exceeded
     ) -> Result<(Vec<Message>, Vec<usize>), anyhow::Error> {
         let provider = self.provider().await?;
-        let _token_counter = create_async_token_counter()
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to create token counter: {}", e))?;
-        let _target_context_limit = estimate_target_context_limit(provider.clone());
-
         let summary_result = summarize_messages(provider.clone(), messages).await?;
 
         let (mut new_messages, mut new_token_counts) = match summary_result {
