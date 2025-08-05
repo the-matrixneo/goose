@@ -247,7 +247,7 @@ async fn update_agent_provider(
     let agent = state
         .get_agent()
         .await
-        .map_err(|_| StatusCode::PRECONDITION_FAILED)?;
+        .map_err(|_e| StatusCode::PRECONDITION_FAILED)?;
 
     let config = Config::global();
     let model = payload.model.unwrap_or_else(|| {
@@ -255,12 +255,15 @@ async fn update_agent_provider(
             .get_param("GOOSE_MODEL")
             .expect("Did not find a model on payload or in env to update provider with")
     });
-    let model_config = ModelConfig::new(&model).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    let new_provider = create(&payload.provider, model_config).unwrap();
+
+    let model_config = ModelConfig::new(&model).map_err(|_e| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let new_provider =
+        create(&payload.provider, model_config).map_err(|_e| StatusCode::INTERNAL_SERVER_ERROR)?;
+
     agent
         .update_provider(new_provider)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|_e| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     Ok(StatusCode::OK)
 }

@@ -17,6 +17,7 @@ use super::formats::anthropic::{
     create_request, get_usage, response_to_message, response_to_streaming_message,
 };
 use super::utils::{emit_debug_trace, get_model};
+use crate::config::custom_providers::CustomProviderConfig;
 use crate::impl_provider_default;
 use crate::message::Message;
 use crate::model::ModelConfig;
@@ -64,6 +65,23 @@ impl AnthropicProvider {
         Ok(Self {
             client,
             host,
+            api_key,
+            model,
+        })
+    }
+
+    pub fn from_custom_config(model: ModelConfig, config: CustomProviderConfig) -> Result<Self> {
+        let timeout = Duration::from_secs(config.timeout_seconds.unwrap_or(600));
+        let client = Client::builder().timeout(timeout).build()?;
+
+        let global_config = crate::config::Config::global();
+        let api_key: String = global_config
+            .get_secret(&config.api_key_env)
+            .map_err(|_| anyhow::anyhow!("Missing API key: {}", config.api_key_env))?;
+
+        Ok(Self {
+            client,
+            host: config.base_url,
             api_key,
             model,
         })

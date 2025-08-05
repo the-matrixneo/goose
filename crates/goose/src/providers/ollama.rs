@@ -1,6 +1,7 @@
 use super::base::{ConfigKey, Provider, ProviderMetadata, ProviderUsage, Usage};
 use super::errors::ProviderError;
 use super::utils::{get_model, handle_response_openai_compat};
+use crate::config::custom_providers::CustomProviderConfig;
 use crate::impl_provider_default;
 use crate::message::Message;
 use crate::model::ModelConfig;
@@ -48,6 +49,17 @@ impl OllamaProvider {
         Ok(Self {
             client,
             host,
+            model,
+        })
+    }
+
+    pub fn from_custom_config(model: ModelConfig, config: CustomProviderConfig) -> Result<Self> {
+        let timeout = Duration::from_secs(config.timeout_seconds.unwrap_or(OLLAMA_TIMEOUT));
+        let client = Client::builder().timeout(timeout).build()?;
+
+        Ok(Self {
+            client,
+            host: config.base_url,
             model,
         })
     }

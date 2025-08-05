@@ -11,7 +11,7 @@ use goose::config::APP_STRATEGY;
 use goose::config::{Config, ConfigError};
 use goose::config::{ExtensionConfigManager, ExtensionEntry};
 use goose::model::ModelConfig;
-use goose::providers::base::{ConfigKey, ModelInfo, ProviderMetadata};
+use goose::providers::base::ProviderMetadata;
 use goose::providers::pricing::{
     get_all_pricing, get_model_pricing, parse_model_id, refresh_pricing,
 };
@@ -23,7 +23,6 @@ use serde_json::Value;
 use serde_yaml;
 use std::{collections::HashMap, sync::Arc};
 use utoipa::ToSchema;
-use uuid::Uuid;
 
 #[derive(Serialize, ToSchema)]
 pub struct ExtensionResponse {
@@ -315,9 +314,70 @@ pub async fn providers(
 ) -> Result<Json<Vec<ProviderDetails>>, StatusCode> {
     verify_secret_key(&headers, &state)?;
 
-    let providers_metadata = get_providers();
+    let mut providers_metadata = get_providers();
 
-    let mut providers_response: Vec<ProviderDetails> = providers_metadata
+    let config_dir = etcetera::choose_app_strategy(goose::config::base::APP_STRATEGY.clone())
+        .expect("goose requires a home dir")
+        .config_dir();
+    let custom_providers_dir = config_dir.join("custom_providers");
+
+    if custom_providers_dir.exists() {
+        if let Ok(entries) = std::fs::read_dir(&custom_providers_dir) {
+            for entry in entries.flatten() {
+                if let Some(extension) = entry.path().extension() {
+                    if extension == "json" {
+                        if let Ok(content) = std::fs::read_to_string(entry.path()) {
+                            if let Ok(custom_provider) = serde_json::from_str::<
+                                goose::config::custom_providers::CustomProviderConfig,
+                            >(&content)
+                            {
+                                // CustomProviderConfig => ProviderMetadata
+                                let default_model = custom_provider
+                                    .models
+                                    .first()
+                                    .map(|m| m.name.clone())
+                                    .unwrap_or_default();
+
+                                let metadata = goose::providers::base::ProviderMetadata {
+                                    name: custom_provider.name.clone(),
+                                    display_name: custom_provider.display_name.clone(),
+                                    description: custom_provider
+                                        .description
+                                        .clone()
+                                        .unwrap_or_else(|| {
+                                            format!(
+                                                "Custom {} provider",
+                                                custom_provider.display_name
+                                            )
+                                        }),
+                                    default_model,
+                                    known_models: custom_provider.models.clone(),
+                                    model_doc_link: "Custom provider".to_string(),
+                                    config_keys: vec![
+                                        goose::providers::base::ConfigKey::new(
+                                            &custom_provider.api_key_env,
+                                            true,
+                                            true,
+                                            None,
+                                        ),
+                                        goose::providers::base::ConfigKey::new(
+                                            "CUSTOM_PROVIDER_BASE_URL",
+                                            true,
+                                            false,
+                                            Some(&custom_provider.base_url),
+                                        ),
+                                    ],
+                                };
+                                providers_metadata.push(metadata);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    let providers_response: Vec<ProviderDetails> = providers_metadata
         .into_iter()
         .map(|metadata| {
             let is_configured = check_provider_configured(&metadata);
@@ -329,92 +389,6 @@ pub async fn providers(
             }
         })
         .collect();
-
-    if let Ok(custom_providers) = goose::config::CustomProviderManager::get_all() {
-        for custom_provider in custom_providers {
-            if custom_provider.is_enabled() {
-                let models: Vec<ModelInfo> = custom_provider
-                    .models()
-                    .iter()
-                    .map(|model_name| ModelInfo::new(model_name.clone(), 128000))
-                    .collect();
-
-                let config_keys = match &custom_provider {
-                    goose::config::CustomProviderConfig::OpenAICompatible(config) => {
-                        vec![
-                            ConfigKey::new(
-                                &format!("{}_API_URL", config.id.to_uppercase()),
-                                true,
-                                false,
-                                Some(&config.api_url),
-                            ),
-                            ConfigKey::new(
-                                &format!("{}_API_KEY", config.id.to_uppercase()),
-                                true,
-                                true,
-                                None,
-                            ),
-                            ConfigKey::new(
-                                &format!("{}_MODELS", config.id.to_uppercase()),
-                                false,
-                                false,
-                                Some(&config.models.join(",")),
-                            ),
-                        ]
-                    }
-                    goose::config::CustomProviderConfig::AnthropicCompatible(config) => {
-                        vec![
-                            ConfigKey::new(
-                                &format!("{}_API_URL", config.id.to_uppercase()),
-                                true,
-                                false,
-                                Some(&config.api_url),
-                            ),
-                            ConfigKey::new(
-                                &format!("{}_API_KEY", config.id.to_uppercase()),
-                                true,
-                                true,
-                                None,
-                            ),
-                            ConfigKey::new(
-                                &format!("{}_MODELS", config.id.to_uppercase()),
-                                false,
-                                false,
-                                Some(&config.models.join(",")),
-                            ),
-                        ]
-                    }
-                };
-
-                let metadata = ProviderMetadata {
-                    name: custom_provider.id().to_string(),
-                    display_name: custom_provider.display_name().to_string(),
-                    description: format!(
-                        "Custom {} compatible provider",
-                        match &custom_provider {
-                            goose::config::CustomProviderConfig::OpenAICompatible(_) => "OpenAI",
-                            goose::config::CustomProviderConfig::AnthropicCompatible(_) =>
-                                "Anthropic",
-                        }
-                    ),
-                    default_model: custom_provider
-                        .models()
-                        .first()
-                        .cloned()
-                        .unwrap_or_default(),
-                    known_models: models,
-                    model_doc_link: String::new(),
-                    config_keys,
-                };
-
-                providers_response.push(ProviderDetails {
-                    name: custom_provider.id().to_string(),
-                    metadata,
-                    is_configured: true,
-                });
-            }
-        }
-    }
 
     Ok(Json(providers_response))
 }
@@ -751,11 +725,10 @@ pub async fn create_custom_provider(
 ) -> Result<Json<String>, StatusCode> {
     verify_secret_key(&headers, &state)?;
 
-    // gen uuid for added provider
+    // use display name as name
     let id = format!(
-        "custom_{}_{}",
-        request.provider_type,
-        Uuid::new_v4().to_string().split('-').next().unwrap()
+        "custom_{}",
+        request.display_name.to_lowercase().replace(' ', "_")
     );
 
     // key naming convention
@@ -777,33 +750,46 @@ pub async fn create_custom_provider(
         )
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    // create final provider config
-    let provider_config = match request.provider_type.as_str() {
-        "openai_compatible" => goose::config::CustomProviderConfig::OpenAICompatible(
-            goose::providers::custom::OpenAICompatibleConfig {
-                id: id.clone(),
-                display_name: request.display_name,
-                api_url: request.api_url,
-                api_key: api_key_name,
-                models: request.models,
-                enabled: true,
-            },
-        ),
-        "anthropic_compatible" => goose::config::CustomProviderConfig::AnthropicCompatible(
-            goose::providers::custom::AnthropicCompatibleConfig {
-                id: id.clone(),
-                display_name: request.display_name,
-                api_url: request.api_url,
-                api_key: api_key_name,
-                models: request.models,
-                enabled: true,
-            },
-        ),
-        _ => return Err(StatusCode::BAD_REQUEST),
+    // models -> ModelInfo fmt
+    let model_infos: Vec<goose::providers::base::ModelInfo> = request
+        .models
+        .iter()
+        .map(|name| goose::providers::base::ModelInfo::new(name.clone(), 128000))
+        .collect();
+
+    let provider_config = goose::config::custom_providers::CustomProviderConfig {
+        name: id.clone(),
+        engine: match request.provider_type.as_str() {
+            "openai_compatible" => goose::config::custom_providers::ProviderEngine::OpenAI,
+            "anthropic_compatible" => goose::config::custom_providers::ProviderEngine::Anthropic,
+            "ollama_compatible" => goose::config::custom_providers::ProviderEngine::Ollama,
+            _ => return Err(StatusCode::BAD_REQUEST),
+        },
+        display_name: request.display_name,
+        description: None,
+        api_key_env: api_key_name,
+        base_url: request.api_url,
+        models: model_infos,
+        headers: None,
+        timeout_seconds: None,
     };
 
-    goose::config::CustomProviderManager::set(provider_config)
+    // create custom provider
+    let config_dir = etcetera::choose_app_strategy(goose::config::base::APP_STRATEGY.clone())
+        .expect("goose requires a home dir")
+        .config_dir();
+    let custom_providers_dir = config_dir.join("custom_providers");
+    std::fs::create_dir_all(&custom_providers_dir)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let json_content = serde_json::to_string_pretty(&provider_config)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let file_path = custom_providers_dir.join(format!("{}.json", id));
+    std::fs::write(file_path, json_content).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    if let Err(e) = goose::providers::refresh_custom_providers() {
+        tracing::warn!("Failed to refresh custom providers after creation: {}", e);
+    }
 
     Ok(Json(format!("Custom provider added - ID: {}", id)))
 }
@@ -828,7 +814,22 @@ pub async fn remove_custom_provider(
     let api_key_name = format!("{}_API_KEY", id.to_uppercase());
     let _ = config.delete_secret(&api_key_name);
 
-    goose::config::CustomProviderManager::remove(&id).map_err(|_| StatusCode::NOT_FOUND)?;
+    // remove provider
+    let config_dir = etcetera::choose_app_strategy(goose::config::base::APP_STRATEGY.clone())
+        .expect("goose requires a home dir")
+        .config_dir();
+    let custom_providers_dir = config_dir.join("custom_providers");
+    let file_path = custom_providers_dir.join(format!("{}.json", id));
+
+    if file_path.exists() {
+        std::fs::remove_file(file_path).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+        if let Err(e) = goose::providers::refresh_custom_providers() {
+            tracing::warn!("Failed to refresh custom providers after deletion: {}", e);
+        }
+    } else {
+        return Err(StatusCode::NOT_FOUND);
+    }
 
     Ok(Json(format!("Removed custom provider: {}", id)))
 }

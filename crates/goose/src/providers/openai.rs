@@ -17,6 +17,7 @@ use super::embedding::{EmbeddingCapable, EmbeddingRequest, EmbeddingResponse};
 use super::errors::ProviderError;
 use super::formats::openai::{create_request, get_usage, response_to_message};
 use super::utils::{emit_debug_trace, get_model, handle_response_openai_compat, ImageFormat};
+use crate::config::custom_providers::CustomProviderConfig;
 use crate::impl_provider_default;
 use crate::message::Message;
 use crate::model::ModelConfig;
@@ -84,6 +85,39 @@ impl OpenAiProvider {
             project,
             model,
             custom_headers,
+        })
+    }
+
+    pub fn from_custom_config(model: ModelConfig, config: CustomProviderConfig) -> Result<Self> {
+        let timeout = Duration::from_secs(config.timeout_seconds.unwrap_or(600));
+        let client = Client::builder().timeout(timeout).build()?;
+
+        let global_config = crate::config::Config::global();
+
+        let api_key: String = global_config
+            .get_secret(&config.api_key_env)
+            .map_err(|_e| anyhow::anyhow!("Missing API key: {}", config.api_key_env))?;
+
+        let url = url::Url::parse(&config.base_url)
+            .map_err(|e| anyhow::anyhow!("Invalid base URL '{}': {}", config.base_url, e))?;
+
+        let host = format!("{}://{}", url.scheme(), url.host_str().unwrap_or(""));
+        let base_path = url.path().trim_start_matches('/').to_string();
+        let base_path = if base_path.is_empty() {
+            "v1/chat/completions".to_string()
+        } else {
+            base_path
+        };
+
+        Ok(Self {
+            client,
+            host,
+            base_path,
+            api_key,
+            organization: None,
+            project: None,
+            model,
+            custom_headers: config.headers,
         })
     }
 

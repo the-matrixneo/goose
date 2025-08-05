@@ -74,11 +74,16 @@ export default function CustomProviderForm({ onSubmit, onCancel }: CustomProvide
           options={[
             { value: 'openai_compatible', label: 'OpenAI Compatible' },
             { value: 'anthropic_compatible', label: 'Anthropic Compatible' },
+            { value: 'ollama_compatible', label: 'Ollama Compatible' },
           ]}
           value={{
             value: providerType,
             label:
-              providerType === 'openai_compatible' ? 'OpenAI Compatible' : 'Anthropic Compatible',
+              providerType === 'openai_compatible'
+                ? 'OpenAI Compatible'
+                : providerType === 'anthropic_compatible'
+                  ? 'Anthropic Compatible'
+                  : 'Ollama Compatible',
           }}
           onChange={(option: unknown) => {
             const selectedOption = option as { value: string; label: string } | null;
