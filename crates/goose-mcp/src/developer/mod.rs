@@ -1651,62 +1651,7 @@ impl DeveloperRouter {
     }
 
     async fn task_tracker(&self, params: Value) -> Result<Vec<Content>, ToolError> {
-        let action =
-            params
-                .get("action")
-                .and_then(|v| v.as_str())
-                .ok_or(ToolError::InvalidParameters(
-                    "The action string is required".to_string(),
-                ))?;
-
-        match action {
-            "list" => {
-                let tasks = self.task_tracker.list_tasks();
-                Ok(vec![
-                    Content::text(format!("Tasks:\n{}", tasks.join("\n")))
-                        .with_audience(vec![Role::Assistant]),
-                    Content::text(format!("Tasks:\n{}", tasks.join("\n")))
-                        .with_audience(vec![Role::User])
-                        .with_priority(0.0),
-                ])
-            }
-            "add" => {
-                let task = params.get("task").and_then(|v| v.as_str()).ok_or(
-                    ToolError::InvalidParameters("The task string is required".to_string()),
-                )?;
-
-                let result = self.task_tracker.add_task(task.to_string());
-
-                Ok(vec![Content::text(result)])
-            }
-            "mark_wip" => {
-                let task = params.get("task").and_then(|v| v.as_str()).ok_or(
-                    ToolError::InvalidParameters("The task string is required".to_string()),
-                )?;
-
-                let result = self.task_tracker.mark_task_wip(task.to_string());
-
-                Ok(vec![Content::text(result)])
-            }
-            "mark_done" => {
-                let task = params.get("task").and_then(|v| v.as_str()).ok_or(
-                    ToolError::InvalidParameters("The task string is required".to_string()),
-                )?;
-
-                let result = self.task_tracker.mark_task_done(task.to_string());
-
-                Ok(vec![Content::text(result)])
-            }
-            "clear" => {
-                let result = self.task_tracker.clear_tasks();
-
-                Ok(vec![Content::text(result)])
-            }
-            _ => Err(ToolError::InvalidParameters(format!(
-                "Unknown action '{}'",
-                action
-            ))),
-        }
+        self.task_tracker.handle_request(params).await
     }
 }
 

@@ -1,3 +1,6 @@
+use mcp_core::handler::ToolError;
+use rmcp::model::{Content, Role};
+use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -72,6 +75,65 @@ impl TaskTracker {
         let mut tasks = self.tasks.lock().unwrap();
         tasks.clear();
         "All tasks cleared".to_string()
+    }
+
+    pub async fn handle_request(&self, params: Value) -> Result<Vec<Content>, ToolError> {
+        let action =
+            params
+                .get("action")
+                .and_then(|v| v.as_str())
+                .ok_or(ToolError::InvalidParameters(
+                    "The action string is required".to_string(),
+                ))?;
+
+        match action {
+            "list" => {
+                let tasks = self.list_tasks();
+                Ok(vec![
+                    Content::text(format!("Tasks:\n{}", tasks.join("\n")))
+                        .with_audience(vec![Role::Assistant]),
+                    Content::text(format!("Tasks:\n{}", tasks.join("\n")))
+                        .with_audience(vec![Role::User])
+                        .with_priority(0.0),
+                ])
+            }
+            "add" => {
+                let task = params.get("task").and_then(|v| v.as_str()).ok_or(
+                    ToolError::InvalidParameters("The task string is required".to_string()),
+                )?;
+
+                let result = self.add_task(task.to_string());
+
+                Ok(vec![Content::text(result)])
+            }
+            "mark_wip" => {
+                let task = params.get("task").and_then(|v| v.as_str()).ok_or(
+                    ToolError::InvalidParameters("The task string is required".to_string()),
+                )?;
+
+                let result = self.mark_task_wip(task.to_string());
+
+                Ok(vec![Content::text(result)])
+            }
+            "mark_done" => {
+                let task = params.get("task").and_then(|v| v.as_str()).ok_or(
+                    ToolError::InvalidParameters("The task string is required".to_string()),
+                )?;
+
+                let result = self.mark_task_done(task.to_string());
+
+                Ok(vec![Content::text(result)])
+            }
+            "clear" => {
+                let result = self.clear_tasks();
+
+                Ok(vec![Content::text(result)])
+            }
+            _ => Err(ToolError::InvalidParameters(format!(
+                "Unknown action '{}'",
+                action
+            ))),
+        }
     }
 }
 
@@ -165,5 +227,144 @@ mod tests {
 
         let tasks = tracker.list_tasks();
         assert!(tasks.is_empty()); // No task should exist
+    }
+
+    #[tokio::test]
+    async fn test_handle_request_list() {
+        let tracker = TaskTracker::new();
+        tracker.add_task("Test task 1".to_string());
+        tracker.add_task("Test task 2".to_string());
+
+        let params = serde_json::json!({"action": "list"});
+        let result = tracker.handle_request(params).await.unwrap();
+
+        assert_eq!(result.len(), 2);
+        match &result[0].raw {
+            rmcp::model::RawContent::Text(text_content) => {
+                assert!(text_content.text.contains("Test task 1 [to do]"));
+                assert!(text_content.text.contains("Test task 2 [to do]"));
+            }
+            _ => panic!("Expected text content"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_handle_request_add() {
+        let tracker = TaskTracker::new();
+
+        let params = serde_json::json!({"action": "add", "task": "New task"});
+        let result = tracker.handle_request(params).await.unwrap();
+
+        assert_eq!(result.len(), 1);
+        match &result[0].raw {
+            rmcp::model::RawContent::Text(text_content) => {
+                assert_eq!(text_content.text, "Added task: New task");
+            }
+            _ => panic!("Expected text content"),
+        }
+
+        let tasks = tracker.list_tasks();
+        assert_eq!(tasks.len(), 1);
+        assert!(tasks[0].contains("New task [to do]"));
+    }
+
+    #[tokio::test]
+    async fn test_handle_request_mark_wip() {
+        let tracker = TaskTracker::new();
+        tracker.add_task("Test task".to_string());
+
+        let params = serde_json::json!({"action": "mark_wip", "task": "Test task"});
+        let result = tracker.handle_request(params).await.unwrap();
+
+        assert_eq!(result.len(), 1);
+        match &result[0].raw {
+            rmcp::model::RawContent::Text(text_content) => {
+                assert_eq!(text_content.text, "Marked as WIP: Test task");
+            }
+            _ => panic!("Expected text content"),
+        }
+
+        let tasks = tracker.list_tasks();
+        assert!(tasks[0].contains("Test task [wip]"));
+    }
+
+    #[tokio::test]
+    async fn test_handle_request_mark_done() {
+        let tracker = TaskTracker::new();
+        tracker.add_task("Test task".to_string());
+
+        let params = serde_json::json!({"action": "mark_done", "task": "Test task"});
+        let result = tracker.handle_request(params).await.unwrap();
+
+        assert_eq!(result.len(), 1);
+        match &result[0].raw {
+            rmcp::model::RawContent::Text(text_content) => {
+                assert_eq!(text_content.text, "Marked as done: Test task");
+            }
+            _ => panic!("Expected text content"),
+        }
+
+        let tasks = tracker.list_tasks();
+        assert!(tasks[0].contains("Test task [done]"));
+    }
+
+    #[tokio::test]
+    async fn test_handle_request_clear() {
+        let tracker = TaskTracker::new();
+        tracker.add_task("Task 1".to_string());
+        tracker.add_task("Task 2".to_string());
+
+        let params = serde_json::json!({"action": "clear"});
+        let result = tracker.handle_request(params).await.unwrap();
+
+        assert_eq!(result.len(), 1);
+        match &result[0].raw {
+            rmcp::model::RawContent::Text(text_content) => {
+                assert_eq!(text_content.text, "All tasks cleared");
+            }
+            _ => panic!("Expected text content"),
+        }
+
+        let tasks = tracker.list_tasks();
+        assert!(tasks.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_handle_request_missing_action() {
+        let tracker = TaskTracker::new();
+
+        let params = serde_json::json!({});
+        let result = tracker.handle_request(params).await;
+
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("The action string is required"));
+    }
+
+    #[tokio::test]
+    async fn test_handle_request_unknown_action() {
+        let tracker = TaskTracker::new();
+
+        let params = serde_json::json!({"action": "unknown"});
+        let result = tracker.handle_request(params).await;
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Unknown action"));
+    }
+
+    #[tokio::test]
+    async fn test_handle_request_missing_task_parameter() {
+        let tracker = TaskTracker::new();
+
+        let params = serde_json::json!({"action": "add"});
+        let result = tracker.handle_request(params).await;
+
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("The task string is required"));
     }
 }
