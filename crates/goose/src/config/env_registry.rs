@@ -19,7 +19,7 @@ pub struct EnvRegistry {
 pub static ENV_REGISTRY: Lazy<EnvRegistry> = Lazy::new(|| EnvRegistry::new());
 
 /// Categories of environment variables used by Goose
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum EnvCategory {
     /// Provider configuration (API keys, endpoints, etc.)
     Provider,
@@ -447,51 +447,58 @@ pub const KNOWN_ENV_VARS: &[EnvVarSpec] = &[
 ];
 
 /// Automatically discover environment variables from provider metadata
+/// Uses the structured provider factory to get actual config keys
 pub fn discover_provider_env_vars() -> Vec<EnvVarSpec> {
     let mut discovered = Vec::new();
     
-    // This would ideally iterate through all available providers
-    // For now, we'll add the common provider patterns that we can discover
+    // Get all provider metadata from the factory
+    let providers = crate::providers::providers();
     
-    // Common provider API keys that follow the pattern PROVIDER_API_KEY
-    let common_providers = [
-        "OPENAI", "ANTHROPIC", "AZURE", "GOOGLE", "COHERE", "MISTRAL", 
-        "DATABRICKS", "BEDROCK", "GEMINI", "VERTEX", "CLAUDE"
-    ];
-    
-    for provider in &common_providers {
-        discovered.push(EnvVarSpec {
-            name: Box::leak(format!("{}_API_KEY", provider).into_boxed_str()),
-            category: EnvCategory::Provider,
-            is_secret: true,
-            description: Box::leak(format!("{} API key", provider).into_boxed_str()),
-        });
-        
-        // Common host/endpoint patterns
-        discovered.push(EnvVarSpec {
-            name: Box::leak(format!("{}_HOST", provider).into_boxed_str()),
-            category: EnvCategory::Provider,
-            is_secret: false,
-            description: Box::leak(format!("{} API host", provider).into_boxed_str()),
-        });
+    for provider_metadata in providers {
+        for config_key in &provider_metadata.config_keys {
+            discovered.push(EnvVarSpec {
+                name: Box::leak(config_key.name.clone().into_boxed_str()),
+                category: EnvCategory::Provider,
+                is_secret: config_key.secret,
+                description: Box::leak(
+                    format!("{} - {}", provider_metadata.display_name, config_key.name).into_boxed_str()
+                ),
+            });
+        }
     }
     
     discovered
 }
 
 /// Automatically discover environment variables from extension configurations
+/// Uses the structured YAML configuration to extract env_keys from extensions
 pub fn discover_extension_env_vars() -> Vec<String> {
     let mut discovered = Vec::new();
     
-    // Get all configured extensions and extract their env_keys
+    // Get all configured extensions and extract their env_keys from the structured config
     if let Ok(config) = super::Config::global().load_values() {
         if let Some(extensions_value) = config.get("extensions") {
             if let Ok(extensions) = serde_json::from_value::<HashMap<String, serde_json::Value>>(extensions_value.clone()) {
-                for (_key, extension_value) in extensions {
-                    // Try to extract env_keys from each extension
+                for (_extension_key, extension_value) in extensions {
+                    // Extract env_keys from extension configuration
                     if let Some(env_keys) = extension_value.get("env_keys") {
                         if let Ok(keys) = serde_json::from_value::<Vec<String>>(env_keys.clone()) {
-                            discovered.extend(keys);
+                            for key in keys {
+                                if !discovered.contains(&key) {
+                                    discovered.push(key);
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Also check for envs map (legacy support)
+                    if let Some(envs) = extension_value.get("envs") {
+                        if let Ok(env_map) = serde_json::from_value::<HashMap<String, String>>(envs.clone()) {
+                            for key in env_map.keys() {
+                                if !discovered.contains(key) {
+                                    discovered.push(key.clone());
+                                }
+                            }
                         }
                     }
                 }
@@ -956,5 +963,45 @@ mod tests {
             key: String,
         }
         assert_eq!(registry.get_typed::<TestStruct>("TEST_JSON"), Some(TestStruct { key: "value".to_string() }));
+    }
+
+    #[test]
+    fn test_structured_provider_discovery() {
+        let discovered = discover_provider_env_vars();
+        
+        // Should find actual provider config keys from the structured metadata
+        let key_names: Vec<&str> = discovered.iter().map(|spec| spec.name).collect();
+        
+        // These should be found from the actual provider metadata
+        assert!(key_names.contains(&"ANTHROPIC_API_KEY"));
+        assert!(key_names.contains(&"ANTHROPIC_HOST"));
+        assert!(key_names.contains(&"OPENAI_API_KEY"));
+        
+        // Verify proper categorization and secret detection
+        for spec in &discovered {
+            assert_eq!(spec.category, EnvCategory::Provider);
+            // API keys should be marked as secrets
+            if spec.name.ends_with("_API_KEY") {
+                assert!(spec.is_secret, "API key {} should be marked as secret", spec.name);
+            }
+        }
+        
+        // Should have more than just a few hardcoded values
+        assert!(discovered.len() > 10, "Should discover many provider config keys, found {}", discovered.len());
+    }
+
+    #[test]
+    fn test_structured_extension_discovery() {
+        // This test may not find anything if no extensions are configured,
+        // but it should not panic and should return a valid (possibly empty) vector
+        let discovered = discover_extension_env_vars();
+        
+        // Should return a valid vector (may be empty if no extensions configured)
+        assert!(discovered.len() >= 0);
+        
+        // All discovered keys should be non-empty strings
+        for key in &discovered {
+            assert!(!key.is_empty(), "Extension env key should not be empty");
+        }
     }
 }

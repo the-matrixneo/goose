@@ -122,7 +122,32 @@ fn main() {
         }
     }
     
+    // Show structured discovery results
+    use goose::config::{discover_provider_env_vars, discover_extension_env_vars};
+    
+    println!("\n🔍 Structured Discovery Results:");
+    let discovered_providers = discover_provider_env_vars();
+    println!("  Discovered {} provider config keys from structured metadata", discovered_providers.len());
+    
+    // Show a sample of discovered keys
+    println!("  Sample discovered provider keys:");
+    for spec in discovered_providers.iter().take(8) {
+        let secret_indicator = if spec.is_secret { " 🔐" } else { " 📝" };
+        println!("    -{}{} - {}", secret_indicator, spec.name, spec.description);
+    }
+
+    let discovered_extensions = discover_extension_env_vars();
+    if !discovered_extensions.is_empty() {
+        println!("  Discovered {} extension env_keys from YAML config", discovered_extensions.len());
+        for key in discovered_extensions.iter().take(3) {
+            println!("    - 🧩 {}", key);
+        }
+    } else {
+        println!("  No extension env_keys found in current YAML config");
+    }
+
     println!("\n✨ Environment registry loaded {} variables at process start", 
              diagnostics.total_env_vars);
     println!("   No more just-in-time environment variable access!");
+    println!("🎯 Now using structured discovery instead of pattern matching!");
 }
