@@ -12,13 +12,13 @@ use mcp_core::handler::ToolError;
 use rmcp::model::Tool;
 use serde::{Deserialize, Serialize};
 // use serde_json::{self};
+use crate::agents::agent::AgentEvent;
+use async_stream::try_stream;
+use futures::stream::BoxStream;
+use futures::stream::StreamExt;
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::{Mutex, RwLock};
 use tracing::{debug, error, instrument};
-use futures::stream::StreamExt;
-use futures::stream::BoxStream;
-use crate::agents::agent::AgentEvent;
-use async_stream::try_stream;
 
 /// Status of a subagent
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -103,7 +103,6 @@ impl SubAgent {
         } // Write lock is released here!
     }
 
-    /// Process a message and generate a streaming response using the subagent's provider
     #[instrument(skip(self, message))]
     pub async fn reply_subagent(
         &self,
@@ -148,14 +147,14 @@ impl SubAgent {
 
         // Return streaming response exactly like main agent
         let max_turns = self.config.max_turns.unwrap_or(DEFAULT_SUBAGENT_MAX_TURNS);
-        
+
         Ok(Box::pin(try_stream! {
-            let mut turns_taken = 0u32;
+            let mut turns_taken = 0;
             let mut messages = messages; // Make messages mutable in stream scope
-            
+
             loop {
                 turns_taken += 1;
-                if turns_taken > max_turns as u32 {
+                if turns_taken > max_turns {
                     self.set_status(SubAgentStatus::Completed("Max turns exceeded".to_string())).await;
                     yield AgentEvent::Message(Message::assistant().with_text(
                         "I've reached the maximum number of actions I can do without user input."
@@ -178,7 +177,7 @@ impl SubAgent {
                     match next {
                         Ok((response, _usage)) => {
                             if let Some(response) = response {
-                                // Process tool calls
+
                                 let tool_requests: Vec<ToolRequest> = response
                                     .content
                                     .iter()
@@ -192,19 +191,15 @@ impl SubAgent {
                                     .collect();
 
                                 yield AgentEvent::Message(response.clone());
-                                
+
                                 let num_tool_requests = tool_requests.len();
+
                                 if num_tool_requests == 0 {
-                                    // No tools, we're done
-                                    self.set_status(SubAgentStatus::Completed("Completed!".to_string())).await;
-                                    added_message = true;
-                                    messages_to_add.push(response);
-                                    break;
+                                    continue;
                                 }
 
-                                // Execute tools and create tool response message
                                 let mut tool_response_message = Message::user();
-                                
+
                                 for request in &tool_requests {
                                     if let Ok(tool_call) = &request.tool_call {
                                         let tool_result = match self
@@ -229,7 +224,7 @@ impl SubAgent {
                                 added_message = true;
                                 messages_to_add.push(response);
                                 messages_to_add.push(tool_response_message);
-                                break; // Move to next provider call
+                                break;
                             }
                         }
                         Err(e) => {
@@ -239,39 +234,30 @@ impl SubAgent {
                         }
                     }
                 }
-                
+
                 if !added_message {
-                    // If we get here without adding messages, break out
                     self.set_status(SubAgentStatus::Completed("No response generated".to_string())).await;
                     break;
                 }
-                
+
                 // Add messages to conversation and internal state
                 for msg in &messages_to_add {
                     self.add_message(msg.clone()).await;
                 }
                 messages.extend(messages_to_add);
-                
-                // If we completed successfully (no tools), exit the loop
-                if let SubAgentStatus::Completed(_) = *self.status.read().await {
-                    break;
-                }
             }
         }))
     }
 
-    /// Add a message to the conversation (for tracking agent responses)
     async fn add_message(&self, message: Message) {
         let mut conversation = self.conversation.lock().await;
         conversation.push(message);
     }
 
-    /// Get the full conversation history
     async fn get_conversation(&self) -> Vec<Message> {
         self.conversation.lock().await.clone()
     }
 
-    /// Build the system prompt for the subagent using the template
     async fn build_system_prompt(&self, available_tools: &[Tool]) -> Result<String, anyhow::Error> {
         let mut context = HashMap::new();
 
@@ -282,7 +268,6 @@ impl SubAgent {
         );
         context.insert("subagent_id", serde_json::Value::String(self.id.clone()));
 
-        // Add max turns if configured
         if let Some(max_turns) = self.config.max_turns {
             context.insert(
                 "max_turns",
@@ -290,7 +275,6 @@ impl SubAgent {
             );
         }
 
-        // Add available tools with descriptions for better context
         let tools_with_descriptions: Vec<String> = available_tools
             .iter()
             .map(|t| {
@@ -311,13 +295,11 @@ impl SubAgent {
             }),
         );
 
-        // Add tool count for context
         context.insert(
             "tool_count",
             serde_json::Value::Number(serde_json::Number::from(available_tools.len())),
         );
 
-        // Render the subagent system prompt template
         let system_prompt = render_global_file("subagent_system.md", &context)
             .map_err(|e| anyhow!("Failed to render subagent system prompt: {}", e))?;
 

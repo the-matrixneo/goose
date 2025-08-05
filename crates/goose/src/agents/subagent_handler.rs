@@ -1,9 +1,9 @@
+use crate::agents::agent::AgentEvent;
 use crate::agents::subagent::SubAgent;
 use crate::agents::subagent_task_config::TaskConfig;
-use crate::agents::agent::AgentEvent;
 use anyhow::Result;
-use mcp_core::ToolError;
 use futures::stream::StreamExt;
+use mcp_core::ToolError;
 
 /// Standalone function to run a complete subagent task
 pub async fn run_complete_subagent_task(
@@ -15,12 +15,10 @@ pub async fn run_complete_subagent_task(
         .await
         .map_err(|e| ToolError::ExecutionError(format!("Failed to create subagent: {}", e)))?;
 
-    // Execute the subagent task and collect streaming results
     let mut stream = subagent
         .reply_subagent(text_instruction, task_config)
         .await?;
 
-    // Collect all messages from the streaming response
     let mut messages = Vec::new();
     while let Some(event_result) = stream.next().await {
         match event_result {
@@ -37,7 +35,6 @@ pub async fn run_complete_subagent_task(
         }
     }
 
-    // Extract all text content from all messages
     let all_text_content: Vec<String> = messages
         .iter()
         .flat_map(|message| {
