@@ -1,0 +1,123 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug goose (CLI)",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=goose",
+                    "--package=goose-cli"
+                ],
+                "filter": {
+                    "name": "goose",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "environment": [],
+            "sourceLanguages": ["rust"]
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug goosed (server)",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=goosed",
+                    "--package=goose-server"
+                ],
+                "filter": {
+                    "name": "goosed",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "environment": [],
+            "sourceLanguages": ["rust"]
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug current test",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib"
+                ]
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "environment": [],
+            "sourceLanguages": ["rust"]
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug with custom args",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=goose",
+                    "--package=goose-cli"
+                ],
+                "filter": {
+                    "name": "goose",
+                    "kind": "bin"
+                }
+            },
+            "args": ["${input:customArgs}"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "environment": [],
+            "sourceLanguages": ["rust"]
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug goosed (for UI testing)",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=goosed",
+                    "--package=goose-server"
+                ],
+                "filter": {
+                    "name": "goosed",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "environment": [
+                {
+                    "name": "GOOSE_EXTERNAL_BACKEND",
+                    "value": "true"
+                },
+                {
+                    "name": "GOOSE_EXTERNAL_PORT", 
+                    "value": "3000"
+                }
+            ],
+            "sourceLanguages": ["rust"]
+        }
+    ],
+    "inputs": [
+        {
+            "id": "customArgs",
+            "description": "Enter command line arguments",
+            "default": "--help",
+            "type": "promptString"
+        }
+    ]
+}
