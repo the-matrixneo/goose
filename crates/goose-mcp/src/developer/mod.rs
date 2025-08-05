@@ -446,7 +446,7 @@ impl DeveloperRouter {
                 
                 Actions:
                 - list: Show all tasks and their status
-                - add: Add a new task (supports adding multiple tasks separated by newlines)
+                - add: Add a new task (supports comma-separated list for bulk adding)
                 - wip: Mark a task as work in progress
                 - done: Mark a task as completed
                 - clear: Remove all tasks
