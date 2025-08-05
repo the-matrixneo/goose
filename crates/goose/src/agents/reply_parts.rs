@@ -13,7 +13,7 @@ use crate::providers::toolshim::{
     augment_message_with_tool_calls, convert_tool_messages_to_text,
     modify_system_prompt_for_tool_json, OllamaInterpreter,
 };
-use crate::providers::usage_estimator::ensure_usage_tokens;
+
 use crate::session;
 use rmcp::model::Tool;
 
@@ -137,17 +137,9 @@ impl Agent {
             .await?;
 
         // Ensure we have token counts, estimating if necessary
-        ensure_usage_tokens(
-            &mut usage,
-            system_prompt,
-            &messages_for_provider,
-            &response,
-            tools,
-        )
-        .await
-        .map_err(|e| {
-            ProviderError::ExecutionError(format!("Failed to ensure usage tokens: {}", e))
-        })?;
+        usage
+            .ensure_tokens(system_prompt, &messages_for_provider, &response, tools)
+            .await?;
 
         crate::providers::base::set_current_model(&usage.model);
 
@@ -192,17 +184,9 @@ impl Agent {
                 .await?;
 
             // Ensure we have token counts for non-streaming case
-            ensure_usage_tokens(
-                &mut usage,
-                system_prompt.as_str(),
-                &messages_for_provider,
-                &message,
-                &tools,
-            )
-            .await
-            .map_err(|e| {
-                ProviderError::ExecutionError(format!("Failed to ensure usage tokens: {}", e))
-            })?;
+            usage
+                .ensure_tokens(system_prompt.as_str(), &messages_for_provider, &message, &tools)
+                .await?;
 
             stream_from_single_message(message, usage)
         };

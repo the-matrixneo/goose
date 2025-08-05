@@ -1,7 +1,7 @@
 use crate::message::Message;
 use crate::prompt_template::render_global_file;
 use crate::providers::base::Provider;
-use crate::providers::usage_estimator::ensure_usage_tokens;
+
 use anyhow::Result;
 use rmcp::model::Role;
 use serde::Serialize;
@@ -49,14 +49,10 @@ pub async fn summarize_messages(
     response.role = Role::User;
 
     // Ensure we have token counts, estimating if necessary
-    ensure_usage_tokens(
-        &mut provider_usage,
-        &system_prompt,
-        &summarization_request,
-        &response,
-        &[],
-    )
-    .await?;
+    provider_usage
+        .ensure_tokens(&system_prompt, &summarization_request, &response, &[])
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to ensure usage tokens: {}", e))?;
 
     let input_tokens = provider_usage.usage.input_tokens.unwrap_or(0) as usize;
     let output_tokens = provider_usage.usage.output_tokens.unwrap_or(0) as usize;

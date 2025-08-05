@@ -191,6 +191,25 @@ impl ProviderUsage {
     pub fn new(model: String, usage: Usage) -> Self {
         Self { model, usage }
     }
+
+    /// Ensures this ProviderUsage has token counts, estimating them if necessary
+    pub async fn ensure_tokens(
+        &mut self,
+        system_prompt: &str,
+        request_messages: &[Message],
+        response: &Message,
+        tools: &[Tool],
+    ) -> Result<(), ProviderError> {
+        crate::providers::usage_estimator::ensure_usage_tokens(
+            self,
+            system_prompt,
+            request_messages,
+            response,
+            tools,
+        )
+        .await
+        .map_err(|e| ProviderError::ExecutionError(format!("Failed to ensure usage tokens: {}", e)))
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, Copy)]
