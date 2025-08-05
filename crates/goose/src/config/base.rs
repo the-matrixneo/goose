@@ -615,9 +615,9 @@ impl Config {
         
         #[cfg(not(test))]
         {
-            // In production, use the pre-loaded registry for performance
-            if let Some(value) = ENV_REGISTRY.get_parsed(key) {
-                return Ok(serde_json::from_value(value)?);
+            // In production, use the pre-loaded registry - thin wrapper
+            if let Some(result) = ENV_REGISTRY.get_typed::<T>(key) {
+                return Ok(result);
             }
         }
 
@@ -710,9 +710,9 @@ impl Config {
         
         #[cfg(not(test))]
         {
-            // In production, use the pre-loaded registry for performance
-            if let Some(value) = ENV_REGISTRY.get_parsed(key) {
-                return Ok(serde_json::from_value(value)?);
+            // In production, use the pre-loaded registry - thin wrapper
+            if let Some(result) = ENV_REGISTRY.get_typed::<T>(key) {
+                return Ok(result);
             }
         }
 
@@ -1516,6 +1516,65 @@ mod tests {
 
         // Clean up
         std::env::remove_var("TEST_PRECEDENCE");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_mock_config_example() -> Result<(), ConfigError> {
+        use crate::config::MockConfig;
+        
+        // Create a mock config with controlled environment
+        let mock = MockConfig::new()
+            .with_env("PROVIDER", "ANTHROPIC")
+            .with_env("PORT", "8080")
+            .with_env("ENABLED", "true")
+            .with_config("fallback_value", Value::String("from_config".to_string()))
+            .with_secret("API_KEY", Value::String("secret123".to_string()));
+
+        // Test environment variable access - no actual env vars set!
+        let provider: String = mock.get_param("PROVIDER")?;
+        assert_eq!(provider, "ANTHROPIC");
+
+        let port: i32 = mock.get_param("PORT")?;
+        assert_eq!(port, 8080);
+
+        let enabled: bool = mock.get_param("ENABLED")?;
+        assert_eq!(enabled, true);
+
+        // Test config file fallback
+        let fallback: String = mock.get_param("fallback_value")?;
+        assert_eq!(fallback, "from_config");
+
+        // Test secret access
+        let api_key: String = mock.get_secret("API_KEY")?;
+        assert_eq!(api_key, "secret123");
+
+        // Test that missing values return errors
+        let missing = mock.get_param::<String>("NONEXISTENT");
+        assert!(missing.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_mock_config_precedence_example() -> Result<(), ConfigError> {
+        use crate::config::MockConfig;
+        
+        // Demonstrate precedence: env vars override config values
+        let mock = MockConfig::new()
+            .with_env("PRECEDENCE_TEST", "env_wins")
+            .with_config("PRECEDENCE_TEST", Value::String("config_loses".to_string()));
+
+        let result: String = mock.get_param("PRECEDENCE_TEST")?;
+        assert_eq!(result, "env_wins");
+
+        // Show that without env var, config value is used
+        let mock_no_env = MockConfig::new()
+            .with_config("PRECEDENCE_TEST", Value::String("config_wins".to_string()));
+
+        let result2: String = mock_no_env.get_param("PRECEDENCE_TEST")?;
+        assert_eq!(result2, "config_wins");
 
         Ok(())
     }

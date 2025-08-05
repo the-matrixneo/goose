@@ -1,8 +1,9 @@
 use once_cell::sync::Lazy;
+use serde::Deserialize;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::env;
-use std::sync::RwLock;
+
 
 /// Centralized registry for environment variables loaded at process start.
 /// This eliminates just-in-time environment variable access and provides
@@ -10,8 +11,8 @@ use std::sync::RwLock;
 pub struct EnvRegistry {
     /// All environment variables loaded at startup
     env_vars: HashMap<String, String>,
-    /// Parsed values cache to avoid re-parsing
-    parsed_cache: RwLock<HashMap<String, Value>>,
+    /// Pre-parsed and validated values - all parsing done at startup
+    parsed_values: HashMap<String, Value>,
 }
 
 /// Global environment registry instance
@@ -445,24 +446,103 @@ pub const KNOWN_ENV_VARS: &[EnvVarSpec] = &[
     },
 ];
 
+/// Automatically discover environment variables from provider metadata
+pub fn discover_provider_env_vars() -> Vec<EnvVarSpec> {
+    let mut discovered = Vec::new();
+    
+    // This would ideally iterate through all available providers
+    // For now, we'll add the common provider patterns that we can discover
+    
+    // Common provider API keys that follow the pattern PROVIDER_API_KEY
+    let common_providers = [
+        "OPENAI", "ANTHROPIC", "AZURE", "GOOGLE", "COHERE", "MISTRAL", 
+        "DATABRICKS", "BEDROCK", "GEMINI", "VERTEX", "CLAUDE"
+    ];
+    
+    for provider in &common_providers {
+        discovered.push(EnvVarSpec {
+            name: Box::leak(format!("{}_API_KEY", provider).into_boxed_str()),
+            category: EnvCategory::Provider,
+            is_secret: true,
+            description: Box::leak(format!("{} API key", provider).into_boxed_str()),
+        });
+        
+        // Common host/endpoint patterns
+        discovered.push(EnvVarSpec {
+            name: Box::leak(format!("{}_HOST", provider).into_boxed_str()),
+            category: EnvCategory::Provider,
+            is_secret: false,
+            description: Box::leak(format!("{} API host", provider).into_boxed_str()),
+        });
+    }
+    
+    discovered
+}
+
+/// Automatically discover environment variables from extension configurations
+pub fn discover_extension_env_vars() -> Vec<String> {
+    let mut discovered = Vec::new();
+    
+    // Get all configured extensions and extract their env_keys
+    if let Ok(config) = super::Config::global().load_values() {
+        if let Some(extensions_value) = config.get("extensions") {
+            if let Ok(extensions) = serde_json::from_value::<HashMap<String, serde_json::Value>>(extensions_value.clone()) {
+                for (_key, extension_value) in extensions {
+                    // Try to extract env_keys from each extension
+                    if let Some(env_keys) = extension_value.get("env_keys") {
+                        if let Ok(keys) = serde_json::from_value::<Vec<String>>(env_keys.clone()) {
+                            discovered.extend(keys);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    discovered
+}
+
 impl EnvRegistry {
     /// Create a new environment registry by loading all environment variables at startup
     pub fn new() -> Self {
-        let env_vars = env::vars().collect();
+        let env_vars: HashMap<String, String> = env::vars().collect();
+        
+        // Parse all environment variables at startup
+        let mut parsed_values = HashMap::new();
+        for (key, value) in &env_vars {
+            if let Ok(parsed) = EnvRegistry::parse_env_value(value) {
+                parsed_values.insert(key.clone(), parsed);
+                // Also add uppercase version for flexible lookup
+                let upper_key = key.to_uppercase();
+                if upper_key != *key {
+                    parsed_values.insert(upper_key, EnvRegistry::parse_env_value(value).unwrap());
+                }
+            }
+        }
         
         Self {
             env_vars,
-            parsed_cache: RwLock::new(HashMap::new()),
+            parsed_values,
         }
     }
 
-    /// Refresh the environment registry by reloading all environment variables
-    /// This is primarily for testing purposes when environment variables change
-    #[cfg(test)]
-    pub fn refresh(&mut self) {
-        self.env_vars = env::vars().collect();
-        if let Ok(mut cache) = self.parsed_cache.write() {
-            cache.clear();
+    /// Create a new environment registry with custom values (for testing)
+    pub fn with_values(values: HashMap<String, String>) -> Self {
+        let mut parsed_values = HashMap::new();
+        for (key, value) in &values {
+            if let Ok(parsed) = EnvRegistry::parse_env_value(value) {
+                parsed_values.insert(key.clone(), parsed);
+                // Also add uppercase version for flexible lookup
+                let upper_key = key.to_uppercase();
+                if upper_key != *key {
+                    parsed_values.insert(upper_key, EnvRegistry::parse_env_value(value).unwrap());
+                }
+            }
+        }
+        
+        Self {
+            env_vars: values,
+            parsed_values,
         }
     }
 
@@ -484,27 +564,22 @@ impl EnvRegistry {
         self.env_vars.get(&upper_key)
     }
 
-    /// Parse an environment variable value into a JSON Value with caching
+    /// Get a pre-parsed environment variable value - thin wrapper, all parsing done at startup
     pub fn get_parsed(&self, key: &str) -> Option<Value> {
-        // Check cache first
-        {
-            let cache = self.parsed_cache.read().ok()?;
-            if let Some(cached) = cache.get(key) {
-                return Some(cached.clone());
-            }
+        // First try exact match
+        if let Some(value) = self.parsed_values.get(key) {
+            return Some(value.clone());
         }
+        
+        // Then try uppercase
+        let upper_key = key.to_uppercase();
+        self.parsed_values.get(&upper_key).cloned()
+    }
 
-        // Get raw value and parse
-        let raw_value = self.get_raw_flexible(key)?;
-        let parsed = self.parse_env_value(raw_value).ok()?;
-
-        // Cache the result
-        {
-            let mut cache = self.parsed_cache.write().ok()?;
-            cache.insert(key.to_string(), parsed.clone());
-        }
-
-        Some(parsed)
+    /// Get a typed value from the environment registry - thin wrapper with deserialization
+    pub fn get_typed<T: for<'de> Deserialize<'de>>(&self, key: &str) -> Option<T> {
+        let value = self.get_parsed(key)?;
+        serde_json::from_value(value).ok()
     }
 
     /// Check if an environment variable exists
@@ -559,7 +634,7 @@ impl EnvRegistry {
 
     /// Parse an environment variable value into a JSON Value
     /// This mirrors the logic from Config::parse_env_value
-    fn parse_env_value(&self, val: &str) -> Result<Value, serde_json::Error> {
+    fn parse_env_value(val: &str) -> Result<Value, serde_json::Error> {
         // First try JSON parsing - this handles quoted strings, objects, arrays, etc.
         if let Ok(json_value) = serde_json::from_str(val) {
             return Ok(json_value);
@@ -601,9 +676,29 @@ impl EnvRegistry {
             }
         }
 
+        // Check discovered provider variables
+        let discovered_providers = discover_provider_env_vars();
+        for spec in &discovered_providers {
+            if self.contains_key(spec.name) && !known_found.contains(&spec.name) {
+                // Add to found if not already in the static list
+                known_found.push(spec.name);
+            }
+        }
+
+        // Check discovered extension variables
+        let discovered_extensions = discover_extension_env_vars();
+        for key in &discovered_extensions {
+            if self.contains_key(key) && !known_found.iter().any(|&k| k == key) {
+                // Convert to static str for compatibility (this is a limitation of the current design)
+                // In a real implementation, we'd want to change the diagnostics structure
+            }
+        }
+
         // Find unknown GOOSE_* variables
         for (key, _) in &self.env_vars {
-            if key.starts_with("GOOSE_") && !KNOWN_ENV_VARS.iter().any(|spec| spec.name == key) {
+            if key.starts_with("GOOSE_") && 
+               !KNOWN_ENV_VARS.iter().any(|spec| spec.name == key) &&
+               !discovered_providers.iter().any(|spec| spec.name == key) {
                 unknown_goose_vars.push(key.clone());
             }
         }
@@ -624,6 +719,90 @@ pub struct EnvDiagnostics {
     pub known_found: Vec<&'static str>,
     pub known_missing: Vec<&'static str>,
     pub unknown_goose_vars: Vec<String>,
+}
+
+/// Mock configuration for testing that completely isolates from system environment
+pub struct MockConfig {
+    env_registry: EnvRegistry,
+    config_values: HashMap<String, Value>,
+    secret_values: HashMap<String, Value>,
+}
+
+impl MockConfig {
+    /// Create a new mock config with specified environment variables
+    pub fn new() -> Self {
+        Self {
+            env_registry: EnvRegistry::with_values(HashMap::new()),
+            config_values: HashMap::new(),
+            secret_values: HashMap::new(),
+        }
+    }
+
+    /// Add environment variables to the mock
+    pub fn with_env_vars(mut self, env_vars: HashMap<String, String>) -> Self {
+        self.env_registry = EnvRegistry::with_values(env_vars);
+        self
+    }
+
+    /// Add a single environment variable
+    pub fn with_env(mut self, key: &str, value: &str) -> Self {
+        let mut env_vars = self.env_registry.env_vars.clone();
+        env_vars.insert(key.to_string(), value.to_string());
+        self.env_registry = EnvRegistry::with_values(env_vars);
+        self
+    }
+
+    /// Add config file values
+    pub fn with_config_values(mut self, values: HashMap<String, Value>) -> Self {
+        self.config_values = values;
+        self
+    }
+
+    /// Add a single config value
+    pub fn with_config(mut self, key: &str, value: Value) -> Self {
+        self.config_values.insert(key.to_string(), value);
+        self
+    }
+
+    /// Add secret values
+    pub fn with_secret_values(mut self, secrets: HashMap<String, Value>) -> Self {
+        self.secret_values = secrets;
+        self
+    }
+
+    /// Add a single secret value
+    pub fn with_secret(mut self, key: &str, value: Value) -> Self {
+        self.secret_values.insert(key.to_string(), value);
+        self
+    }
+
+    /// Get a parameter value (mimics Config::get_param)
+    pub fn get_param<T: for<'de> serde::Deserialize<'de>>(&self, key: &str) -> Result<T, super::ConfigError> {
+        // First check environment variables
+        if let Some(value) = self.env_registry.get_parsed(key) {
+            return Ok(serde_json::from_value(value)?);
+        }
+
+        // Then check config values
+        self.config_values
+            .get(key)
+            .ok_or_else(|| super::ConfigError::NotFound(key.to_string()))
+            .and_then(|v| Ok(serde_json::from_value(v.clone())?))
+    }
+
+    /// Get a secret value (mimics Config::get_secret)
+    pub fn get_secret<T: for<'de> serde::Deserialize<'de>>(&self, key: &str) -> Result<T, super::ConfigError> {
+        // First check environment variables
+        if let Some(value) = self.env_registry.get_parsed(key) {
+            return Ok(serde_json::from_value(value)?);
+        }
+
+        // Then check secret values
+        self.secret_values
+            .get(key)
+            .ok_or_else(|| super::ConfigError::NotFound(key.to_string()))
+            .and_then(|v| Ok(serde_json::from_value(v.clone())?))
+    }
 }
 
 #[cfg(test)]
@@ -656,15 +835,15 @@ mod tests {
         let registry = EnvRegistry::new();
         
         // Test boolean parsing
-        let parsed = registry.parse_env_value("true").unwrap();
+        let parsed = EnvRegistry::parse_env_value("true").unwrap();
         assert_eq!(parsed, Value::Bool(true));
         
         // Test number parsing
-        let parsed = registry.parse_env_value("42").unwrap();
+        let parsed = EnvRegistry::parse_env_value("42").unwrap();
         assert_eq!(parsed, Value::Number(42.into()));
         
         // Test string parsing
-        let parsed = registry.parse_env_value("hello").unwrap();
+        let parsed = EnvRegistry::parse_env_value("hello").unwrap();
         assert_eq!(parsed, Value::String("hello".to_string()));
     }
 
@@ -705,5 +884,77 @@ mod tests {
         
         env::remove_var("GOOSE_MODEL");
         env::remove_var("GOOSE_UNKNOWN_VAR");
+    }
+
+    #[test]
+    fn test_mock_config() {
+        let mock = MockConfig::new()
+            .with_env("TEST_ENV_VAR", "env_value")
+            .with_config("test_config_key", serde_json::Value::String("config_value".to_string()))
+            .with_secret("test_secret_key", serde_json::Value::String("secret_value".to_string()));
+
+        // Test environment variable access
+        let env_result: String = mock.get_param("TEST_ENV_VAR").unwrap();
+        assert_eq!(env_result, "env_value");
+
+        // Test config value access
+        let config_result: String = mock.get_param("test_config_key").unwrap();
+        assert_eq!(config_result, "config_value");
+
+        // Test secret value access
+        let secret_result: String = mock.get_secret("test_secret_key").unwrap();
+        assert_eq!(secret_result, "secret_value");
+
+        // Test precedence: env vars should override config values
+        let mock_with_precedence = MockConfig::new()
+            .with_env("PRECEDENCE_TEST", "env_wins")
+            .with_config("PRECEDENCE_TEST", serde_json::Value::String("config_loses".to_string()));
+
+        let precedence_result: String = mock_with_precedence.get_param("PRECEDENCE_TEST").unwrap();
+        assert_eq!(precedence_result, "env_wins");
+    }
+
+    #[test]
+    fn test_mock_config_isolation() {
+        // Set a real environment variable
+        env::set_var("ISOLATION_TEST", "real_env_value");
+
+        // Create a mock that doesn't include this variable
+        let mock = MockConfig::new()
+            .with_config("other_key", serde_json::Value::String("mock_value".to_string()));
+
+        // Mock should not see the real environment variable
+        let result = mock.get_param::<String>("ISOLATION_TEST");
+        assert!(result.is_err());
+
+        // But should see its own config
+        let other_result: String = mock.get_param("other_key").unwrap();
+        assert_eq!(other_result, "mock_value");
+
+        env::remove_var("ISOLATION_TEST");
+    }
+
+    #[test]
+    fn test_parsed_values_at_startup() {
+        let env_vars = HashMap::from([
+            ("TEST_STRING".to_string(), "hello".to_string()),
+            ("TEST_NUMBER".to_string(), "42".to_string()),
+            ("TEST_BOOL".to_string(), "true".to_string()),
+            ("TEST_JSON".to_string(), r#"{"key": "value"}"#.to_string()),
+        ]);
+
+        let registry = EnvRegistry::with_values(env_vars);
+
+        // Test that values are pre-parsed correctly
+        assert_eq!(registry.get_typed::<String>("TEST_STRING"), Some("hello".to_string()));
+        assert_eq!(registry.get_typed::<i32>("TEST_NUMBER"), Some(42));
+        assert_eq!(registry.get_typed::<bool>("TEST_BOOL"), Some(true));
+        
+        // Test JSON parsing
+        #[derive(Deserialize, PartialEq, Debug)]
+        struct TestStruct {
+            key: String,
+        }
+        assert_eq!(registry.get_typed::<TestStruct>("TEST_JSON"), Some(TestStruct { key: "value".to_string() }));
     }
 }

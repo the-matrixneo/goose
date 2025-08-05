@@ -7,7 +7,7 @@ pub mod signup_openrouter;
 
 pub use crate::agents::ExtensionConfig;
 pub use base::{Config, ConfigError, APP_STRATEGY};
-pub use env_registry::{EnvCategory, EnvRegistry, EnvVarSpec, ENV_REGISTRY, KNOWN_ENV_VARS};
+pub use env_registry::{EnvCategory, EnvRegistry, EnvVarSpec, MockConfig, ENV_REGISTRY, KNOWN_ENV_VARS};
 pub use experiments::ExperimentManager;
 pub use extensions::{ExtensionConfigManager, ExtensionEntry};
 pub use permission::PermissionManager;
