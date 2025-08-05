@@ -784,8 +784,8 @@ impl Agent {
 
             // Create compaction notification message
             let compaction_msg = match (compact_result.tokens_before, &compact_result.summarization_usage) {
-                (Some(before), Some(usage)) => {
-                    let after = usage.usage.total_tokens.unwrap_or(0) as usize;
+                (before, Some(usage)) => {
+                    let after = usage.usage.output_tokens.unwrap_or(0) as usize;
                     format!(
                         "Auto-compacted context: {} → {} tokens ({:.0}% reduction)\n\n",
                         before,
