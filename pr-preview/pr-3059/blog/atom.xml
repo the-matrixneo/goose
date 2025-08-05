@@ -2,7 +2,7 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
     <id>https://block.github.io/goose/pr-preview/pr-3059/blog</id>
     <title>codename goose Blog</title>
-    <updated>2025-08-04T00:00:00.000Z</updated>
+    <updated>2025-08-05T00:00:00.000Z</updated>
     <generator>https://github.com/jpmonette/feed</generator>
     <link rel="alternate" href="https://block.github.io/goose/pr-preview/pr-3059/blog"/>
     <subtitle>codename goose Blog</subtitle>
@@ -11,9 +11,9 @@
         <title type="html"><![CDATA[MCP Jupyter: AI-Powered Machine Learning and Data Science]]></title>
         <id>https://block.github.io/goose/pr-preview/pr-3059/blog/2025/08/04/mcp-jupyter-server</id>
         <link href="https://block.github.io/goose/pr-preview/pr-3059/blog/2025/08/04/mcp-jupyter-server"/>
-        <updated>2025-08-04T00:00:00.000Z</updated>
+        <updated>2025-08-05T00:00:00.000Z</updated>
         <summary type="html"><![CDATA[Enable AI agents to work directly with your Jupyter notebooks, leveraging persistent memory and stateful collaboration for enhanced ML and data science workflows]]></summary>
-        <content type="html"><![CDATA[<p><img decoding="async" loading="lazy" alt="MCP Jupyter Server" src="https://block.github.io/goose/pr-preview/pr-3059/assets/images/data-goose-31db12eb84fe22345f4ed83d50d8d41f.png" width="2200" height="1200" class="img_ev3q"></p>
+        <content type="html"><![CDATA[<p><img decoding="async" loading="lazy" alt="MCP Jupyter Server" src="https://block.github.io/goose/pr-preview/pr-3059/assets/images/data-goose-7fc60ab0a13a9e9b6c22172d6ac166ab.png" width="1200" height="630" class="img_ev3q"></p>
 <p>Machine learning and data science workflows are inherently iterative. You load data, explore patterns, build models, and refine your approach based on results. But traditional AI assistants lose context between interactions, forcing you to reload data and re-establish context repeatedly—making data-heavy development slow and expensive.</p>
 <p>The <a href="https://github.com/block/mcp-jupyter" target="_blank" rel="noopener noreferrer"><strong>MCP Jupyter Server</strong></a> solves this by enabling AI agents like Goose to work directly with your Jupyter notebooks, maintaining persistent memory and state across interactions while letting the AI interact with your data through code execution rather than raw data transfer.</p>
 <iframe class="aspect-ratio" src="https://www.youtube.com/embed/0i6gB_mWaRM" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin"></iframe>
