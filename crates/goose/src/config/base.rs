@@ -5,11 +5,13 @@ use once_cell::sync::{Lazy, OnceCell};
 use serde::Deserialize;
 use serde_json::Value;
 use std::collections::HashMap;
-use std::env;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
+
+#[cfg(not(test))]
+use super::env_registry::ENV_REGISTRY;
 
 pub static APP_STRATEGY: Lazy<AppStrategyArgs> = Lazy::new(|| AppStrategyArgs {
     top_level_domain: "Block".to_string(),
@@ -129,13 +131,33 @@ impl Default for Config {
 
         let config_path = config_dir.join("config.yaml");
 
-        let secrets = match env::var("GOOSE_DISABLE_KEYRING") {
-            Ok(_) => SecretStorage::File {
-                path: config_dir.join("secrets.yaml"),
-            },
-            Err(_) => SecretStorage::Keyring {
-                service: KEYRING_SERVICE.to_string(),
-            },
+        let secrets = {
+            #[cfg(test)]
+            {
+                use std::env;
+                if env::var("GOOSE_DISABLE_KEYRING").is_ok() {
+                    SecretStorage::File {
+                        path: config_dir.join("secrets.yaml"),
+                    }
+                } else {
+                    SecretStorage::Keyring {
+                        service: KEYRING_SERVICE.to_string(),
+                    }
+                }
+            }
+            
+            #[cfg(not(test))]
+            {
+                if ENV_REGISTRY.contains_key("GOOSE_DISABLE_KEYRING") {
+                    SecretStorage::File {
+                        path: config_dir.join("secrets.yaml"),
+                    }
+                } else {
+                    SecretStorage::Keyring {
+                        service: KEYRING_SERVICE.to_string(),
+                    }
+                }
+            }
         };
         Config {
             config_path,
@@ -561,7 +583,7 @@ impl Config {
     /// Get a configuration value (non-secret).
     ///
     /// This will attempt to get the value from:
-    /// 1. Environment variable with the exact key name
+    /// 1. Environment variable with the exact key name (loaded at process start)
     /// 2. Configuration file
     ///
     /// The value will be deserialized into the requested type. This works with
@@ -575,11 +597,28 @@ impl Config {
     /// - The value cannot be deserialized into the requested type
     /// - There is an error reading the config file
     pub fn get_param<T: for<'de> Deserialize<'de>>(&self, key: &str) -> Result<T, ConfigError> {
-        // First check environment variables (convert to uppercase)
-        let env_key = key.to_uppercase();
-        if let Ok(val) = env::var(&env_key) {
-            let value = Self::parse_env_value(&val)?;
-            return Ok(serde_json::from_value(value)?);
+        // First check environment variables
+        #[cfg(test)]
+        {
+            // In tests, check environment variables directly to support dynamic changes
+            use std::env;
+            let env_key = key.to_uppercase();
+            if let Ok(val) = env::var(&env_key) {
+                let value = Self::parse_env_value(&val)?;
+                return Ok(serde_json::from_value(value)?);
+            }
+            if let Ok(val) = env::var(key) {
+                let value = Self::parse_env_value(&val)?;
+                return Ok(serde_json::from_value(value)?);
+            }
+        }
+        
+        #[cfg(not(test))]
+        {
+            // In production, use the pre-loaded registry for performance
+            if let Some(value) = ENV_REGISTRY.get_parsed(key) {
+                return Ok(serde_json::from_value(value)?);
+            }
         }
 
         // Load current values from file
@@ -639,7 +678,7 @@ impl Config {
     /// Get a secret value.
     ///
     /// This will attempt to get the value from:
-    /// 1. Environment variable with the exact key name
+    /// 1. Environment variable with the exact key name (loaded at process start)
     /// 2. System keyring
     ///
     /// The value will be deserialized into the requested type. This works with
@@ -653,11 +692,28 @@ impl Config {
     /// - The value cannot be deserialized into the requested type
     /// - There is an error accessing the keyring
     pub fn get_secret<T: for<'de> Deserialize<'de>>(&self, key: &str) -> Result<T, ConfigError> {
-        // First check environment variables (convert to uppercase)
-        let env_key = key.to_uppercase();
-        if let Ok(val) = env::var(&env_key) {
-            let value = Self::parse_env_value(&val)?;
-            return Ok(serde_json::from_value(value)?);
+        // First check environment variables
+        #[cfg(test)]
+        {
+            // In tests, check environment variables directly to support dynamic changes
+            use std::env;
+            let env_key = key.to_uppercase();
+            if let Ok(val) = env::var(&env_key) {
+                let value = Self::parse_env_value(&val)?;
+                return Ok(serde_json::from_value(value)?);
+            }
+            if let Ok(val) = env::var(key) {
+                let value = Self::parse_env_value(&val)?;
+                return Ok(serde_json::from_value(value)?);
+            }
+        }
+        
+        #[cfg(not(test))]
+        {
+            // In production, use the pre-loaded registry for performance
+            if let Some(value) = ENV_REGISTRY.get_parsed(key) {
+                return Ok(serde_json::from_value(value)?);
+            }
         }
 
         // Then check keyring
