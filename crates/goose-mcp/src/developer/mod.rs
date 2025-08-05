@@ -1,6 +1,7 @@
 mod editor_models;
 mod lang;
 mod shell;
+mod task_tracker;
 
 use anyhow::Result;
 use base64::Engine;
@@ -39,6 +40,7 @@ use rmcp::object;
 
 use self::editor_models::{create_editor_model, EditorModel};
 use self::shell::{expand_path, get_shell_config, is_absolute_path, normalize_line_endings};
+use self::task_tracker::TaskTracker;
 use indoc::indoc;
 use std::process::Stdio;
 use std::sync::{Arc, Mutex};
@@ -99,6 +101,7 @@ pub struct DeveloperRouter {
     file_history: Arc<Mutex<HashMap<PathBuf, Vec<String>>>>,
     ignore_patterns: Arc<Gitignore>,
     editor_model: Option<EditorModel>,
+    task_tracker: TaskTracker,
 }
 
 impl Default for DeveloperRouter {
@@ -421,6 +424,44 @@ impl DeveloperRouter {
             open_world_hint: Some(false),
         });
 
+        let task_tracker_tool = Tool::new(
+            "task_tracker",
+            indoc! {r#"
+                Manage development tasks with a simple task tracker.
+                
+                Actions:
+                - list: Show all tasks and their status
+                - add: Add a new task (supports adding multiple tasks separated by newlines)
+                - wip: Mark a task as work in progress
+                - done: Mark a task as completed
+                - clear: Remove all tasks
+                
+                Each task has a status: to do, wip (work in progress), or done.
+            "#},
+            object!({
+                "type": "object",
+                "required": ["action"],
+                "properties": {
+                    "action": {
+                        "type": "string",
+                        "enum": ["list", "add", "wip", "done", "clear"],
+                        "description": "The action to perform"
+                    },
+                    "task": {
+                        "type": "string",
+                        "description": "The task description (required for add, wip, done actions)"
+                    }
+                }
+            }),
+        )
+        .annotate(ToolAnnotations {
+            title: Some("Task Tracker".to_string()),
+            read_only_hint: Some(false),
+            destructive_hint: Some(false),
+            idempotent_hint: Some(false),
+            open_world_hint: Some(false),
+        });
+
         // Get base instructions and working directory
         let cwd = std::env::current_dir().expect("should have a current working dir");
         let os = std::env::consts::OS;
@@ -583,12 +624,14 @@ impl DeveloperRouter {
                 list_windows_tool,
                 screen_capture_tool,
                 image_processor_tool,
+                task_tracker_tool,
             ],
             prompts: Arc::new(load_prompt_files()),
             instructions,
             file_history: Arc::new(Mutex::new(HashMap::new())),
             ignore_patterns: Arc::new(ignore_patterns),
             editor_model,
+            task_tracker: TaskTracker::new(),
         }
     }
 
@@ -1606,6 +1649,65 @@ impl DeveloperRouter {
             Content::image(data, "image/png").with_priority(0.0),
         ])
     }
+
+    async fn task_tracker(&self, params: Value) -> Result<Vec<Content>, ToolError> {
+        let action =
+            params
+                .get("action")
+                .and_then(|v| v.as_str())
+                .ok_or(ToolError::InvalidParameters(
+                    "The action string is required".to_string(),
+                ))?;
+
+        match action {
+            "list" => {
+                let tasks = self.task_tracker.list_tasks();
+                Ok(vec![
+                    Content::text(format!("Tasks:\n{}", tasks.join("\n")))
+                        .with_audience(vec![Role::Assistant]),
+                    Content::text(format!("Tasks:\n{}", tasks.join("\n")))
+                        .with_audience(vec![Role::User])
+                        .with_priority(0.0),
+                ])
+            }
+            "add" => {
+                let task = params.get("task").and_then(|v| v.as_str()).ok_or(
+                    ToolError::InvalidParameters("The task string is required".to_string()),
+                )?;
+
+                let result = self.task_tracker.add_task(task.to_string());
+
+                Ok(vec![Content::text(result)])
+            }
+            "mark_wip" => {
+                let task = params.get("task").and_then(|v| v.as_str()).ok_or(
+                    ToolError::InvalidParameters("The task string is required".to_string()),
+                )?;
+
+                let result = self.task_tracker.mark_task_wip(task.to_string());
+
+                Ok(vec![Content::text(result)])
+            }
+            "mark_done" => {
+                let task = params.get("task").and_then(|v| v.as_str()).ok_or(
+                    ToolError::InvalidParameters("The task string is required".to_string()),
+                )?;
+
+                let result = self.task_tracker.mark_task_done(task.to_string());
+
+                Ok(vec![Content::text(result)])
+            }
+            "clear" => {
+                let result = self.task_tracker.clear_tasks();
+
+                Ok(vec![Content::text(result)])
+            }
+            _ => Err(ToolError::InvalidParameters(format!(
+                "Unknown action '{}'",
+                action
+            ))),
+        }
+    }
 }
 
 impl Router for DeveloperRouter {
@@ -1645,6 +1747,7 @@ impl Router for DeveloperRouter {
                 "list_windows" => this.list_windows(arguments).await,
                 "screen_capture" => this.screen_capture(arguments).await,
                 "image_processor" => this.image_processor(arguments).await,
+                "task_tracker" => this.task_tracker(arguments).await,
                 _ => Err(ToolError::NotFound(format!("Tool {} not found", tool_name))),
             }
         })
@@ -1703,6 +1806,7 @@ impl Clone for DeveloperRouter {
             file_history: Arc::clone(&self.file_history),
             ignore_patterns: Arc::clone(&self.ignore_patterns),
             editor_model: create_editor_model(), // Recreate the editor model since it's not Clone
+            task_tracker: self.task_tracker.clone(),
         }
     }
 }
@@ -2169,6 +2273,7 @@ mod tests {
             file_history: Arc::new(Mutex::new(HashMap::new())),
             ignore_patterns: Arc::new(ignore_patterns),
             editor_model: None,
+            task_tracker: TaskTracker::new(),
         };
 
         // Test basic file matching
@@ -2220,6 +2325,7 @@ mod tests {
             file_history: Arc::new(Mutex::new(HashMap::new())),
             ignore_patterns: Arc::new(ignore_patterns),
             editor_model: None,
+            task_tracker: TaskTracker::new(),
         };
 
         // Try to write to an ignored file
@@ -2280,6 +2386,7 @@ mod tests {
             file_history: Arc::new(Mutex::new(HashMap::new())),
             ignore_patterns: Arc::new(ignore_patterns),
             editor_model: None,
+            task_tracker: TaskTracker::new(),
         };
 
         // Create an ignored file
