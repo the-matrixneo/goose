@@ -1,10 +1,7 @@
 use crate::{
     agents::Agent,
     config::Config,
-    context_mgmt::{
-        common::{SYSTEM_PROMPT_TOKEN_OVERHEAD, TOOLS_TOKEN_OVERHEAD},
-        get_messages_token_counts_async,
-    },
+    context_mgmt::get_messages_token_counts_async,
     message::Message,
     token_counter::create_async_token_counter,
 };
@@ -20,9 +17,8 @@ pub struct AutoCompactResult {
     pub messages: Vec<Message>,
     /// Token count before compaction (if compaction occurred)
     pub tokens_before: Option<usize>,
-    /// Token count after compaction (if compaction occurred)
-    pub tokens_after: Option<usize>,
     /// Provider usage from summarization (if compaction occurred)
+    /// This contains the actual token counts after compaction
     pub summarization_usage: Option<crate::providers::base::ProviderUsage>,
 }
 
@@ -138,11 +134,11 @@ pub async fn check_compaction_needed(
 /// * `messages` - The current message history to compact
 ///
 /// # Returns
-/// * Tuple of (compacted_messages, tokens_before, tokens_after, summarization_usage)
+/// * Tuple of (compacted_messages, tokens_before, summarization_usage)
 pub async fn perform_compaction(
     agent: &Agent,
     messages: &[Message],
-) -> Result<(Vec<Message>, usize, usize, Option<crate::providers::base::ProviderUsage>)> {
+) -> Result<(Vec<Message>, usize, Option<crate::providers::base::ProviderUsage>)> {
     // Get token counter to measure before/after
     let token_counter = create_async_token_counter()
         .await
@@ -165,7 +161,7 @@ pub async fn perform_compaction(
         (1.0 - (tokens_after as f64 / tokens_before as f64)) * 100.0
     );
 
-    Ok((compacted_messages, tokens_before, tokens_after, summarization_usage))
+    Ok((compacted_messages, tokens_before, summarization_usage))
 }
 
 /// Check if messages need compaction and compact them if necessary
@@ -203,7 +199,6 @@ pub async fn check_and_compact_messages(
             compacted: false,
             messages: messages.to_vec(),
             tokens_before: None,
-            tokens_after: None,
             summarization_usage: None,
         });
     }
@@ -227,7 +222,7 @@ pub async fn check_and_compact_messages(
     };
 
     // Perform the compaction on messages excluding the preserved user message
-    let (mut compacted_messages, tokens_before, tokens_after, summarization_usage) =
+    let (mut compacted_messages, tokens_before, summarization_usage) =
         perform_compaction(agent, messages_to_compact).await?;
 
     // Add back the preserved user message if it exists
@@ -238,8 +233,7 @@ pub async fn check_and_compact_messages(
     Ok(AutoCompactResult {
         compacted: true,
         messages: compacted_messages,
-        tokens_before: Some(tokens_before + SYSTEM_PROMPT_TOKEN_OVERHEAD + TOOLS_TOKEN_OVERHEAD),
-        tokens_after: Some(tokens_after + SYSTEM_PROMPT_TOKEN_OVERHEAD + TOOLS_TOKEN_OVERHEAD),
+        tokens_before: Some(tokens_before),
         summarization_usage,
     })
 }
@@ -396,11 +390,10 @@ mod tests {
             create_test_message("Third message"),
         ];
 
-        let (compacted_messages, tokens_before, tokens_after, _summarization_usage) =
+        let (compacted_messages, tokens_before, _summarization_usage) =
             perform_compaction(&agent, &messages).await.unwrap();
 
         assert!(tokens_before > 0);
-        assert!(tokens_after > 0);
         // Note: The mock provider returns a fixed summary, which might not always be smaller
         // In real usage, compaction should reduce tokens, but for testing we just verify it works
         assert!(!compacted_messages.is_empty());
@@ -427,7 +420,7 @@ mod tests {
         assert!(!result.compacted);
         assert_eq!(result.messages.len(), messages.len());
         assert!(result.tokens_before.is_none());
-        assert!(result.tokens_after.is_none());
+
 
         // Test with threshold 1.0 (disabled)
         let result = check_and_compact_messages(&agent, &messages, Some(1.0), None)
@@ -503,13 +496,15 @@ mod tests {
 
         assert!(result.compacted);
         assert!(result.tokens_before.is_some());
-        assert!(result.tokens_after.is_some());
+        assert!(result.summarization_usage.is_some());
 
         // Should have fewer tokens after compaction
-        if let (Some(before), Some(after)) = (result.tokens_before, result.tokens_after) {
+        if let (Some(before), Some(usage)) = (result.tokens_before, &result.summarization_usage) {
+            let after = usage.usage.total_tokens.unwrap_or(0) as usize;
             assert!(
                 after < before,
-                "Token count should decrease after compaction"
+                "Token count should decrease after compaction: {} -> {}",
+                before, after
             );
         }
 
@@ -705,7 +700,7 @@ mod tests {
         // Should have triggered compaction
         assert!(result.compacted);
         assert!(result.tokens_before.is_some());
-        assert!(result.tokens_after.is_some());
+        assert!(result.summarization_usage.is_some());
 
         // Verify the compacted messages are returned
         assert!(!result.messages.is_empty());

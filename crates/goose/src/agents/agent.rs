@@ -783,17 +783,17 @@ impl Agent {
             let compacted_messages = compact_result.messages;
 
             // Create compaction notification message
-            let compaction_msg = if let (Some(before), Some(after)) =
-                (compact_result.tokens_before, compact_result.tokens_after)
-            {
-                format!(
-                    "Auto-compacted context: {} → {} tokens ({:.0}% reduction)\n\n",
-                    before,
-                    after,
-                    (1.0 - (after as f64 / before as f64)) * 100.0
-                )
-            } else {
-                "Auto-compacted context to reduce token usage\n\n".to_string()
+            let compaction_msg = match (compact_result.tokens_before, &compact_result.summarization_usage) {
+                (Some(before), Some(usage)) => {
+                    let after = usage.usage.total_tokens.unwrap_or(0) as usize;
+                    format!(
+                        "Auto-compacted context: {} → {} tokens ({:.0}% reduction)\n\n",
+                        before,
+                        after,
+                        (1.0 - (after as f64 / before as f64)) * 100.0
+                    )
+                }
+                _ => "Auto-compacted context to reduce token usage\n\n".to_string()
             };
 
             return Ok(Some((compacted_messages, compaction_msg, compact_result.summarization_usage)));
@@ -946,13 +946,25 @@ impl Agent {
                             // Record usage for the session
                             if let Some(ref session_config) = &session {
                                 if let Some(ref usage) = usage {
-                                    // Combine with summarization usage if present
-                                    let combined_usage = if let Some(ref sum_usage) = summarization_usage {
-                                        usage.combine_with(sum_usage)
+                                    // If we have summarization usage, we need to add only the main response cost
+                                    // to avoid double-counting the conversation content that was summarized
+                                    let final_usage = if let Some(ref sum_usage) = summarization_usage {
+                                        // Create a usage that represents: summarization cost + main response cost
+                                        // But we need to be careful not to double-count input tokens
+                                        let main_output_only = crate::providers::base::Usage::new(
+                                            None, // Don't double-count input tokens
+                                            usage.usage.output_tokens, // Add main response output
+                                            usage.usage.output_tokens, // Total = just the output
+                                        );
+                                        let main_output_usage = crate::providers::base::ProviderUsage::new(
+                                            usage.model.clone(),
+                                            main_output_only,
+                                        );
+                                        sum_usage.combine_with(&main_output_usage)
                                     } else {
                                         usage.clone()
                                     };
-                                    Self::update_session_metrics(session_config, &combined_usage, messages.len())
+                                    Self::update_session_metrics(session_config, &final_usage, messages.len())
                                         .await?;
                                 }
                             }
