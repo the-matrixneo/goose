@@ -546,7 +546,7 @@ function ToolResultView({ result, isStartExpanded }: ToolResultViewProps) {
       label={<span className="pl-4 py-1 font-medium">Output</span>}
       isStartExpanded={isStartExpanded}
     >
-      <div className="pl-4 pr-4 py-4">
+      <div className="pl-8 pr-4">
         {result.type === 'text' && result.text && (
           <MarkdownContent
             content={result.text}
