@@ -13,23 +13,19 @@ pub async fn ensure_usage_tokens(
     response: &Message,
     tools: &[Tool],
 ) -> Result<()> {
-    // If we already have both input and output tokens, nothing to do
     if provider_usage.usage.input_tokens.is_some() && provider_usage.usage.output_tokens.is_some() {
         return Ok(());
     }
 
-    // Create token counter for estimation
     let token_counter = create_async_token_counter()
         .await
         .map_err(|e| anyhow::anyhow!("Failed to create token counter: {}", e))?;
 
-    // Estimate input tokens if missing
     if provider_usage.usage.input_tokens.is_none() {
         let input_count = token_counter.count_chat_tokens(system_prompt, request_messages, tools);
         provider_usage.usage.input_tokens = Some(input_count as i32);
     }
 
-    // Estimate output tokens if missing
     if provider_usage.usage.output_tokens.is_none() {
         let response_text = response
             .content
@@ -41,7 +37,6 @@ pub async fn ensure_usage_tokens(
         provider_usage.usage.output_tokens = Some(output_count as i32);
     }
 
-    // Update total tokens if we have both input and output
     if let (Some(input), Some(output)) = (
         provider_usage.usage.input_tokens,
         provider_usage.usage.output_tokens,
