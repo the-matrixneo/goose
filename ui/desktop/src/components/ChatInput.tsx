@@ -12,7 +12,6 @@ import { Message } from '../types/message';
 import { DirSwitcher } from './bottom_menu/DirSwitcher';
 import ModelsBottomBar from './settings/models/bottom_bar/ModelsBottomBar';
 import { BottomMenuModeSelection } from './bottom_menu/BottomMenuModeSelection';
-import { ManualCompactButton } from './context_management/ManualCompactButton';
 import { AlertType, useAlerts } from './alerts';
 import { useToolCount } from './alerts/useToolCount';
 import { useConfig } from './ConfigContext';
@@ -110,7 +109,7 @@ export default function ChatInput({
   const { alerts, addAlert, clearAlerts } = useAlerts();
   const dropdownRef = useRef<HTMLDivElement>(null);
   const toolCount = useToolCount();
-  const { isLoadingCompaction } = useChatContextManager();
+  const { isLoadingCompaction, handleManualCompaction } = useChatContextManager();
   const { getProviders, read } = useConfig();
   const { getCurrentModelAndProvider, currentModel, currentProvider } = useModelAndProvider();
   const [tokenLimit, setTokenLimit] = useState<number>(TOKEN_LIMIT_DEFAULT);
@@ -409,14 +408,21 @@ export default function ChatInput({
         // Only show error alert when limit reached
         addAlert({
           type: AlertType.Error,
-          message: `Token limit reached (${numTokens.toLocaleString()}/${tokenLimit.toLocaleString()}) \n You've reached the model's conversation limit. The session will be saved — copy anything important and start a new one to continue.`,
+          message: `You've reached the model's context limit.`,
           autoShow: true, // Auto-show token limit errors
         });
       } else if (numTokens >= tokenLimit * TOKEN_WARNING_THRESHOLD) {
-        // Only show warning alert when approaching limit
+        // Show warning alert when approaching limit with action to compact
         addAlert({
           type: AlertType.Warning,
-          message: `Approaching token limit (${numTokens.toLocaleString()}/${tokenLimit.toLocaleString()}) \n You're reaching the model's conversation limit. Consider compacting the conversation to continue.`,
+          message: `You're reaching the model's context limit.`,
+          action: {
+            text: 'Compact conversation',
+            onClick: () => {
+              // Trigger manual compaction
+              handleManualCompaction(messages, setMessages);
+            },
+          },
           autoShow: true, // Auto-show token limit warnings
         });
       } else {
@@ -456,7 +462,16 @@ export default function ChatInput({
     }
     // We intentionally omit setView as it shouldn't trigger a re-render of alerts
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [numTokens, toolCount, tokenLimit, isTokenLimitLoaded, addAlert, clearAlerts]);
+  }, [
+    numTokens,
+    toolCount,
+    tokenLimit,
+    isTokenLimitLoaded,
+    addAlert,
+    clearAlerts,
+    messages,
+    setMessages,
+  ]);
 
   // Cleanup effect for component unmount - prevent memory leaks
   useEffect(() => {
@@ -1286,13 +1301,6 @@ export default function ChatInput({
           </Tooltip>
           <div className="w-px h-4 bg-border-default mx-2" />
           <BottomMenuModeSelection />
-          {messages.length > 0 && (
-            <ManualCompactButton
-              messages={messages}
-              isLoading={isLoading}
-              setMessages={setMessages}
-            />
-          )}
           <div className="w-px h-4 bg-border-default mx-2" />
           <div className="flex items-center h-full">
             <Tooltip>

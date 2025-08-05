@@ -118,20 +118,6 @@ export const ContextHandler: React.FC<ContextHandlerProps> = ({
     triggerContextLengthExceeded();
   };
 
-  // Function to open a new goose window
-  const openNewSession = () => {
-    try {
-      // Use the workingDir from props directly without reassignment to avoid TypeScript error
-      const sessionWorkingDir = window.appConfig?.get('GOOSE_WORKING_DIR') || workingDir;
-      console.log(`Creating new chat window with working dir: ${sessionWorkingDir}`);
-      window.electron.createChatWindow(undefined, sessionWorkingDir as string);
-    } catch (error) {
-      console.error('Error creating new window:', error);
-      // Fallback to basic window.open if the electron API fails
-      window.open('/', '_blank');
-    }
-  };
-
   // Render the notification UI
   const renderLoadingState = () => (
     <div className="flex items-center text-xs text-gray-400">
@@ -144,16 +130,16 @@ export const ContextHandler: React.FC<ContextHandlerProps> = ({
     <>
       <span className="text-xs text-gray-400">
         {isContextLengthExceeded
-          ? `Your conversation has exceeded the model's context capacity`
+          ? `You've reached the conversation limit`
           : `Summarization requested`}
       </span>
       <span className="text-xs text-gray-400">
         {isContextLengthExceeded
-          ? `This conversation has too much information to continue. Extension data often takes up significant space.`
+          ? `The conversation needs to be compacted to continue.`
           : `Summarization failed. Continue chatting or start a new session.`}
       </span>
-      <Button onClick={openNewSession} className="text-xs transition-colors mt-1 flex items-center">
-        Click here to start a new session
+      <Button onClick={handleRetry} className="text-xs transition-colors mt-1 flex items-center">
+        Compact Conversation and Continue
       </Button>
     </>
   );
@@ -162,11 +148,11 @@ export const ContextHandler: React.FC<ContextHandlerProps> = ({
     <>
       <span className="text-xs text-gray-400">
         {isContextLengthExceeded
-          ? `Your conversation has exceeded the model's context capacity`
+          ? `You've reached the conversation limit`
           : `Summarization requested`}
       </span>
       <Button onClick={handleRetry} className="text-xs transition-colors mt-1 flex items-center">
-        Retry loading summary
+        Compact Conversation and Continue
       </Button>
     </>
   );
@@ -175,7 +161,7 @@ export const ContextHandler: React.FC<ContextHandlerProps> = ({
     <>
       <span className="text-xs text-gray-400">
         {isContextLengthExceeded
-          ? `Your conversation has exceeded the model's context capacity and a summary was prepared.`
+          ? `Conversation compacted successfully.`
           : `A summary of your conversation was prepared as requested.`}
       </span>
       <span className="text-xs text-gray-400">
