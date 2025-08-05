@@ -335,17 +335,6 @@
     ]
   },
   {
-    "id": "filesystem-mcp",
-    "name": "Filesystem",
-    "description": "File system operations and management",
-    "command": "uvx mcp-server-filesystem",
-    "link": "https://github.com/modelcontextprotocol/servers",
-    "installation_notes": "Install using uvx package manager.",
-    "is_builtin": false,
-    "endorsed": true,
-    "environmentVariables": []
-  },
-  {
     "id": "github-mcp",
     "name": "GitHub",
     "description": "GitHub repository management and operations",
