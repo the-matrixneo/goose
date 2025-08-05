@@ -427,7 +427,22 @@ impl DeveloperRouter {
         let task_tracker_tool = Tool::new(
             "task_tracker",
             indoc! {r#"
-                Manage development tasks with a simple task tracker.
+                The task tracker tool will help you keep track of tasks
+                ALWAYS to use this when starting an activity to help you plan, and when resuming or shifting activities
+                ALWAYS check the task tracker tasks, and update it as you go
+                This is an ESSENTIAL tool for breaking down your work into chunks and ensuring it is completed 
+                Check the list often, and update it (one by one) as you complete tasks
+                When starting out, you SHOULD plan your tasks in advance in very short description for each 
+                
+                use wip action when you start on one task at a time and done action when finished with it 
+                
+                By default (no parameters), returns a list of all tasks with their status.
+                for example, 
+                    user: "build me a time machine". 
+                    task list: "establish a view of quantum physics", "solve causality paradoxes", "research negative energy", "test time machine" 
+
+                Each task has a status: to do, wip (work in progress), or done.
+                Note: Task descriptions must be 200 characters or less. Keep them concise!                
                 
                 Actions:
                 - list: Show all tasks and their status
@@ -449,7 +464,7 @@ impl DeveloperRouter {
                     },
                     "task": {
                         "type": "string",
-                        "description": "The task description (required for add, wip, done actions)"
+                        "description": "The brief task description (required for add, wip, done actions)"
                     }
                 }
             }),
