@@ -139,6 +139,7 @@ The `extensions` field allows you to specify which Model Context Protocol (MCP) 
 | `name` | String | Unique name for the extension |
 | `cmd` | String | Command to run the extension |
 | `args` | Array | List of arguments for the command |
+| `env_keys` | Array | (Optional) Names of environment variables (e.g. API keys) required by the extension |
 | `timeout` | Number | Timeout in seconds |
 | `bundled` | Boolean | (Optional) Whether the extension is bundled with Goose |
 | `description` | String | Description of what the extension does |
@@ -163,7 +164,34 @@ extensions:
     args:
       - 'mcp_presidio@latest'
     description: "For searching logs using Presidio"
+  
+  - type: stdio
+    name: github-mcp
+    cmd: github-mcp-server
+    args: []
+    env_keys:
+      - GITHUB_TOKEN
+      - GITHUB_API_URL
+    timeout: 60
+    description: "GitHub MCP extension for repository operations"
 ```
+
+### Extension Secrets
+
+This feature is only available through the CLI.
+
+When extensions specify `env_keys`, Goose automatically detects these as required environment variables and will prompt users to provide them when running the recipe.
+
+#### How Environment Variable Management Works
+
+1. **Environment Variable Discovery**: When a recipe is loaded, Goose scans all extensions (including those in sub-recipes) for `env_keys` fields
+2. **Interactive Prompting**: If any required environment variables are missing from the secure keyring, Goose prompts the user to enter them
+3. **Secure Storage**: Values are stored securely in the system keyring and reused for subsequent runs
+4. **Optional Variables**: Users can press `ESC` to skip entering a variable if it's optional for the extension
+
+:::info
+This feature is designed to prompt for and securely store secrets (such as API keys), but `env_keys` can include any environment variable needed by the extension (such as API endpoints, configuration values, etc.).
+:::
 
 ## Sub-Recipes
 
@@ -328,6 +356,28 @@ Recipes support Jinja-style template syntax in both `instructions` and `prompt` 
 instructions: "Follow these steps with {{ parameter_name }}"
 prompt: "Your task is to {{ action }}"
 ```
+
+### Template Filters
+
+Use filters to transform parameter values. For example, specifying `{{ raw_data | indent(2) }}` in the following example (instead of just `{{ raw_data }}`) maintains a valid YAML format when passing multi-line content to sub-recipes:
+
+```yaml
+sub_recipes:
+  - name: "analyze"
+    path: "./analyze.yaml"
+    values:
+      content: |
+{{ raw_data | indent(2) }}
+```
+
+**Common filters:**
+- `{{ content | indent(2) }}` - Indent multi-line content
+- `{{ text | upper }}` - Convert to uppercase
+- `{{ value | default("fallback") }}` - Provide fallback values
+
+See [Jinja filters documentation](https://jinja.palletsprojects.com/en/3.1.x/templates/#builtin-filters) for the complete list.
+
+### Template Inheritance
 
 Advanced template features include:
 - Template inheritance using `{% extends "parent.yaml" %}`

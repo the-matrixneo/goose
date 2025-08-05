@@ -26,7 +26,7 @@ Sub-recipe sessions run in isolation - they don't share conversation history, me
 
 ### Parameter Handling
 
-Sub-recipes receive parameters in two ways:
+Parameters received by sub-recipes can be used in prompts and instructions using `{{ parameter_name }}` syntax. Sub-recipes receive parameters in two ways:
 
 1. **Pre-set values**: Fixed parameter values defined in the `values` field are automatically provided and cannot be overridden at runtime
 2. **Automatic parameter inheritance**: Sub-recipes automatically have access to all parameters passed to the main recipe at runtime.
@@ -34,7 +34,7 @@ Sub-recipes receive parameters in two ways:
 Pre-set values take precedence over inherited parameters. If both the main recipe and `values` field provide the same parameter, the `values` version is used.
 
 :::info Template Variables
-Parameters received by sub-recipes can be used in prompts and instructions using `{{ parameter_name }}` syntax.
+Use the `indent` filter to maintain valid YAML format when passing multi-line content to sub-recipes, for example: `{{ content | indent(2) }}`. See [Template Support](/docs/guides/recipes/recipe-reference#template-support) for more details.
 :::
 
 ## Examples
