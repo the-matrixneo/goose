@@ -254,7 +254,8 @@ impl ExtensionManager {
                 });
                 let (transport, mut stderr) = TokioChildProcess::builder(command)
                     .stderr(Stdio::piped())
-                    .spawn()?;
+                    .spawn()
+                    .map_err(|e| ExtensionError::ClientCreationError(e.to_string()))?;
                 let mut stderr = stderr
                     .take()
                     .expect("should have a stderr handle because it was requested");
@@ -276,10 +277,16 @@ impl ExtensionManager {
                 let client = match client_result {
                     Ok(client) => Ok(client),
                     Err(error) => {
-                        let error_task_out = stderr_task.await?;
-                        Err::<McpClient, ExtensionError>(match error_task_out {
-                            Ok(stderr_content) => ProcessExit::new(stderr_content, error).into(),
-                            Err(e) => e.into(),
+                        let error_task_out = stderr_task
+                            .await
+                            .map_err(|e| ExtensionError::ClientCreationError(e.to_string()))?;
+
+                        Err(match error_task_out {
+                            Ok(stderr_content) => ExtensionError::ClientCreationError(format!(
+                                "Process quit: {}. Stderr: {}",
+                                error, stderr_content
+                            )),
+                            Err(e) => ExtensionError::ClientCreationError(e.to_string()),
                         })
                     }
                 }?;
