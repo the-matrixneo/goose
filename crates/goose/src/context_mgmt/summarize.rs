@@ -12,11 +12,13 @@ struct SummarizeContext {
     messages: String,
 }
 
+use crate::providers::base::ProviderUsage;
+
 /// Summarization function that uses the detailed prompt from the markdown template
 pub async fn summarize_messages(
     provider: Arc<dyn Provider>,
     messages: &[Message],
-) -> Result<Option<(Message, usize, usize)>, anyhow::Error> {
+) -> Result<Option<(Message, ProviderUsage)>, anyhow::Error> {
     if messages.is_empty() {
         return Ok(None);
     }
@@ -54,10 +56,7 @@ pub async fn summarize_messages(
         .await
         .map_err(|e| anyhow::anyhow!("Failed to ensure usage tokens: {}", e))?;
 
-    let input_tokens = provider_usage.usage.input_tokens.unwrap_or(0) as usize;
-    let output_tokens = provider_usage.usage.output_tokens.unwrap_or(0) as usize;
-
-    Ok(Some((response, input_tokens, output_tokens)))
+    Ok(Some((response, provider_usage)))
 }
 
 #[cfg(test)]
@@ -151,15 +150,15 @@ mod tests {
             summary_result.is_some(),
             "The summary should contain a result."
         );
-        let (summarized_message, input_tokens, output_tokens) = summary_result.unwrap();
+        let (summarized_message, provider_usage) = summary_result.unwrap();
 
         assert_eq!(
             summarized_message.role,
             Role::User,
             "The summarized message should be from the user."
         );
-        assert!(input_tokens > 0, "Should have input token count");
-        assert!(output_tokens > 0, "Should have output token count");
+        assert!(provider_usage.usage.input_tokens.unwrap_or(0) > 0, "Should have input token count");
+        assert!(provider_usage.usage.output_tokens.unwrap_or(0) > 0, "Should have output token count");
     }
 
     #[tokio::test]

@@ -22,6 +22,8 @@ pub struct AutoCompactResult {
     pub tokens_before: Option<usize>,
     /// Token count after compaction (if compaction occurred)
     pub tokens_after: Option<usize>,
+    /// Provider usage from summarization (if compaction occurred)
+    pub summarization_usage: Option<crate::providers::base::ProviderUsage>,
 }
 
 /// Result of checking if compaction is needed
@@ -136,11 +138,11 @@ pub async fn check_compaction_needed(
 /// * `messages` - The current message history to compact
 ///
 /// # Returns
-/// * Tuple of (compacted_messages, tokens_before, tokens_after)
+/// * Tuple of (compacted_messages, tokens_before, tokens_after, summarization_usage)
 pub async fn perform_compaction(
     agent: &Agent,
     messages: &[Message],
-) -> Result<(Vec<Message>, usize, usize)> {
+) -> Result<(Vec<Message>, usize, usize, Option<crate::providers::base::ProviderUsage>)> {
     // Get token counter to measure before/after
     let token_counter = create_async_token_counter()
         .await
@@ -153,7 +155,7 @@ pub async fn perform_compaction(
     info!("Performing compaction on {} tokens", tokens_before);
 
     // Perform compaction
-    let (compacted_messages, compacted_token_counts) = agent.summarize_context(messages).await?;
+    let (compacted_messages, compacted_token_counts, summarization_usage) = agent.summarize_context(messages).await?;
     let tokens_after: usize = compacted_token_counts.iter().sum();
 
     info!(
@@ -163,7 +165,7 @@ pub async fn perform_compaction(
         (1.0 - (tokens_after as f64 / tokens_before as f64)) * 100.0
     );
 
-    Ok((compacted_messages, tokens_before, tokens_after))
+    Ok((compacted_messages, tokens_before, tokens_after, summarization_usage))
 }
 
 /// Check if messages need compaction and compact them if necessary
@@ -202,6 +204,7 @@ pub async fn check_and_compact_messages(
             messages: messages.to_vec(),
             tokens_before: None,
             tokens_after: None,
+            summarization_usage: None,
         });
     }
 
@@ -224,7 +227,7 @@ pub async fn check_and_compact_messages(
     };
 
     // Perform the compaction on messages excluding the preserved user message
-    let (mut compacted_messages, tokens_before, tokens_after) =
+    let (mut compacted_messages, tokens_before, tokens_after, summarization_usage) =
         perform_compaction(agent, messages_to_compact).await?;
 
     // Add back the preserved user message if it exists
@@ -237,6 +240,7 @@ pub async fn check_and_compact_messages(
         messages: compacted_messages,
         tokens_before: Some(tokens_before + SYSTEM_PROMPT_TOKEN_OVERHEAD + TOOLS_TOKEN_OVERHEAD),
         tokens_after: Some(tokens_after + SYSTEM_PROMPT_TOKEN_OVERHEAD + TOOLS_TOKEN_OVERHEAD),
+        summarization_usage,
     })
 }
 
@@ -392,7 +396,7 @@ mod tests {
             create_test_message("Third message"),
         ];
 
-        let (compacted_messages, tokens_before, tokens_after) =
+        let (compacted_messages, tokens_before, tokens_after, _summarization_usage) =
             perform_compaction(&agent, &messages).await.unwrap();
 
         assert!(tokens_before > 0);

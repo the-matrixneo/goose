@@ -48,22 +48,24 @@ impl Agent {
     }
 
     /// Public API to summarize the conversation so that its token count is within the allowed context limit.
+    /// Returns the summarized messages, token counts, and the ProviderUsage from summarization
     pub async fn summarize_context(
         &self,
         messages: &[Message], // last message is a user msg that led to assistant message with_context_length_exceeded
-    ) -> Result<(Vec<Message>, Vec<usize>), anyhow::Error> {
+    ) -> Result<(Vec<Message>, Vec<usize>, Option<crate::providers::base::ProviderUsage>), anyhow::Error> {
         let provider = self.provider().await?;
         let summary_result = summarize_messages(provider.clone(), messages).await?;
 
-        let (mut new_messages, mut new_token_counts) = match summary_result {
-            Some((summary_message, input_tokens, output_tokens)) => {
-                // For token counting purposes, we use the total tokens (input + output)
-                (vec![summary_message], vec![input_tokens + output_tokens])
+        let (mut new_messages, mut new_token_counts, summarization_usage) = match summary_result {
+            Some((summary_message, provider_usage)) => {
+                // For token counting purposes, we use the total tokens from the provider usage
+                let total_tokens = provider_usage.usage.total_tokens.unwrap_or(0) as usize;
+                (vec![summary_message], vec![total_tokens], Some(provider_usage))
             }
             None => {
                 // No summary was generated (empty input)
                 tracing::warn!("Summarization failed. Returning empty messages.");
-                return Ok((vec![], vec![]));
+                return Ok((vec![], vec![], None));
             }
         };
 
@@ -77,6 +79,6 @@ impl Agent {
             new_token_counts.push(assistant_message_tokens);
         }
 
-        Ok((new_messages, new_token_counts))
+        Ok((new_messages, new_token_counts, summarization_usage))
     }
 }

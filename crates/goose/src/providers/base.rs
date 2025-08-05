@@ -211,6 +211,15 @@ impl ProviderUsage {
         .await
         .map_err(|e| ProviderError::ExecutionError(format!("Failed to ensure usage tokens: {}", e)))
     }
+
+    /// Combine this ProviderUsage with another, adding their token counts
+    /// Uses the model from this ProviderUsage
+    pub fn combine_with(&self, other: &ProviderUsage) -> ProviderUsage {
+        ProviderUsage {
+            model: self.model.clone(),
+            usage: self.usage + other.usage,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, Copy)]

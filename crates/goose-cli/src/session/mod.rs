@@ -162,7 +162,7 @@ impl Session {
         message_suffix: &str,
     ) -> Result<()> {
         // Summarize messages to fit within context length
-        let (summarized_messages, _) = agent.summarize_context(messages).await?;
+        let (summarized_messages, _, _) = agent.summarize_context(messages).await?;
         let msg = format!("Context maxed out\n{}\n{}", "-".repeat(50), message_suffix);
         output::render_text(&msg, Some(Color::Yellow), true);
         *messages = summarized_messages;
@@ -719,7 +719,7 @@ impl Session {
                         let provider = self.agent.provider().await?;
 
                         // Call the summarize_context method which uses the summarize_messages function
-                        let (summarized_messages, _) =
+                        let (summarized_messages, _, _) =
                             self.agent.summarize_context(&self.messages).await?;
 
                         // Update the session messages with the summarized ones

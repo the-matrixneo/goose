@@ -760,7 +760,7 @@ impl Agent {
         &self,
         messages: &[Message],
         session: &Option<SessionConfig>,
-    ) -> Result<Option<(Vec<Message>, String)>> {
+    ) -> Result<Option<(Vec<Message>, String, Option<crate::providers::base::ProviderUsage>)>> {
         // Try to get session metadata for more accurate token counts
         let session_metadata = if let Some(session_config) = session {
             match session::storage::get_path(session_config.id.clone()) {
@@ -796,7 +796,7 @@ impl Agent {
                 "Auto-compacted context to reduce token usage\n\n".to_string()
             };
 
-            return Ok(Some((compacted_messages, compaction_msg)));
+            return Ok(Some((compacted_messages, compaction_msg, compact_result.summarization_usage)));
         }
 
         Ok(None)
@@ -810,16 +810,16 @@ impl Agent {
         cancel_token: Option<CancellationToken>,
     ) -> Result<BoxStream<'_, Result<AgentEvent>>> {
         // Handle auto-compaction before processing
-        let (messages, compaction_msg) = match self
+        let (messages, compaction_msg, summarization_usage) = match self
             .handle_auto_compaction(unfixed_messages, &session)
             .await?
         {
-            Some((compacted_messages, msg)) => (compacted_messages, Some(msg)),
+            Some((compacted_messages, msg, usage)) => (compacted_messages, Some(msg), usage),
             None => {
                 let context = self
                     .prepare_reply_context(unfixed_messages, &session)
                     .await?;
-                (context.messages, None)
+                (context.messages, None, None)
             }
         };
 
@@ -830,7 +830,7 @@ impl Agent {
                 yield AgentEvent::HistoryReplaced(messages.clone());
 
                 // Continue with normal reply processing using compacted messages
-                let mut reply_stream = self.reply_internal(&messages, session, cancel_token).await?;
+                let mut reply_stream = self.reply_internal(&messages, session, cancel_token, summarization_usage).await?;
                 while let Some(event) = reply_stream.next().await {
                     yield event?;
                 }
@@ -838,7 +838,7 @@ impl Agent {
         }
 
         // No compaction needed, proceed with normal processing
-        self.reply_internal(&messages, session, cancel_token).await
+        self.reply_internal(&messages, session, cancel_token, summarization_usage).await
     }
 
     /// Main reply method that handles the actual agent processing
@@ -847,6 +847,7 @@ impl Agent {
         messages: &[Message],
         session: Option<SessionConfig>,
         cancel_token: Option<CancellationToken>,
+        summarization_usage: Option<crate::providers::base::ProviderUsage>,
     ) -> Result<BoxStream<'_, Result<AgentEvent>>> {
         let context = self.prepare_reply_context(messages, &session).await?;
         let ReplyContext {
@@ -945,7 +946,13 @@ impl Agent {
                             // Record usage for the session
                             if let Some(ref session_config) = &session {
                                 if let Some(ref usage) = usage {
-                                    Self::update_session_metrics(session_config, usage, messages.len())
+                                    // Combine with summarization usage if present
+                                    let combined_usage = if let Some(ref sum_usage) = summarization_usage {
+                                        usage.combine_with(sum_usage)
+                                    } else {
+                                        usage.clone()
+                                    };
+                                    Self::update_session_metrics(session_config, &combined_usage, messages.len())
                                         .await?;
                                 }
                             }
