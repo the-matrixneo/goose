@@ -39,7 +39,7 @@ pub struct EnvRegistry {
 }
 
 /// Global environment registry instance
-pub static ENV_REGISTRY: Lazy<EnvRegistry> = Lazy::new(|| EnvRegistry::new());
+pub static ENV_REGISTRY: Lazy<EnvRegistry> = Lazy::new(EnvRegistry::new);
 
 /// Categories of environment variables used by Goose
 #[derive(Debug, Clone, PartialEq)]
@@ -63,9 +63,10 @@ pub enum EnvCategory {
 }
 
 /// Expected type for an environment variable
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub enum EnvVarType {
     /// String value (default if not specified)
+    #[default]
     String,
     /// Integer value
     Integer,
@@ -77,12 +78,6 @@ pub enum EnvVarType {
     JsonObject,
     /// JSON array
     JsonArray,
-}
-
-impl Default for EnvVarType {
-    fn default() -> Self {
-        EnvVarType::String
-    }
 }
 
 /// Known environment variables with their categories and whether they're secrets
@@ -355,7 +350,7 @@ pub const KNOWN_ENV_VARS: &[EnvVarSpec] = &[
         category: EnvCategory::Tracing,
         is_secret: false,
         description: "OTLP exporter endpoint",
-        var_type: EnvVarType::Integer,
+        var_type: EnvVarType::String,
     },
     EnvVarSpec {
         name: "OTEL_EXPORTER_OTLP_TIMEOUT",
@@ -609,6 +604,12 @@ pub fn discover_extension_env_vars() -> Vec<String> {
     discovered
 }
 
+impl Default for EnvRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EnvRegistry {
     /// Create a new environment registry by loading all environment variables at startup
     pub fn new() -> Self {
@@ -723,15 +724,9 @@ impl EnvRegistry {
     /// Find the spec for a given environment variable
     fn find_spec(&self, key: &str) -> Option<&'static EnvVarSpec> {
         let upper_key = key.to_uppercase();
-
-        // Check static known vars
-        for spec in KNOWN_ENV_VARS {
-            if spec.name == key || spec.name == upper_key {
-                return Some(spec);
-            }
-        }
-
-        None
+        
+        // Use iterator instead of manual loop
+        KNOWN_ENV_VARS.iter().find(|&spec| spec.name == key || spec.name == upper_key)
     }
 
     /// Validate that a value matches the expected type
@@ -914,7 +909,7 @@ impl EnvRegistry {
         }
 
         // Find unknown GOOSE_* variables
-        for (key, _) in &self.env_vars {
+        for key in self.env_vars.keys() {
             if key.starts_with("GOOSE_")
                 && !KNOWN_ENV_VARS.iter().any(|spec| spec.name == key)
                 && !discovered_providers.iter().any(|spec| spec.name == key)
