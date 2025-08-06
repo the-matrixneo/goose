@@ -124,7 +124,7 @@ impl TaskTracker {
 
                 Ok(vec![Content::text(result)])
             }
-            "clear" => {
+            "clear-tasks" => {
                 let result = self.clear_tasks();
 
                 Ok(vec![Content::text(result)])
@@ -314,7 +314,7 @@ mod tests {
         tracker.add_task("Task 1".to_string());
         tracker.add_task("Task 2".to_string());
 
-        let params = serde_json::json!({"action": "clear"});
+        let params = serde_json::json!({"action": "clear-tasks"});
         let result = tracker.handle_request(params).await.unwrap();
 
         assert_eq!(result.len(), 1);

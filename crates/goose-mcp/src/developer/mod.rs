@@ -352,28 +352,28 @@ impl DeveloperRouter {
             "task_tracker",
             indoc! {r#"
                 The task tracker tool will help you keep track of tasks
-                ALWAYS to use this when starting an activity to help you plan, and when resuming or shifting activities
+                ALWAYS to use this when starting a non trivial activity to help you plan, and when resuming or shifting activities
                 ALWAYS check the task tracker tasks, and update it as you go
                 This is an ESSENTIAL tool for breaking down your work into chunks and ensuring it is completed 
                 Check the list often, and update it (one by one) as you complete tasks
-                When starting out, you SHOULD plan your tasks in advance in very short description for each 
+                When starting out, you SHOULD plan your tasks in advance in very short description for each
                 
                 use wip action when you start on one task at a time and done action when finished with it 
-                
-                By default (no parameters), returns a list of all tasks with their status.
+                                
                 for example, 
                     user: "build me a time machine". 
                     task list: "establish a view of quantum physics", "solve causality paradoxes", "research negative energy", "test time machine" 
 
                 Each task has a status: to do, wip (work in progress), or done.
-                Note: Task descriptions must be 200 characters or less. Keep them concise!                
+                Note: Task descriptions must be 200 characters or less. Keep them concise
+                From time to time you may need to clear-tasks to start fresh                
                 
                 Actions:
                 - list: Show all tasks and their status
                 - add: Add a new task
                 - wip: Mark a task as work in progress
                 - done: Mark a task as completed
-                - clear: Remove all tasks
+                - clear-tasks: Remove all tasks and start fresh
                 
                 Each task has a status: to do, wip (work in progress), or done.
             "#},
@@ -383,7 +383,7 @@ impl DeveloperRouter {
                 "properties": {
                     "action": {
                         "type": "string",
-                        "enum": ["list", "add", "wip", "done", "clear"],
+                        "enum": ["list", "add", "wip", "done", "clear-tasks"],
                         "description": "The action to perform"
                     },
                     "task": {
