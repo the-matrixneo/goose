@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { FileText, Clock, Home, Puzzle, History } from 'lucide-react';
+import { FileText, Clock, Home, Puzzle, History, Hammer } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import {
   SidebarContent,
