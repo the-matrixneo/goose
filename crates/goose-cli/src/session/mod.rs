@@ -719,13 +719,13 @@ impl Session {
                         let provider = self.agent.provider().await?;
 
                         // Call the summarize_context method which uses the summarize_messages function
-                        let (summarized_messages, _, _) =
+                        let (summarized_messages, _token_counts, summarization_usage) =
                             self.agent.summarize_context(&self.messages).await?;
 
                         // Update the session messages with the summarized ones
                         self.messages = summarized_messages;
 
-                        // Persist the summarized messages
+                        // Persist the summarized messages and update session metadata with new token counts
                         if let Some(session_file) = &self.session_file {
                             let working_dir = std::env::current_dir().ok();
                             session::persist_messages_with_schedule_id(
@@ -736,6 +736,33 @@ impl Session {
                                 working_dir,
                             )
                             .await?;
+
+                            // Update session metadata with the new token counts from summarization
+                            if let Some(usage) = summarization_usage {
+                                let session_file_path = session::storage::get_path(session::storage::Identifier::Path(session_file.to_path_buf()))?;
+                                let mut metadata = session::storage::read_metadata(&session_file_path)?;
+                                
+                                // Update token counts with the summarization usage
+                                // Use output tokens as total since that's what's actually in the context going forward
+                                let summary_tokens = usage.usage.output_tokens.unwrap_or(0);
+                                metadata.total_tokens = Some(summary_tokens);
+                                metadata.input_tokens = None; // Clear input tokens since we now have a summary
+                                metadata.output_tokens = Some(summary_tokens);
+                                metadata.message_count = self.messages.len();
+                                
+                                // Update accumulated tokens (add the summarization cost)
+                                let accumulate = |a: Option<i32>, b: Option<i32>| -> Option<i32> {
+                                    match (a, b) {
+                                        (Some(x), Some(y)) => Some(x + y),
+                                        _ => a.or(b),
+                                    }
+                                };
+                                metadata.accumulated_total_tokens = accumulate(metadata.accumulated_total_tokens, usage.usage.total_tokens);
+                                metadata.accumulated_input_tokens = accumulate(metadata.accumulated_input_tokens, usage.usage.input_tokens);
+                                metadata.accumulated_output_tokens = accumulate(metadata.accumulated_output_tokens, usage.usage.output_tokens);
+                                
+                                session::storage::update_metadata(&session_file_path, &metadata).await?;
+                            }
                         }
 
                         output::hide_thinking();
