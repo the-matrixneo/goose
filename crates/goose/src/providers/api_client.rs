@@ -172,8 +172,59 @@ impl<'a> ApiRequestBuilder<'a> {
     }
 
     pub async fn response_post(self, payload: &Value) -> Result<Response> {
+        let start_time = std::time::Instant::now();
+
+        // Extract model info from payload if available
+        let model_name = payload
+            .get("model")
+            .and_then(|m| m.as_str())
+            .unwrap_or("unknown")
+            .to_string();
+
+        // Get current session ID for correlation
+        let session_id = crate::telemetry_logger::CURRENT_SESSION_ID
+            .lock()
+            .await
+            .clone();
+
+        // Generate a correlation ID for this request
+        let correlation_id = uuid::Uuid::new_v4().to_string();
+
+        // Get the current provider name from the global store
+        let provider_name =
+            crate::providers::base::get_current_provider().unwrap_or_else(|| "unknown".to_string());
+
         let request = self.send_request(|url, client| client.post(url)).await?;
-        Ok(request.json(payload).send().await?)
+        let response = request.json(payload).send().await?;
+
+        let duration_ms = start_time.elapsed().as_millis() as u64;
+
+        // Log the request with enhanced telemetry
+        if let Some(logger) = crate::telemetry_logger::get_telemetry_logger().await {
+            let entry = crate::telemetry_logger::TelemetryLogEntry {
+                timestamp: chrono::Utc::now(),
+                request_type: "api_post".to_string(),
+                provider: provider_name,
+                model: model_name,
+                request: payload.clone(),
+                response: None,
+                error: None,
+                duration_ms: Some(duration_ms),
+                token_usage: None, // Will be populated from response
+                tool_execution: None,
+                performance: Some(crate::telemetry_logger::PerformanceMetrics {
+                    duration_ms: Some(duration_ms),
+                    first_token_ms: None,    // Will be populated for streaming
+                    tokens_per_second: None, // Will be calculated from response
+                }),
+                response_size_bytes: None, // Will be populated from response
+                session_id,
+                correlation_id: Some(correlation_id),
+            };
+            let _ = logger.log(entry).await;
+        }
+
+        Ok(response)
     }
 
     pub async fn api_get(self) -> Result<ApiResponse> {

@@ -2,8 +2,6 @@ use std::collections::{HashMap, HashSet};
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::fs::OpenOptions;
-use std::io::Write;
 
 use anyhow::{anyhow, Result};
 use futures::stream::BoxStream;
@@ -62,15 +60,34 @@ use crate::conversation::message::{Message, ToolRequest};
 
 const DEFAULT_MAX_TURNS: u32 = 1000;
 
-// Simple logging helper
-fn log_wait_event(event: &str) {
-    if let Ok(mut file) = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open("/tmp/goose-waiting.log")
-    {
-        let timestamp = chrono::Local::now().format("%Y-%m-%d %H:%M:%S.%3f");
-        let _ = writeln!(file, "{} - {}", timestamp, event);
+// Helper to log wait events using the TelemetryLogger
+async fn log_wait_event(event: &str) {
+    if let Some(logger) = crate::telemetry_logger::get_telemetry_logger().await {
+        let provider =
+            crate::providers::base::get_current_provider().unwrap_or_else(|| "unknown".to_string());
+        let model =
+            crate::providers::base::get_current_model().unwrap_or_else(|| "unknown".to_string());
+
+        let entry = crate::telemetry_logger::TelemetryLogEntry {
+            timestamp: chrono::Utc::now(),
+            request_type: "wait_event".to_string(),
+            provider,
+            model,
+            request: serde_json::json!({ "event": event }),
+            response: None,
+            error: None,
+            duration_ms: None,
+            token_usage: None,
+            tool_execution: None,
+            performance: None,
+            response_size_bytes: None,
+            session_id: crate::telemetry_logger::CURRENT_SESSION_ID
+                .lock()
+                .await
+                .clone(),
+            correlation_id: None,
+        };
+        let _ = logger.log(entry).await;
     }
 }
 
@@ -432,8 +449,9 @@ impl Agent {
             };
         }
 
-        log_wait_event(&format!("WAITING_TOOL_START: {}", tool_call.name));
-        
+        let _start_time = std::time::Instant::now();
+        log_wait_event(&format!("WAITING_TOOL_START: {}", tool_call.name)).await;
+
         let extension_manager = self.extension_manager.read().await;
         let sub_recipe_manager = self.sub_recipe_manager.lock().await;
         let result: ToolCallResult = if sub_recipe_manager.is_sub_recipe_tool(&tool_call.name) {
@@ -504,7 +522,7 @@ impl Agent {
             })
         };
 
-        log_wait_event(&format!("WAITING_TOOL_END: {}", tool_call.name));
+        log_wait_event(&format!("WAITING_TOOL_END: {}", tool_call.name)).await;
 
         (
             request_id,

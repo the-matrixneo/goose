@@ -19,6 +19,9 @@ use std::sync::Mutex;
 /// A global store for the current model being used, we use this as when a provider returns, it tells us the real model, not an alias
 pub static CURRENT_MODEL: Lazy<Mutex<Option<String>>> = Lazy::new(|| Mutex::new(None));
 
+/// A global store for the current provider being used
+pub static CURRENT_PROVIDER: Lazy<Mutex<Option<String>>> = Lazy::new(|| Mutex::new(None));
+
 /// Set the current model in the global store
 pub fn set_current_model(model: &str) {
     if let Ok(mut current_model) = CURRENT_MODEL.lock() {
@@ -29,6 +32,21 @@ pub fn set_current_model(model: &str) {
 /// Get the current model from the global store, the real model, not an alias
 pub fn get_current_model() -> Option<String> {
     CURRENT_MODEL.lock().ok().and_then(|model| model.clone())
+}
+
+/// Set the current provider in the global store
+pub fn set_current_provider(provider: &str) {
+    if let Ok(mut current_provider) = CURRENT_PROVIDER.lock() {
+        *current_provider = Some(provider.to_string());
+    }
+}
+
+/// Get the current provider from the global store
+pub fn get_current_provider() -> Option<String> {
+    CURRENT_PROVIDER
+        .lock()
+        .ok()
+        .and_then(|provider| provider.clone())
 }
 
 /// Information about a model's capabilities
@@ -288,6 +306,13 @@ pub trait Provider: Send + Sync {
     fn metadata() -> ProviderMetadata
     where
         Self: Sized;
+
+    /// Get the provider name (e.g., "openai", "anthropic", "databricks")
+    /// This is used for telemetry and logging
+    fn provider_name(&self) -> String {
+        // Default implementation - providers should override this
+        "unknown".to_string()
+    }
 
     /// Generate the next message using the configured model and other parameters
     ///

@@ -229,6 +229,10 @@ impl Provider for DatabricksProvider {
         )
     }
 
+    fn provider_name(&self) -> String {
+        "databricks".to_string()
+    }
+
     fn retry_config(&self) -> RetryConfig {
         self.retry_config.clone()
     }
