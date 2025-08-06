@@ -4,7 +4,7 @@ import { Hammer, Plus, Clock, FolderOpen } from 'lucide-react';
 import { MainPanelLayout } from '../Layout/MainPanelLayout';
 import { Button } from '../ui/button';
 import { Card } from '../ui/card';
-import { ScrollArea } from '../ui/scroll-area';
+// import { ScrollArea } from '../ui/scroll-area';
 import { formatMessageTimestamp } from '../../utils/timeUtils';
 import { toastSuccess, toastError } from '../../toasts';
 import { Input } from '../ui/input';

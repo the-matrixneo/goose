@@ -56,6 +56,7 @@ import {
   ChatContextManagerProvider,
   useChatContextManager,
 } from './context_management/ChatContextManager';
+import { SidecarProvider } from './SidecarLayout';
 import { type View, ViewOptions } from '../App';
 import { MainPanelLayout } from './Layout/MainPanelLayout';
 import ChatInput from './ChatInput';
@@ -605,7 +606,9 @@ function BaseChatContent({
 export default function BaseChat(props: BaseChatProps) {
   return (
     <ChatContextManagerProvider>
-      <BaseChatContent {...props} />
+      <SidecarProvider>
+        <BaseChatContent {...props} />
+      </SidecarProvider>
     </ChatContextManagerProvider>
   );
 }
