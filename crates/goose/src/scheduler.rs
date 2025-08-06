@@ -1404,19 +1404,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_scheduled_session_has_schedule_id() -> Result<(), Box<dyn std::error::Error>> {
-        // Use MockConfig instead of setting real environment variables
-        use crate::config::MockConfig;
-        use std::sync::Arc;
+        // Reset global config for test isolation
+        Config::reset_global();
         
-        // Create a mock config with the required environment variables
-        let mock_config = MockConfig::new()
+        // Set up test configuration using the new testing mechanism
+        let test_config = Config::new()
             .with_env("GOOSE_PROVIDER", "test_provider")
             .with_env("GOOSE_MODEL", "test_model");
         
-        // Note: In a real implementation, we'd need to inject this mock_config
-        // into the code that reads these values. For now, this test still uses
-        // the mock provider override to bypass the real provider creation.
-        // This demonstrates the pattern even though the test bypasses the actual config lookup.
+        Config::set_global_for_test(test_config);
 
         let temp_dir = tempdir()?;
         let recipe_dir = temp_dir.path().join("recipes_for_test_scheduler");
@@ -1464,11 +1460,12 @@ mod tests {
             execution_mode: Some("background".to_string()), // Default for test
         };
 
-        // Verify that our mock config has the expected values
-        let provider_from_mock: String = mock_config.get_param("GOOSE_PROVIDER")?;
-        let model_from_mock: String = mock_config.get_param("GOOSE_MODEL")?;
-        assert_eq!(provider_from_mock, "test_provider");
-        assert_eq!(model_from_mock, "test_model");
+        // Verify that our test config has the expected values
+        let global_config = Config::global();
+        let provider_from_config: String = global_config.get_param("GOOSE_PROVIDER")?;
+        let model_from_config: String = global_config.get_param("GOOSE_MODEL")?;
+        assert_eq!(provider_from_config, "test_provider");
+        assert_eq!(model_from_config, "test_model");
 
         let mock_model_config = ModelConfig::new_or_fail("test_model");
         let mock_provider_instance = create_scheduler_test_mock_provider(mock_model_config);
@@ -1515,8 +1512,8 @@ mod tests {
             expected_session_path.display()
         );
 
-        // No need to clean up environment variables since we didn't set them!
-        // The MockConfig is isolated and doesn't affect the real environment
+        // Clean up test configuration
+        Config::reset_global();
 
         Ok(())
     }

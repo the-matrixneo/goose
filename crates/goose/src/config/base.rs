@@ -220,7 +220,20 @@ impl Config {
     ///
     /// This is primarily useful for testing or for applications that need
     /// to manage multiple configuration files.
-    pub fn new<P: AsRef<Path>>(config_path: P, service: &str) -> Result<Self, ConfigError> {
+    pub fn new() -> Self {
+        Config::default()
+    }
+    
+    /// Add environment variable (test only)
+    #[cfg(test)]
+    pub fn with_env(self, key: &str, value: &str) -> Self {
+        // Set the environment variable
+        std::env::set_var(key.to_uppercase(), value);
+        self
+    }
+    
+    /// Create a new configuration instance with specific path
+    pub fn with_path<P: AsRef<Path>>(config_path: P, service: &str) -> Result<Self, ConfigError> {
         Ok(Config {
             config_path: config_path.as_ref().to_path_buf(),
             secrets: SecretStorage::Keyring {
@@ -898,7 +911,7 @@ mod tests {
     #[test]
     fn test_basic_config() -> Result<(), ConfigError> {
         let temp_file = NamedTempFile::new().unwrap();
-        let config = Config::new(temp_file.path(), TEST_KEYRING_SERVICE)?;
+        let config = Config::with_path(temp_file.path(), TEST_KEYRING_SERVICE)?;
 
         // Set a simple string value
         config.set_param("test_key", Value::String("test_value".to_string()))?;
@@ -924,7 +937,7 @@ mod tests {
         }
 
         let temp_file = NamedTempFile::new().unwrap();
-        let config = Config::new(temp_file.path(), TEST_KEYRING_SERVICE)?;
+        let config = Config::with_path(temp_file.path(), TEST_KEYRING_SERVICE)?;
 
         // Set a complex value
         config.set_param(
@@ -945,7 +958,7 @@ mod tests {
     #[test]
     fn test_missing_value() {
         let temp_file = NamedTempFile::new().unwrap();
-        let config = Config::new(temp_file.path(), TEST_KEYRING_SERVICE).unwrap();
+        let config = Config::with_path(temp_file.path(), TEST_KEYRING_SERVICE).unwrap();
 
         let result: Result<String, ConfigError> = config.get_param("nonexistent_key");
         assert!(matches!(result, Err(ConfigError::NotFound(_))));
@@ -954,7 +967,7 @@ mod tests {
     #[test]
     fn test_yaml_formatting() -> Result<(), ConfigError> {
         let temp_file = NamedTempFile::new().unwrap();
-        let config = Config::new(temp_file.path(), TEST_KEYRING_SERVICE)?;
+        let config = Config::with_path(temp_file.path(), TEST_KEYRING_SERVICE)?;
 
         config.set_param("key1", Value::String("value1".to_string()))?;
         config.set_param("key2", Value::Number(42.into()))?;
@@ -970,7 +983,7 @@ mod tests {
     #[test]
     fn test_value_management() -> Result<(), ConfigError> {
         let temp_file = NamedTempFile::new().unwrap();
-        let config = Config::new(temp_file.path(), TEST_KEYRING_SERVICE)?;
+        let config = Config::with_path(temp_file.path(), TEST_KEYRING_SERVICE)?;
 
         config.set_param("key", Value::String("value".to_string()))?;
 
@@ -1009,7 +1022,7 @@ mod tests {
     fn test_secret_management() -> Result<(), ConfigError> {
         cleanup_keyring()?;
         let temp_file = NamedTempFile::new().unwrap();
-        let config = Config::new(temp_file.path(), TEST_KEYRING_SERVICE)?;
+        let config = Config::with_path(temp_file.path(), TEST_KEYRING_SERVICE)?;
 
         // Test setting and getting a simple secret
         config.set_secret("api_key", Value::String("secret123".to_string()))?;
@@ -1036,7 +1049,7 @@ mod tests {
     fn test_multiple_secrets() -> Result<(), ConfigError> {
         cleanup_keyring()?;
         let temp_file = NamedTempFile::new().unwrap();
-        let config = Config::new(temp_file.path(), TEST_KEYRING_SERVICE)?;
+        let config = Config::with_path(temp_file.path(), TEST_KEYRING_SERVICE)?;
 
         // Set multiple secrets
         config.set_secret("key1", Value::String("secret1".to_string()))?;
@@ -1067,7 +1080,7 @@ mod tests {
         use std::thread;
 
         let temp_file = NamedTempFile::new().unwrap();
-        let config = Arc::new(Config::new(temp_file.path(), TEST_KEYRING_SERVICE)?);
+        let config = Arc::new(Config::with_path(temp_file.path(), TEST_KEYRING_SERVICE)?);
         let barrier = Arc::new(Barrier::new(3)); // For 3 concurrent threads
         let values = Arc::new(Mutex::new(HashMap::new()));
         let mut handles = vec![];
@@ -1135,7 +1148,7 @@ mod tests {
     #[test]
     fn test_config_recovery_from_backup() -> Result<(), ConfigError> {
         let temp_file = NamedTempFile::new().unwrap();
-        let config = Config::new(temp_file.path(), TEST_KEYRING_SERVICE)?;
+        let config = Config::with_path(temp_file.path(), TEST_KEYRING_SERVICE)?;
 
         // Create a valid config first
         config.set_param("key1", Value::String("value1".to_string()))?;
@@ -1178,7 +1191,7 @@ mod tests {
     #[test]
     fn test_config_recovery_creates_fresh_file() -> Result<(), ConfigError> {
         let temp_file = NamedTempFile::new().unwrap();
-        let config = Config::new(temp_file.path(), TEST_KEYRING_SERVICE)?;
+        let config = Config::with_path(temp_file.path(), TEST_KEYRING_SERVICE)?;
 
         // Create a corrupted config file with no backup
         std::fs::write(temp_file.path(), "invalid: yaml: content: [unclosed")?;
@@ -1212,7 +1225,7 @@ mod tests {
         std::fs::remove_file(config_path)?;
         assert!(!config_path.exists());
 
-        let config = Config::new(config_path, TEST_KEYRING_SERVICE)?;
+        let config = Config::with_path(config_path, TEST_KEYRING_SERVICE)?;
 
         // Try to load values - should create a fresh default config file
         let values = config.load_values()?;
@@ -1239,7 +1252,7 @@ mod tests {
     fn test_config_recovery_from_backup_when_missing() -> Result<(), ConfigError> {
         let temp_file = NamedTempFile::new().unwrap();
         let config_path = temp_file.path();
-        let config = Config::new(config_path, TEST_KEYRING_SERVICE)?;
+        let config = Config::with_path(config_path, TEST_KEYRING_SERVICE)?;
 
         // First, create a config with some data
         config.set_param("test_key_backup", Value::String("backup_value".to_string()))?;
@@ -1283,7 +1296,7 @@ mod tests {
     #[test]
     fn test_atomic_write_prevents_corruption() -> Result<(), ConfigError> {
         let temp_file = NamedTempFile::new().unwrap();
-        let config = Config::new(temp_file.path(), TEST_KEYRING_SERVICE)?;
+        let config = Config::with_path(temp_file.path(), TEST_KEYRING_SERVICE)?;
 
         // Set initial values
         config.set_param("key1", Value::String("value1".to_string()))?;
@@ -1303,7 +1316,7 @@ mod tests {
     #[test]
     fn test_backup_rotation() -> Result<(), ConfigError> {
         let temp_file = NamedTempFile::new().unwrap();
-        let config = Config::new(temp_file.path(), TEST_KEYRING_SERVICE)?;
+        let config = Config::with_path(temp_file.path(), TEST_KEYRING_SERVICE)?;
 
         // Create multiple versions to test rotation
         for i in 1..=7 {
@@ -1499,7 +1512,7 @@ mod tests {
     #[test]
     fn test_env_var_with_config_integration() -> Result<(), ConfigError> {
         let temp_file = NamedTempFile::new().unwrap();
-        let config = Config::new(temp_file.path(), TEST_KEYRING_SERVICE)?;
+        let config = Config::with_path(temp_file.path(), TEST_KEYRING_SERVICE)?;
 
         // Test string environment variable (the original issue case)
         std::env::set_var("PROVIDER", "ANTHROPIC");
@@ -1539,7 +1552,7 @@ mod tests {
     #[test]
     fn test_env_var_precedence_over_config_file() -> Result<(), ConfigError> {
         let temp_file = NamedTempFile::new().unwrap();
-        let config = Config::new(temp_file.path(), TEST_KEYRING_SERVICE)?;
+        let config = Config::with_path(temp_file.path(), TEST_KEYRING_SERVICE)?;
 
         // Set value in config file
         config.set_param("test_precedence", Value::String("file_value".to_string()))?;
@@ -1628,7 +1641,7 @@ mod tests {
         
         // Create a custom config with specific test values
         let temp_file = NamedTempFile::new().unwrap();
-        let test_config = Config::new(temp_file.path(), TEST_KEYRING_SERVICE)?;
+        let test_config = Config::with_path(temp_file.path(), TEST_KEYRING_SERVICE)?;
         
         // Set some test values in the config
         test_config.set_param("test_global_key", Value::String("test_value".to_string()))?;
