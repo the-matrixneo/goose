@@ -157,8 +157,14 @@ mod tests {
             Role::User,
             "The summarized message should be from the user."
         );
-        assert!(provider_usage.usage.input_tokens.unwrap_or(0) > 0, "Should have input token count");
-        assert!(provider_usage.usage.output_tokens.unwrap_or(0) > 0, "Should have output token count");
+        assert!(
+            provider_usage.usage.input_tokens.unwrap_or(0) > 0,
+            "Should have input token count"
+        );
+        assert!(
+            provider_usage.usage.output_tokens.unwrap_or(0) > 0,
+            "Should have output token count"
+        );
     }
 
     #[tokio::test]

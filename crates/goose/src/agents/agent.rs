@@ -760,7 +760,13 @@ impl Agent {
         &self,
         messages: &[Message],
         session: &Option<SessionConfig>,
-    ) -> Result<Option<(Vec<Message>, String, Option<crate::providers::base::ProviderUsage>)>> {
+    ) -> Result<
+        Option<(
+            Vec<Message>,
+            String,
+            Option<crate::providers::base::ProviderUsage>,
+        )>,
+    > {
         // Try to get session metadata for more accurate token counts
         let session_metadata = if let Some(session_config) = session {
             match session::storage::get_path(session_config.id.clone()) {
@@ -783,7 +789,11 @@ impl Agent {
             let compacted_messages = compact_result.messages;
             let compaction_msg = "Auto-compacted context to reduce token usage\n\n".to_string();
 
-            return Ok(Some((compacted_messages, compaction_msg, compact_result.summarization_usage)));
+            return Ok(Some((
+                compacted_messages,
+                compaction_msg,
+                compact_result.summarization_usage,
+            )));
         }
 
         Ok(None)
@@ -825,7 +835,8 @@ impl Agent {
         }
 
         // No compaction needed, proceed with normal processing
-        self.reply_internal(&messages, session, cancel_token, summarization_usage).await
+        self.reply_internal(&messages, session, cancel_token, summarization_usage)
+            .await
     }
 
     /// Main reply method that handles the actual agent processing

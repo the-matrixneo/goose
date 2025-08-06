@@ -1,8 +1,5 @@
 use crate::{
-    agents::Agent,
-    config::Config,
-    context_mgmt::get_messages_token_counts_async,
-    message::Message,
+    agents::Agent, config::Config, context_mgmt::get_messages_token_counts_async, message::Message,
     token_counter::create_async_token_counter,
 };
 use anyhow::Result;
@@ -181,7 +178,8 @@ pub async fn check_and_compact_messages(
     };
 
     // Perform the compaction on messages excluding the preserved user message
-    let (mut compacted_messages, _, summarization_usage) = agent.summarize_context(messages_to_compact).await?;
+    let (mut compacted_messages, _, summarization_usage) =
+        agent.summarize_context(messages_to_compact).await?;
 
     // Add back the preserved user message if it exists
     if let Some(user_message) = preserved_user_message {
@@ -352,7 +350,6 @@ mod tests {
         assert_eq!(result.messages.len(), messages.len());
         assert!(result.summarization_usage.is_none());
 
-
         // Test with threshold 1.0 (disabled)
         let result = check_and_compact_messages(&agent, &messages, Some(1.0), None)
             .await
@@ -432,7 +429,10 @@ mod tests {
         if let Some(usage) = &result.summarization_usage {
             assert!(usage.usage.total_tokens.is_some());
             let after = usage.usage.total_tokens.unwrap_or(0) as usize;
-            assert!(after > 0, "Token count after compaction should be greater than 0");
+            assert!(
+                after > 0,
+                "Token count after compaction should be greater than 0"
+            );
         }
 
         // Should have fewer messages (summarized)

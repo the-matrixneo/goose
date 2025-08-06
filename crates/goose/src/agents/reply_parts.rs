@@ -185,7 +185,12 @@ impl Agent {
 
             // Ensure we have token counts for non-streaming case
             usage
-                .ensure_tokens(system_prompt.as_str(), &messages_for_provider, &message, &tools)
+                .ensure_tokens(
+                    system_prompt.as_str(),
+                    &messages_for_provider,
+                    &message,
+                    &tools,
+                )
                 .await?;
 
             stream_from_single_message(message, usage)

@@ -52,7 +52,14 @@ impl Agent {
     pub async fn summarize_context(
         &self,
         messages: &[Message], // last message is a user msg that led to assistant message with_context_length_exceeded
-    ) -> Result<(Vec<Message>, Vec<usize>, Option<crate::providers::base::ProviderUsage>), anyhow::Error> {
+    ) -> Result<
+        (
+            Vec<Message>,
+            Vec<usize>,
+            Option<crate::providers::base::ProviderUsage>,
+        ),
+        anyhow::Error,
+    > {
         let provider = self.provider().await?;
         let summary_result = summarize_messages(provider.clone(), messages).await?;
 
@@ -61,7 +68,11 @@ impl Agent {
                 // For token counting purposes, we use the output tokens (the actual summary content)
                 // since that's what will be in the context going forward
                 let total_tokens = provider_usage.usage.output_tokens.unwrap_or(0) as usize;
-                (vec![summary_message], vec![total_tokens], Some(provider_usage))
+                (
+                    vec![summary_message],
+                    vec![total_tokens],
+                    Some(provider_usage),
+                )
             }
             None => {
                 // No summary was generated (empty input)
