@@ -121,7 +121,8 @@ static GLOBAL_CONFIG: OnceCell<Config> = OnceCell::new();
 
 // In test mode, use a Mutex so we can reset it
 #[cfg(test)]
-static GLOBAL_CONFIG: Lazy<std::sync::Mutex<Option<Config>>> = Lazy::new(|| std::sync::Mutex::new(None));
+static GLOBAL_CONFIG: Lazy<std::sync::Mutex<Option<Config>>> =
+    Lazy::new(|| std::sync::Mutex::new(None));
 
 impl Default for Config {
     fn default() -> Self {
@@ -150,7 +151,7 @@ impl Default for Config {
                     }
                 }
             }
-            
+
             #[cfg(not(test))]
             {
                 if ENV_REGISTRY.contains_key("GOOSE_DISABLE_KEYRING") {
@@ -180,7 +181,7 @@ impl Config {
     pub fn global() -> &'static Config {
         GLOBAL_CONFIG.get_or_init(Config::default)
     }
-    
+
     /// Get the global configuration instance (test version).
     /// In tests, this uses a Mutex to allow resetting the config.
     #[cfg(test)]
@@ -191,7 +192,7 @@ impl Config {
         if guard.is_none() {
             *guard = Some(Config::default());
         }
-        
+
         // We need to get a static reference somehow
         // This is safe because we only set it once per test
         unsafe {
@@ -201,35 +202,35 @@ impl Config {
             &*config_ptr
         }
     }
-    
+
     /// Reset the global config (test only)
     #[cfg(test)]
     fn reset_global() {
         let mut guard = GLOBAL_CONFIG.lock().unwrap();
         *guard = None;
     }
-    
+
     /// Set a custom global config (test only) - internal use
     #[cfg(test)]
     fn set_global_internal(config: Config) {
         let mut guard = GLOBAL_CONFIG.lock().unwrap();
         *guard = Some(config);
     }
-    
+
     /// Use a test configuration for the duration of a test.
     /// Returns a guard that will automatically reset the global config when dropped.
-    /// 
+    ///
     /// # Example
     /// ```no_run
     /// let _guard = Config::test()
     ///     .with_env("GOOSE_PROVIDER", "test_provider")
     ///     .with_env("GOOSE_MODEL", "test_model")
     ///     .apply();
-    /// 
+    ///
     /// // Test code here uses the test config
     /// let global = Config::global();
     /// assert_eq!(global.get_param::<String>("GOOSE_PROVIDER")?, "test_provider");
-    /// 
+    ///
     /// // Config is automatically reset when _guard goes out of scope
     /// ```
     #[cfg(test)]
@@ -244,7 +245,7 @@ impl Config {
     pub fn new() -> Self {
         Config::default()
     }
-    
+
     /// Add environment variable (test only)
     #[cfg(test)]
     pub fn with_env(self, key: &str, value: &str) -> Self {
@@ -252,7 +253,7 @@ impl Config {
         std::env::set_var(key.to_uppercase(), value);
         self
     }
-    
+
     /// Create a new configuration instance with specific path
     pub fn with_path<P: AsRef<Path>>(config_path: P, service: &str) -> Result<Self, ConfigError> {
         Ok(Config {
@@ -688,7 +689,7 @@ impl Config {
                 return Ok(serde_json::from_value(value)?);
             }
         }
-        
+
         #[cfg(not(test))]
         {
             // In production, use the pre-loaded registry - thin wrapper
@@ -783,7 +784,7 @@ impl Config {
                 return Ok(serde_json::from_value(value)?);
             }
         }
-        
+
         #[cfg(not(test))]
         {
             // In production, use the pre-loaded registry - thin wrapper
@@ -928,21 +929,21 @@ impl TestConfigBuilder {
             env_vars: Vec::new(),
         }
     }
-    
+
     /// Add an environment variable to the test configuration
     pub fn with_env(mut self, key: &str, value: &str) -> Self {
         self.env_vars.push((key.to_string(), value.to_string()));
         self
     }
-    
+
     /// Apply the test configuration and return a guard that will clean up when dropped
     pub fn apply(self) -> TestConfigGuard {
         // Reset the global config first
         Config::reset_global();
-        
+
         // Save current env vars for restoration
         let mut saved_env_vars = Vec::new();
-        
+
         // Set all the test env vars
         for (key, value) in &self.env_vars {
             let upper_key = key.to_uppercase();
@@ -955,14 +956,12 @@ impl TestConfigBuilder {
             // Set the new value
             std::env::set_var(&upper_key, value);
         }
-        
+
         // Create and set a new test config
         let test_config = Config::new();
         Config::set_global_internal(test_config);
-        
-        TestConfigGuard {
-            saved_env_vars,
-        }
+
+        TestConfigGuard { saved_env_vars }
     }
 }
 
@@ -982,7 +981,7 @@ impl Drop for TestConfigGuard {
                 None => std::env::remove_var(key),
             }
         }
-        
+
         // Reset the global config
         Config::reset_global();
     }
@@ -1676,12 +1675,12 @@ mod tests {
         let _guard = Config::test()
             .with_env("TEST_GLOBAL_KEY", "test_value")
             .apply();
-        
+
         // Now any code that uses Config::global() will get our test config
         let global = Config::global();
         let value: String = global.get_param("TEST_GLOBAL_KEY")?;
         assert_eq!(value, "test_value");
-        
+
         // No manual cleanup needed - guard handles it automatically
         Ok(())
     }

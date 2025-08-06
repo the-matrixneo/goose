@@ -118,7 +118,6 @@ pub const KNOWN_ENV_VARS: &[EnvVarSpec] = &[
         description: "Google API key",
         var_type: EnvVarType::String,
     },
-    
     // Provider configuration
     EnvVarSpec {
         name: "GOOSE_MODEL",
@@ -162,7 +161,6 @@ pub const KNOWN_ENV_VARS: &[EnvVarSpec] = &[
         description: "Fallback turns for lead model",
         var_type: EnvVarType::Integer,
     },
-    
     // Core configuration
     EnvVarSpec {
         name: "GOOSE_CONTEXT_LIMIT",
@@ -213,7 +211,6 @@ pub const KNOWN_ENV_VARS: &[EnvVarSpec] = &[
         description: "Working directory path",
         var_type: EnvVarType::String,
     },
-    
     // Toolshim configuration
     EnvVarSpec {
         name: "GOOSE_TOOLSHIM",
@@ -229,7 +226,6 @@ pub const KNOWN_ENV_VARS: &[EnvVarSpec] = &[
         description: "Ollama model for toolshim",
         var_type: EnvVarType::String,
     },
-    
     // Router configuration
     EnvVarSpec {
         name: "GOOSE_ROUTER_TOOL_SELECTION_STRATEGY",
@@ -252,7 +248,6 @@ pub const KNOWN_ENV_VARS: &[EnvVarSpec] = &[
         description: "Embedding model name",
         var_type: EnvVarType::String,
     },
-    
     // Interface configuration
     EnvVarSpec {
         name: "GOOSE_CLI_THEME",
@@ -275,7 +270,6 @@ pub const KNOWN_ENV_VARS: &[EnvVarSpec] = &[
         description: "Minimum priority for CLI display",
         var_type: EnvVarType::Integer,
     },
-    
     // Scheduler configuration
     EnvVarSpec {
         name: "GOOSE_SCHEDULER_TYPE",
@@ -291,7 +285,6 @@ pub const KNOWN_ENV_VARS: &[EnvVarSpec] = &[
         description: "Path to temporal binary",
         var_type: EnvVarType::String,
     },
-    
     // Debug configuration
     EnvVarSpec {
         name: "CLAUDE_THINKING_ENABLED",
@@ -321,7 +314,6 @@ pub const KNOWN_ENV_VARS: &[EnvVarSpec] = &[
         description: "Enable Claude Code debug mode",
         var_type: EnvVarType::Boolean,
     },
-    
     // Tracing configuration
     EnvVarSpec {
         name: "LANGFUSE_PUBLIC_KEY",
@@ -372,7 +364,6 @@ pub const KNOWN_ENV_VARS: &[EnvVarSpec] = &[
         description: "OTLP exporter timeout",
         var_type: EnvVarType::Integer,
     },
-    
     // System environment
     EnvVarSpec {
         name: "HOME",
@@ -423,7 +414,6 @@ pub const KNOWN_ENV_VARS: &[EnvVarSpec] = &[
         description: "Wayland display",
         var_type: EnvVarType::String,
     },
-    
     // Extension/MCP configuration
     EnvVarSpec {
         name: "GOOGLE_DRIVE_OAUTH_PATH",
@@ -474,7 +464,6 @@ pub const KNOWN_ENV_VARS: &[EnvVarSpec] = &[
         description: "Context file names for developer extension",
         var_type: EnvVarType::String,
     },
-    
     // Testing configuration
     EnvVarSpec {
         name: "GOOSE_TEST_PROVIDER",
@@ -490,7 +479,6 @@ pub const KNOWN_ENV_VARS: &[EnvVarSpec] = &[
         description: "GitHub Actions environment indicator",
         var_type: EnvVarType::String,
     },
-    
     // Recipe configuration
     EnvVarSpec {
         name: "GOOSE_RECIPE_PATH",
@@ -499,7 +487,6 @@ pub const KNOWN_ENV_VARS: &[EnvVarSpec] = &[
         description: "Recipe search path",
         var_type: EnvVarType::String,
     },
-    
     // Subagent configuration
     EnvVarSpec {
         name: "GOOSE_SUBAGENT_MAX_TURNS",
@@ -508,7 +495,6 @@ pub const KNOWN_ENV_VARS: &[EnvVarSpec] = &[
         description: "Maximum turns for subagents",
         var_type: EnvVarType::Integer,
     },
-    
     // Server configuration
     EnvVarSpec {
         name: "GOOSE_SERVER__SECRET_KEY",
@@ -558,10 +544,10 @@ pub const KNOWN_ENV_VARS: &[EnvVarSpec] = &[
 /// Uses the structured provider factory to get actual config keys
 pub fn discover_provider_env_vars() -> Vec<EnvVarSpec> {
     let mut discovered = Vec::new();
-    
+
     // Get all provider metadata from the factory
     let providers = crate::providers::providers();
-    
+
     for provider_metadata in providers {
         for config_key in &provider_metadata.config_keys {
             discovered.push(EnvVarSpec {
@@ -569,13 +555,14 @@ pub fn discover_provider_env_vars() -> Vec<EnvVarSpec> {
                 category: EnvCategory::Provider,
                 is_secret: config_key.secret,
                 description: Box::leak(
-                    format!("{} - {}", provider_metadata.display_name, config_key.name).into_boxed_str()
+                    format!("{} - {}", provider_metadata.display_name, config_key.name)
+                        .into_boxed_str(),
                 ),
                 var_type: EnvVarType::String, // Default to string for provider config
             });
         }
     }
-    
+
     discovered
 }
 
@@ -583,11 +570,13 @@ pub fn discover_provider_env_vars() -> Vec<EnvVarSpec> {
 /// Uses the structured YAML configuration to extract env_keys from extensions
 pub fn discover_extension_env_vars() -> Vec<String> {
     let mut discovered = Vec::new();
-    
+
     // Get all configured extensions and extract their env_keys from the structured config
     if let Ok(config) = super::Config::global().load_values() {
         if let Some(extensions_value) = config.get("extensions") {
-            if let Ok(extensions) = serde_json::from_value::<HashMap<String, serde_json::Value>>(extensions_value.clone()) {
+            if let Ok(extensions) = serde_json::from_value::<HashMap<String, serde_json::Value>>(
+                extensions_value.clone(),
+            ) {
                 for (_extension_key, extension_value) in extensions {
                     // Extract env_keys from extension configuration
                     if let Some(env_keys) = extension_value.get("env_keys") {
@@ -599,10 +588,12 @@ pub fn discover_extension_env_vars() -> Vec<String> {
                             }
                         }
                     }
-                    
+
                     // Also check for envs map (legacy support)
                     if let Some(envs) = extension_value.get("envs") {
-                        if let Ok(env_map) = serde_json::from_value::<HashMap<String, String>>(envs.clone()) {
+                        if let Ok(env_map) =
+                            serde_json::from_value::<HashMap<String, String>>(envs.clone())
+                        {
                             for key in env_map.keys() {
                                 if !discovered.contains(key) {
                                     discovered.push(key.clone());
@@ -614,7 +605,7 @@ pub fn discover_extension_env_vars() -> Vec<String> {
             }
         }
     }
-    
+
     discovered
 }
 
@@ -622,25 +613,28 @@ impl EnvRegistry {
     /// Create a new environment registry by loading all environment variables at startup
     pub fn new() -> Self {
         let env_vars: HashMap<String, String> = env::vars().collect();
-        
+
         // Parse all environment variables at startup
         let mut parsed_values = HashMap::new();
         let mut value_sources = HashMap::new();
-        
+
         for (key, value) in &env_vars {
             if let Ok(parsed) = EnvRegistry::parse_env_value(value) {
                 parsed_values.insert(key.clone(), parsed);
                 value_sources.insert(key.clone(), ValueSource::Environment);
-                
+
                 // Also add uppercase version for flexible lookup
                 let upper_key = key.to_uppercase();
                 if upper_key != *key {
-                    parsed_values.insert(upper_key.clone(), EnvRegistry::parse_env_value(value).unwrap());
+                    parsed_values.insert(
+                        upper_key.clone(),
+                        EnvRegistry::parse_env_value(value).unwrap(),
+                    );
                     value_sources.insert(upper_key, ValueSource::Environment);
                 }
             }
         }
-        
+
         Self {
             env_vars,
             parsed_values,
@@ -652,21 +646,24 @@ impl EnvRegistry {
     pub fn with_values(values: HashMap<String, String>) -> Self {
         let mut parsed_values = HashMap::new();
         let mut value_sources = HashMap::new();
-        
+
         for (key, value) in &values {
             if let Ok(parsed) = EnvRegistry::parse_env_value(value) {
                 parsed_values.insert(key.clone(), parsed);
                 value_sources.insert(key.clone(), ValueSource::Environment);
-                
+
                 // Also add uppercase version for flexible lookup
                 let upper_key = key.to_uppercase();
                 if upper_key != *key {
-                    parsed_values.insert(upper_key.clone(), EnvRegistry::parse_env_value(value).unwrap());
+                    parsed_values.insert(
+                        upper_key.clone(),
+                        EnvRegistry::parse_env_value(value).unwrap(),
+                    );
                     value_sources.insert(upper_key, ValueSource::Environment);
                 }
             }
         }
-        
+
         Self {
             env_vars: values,
             parsed_values,
@@ -686,7 +683,7 @@ impl EnvRegistry {
         if let Some(value) = self.env_vars.get(key) {
             return Some(value);
         }
-        
+
         // Then try uppercase
         let upper_key = key.to_uppercase();
         self.env_vars.get(&upper_key)
@@ -698,7 +695,7 @@ impl EnvRegistry {
         if let Some(value) = self.parsed_values.get(key) {
             return Some(value.clone());
         }
-        
+
         // Then try uppercase
         let upper_key = key.to_uppercase();
         self.parsed_values.get(&upper_key).cloned()
@@ -707,35 +704,36 @@ impl EnvRegistry {
     /// Get a typed value from the environment registry with type validation
     pub fn get_typed<T: for<'de> Deserialize<'de>>(&self, key: &str) -> Option<T> {
         let value = self.get_parsed(key)?;
-        
+
         // Check if this is a known env var with a specific type
         if let Some(spec) = self.find_spec(key) {
             // Validate the type matches what's expected
             if !self.validate_type(&value, &spec.var_type) {
                 tracing::warn!(
                     "Environment variable {} expected type {:?} but got incompatible value",
-                    key, spec.var_type
+                    key,
+                    spec.var_type
                 );
             }
         }
-        
+
         serde_json::from_value(value).ok()
     }
-    
+
     /// Find the spec for a given environment variable
     fn find_spec(&self, key: &str) -> Option<&'static EnvVarSpec> {
         let upper_key = key.to_uppercase();
-        
+
         // Check static known vars
         for spec in KNOWN_ENV_VARS {
             if spec.name == key || spec.name == upper_key {
                 return Some(spec);
             }
         }
-        
+
         None
     }
-    
+
     /// Validate that a value matches the expected type
     fn validate_type(&self, value: &Value, expected_type: &EnvVarType) -> bool {
         match (value, expected_type) {
@@ -755,7 +753,9 @@ impl EnvRegistry {
     pub fn get_tracked(&self, key: &str) -> TrackedValue {
         // First try exact match
         if let Some(value) = self.parsed_values.get(key) {
-            let source = self.value_sources.get(key)
+            let source = self
+                .value_sources
+                .get(key)
                 .cloned()
                 .unwrap_or(ValueSource::Environment);
             return TrackedValue {
@@ -763,11 +763,13 @@ impl EnvRegistry {
                 source,
             };
         }
-        
+
         // Then try uppercase
         let upper_key = key.to_uppercase();
         if let Some(value) = self.parsed_values.get(&upper_key) {
-            let source = self.value_sources.get(&upper_key)
+            let source = self
+                .value_sources
+                .get(&upper_key)
                 .cloned()
                 .unwrap_or(ValueSource::Environment);
             return TrackedValue {
@@ -775,7 +777,7 @@ impl EnvRegistry {
                 source,
             };
         }
-        
+
         // Not found
         TrackedValue {
             value: Value::Null,
@@ -789,13 +791,13 @@ impl EnvRegistry {
         if let Some(source) = self.value_sources.get(key) {
             return source.clone();
         }
-        
+
         // Then try uppercase
         let upper_key = key.to_uppercase();
         if let Some(source) = self.value_sources.get(&upper_key) {
             return source.clone();
         }
-        
+
         ValueSource::NotFound
     }
 
@@ -807,7 +809,7 @@ impl EnvRegistry {
     /// Get all environment variables in a specific category
     pub fn get_by_category(&self, _category: EnvCategory) -> HashMap<String, String> {
         let mut result = HashMap::new();
-        
+
         for spec in KNOWN_ENV_VARS {
             if std::mem::discriminant(&spec.category) == std::mem::discriminant(&_category) {
                 if let Some(value) = self.get_raw(spec.name) {
@@ -815,14 +817,14 @@ impl EnvRegistry {
                 }
             }
         }
-        
+
         result
     }
 
     /// Get all secret environment variables
     pub fn get_secrets(&self) -> HashMap<String, String> {
         let mut result = HashMap::new();
-        
+
         for spec in KNOWN_ENV_VARS {
             if spec.is_secret {
                 if let Some(value) = self.get_raw(spec.name) {
@@ -830,14 +832,14 @@ impl EnvRegistry {
                 }
             }
         }
-        
+
         result
     }
 
     /// Get all non-secret environment variables
     pub fn get_params(&self) -> HashMap<String, String> {
         let mut result = HashMap::new();
-        
+
         for spec in KNOWN_ENV_VARS {
             if !spec.is_secret {
                 if let Some(value) = self.get_raw(spec.name) {
@@ -845,7 +847,7 @@ impl EnvRegistry {
                 }
             }
         }
-        
+
         result
     }
 
@@ -913,9 +915,10 @@ impl EnvRegistry {
 
         // Find unknown GOOSE_* variables
         for (key, _) in &self.env_vars {
-            if key.starts_with("GOOSE_") && 
-               !KNOWN_ENV_VARS.iter().any(|spec| spec.name == key) &&
-               !discovered_providers.iter().any(|spec| spec.name == key) {
+            if key.starts_with("GOOSE_")
+                && !KNOWN_ENV_VARS.iter().any(|spec| spec.name == key)
+                && !discovered_providers.iter().any(|spec| spec.name == key)
+            {
                 unknown_goose_vars.push(key.clone());
             }
         }
@@ -953,28 +956,34 @@ mod tests {
     fn test_flexible_lookup() {
         env::set_var("TEST_FLEXIBLE_UPPER", "upper_value");
         let registry = EnvRegistry::new();
-        
+
         // Should find with exact match
-        assert_eq!(registry.get_raw_flexible("TEST_FLEXIBLE_UPPER"), Some(&"upper_value".to_string()));
-        
+        assert_eq!(
+            registry.get_raw_flexible("TEST_FLEXIBLE_UPPER"),
+            Some(&"upper_value".to_string())
+        );
+
         // Should find with case conversion
-        assert_eq!(registry.get_raw_flexible("test_flexible_upper"), Some(&"upper_value".to_string()));
-        
+        assert_eq!(
+            registry.get_raw_flexible("test_flexible_upper"),
+            Some(&"upper_value".to_string())
+        );
+
         env::remove_var("TEST_FLEXIBLE_UPPER");
     }
 
     #[test]
     fn test_value_parsing() {
         let registry = EnvRegistry::new();
-        
+
         // Test boolean parsing
         let parsed = EnvRegistry::parse_env_value("true").unwrap();
         assert_eq!(parsed, Value::Bool(true));
-        
+
         // Test number parsing
         let parsed = EnvRegistry::parse_env_value("42").unwrap();
         assert_eq!(parsed, Value::Number(42.into()));
-        
+
         // Test string parsing
         let parsed = EnvRegistry::parse_env_value("hello").unwrap();
         assert_eq!(parsed, Value::String("hello".to_string()));
@@ -984,10 +993,10 @@ mod tests {
     fn test_category_filtering() {
         env::set_var("GOOSE_MODEL", "test_model");
         let registry = EnvRegistry::new();
-        
+
         let provider_vars = registry.get_by_category(EnvCategory::Provider);
         assert!(provider_vars.contains_key("GOOSE_MODEL"));
-        
+
         env::remove_var("GOOSE_MODEL");
     }
 
@@ -995,13 +1004,13 @@ mod tests {
     fn test_secrets_filtering() {
         env::set_var("OPENAI_API_KEY", "test_key");
         let registry = EnvRegistry::new();
-        
+
         let secrets = registry.get_secrets();
         assert!(secrets.contains_key("OPENAI_API_KEY"));
-        
+
         let params = registry.get_params();
         assert!(!params.contains_key("OPENAI_API_KEY"));
-        
+
         env::remove_var("OPENAI_API_KEY");
     }
 
@@ -1010,11 +1019,14 @@ mod tests {
         env::set_var("GOOSE_MODEL", "test_model");
         env::set_var("GOOSE_UNKNOWN_VAR", "unknown");
         let registry = EnvRegistry::new();
-        
+
         let diagnostics = registry.get_diagnostics();
         assert!(diagnostics.known_found.contains(&"GOOSE_MODEL"));
-        assert!(diagnostics.unknown_goose_vars.iter().any(|s| s == "GOOSE_UNKNOWN_VAR"));
-        
+        assert!(diagnostics
+            .unknown_goose_vars
+            .iter()
+            .any(|s| s == "GOOSE_UNKNOWN_VAR"));
+
         env::remove_var("GOOSE_MODEL");
         env::remove_var("GOOSE_UNKNOWN_VAR");
     }
@@ -1031,41 +1043,57 @@ mod tests {
         let registry = EnvRegistry::with_values(env_vars);
 
         // Test that values are pre-parsed correctly
-        assert_eq!(registry.get_typed::<String>("TEST_STRING"), Some("hello".to_string()));
+        assert_eq!(
+            registry.get_typed::<String>("TEST_STRING"),
+            Some("hello".to_string())
+        );
         assert_eq!(registry.get_typed::<i32>("TEST_NUMBER"), Some(42));
         assert_eq!(registry.get_typed::<bool>("TEST_BOOL"), Some(true));
-        
+
         // Test JSON parsing
         #[derive(Deserialize, PartialEq, Debug)]
         struct TestStruct {
             key: String,
         }
-        assert_eq!(registry.get_typed::<TestStruct>("TEST_JSON"), Some(TestStruct { key: "value".to_string() }));
+        assert_eq!(
+            registry.get_typed::<TestStruct>("TEST_JSON"),
+            Some(TestStruct {
+                key: "value".to_string()
+            })
+        );
     }
 
     #[test]
     fn test_structured_provider_discovery() {
         let discovered = discover_provider_env_vars();
-        
+
         // Should find actual provider config keys from the structured metadata
         let key_names: Vec<&str> = discovered.iter().map(|spec| spec.name).collect();
-        
+
         // These should be found from the actual provider metadata
         assert!(key_names.contains(&"ANTHROPIC_API_KEY"));
         assert!(key_names.contains(&"ANTHROPIC_HOST"));
         assert!(key_names.contains(&"OPENAI_API_KEY"));
-        
+
         // Verify proper categorization and secret detection
         for spec in &discovered {
             assert_eq!(spec.category, EnvCategory::Provider);
             // API keys should be marked as secrets
             if spec.name.ends_with("_API_KEY") {
-                assert!(spec.is_secret, "API key {} should be marked as secret", spec.name);
+                assert!(
+                    spec.is_secret,
+                    "API key {} should be marked as secret",
+                    spec.name
+                );
             }
         }
-        
+
         // Should have more than just a few hardcoded values
-        assert!(discovered.len() > 10, "Should discover many provider config keys, found {}", discovered.len());
+        assert!(
+            discovered.len() > 10,
+            "Should discover many provider config keys, found {}",
+            discovered.len()
+        );
     }
 
     #[test]
@@ -1073,10 +1101,10 @@ mod tests {
         // This test may not find anything if no extensions are configured,
         // but it should not panic and should return a valid (possibly empty) vector
         let discovered = discover_extension_env_vars();
-        
+
         // Should return a valid vector (may be empty if no extensions configured)
         assert!(discovered.len() >= 0);
-        
+
         // All discovered keys should be non-empty strings
         for key in &discovered {
             assert!(!key.is_empty(), "Extension env key should not be empty");
@@ -1103,19 +1131,23 @@ mod tests {
         assert_eq!(tracked.value, Value::Null);
 
         // Test getting source directly
-        assert_eq!(registry.get_source("TEST_ENV_VAR"), ValueSource::Environment);
+        assert_eq!(
+            registry.get_source("TEST_ENV_VAR"),
+            ValueSource::Environment
+        );
         assert_eq!(registry.get_source("TEST_NUMBER"), ValueSource::Environment);
         assert_eq!(registry.get_source("NON_EXISTENT"), ValueSource::NotFound);
 
         // Test case-insensitive lookup for source
-        assert_eq!(registry.get_source("test_env_var"), ValueSource::Environment);
+        assert_eq!(
+            registry.get_source("test_env_var"),
+            ValueSource::Environment
+        );
     }
 
     #[test]
     fn test_value_source_with_uppercase() {
-        let env_vars = HashMap::from([
-            ("test_lower".to_string(), "lower_value".to_string()),
-        ]);
+        let env_vars = HashMap::from([("test_lower".to_string(), "lower_value".to_string())]);
 
         let registry = EnvRegistry::with_values(env_vars);
 
@@ -1128,14 +1160,14 @@ mod tests {
         assert_eq!(registry.get_source("test_lower"), ValueSource::Environment);
         assert_eq!(registry.get_source("TEST_LOWER"), ValueSource::Environment);
     }
-    
+
     #[test]
     fn test_type_validation() {
         // Test that type validation works for known env vars
         let env_vars = HashMap::from([
             // Integer type
             ("GOOSE_CONTEXT_LIMIT".to_string(), "1000".to_string()),
-            // Boolean type  
+            // Boolean type
             ("GOOSE_DISABLE_KEYRING".to_string(), "true".to_string()),
             // Float type
             ("GOOSE_TEMPERATURE".to_string(), "0.7".to_string()),
