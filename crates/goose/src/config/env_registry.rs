@@ -724,9 +724,11 @@ impl EnvRegistry {
     /// Find the spec for a given environment variable
     fn find_spec(&self, key: &str) -> Option<&'static EnvVarSpec> {
         let upper_key = key.to_uppercase();
-        
+
         // Use iterator instead of manual loop
-        KNOWN_ENV_VARS.iter().find(|&spec| spec.name == key || spec.name == upper_key)
+        KNOWN_ENV_VARS
+            .iter()
+            .find(|&spec| spec.name == key || spec.name == upper_key)
     }
 
     /// Validate that a value matches the expected type
