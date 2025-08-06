@@ -15,7 +15,6 @@ use rmcp::model::Tool;
 use serde_json::Value;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tokio::sync::RwLock;
 use tracing::error;
 
 pub struct ToolRouteManager {
@@ -89,7 +88,7 @@ impl ToolRouteManager {
         &self,
         provider: Arc<dyn Provider>,
         reindex_all: Option<bool>,
-        extension_manager: &Arc<RwLock<ExtensionManager>>,
+        extension_manager: &Arc<ExtensionManager>,
     ) -> Result<()> {
         let strategy = self.get_router_tool_selection_strategy().await;
         let selector = match strategy {
@@ -110,7 +109,6 @@ impl ToolRouteManager {
         };
 
         // First index platform tools
-        let extension_manager = extension_manager.read().await;
         ToolRouterIndexManager::index_platform_tools(&selector, &extension_manager).await?;
 
         if reindex_all.unwrap_or(false) {
@@ -145,7 +143,7 @@ impl ToolRouteManager {
     pub async fn list_tools_for_router(
         &self,
         strategy: Option<RouterToolSelectionStrategy>,
-        extension_manager: &Arc<RwLock<ExtensionManager>>,
+        extension_manager: &Arc<ExtensionManager>,
     ) -> Vec<Tool> {
         if *self.router_disabled_override.lock().await {
             return vec![];
@@ -166,7 +164,6 @@ impl ToolRouteManager {
         let selector = self.router_tool_selector.lock().await.clone();
         if let Some(selector) = selector {
             if let Ok(recent_calls) = selector.get_recent_tool_calls(20).await {
-                let extension_manager = extension_manager.read().await;
                 // Add recent tool calls to the list, avoiding duplicates
                 for tool_name in recent_calls {
                     // Find the tool in the extension manager's tools

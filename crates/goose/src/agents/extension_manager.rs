@@ -254,8 +254,7 @@ impl ExtensionManager {
                 });
                 let (transport, mut stderr) = TokioChildProcess::builder(command)
                     .stderr(Stdio::piped())
-                    .spawn()
-                    .map_err(|e| ExtensionError::ClientCreationError(e.to_string()))?;
+                    .spawn()?;
                 let mut stderr = stderr
                     .take()
                     .expect("should have a stderr handle because it was requested");
@@ -277,16 +276,10 @@ impl ExtensionManager {
                 let client = match client_result {
                     Ok(client) => Ok(client),
                     Err(error) => {
-                        let error_task_out = stderr_task
-                            .await
-                            .map_err(|e| ExtensionError::ClientCreationError(e.to_string()))?;
-
-                        Err(match error_task_out {
-                            Ok(stderr_content) => ExtensionError::ClientCreationError(format!(
-                                "Process quit: {}. Stderr: {}",
-                                error, stderr_content
-                            )),
-                            Err(e) => ExtensionError::ClientCreationError(e.to_string()),
+                        let error_task_out = stderr_task.await?;
+                        Err::<McpClient, ExtensionError>(match error_task_out {
+                            Ok(stderr_content) => ProcessExit::new(stderr_content, error).into(),
+                            Err(e) => e.into(),
                         })
                     }
                 }?;
@@ -562,7 +555,7 @@ impl ExtensionManager {
         // Loop through each extension and try to read the resource, don't raise an error if the resource is not found
         // TODO: do we want to find if a provided uri is in multiple extensions?
         // currently it will return the first match and skip any others
-        for extension_name in self.resource_capable_extensions.iter() {
+        for extension_name in self.resource_capable_extensions.lock().await.iter() {
             let result = self
                 .read_resource_from_extension(uri, extension_name, cancellation_token.clone())
                 .await;
@@ -678,10 +671,16 @@ impl ExtensionManager {
                 let mut futures = FuturesUnordered::new();
 
                 // Create futures for each resource_capable_extension
-                for extension_name in &self.resource_capable_extensions {
+                for extension_name in self
+                    .resource_capable_extensions
+                    .lock()
+                    .await
+                    .iter()
+                    .cloned()
+                {
                     let token = cancellation_token.clone();
                     futures.push(async move {
-                        self.list_resources_from_extension(extension_name, token)
+                        self.list_resources_from_extension(extension_name.as_str(), token)
                             .await
                     });
                 }
@@ -784,12 +783,12 @@ impl ExtensionManager {
     ) -> Result<HashMap<String, Vec<Prompt>>, ToolError> {
         let mut futures = FuturesUnordered::new();
 
-        for extension_name in self.clients.keys() {
+        for extension_name in self.clients.lock().await.keys().cloned() {
             let token = cancellation_token.clone();
             futures.push(async move {
                 (
-                    extension_name,
-                    self.list_prompts_from_extension(extension_name, token)
+                    extension_name.clone(),
+                    self.list_prompts_from_extension(extension_name.as_str(), token)
                         .await,
                 )
             });
@@ -1003,27 +1002,27 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_get_client_for_tool() {
+    #[tokio::test]
+    async fn test_get_client_for_tool() {
         let mut extension_manager = ExtensionManager::new();
 
         // Add some mock clients
-        extension_manager.clients.insert(
+        extension_manager.clients.lock().await.insert(
             normalize("test_client".to_string()),
             Arc::new(Mutex::new(Box::new(MockClient {}))),
         );
 
-        extension_manager.clients.insert(
+        extension_manager.clients.lock().await.insert(
             normalize("__client".to_string()),
             Arc::new(Mutex::new(Box::new(MockClient {}))),
         );
 
-        extension_manager.clients.insert(
+        extension_manager.clients.lock().await.insert(
             normalize("__cli__ent__".to_string()),
             Arc::new(Mutex::new(Box::new(MockClient {}))),
         );
 
-        extension_manager.clients.insert(
+        extension_manager.clients.lock().await.insert(
             normalize("client 🚀".to_string()),
             Arc::new(Mutex::new(Box::new(MockClient {}))),
         );
@@ -1031,21 +1030,25 @@ mod tests {
         // Test basic case
         assert!(extension_manager
             .get_client_for_tool("test_client__tool")
+            .await
             .is_some());
 
         // Test leading underscores
         assert!(extension_manager
             .get_client_for_tool("__client__tool")
+            .await
             .is_some());
 
         // Test multiple underscores in client name, and ending with __
         assert!(extension_manager
             .get_client_for_tool("__cli__ent____tool")
+            .await
             .is_some());
 
         // Test unicode in tool name, "client 🚀" should become "client_"
         assert!(extension_manager
             .get_client_for_tool("client___tool")
+            .await
             .is_some());
     }
 
@@ -1056,17 +1059,17 @@ mod tests {
         let mut extension_manager = ExtensionManager::new();
 
         // Add some mock clients
-        extension_manager.clients.insert(
+        extension_manager.clients.lock().await.insert(
             normalize("test_client".to_string()),
             Arc::new(Mutex::new(Box::new(MockClient {}))),
         );
 
-        extension_manager.clients.insert(
+        extension_manager.clients.lock().await.insert(
             normalize("__cli__ent__".to_string()),
             Arc::new(Mutex::new(Box::new(MockClient {}))),
         );
 
-        extension_manager.clients.insert(
+        extension_manager.clients.lock().await.insert(
             normalize("client 🚀".to_string()),
             Arc::new(Mutex::new(Box::new(MockClient {}))),
         );

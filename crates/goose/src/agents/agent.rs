@@ -413,7 +413,6 @@ impl Agent {
             };
         }
 
-        let extension_manager = &*self.extension_manager;
         let sub_recipe_manager = self.sub_recipe_manager.lock().await;
         let result: ToolCallResult = if sub_recipe_manager.is_sub_recipe_tool(&tool_call.name) {
             sub_recipe_manager
@@ -439,7 +438,7 @@ impl Agent {
         } else if tool_call.name == PLATFORM_READ_RESOURCE_TOOL_NAME {
             // Check if the tool is read_resource and handle it separately
             ToolCallResult::from(
-                extension_manager
+                self.extension_manager
                     .read_resource(
                         tool_call.arguments.clone(),
                         cancellation_token.unwrap_or_default(),
@@ -448,7 +447,7 @@ impl Agent {
             )
         } else if tool_call.name == PLATFORM_LIST_RESOURCES_TOOL_NAME {
             ToolCallResult::from(
-                extension_manager
+                self.extension_manager
                     .list_resources(
                         tool_call.arguments.clone(),
                         cancellation_token.unwrap_or_default(),
@@ -456,7 +455,7 @@ impl Agent {
                     .await,
             )
         } else if tool_call.name == PLATFORM_SEARCH_AVAILABLE_EXTENSIONS_TOOL_NAME {
-            ToolCallResult::from(extension_manager.search_available_extensions().await)
+            ToolCallResult::from(self.extension_manager.search_available_extensions().await)
         } else if self.is_frontend_tool(&tool_call.name).await {
             // For frontend tools, return an error indicating we need frontend execution
             ToolCallResult::from(Err(ToolError::ExecutionError(
@@ -475,7 +474,8 @@ impl Agent {
             }
         } else {
             // Clone the result to ensure no references to extension_manager are returned
-            let result = extension_manager
+            let result = self
+                .extension_manager
                 .dispatch_tool_call(tool_call.clone(), cancellation_token.unwrap_or_default())
                 .await;
             result.unwrap_or_else(|e| {
@@ -502,17 +502,14 @@ impl Agent {
         extension_name: String,
         request_id: String,
     ) -> (String, Result<Vec<Content>, ToolError>) {
-        let extension_manager = &*self.extension_manager;
-
         let selector = self.tool_route_manager.get_router_tool_selector().await;
         if ToolRouterIndexManager::is_tool_router_enabled(&selector) {
             if let Some(selector) = selector {
                 let selector_action = if action == "disable" { "remove" } else { "add" };
-                let extension_manager_ref = &*extension_manager;
                 let selector = Arc::new(selector);
                 if let Err(e) = ToolRouterIndexManager::update_extension_tools(
                     &selector,
-                    extension_manager_ref,
+                    &self.extension_manager,
                     &extension_name,
                     selector_action,
                 )
@@ -528,9 +525,9 @@ impl Agent {
                 }
             }
         }
-        let mut extension_manager = self.extension_manager.write().await;
         if action == "disable" {
-            let result = extension_manager
+            let result = self
+                .extension_manager
                 .remove_extension(&extension_name)
                 .await
                 .map(|_| {
@@ -564,7 +561,8 @@ impl Agent {
                 )
             }
         };
-        let result = extension_manager
+        let result = self
+            .extension_manager
             .add_extension(config)
             .await
             .map(|_| {
@@ -575,7 +573,6 @@ impl Agent {
             })
             .map_err(|e| ToolError::ExecutionError(e.to_string()));
 
-        drop(extension_manager);
         // Update vector index if operation was successful and vector routing is enabled
         if result.is_ok() {
             let selector = self.tool_route_manager.get_router_tool_selector().await;
@@ -667,8 +664,8 @@ impl Agent {
     }
 
     pub async fn list_tools(&self, extension_name: Option<String>) -> Vec<Tool> {
-        let extension_manager = &*self.extension_manager;
-        let mut prefixed_tools = extension_manager
+        let mut prefixed_tools = self
+            .extension_manager
             .get_prefixed_tools(extension_name.clone())
             .await
             .unwrap_or_default();
@@ -685,7 +682,7 @@ impl Agent {
             prefixed_tools.push(create_dynamic_task_tool());
 
             // Add resource tools if supported
-            if extension_manager.supports_resources().await {
+            if self.extension_manager.supports_resources().await {
                 prefixed_tools.extend([
                     platform_tools::read_resource_tool(),
                     platform_tools::list_resources_tool(),
@@ -718,7 +715,6 @@ impl Agent {
     pub async fn remove_extension(&self, name: &str) -> Result<()> {
         let extension_manager = &*self.extension_manager;
         extension_manager.remove_extension(name).await?;
-        drop(extension_manager);
 
         // If vector tool selection is enabled, remove tools from the index
         let selector = self.tool_route_manager.get_router_tool_selector().await;

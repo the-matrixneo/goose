@@ -193,10 +193,10 @@ where
     let mock_client = weather_client();
 
     let agent = Agent::new();
-    {
-        let mut extension_manager = agent.extension_manager.write().await;
-        extension_manager.add_client("weather_extension".to_string(), Box::new(mock_client));
-    }
+    agent
+        .extension_manager
+        .add_client("weather_extension".to_string(), Box::new(mock_client))
+        .await;
 
     agent
         .update_provider(provider_arc as Arc<dyn goose::providers::base::Provider>)
