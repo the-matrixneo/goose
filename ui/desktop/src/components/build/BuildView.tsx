@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { IpcRendererEvent } from 'electron';
 import { Hammer, Plus, Clock, FolderOpen } from 'lucide-react';
 import { MainPanelLayout } from '../Layout/MainPanelLayout';
 import { Button } from '../ui/button';
 import { Card } from '../ui/card';
 import { ScrollArea } from '../ui/scroll-area';
 import { formatMessageTimestamp } from '../../utils/timeUtils';
+import { toastSuccess, toastError } from '../../toasts';
+import { Input } from '../ui/input';
 
-// Mock data for demonstration - replace with real data
 interface AppTile {
   id: string;
   app_name: string;
@@ -15,36 +17,117 @@ interface AppTile {
 }
 
 const BuildView: React.FC = () => {
-  // Placeholder apps data - you can replace this with real data
-  const [apps] = useState<AppTile[]>([
-    {
-      id: '1',
-      app_name: 'Customer Dashboard',
-      last_edited: Math.floor((Date.now() - 1000 * 60 * 30) / 1000), // 30 mins ago
-      path: '/apps/customer-dashboard',
-    },
-    {
-      id: '2',
-      app_name: 'API Documentation Generator',
-      last_edited: Math.floor((Date.now() - 1000 * 60 * 60 * 2) / 1000), // 2 hours ago
-      path: '/apps/api-docs-gen',
-    },
-    {
-      id: '3',
-      app_name: 'Data Pipeline Builder',
-      last_edited: Math.floor((Date.now() - 1000 * 60 * 60 * 24) / 1000), // 1 day ago
-      path: '/apps/data-pipeline',
-    },
-  ]);
+  const [apps, setApps] = useState<AppTile[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isCreating, setIsCreating] = useState(false);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [appName, setAppName] = useState('');
+  const [creationProgress, setCreationProgress] = useState('');
+  const [hasError, setHasError] = useState(false);
 
-  const handleCreateApp = () => {
-    // TODO: Implement create app functionality
-    console.log('Create App clicked - implement your logic here');
+  const loadApps = async () => {
+    try {
+      const appsList = await window.electron.listApps();
+      setApps(appsList);
+    } catch (err) {
+      console.error('Failed to load apps:', err);
+      toastError({
+        title: 'Failed to load apps',
+        msg: 'Could not load apps from ~/goose/apps directory',
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleAppClick = (app: AppTile) => {
-    // TODO: Implement app click functionality
-    console.log('App clicked:', app);
+  useEffect(() => {
+    loadApps();
+
+    // Listen for app creation progress
+    const handleProgress = (_event: IpcRendererEvent, ...args: unknown[]) => {
+      const data = args[0] as { appName: string; lastLine: string; type: 'stdout' | 'stderr' };
+      setCreationProgress(data.lastLine);
+      // Mark if we're getting stderr (potential errors)
+      if (data.type === 'stderr') {
+        setHasError(true);
+      }
+    };
+
+    window.electron.on('app-creation-progress', handleProgress);
+
+    // Cleanup listener
+    return () => {
+      window.electron.off('app-creation-progress', handleProgress);
+    };
+  }, []);
+
+  const handleCreateAppClick = () => {
+    setAppName('');
+    setShowCreateDialog(true);
+  };
+
+  const handleCreateApp = async () => {
+    if (!appName.trim()) return;
+
+    // Validate app name
+    if (!/^[a-zA-Z0-9-_]+$/.test(appName.trim())) {
+      toastError({
+        title: 'Invalid app name',
+        msg: 'App name can only contain letters, numbers, hyphens, and underscores',
+      });
+      return;
+    }
+
+    setIsCreating(true);
+    setCreationProgress('Starting app creation...');
+    setHasError(false);
+
+    try {
+      await window.electron.createApp(appName.trim());
+
+      toastSuccess({
+        title: 'App created!',
+        msg: `Successfully created ${appName.trim()}`,
+      });
+      // Reload the apps list
+      await loadApps();
+      // Close dialog and reset
+      setShowCreateDialog(false);
+      setAppName('');
+      setCreationProgress('');
+      setHasError(false);
+    } catch (err) {
+      console.error('[BuildView] Failed to create app:', err);
+      setHasError(true);
+      setCreationProgress(err instanceof Error ? err.message : 'Unknown error occurred');
+      toastError({
+        title: 'Failed to create app',
+        msg: err instanceof Error ? err.message : 'Unknown error occurred',
+      });
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const handleCancelCreate = () => {
+    if (!isCreating) {
+      setShowCreateDialog(false);
+      setAppName('');
+      setCreationProgress('');
+      setHasError(false);
+    }
+  };
+
+  const handleAppClick = async (app: AppTile) => {
+    try {
+      await window.electron.openApp(app.path);
+    } catch (err) {
+      console.error('Failed to open app:', err);
+      toastError({
+        title: 'Failed to open app',
+        msg: 'Could not open the app directory',
+      });
+    }
   };
 
   // Component for rendering individual app tiles (similar to SessionItem)
@@ -83,9 +166,10 @@ const BuildView: React.FC = () => {
               <h1 className="text-4xl font-light">Build</h1>
               {/* Create App button on the right */}
               <Button
-                onClick={handleCreateApp}
+                onClick={handleCreateAppClick}
                 variant="default"
                 className="flex items-center gap-2"
+                disabled={isCreating}
               >
                 <Plus className="w-4 h-4" />
                 Create App
@@ -104,7 +188,14 @@ const BuildView: React.FC = () => {
                   <h2 className="text-text-muted">Your Apps</h2>
                 </div>
 
-                {apps.length > 0 ? (
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-12 text-text-muted">
+                    <div className="flex items-center gap-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-text-muted"></div>
+                      <span>Loading apps...</span>
+                    </div>
+                  </div>
+                ) : apps.length > 0 ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
                     {apps.map((app) => (
                       <AppTile key={app.id} app={app} />
@@ -116,9 +207,10 @@ const BuildView: React.FC = () => {
                     <p className="text-lg mb-2">No apps yet</p>
                     <p className="text-sm mb-4">Create your first app to get started</p>
                     <Button
-                      onClick={handleCreateApp}
+                      onClick={handleCreateAppClick}
                       variant="default"
                       className="flex items-center gap-2"
+                      disabled={isCreating}
                     >
                       <Plus className="w-4 h-4" />
                       Create Your First App
@@ -130,6 +222,87 @@ const BuildView: React.FC = () => {
           </ScrollArea>
         </div>
       </div>
+
+      {/* Create App Dialog */}
+      {showCreateDialog && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/50">
+          <div className="bg-background-default border border-border-subtle rounded-lg p-6 w-[400px] max-w-[90vw]">
+            <h3 className="text-lg font-medium text-text-standard mb-4">Create New App</h3>
+
+            <div className="space-y-4">
+              <div>
+                <label
+                  htmlFor="app-name"
+                  className="block text-sm font-medium text-text-standard mb-2"
+                >
+                  App Name
+                </label>
+                <Input
+                  id="app-name"
+                  type="text"
+                  value={appName}
+                  onChange={(e) => setAppName(e.target.value)}
+                  placeholder="my-awesome-app"
+                  className="w-full"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && appName.trim()) {
+                      handleCreateApp();
+                    } else if (e.key === 'Escape') {
+                      handleCancelCreate();
+                    }
+                  }}
+                />
+                <p className="text-xs text-text-muted mt-1">
+                  Only letters, numbers, hyphens, and underscores are allowed
+                </p>
+
+                {/* Progress indicator */}
+                {isCreating && (
+                  <div className="mt-3 p-3 bg-background-muted rounded-lg border border-border-subtle">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+                      <span className="text-sm font-medium text-text-standard">
+                        Creating app...
+                      </span>
+                    </div>
+                    {creationProgress && (
+                      <div
+                        className={`text-xs font-mono bg-background-default p-2 rounded border ${
+                          hasError ? 'text-red-600 border-red-300' : 'text-text-muted'
+                        }`}
+                      >
+                        {creationProgress}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-3 mt-6">
+              <Button onClick={handleCancelCreate} variant="ghost" disabled={isCreating}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleCreateApp}
+                disabled={!appName.trim() || isCreating}
+                variant="default"
+                className="min-w-[120px]"
+              >
+                {isCreating ? (
+                  <div className="flex items-center gap-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    Creating...
+                  </div>
+                ) : (
+                  'Create App'
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </MainPanelLayout>
   );
 };
