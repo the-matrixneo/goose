@@ -579,11 +579,10 @@ impl Agent {
             if ToolRouterIndexManager::is_tool_router_enabled(&selector) {
                 if let Some(selector) = selector {
                     let vector_action = if action == "disable" { "remove" } else { "add" };
-                    let extension_manager = &*self.extension_manager;
                     let selector = Arc::new(selector);
                     if let Err(e) = ToolRouterIndexManager::update_extension_tools(
                         &selector,
-                        &extension_manager,
+                        &self.extension_manager,
                         &extension_name,
                         vector_action,
                     )
@@ -632,8 +631,9 @@ impl Agent {
                 }
             }
             _ => {
-                let extension_manager = &*self.extension_manager;
-                extension_manager.add_extension(extension.clone()).await?;
+                self.extension_manager
+                    .add_extension(extension.clone())
+                    .await?;
             }
         }
 
@@ -641,11 +641,10 @@ impl Agent {
         let selector = self.tool_route_manager.get_router_tool_selector().await;
         if ToolRouterIndexManager::is_tool_router_enabled(&selector) {
             if let Some(selector) = selector {
-                let extension_manager = &*self.extension_manager;
                 let selector = Arc::new(selector);
                 if let Err(e) = ToolRouterIndexManager::update_extension_tools(
                     &selector,
-                    &extension_manager,
+                    &self.extension_manager,
                     &extension.name(),
                     "add",
                 )
@@ -713,17 +712,15 @@ impl Agent {
     }
 
     pub async fn remove_extension(&self, name: &str) -> Result<()> {
-        let extension_manager = &*self.extension_manager;
-        extension_manager.remove_extension(name).await?;
+        self.extension_manager.remove_extension(name).await?;
 
         // If vector tool selection is enabled, remove tools from the index
         let selector = self.tool_route_manager.get_router_tool_selector().await;
         if ToolRouterIndexManager::is_tool_router_enabled(&selector) {
             if let Some(selector) = selector {
-                let extension_manager = &*self.extension_manager;
                 ToolRouterIndexManager::update_extension_tools(
                     &selector,
-                    &extension_manager,
+                    &self.extension_manager,
                     name,
                     "remove",
                 )
@@ -735,8 +732,7 @@ impl Agent {
     }
 
     pub async fn list_extensions(&self) -> Vec<String> {
-        let extension_manager = &*self.extension_manager;
-        extension_manager
+        self.extension_manager
             .list_extensions()
             .await
             .expect("Failed to list extensions")
@@ -1183,18 +1179,16 @@ impl Agent {
     }
 
     pub async fn list_extension_prompts(&self) -> HashMap<String, Vec<Prompt>> {
-        let extension_manager = &*self.extension_manager;
-        extension_manager
+        self.extension_manager
             .list_prompts(CancellationToken::default())
             .await
             .expect("Failed to list prompts")
     }
 
     pub async fn get_prompt(&self, name: &str, arguments: Value) -> Result<GetPromptResult> {
-        let extension_manager = &*self.extension_manager;
-
         // First find which extension has this prompt
-        let prompts = extension_manager
+        let prompts = self
+            .extension_manager
             .list_prompts(CancellationToken::default())
             .await
             .map_err(|e| anyhow!("Failed to list prompts: {}", e))?;
@@ -1204,7 +1198,8 @@ impl Agent {
             .find(|(_, prompt_list)| prompt_list.iter().any(|p| p.name == name))
             .map(|(extension, _)| extension)
         {
-            return extension_manager
+            return self
+                .extension_manager
                 .get_prompt(extension, name, arguments, CancellationToken::default())
                 .await
                 .map_err(|e| anyhow!("Failed to get prompt: {}", e));
@@ -1214,8 +1209,7 @@ impl Agent {
     }
 
     pub async fn get_plan_prompt(&self) -> Result<String> {
-        let extension_manager = &*self.extension_manager;
-        let tools = extension_manager.get_prefixed_tools(None).await?;
+        let tools = self.extension_manager.get_prefixed_tools(None).await?;
         let tools_info = tools
             .into_iter()
             .map(|tool| {
@@ -1231,7 +1225,7 @@ impl Agent {
             })
             .collect();
 
-        let plan_prompt = extension_manager.get_planning_prompt(tools_info).await;
+        let plan_prompt = self.extension_manager.get_planning_prompt(tools_info).await;
 
         Ok(plan_prompt)
     }
@@ -1243,8 +1237,7 @@ impl Agent {
     }
 
     pub async fn create_recipe(&self, mut messages: Vec<Message>) -> Result<Recipe> {
-        let extension_manager = &*self.extension_manager;
-        let extensions_info = extension_manager.get_extensions_info().await;
+        let extensions_info = self.extension_manager.get_extensions_info().await;
 
         // Get model name from provider
         let provider = self.provider().await?;
@@ -1255,13 +1248,15 @@ impl Agent {
         let system_prompt = prompt_manager.build_system_prompt(
             extensions_info,
             self.frontend_instructions.lock().await.clone(),
-            extension_manager.suggest_disable_extensions_prompt().await,
+            self.extension_manager
+                .suggest_disable_extensions_prompt()
+                .await,
             Some(model_name),
             None,
         );
 
         let recipe_prompt = prompt_manager.get_recipe_prompt().await;
-        let tools = extension_manager.get_prefixed_tools(None).await?;
+        let tools = self.extension_manager.get_prefixed_tools(None).await?;
 
         messages.push(Message::user().with_text(recipe_prompt));
 
