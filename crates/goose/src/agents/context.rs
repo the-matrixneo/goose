@@ -58,8 +58,9 @@ impl Agent {
 
         let (mut new_messages, mut new_token_counts, summarization_usage) = match summary_result {
             Some((summary_message, provider_usage)) => {
-                // For token counting purposes, we use the total tokens from the provider usage
-                let total_tokens = provider_usage.usage.total_tokens.unwrap_or(0) as usize;
+                // For token counting purposes, we use the output tokens (the actual summary content)
+                // since that's what will be in the context going forward
+                let total_tokens = provider_usage.usage.output_tokens.unwrap_or(0) as usize;
                 (vec![summary_message], vec![total_tokens], Some(provider_usage))
             }
             None => {
