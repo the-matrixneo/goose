@@ -4,6 +4,27 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::env;
 
+/// Source of a configuration value
+#[derive(Debug, Clone, PartialEq)]
+pub enum ValueSource {
+    /// Value came from environment variable
+    Environment,
+    /// Value came from config file (YAML)
+    ConfigFile,
+    /// Value came from keyring/secret storage
+    Secret,
+    /// Value is a default value
+    Default,
+    /// Value was not found
+    NotFound,
+}
+
+/// A configuration value with its source
+#[derive(Debug, Clone)]
+pub struct TrackedValue {
+    pub value: Value,
+    pub source: ValueSource,
+}
 
 /// Centralized registry for environment variables loaded at process start.
 /// This eliminates just-in-time environment variable access and provides
@@ -13,6 +34,8 @@ pub struct EnvRegistry {
     env_vars: HashMap<String, String>,
     /// Pre-parsed and validated values - all parsing done at startup
     parsed_values: HashMap<String, Value>,
+    /// Track the source of each value
+    value_sources: HashMap<String, ValueSource>,
 }
 
 /// Global environment registry instance
@@ -516,13 +539,18 @@ impl EnvRegistry {
         
         // Parse all environment variables at startup
         let mut parsed_values = HashMap::new();
+        let mut value_sources = HashMap::new();
+        
         for (key, value) in &env_vars {
             if let Ok(parsed) = EnvRegistry::parse_env_value(value) {
                 parsed_values.insert(key.clone(), parsed);
+                value_sources.insert(key.clone(), ValueSource::Environment);
+                
                 // Also add uppercase version for flexible lookup
                 let upper_key = key.to_uppercase();
                 if upper_key != *key {
-                    parsed_values.insert(upper_key, EnvRegistry::parse_env_value(value).unwrap());
+                    parsed_values.insert(upper_key.clone(), EnvRegistry::parse_env_value(value).unwrap());
+                    value_sources.insert(upper_key, ValueSource::Environment);
                 }
             }
         }
@@ -530,19 +558,25 @@ impl EnvRegistry {
         Self {
             env_vars,
             parsed_values,
+            value_sources,
         }
     }
 
     /// Create a new environment registry with custom values (for testing)
     pub fn with_values(values: HashMap<String, String>) -> Self {
         let mut parsed_values = HashMap::new();
+        let mut value_sources = HashMap::new();
+        
         for (key, value) in &values {
             if let Ok(parsed) = EnvRegistry::parse_env_value(value) {
                 parsed_values.insert(key.clone(), parsed);
+                value_sources.insert(key.clone(), ValueSource::Environment);
+                
                 // Also add uppercase version for flexible lookup
                 let upper_key = key.to_uppercase();
                 if upper_key != *key {
-                    parsed_values.insert(upper_key, EnvRegistry::parse_env_value(value).unwrap());
+                    parsed_values.insert(upper_key.clone(), EnvRegistry::parse_env_value(value).unwrap());
+                    value_sources.insert(upper_key, ValueSource::Environment);
                 }
             }
         }
@@ -550,6 +584,7 @@ impl EnvRegistry {
         Self {
             env_vars: values,
             parsed_values,
+            value_sources,
         }
     }
 
@@ -587,6 +622,54 @@ impl EnvRegistry {
     pub fn get_typed<T: for<'de> Deserialize<'de>>(&self, key: &str) -> Option<T> {
         let value = self.get_parsed(key)?;
         serde_json::from_value(value).ok()
+    }
+
+    /// Get a value with its source information
+    pub fn get_tracked(&self, key: &str) -> TrackedValue {
+        // First try exact match
+        if let Some(value) = self.parsed_values.get(key) {
+            let source = self.value_sources.get(key)
+                .cloned()
+                .unwrap_or(ValueSource::Environment);
+            return TrackedValue {
+                value: value.clone(),
+                source,
+            };
+        }
+        
+        // Then try uppercase
+        let upper_key = key.to_uppercase();
+        if let Some(value) = self.parsed_values.get(&upper_key) {
+            let source = self.value_sources.get(&upper_key)
+                .cloned()
+                .unwrap_or(ValueSource::Environment);
+            return TrackedValue {
+                value: value.clone(),
+                source,
+            };
+        }
+        
+        // Not found
+        TrackedValue {
+            value: Value::Null,
+            source: ValueSource::NotFound,
+        }
+    }
+
+    /// Get the source of a value
+    pub fn get_source(&self, key: &str) -> ValueSource {
+        // First try exact match
+        if let Some(source) = self.value_sources.get(key) {
+            return source.clone();
+        }
+        
+        // Then try uppercase
+        let upper_key = key.to_uppercase();
+        if let Some(source) = self.value_sources.get(&upper_key) {
+            return source.clone();
+        }
+        
+        ValueSource::NotFound
     }
 
     /// Check if an environment variable exists
@@ -1003,5 +1086,51 @@ mod tests {
         for key in &discovered {
             assert!(!key.is_empty(), "Extension env key should not be empty");
         }
+    }
+
+    #[test]
+    fn test_value_source_tracking() {
+        let env_vars = HashMap::from([
+            ("TEST_ENV_VAR".to_string(), "env_value".to_string()),
+            ("TEST_NUMBER".to_string(), "42".to_string()),
+        ]);
+
+        let registry = EnvRegistry::with_values(env_vars);
+
+        // Test getting tracked value for existing env var
+        let tracked = registry.get_tracked("TEST_ENV_VAR");
+        assert_eq!(tracked.source, ValueSource::Environment);
+        assert_eq!(tracked.value, Value::String("env_value".to_string()));
+
+        // Test getting tracked value for non-existent var
+        let tracked = registry.get_tracked("NON_EXISTENT");
+        assert_eq!(tracked.source, ValueSource::NotFound);
+        assert_eq!(tracked.value, Value::Null);
+
+        // Test getting source directly
+        assert_eq!(registry.get_source("TEST_ENV_VAR"), ValueSource::Environment);
+        assert_eq!(registry.get_source("TEST_NUMBER"), ValueSource::Environment);
+        assert_eq!(registry.get_source("NON_EXISTENT"), ValueSource::NotFound);
+
+        // Test case-insensitive lookup for source
+        assert_eq!(registry.get_source("test_env_var"), ValueSource::Environment);
+    }
+
+    #[test]
+    fn test_value_source_with_uppercase() {
+        let env_vars = HashMap::from([
+            ("test_lower".to_string(), "lower_value".to_string()),
+        ]);
+
+        let registry = EnvRegistry::with_values(env_vars);
+
+        // Test that uppercase lookup also gets correct source
+        let tracked = registry.get_tracked("TEST_LOWER");
+        assert_eq!(tracked.source, ValueSource::Environment);
+        assert_eq!(tracked.value, Value::String("lower_value".to_string()));
+
+        // Test source lookup with different cases
+        assert_eq!(registry.get_source("test_lower"), ValueSource::Environment);
+        assert_eq!(registry.get_source("TEST_LOWER"), ValueSource::Environment);
     }
 }
