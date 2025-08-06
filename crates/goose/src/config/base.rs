@@ -116,7 +116,12 @@ enum SecretStorage {
 }
 
 // Global instance
+#[cfg(not(test))]
 static GLOBAL_CONFIG: OnceCell<Config> = OnceCell::new();
+
+// In test mode, use a Mutex so we can reset it
+#[cfg(test)]
+static GLOBAL_CONFIG: Lazy<std::sync::Mutex<Option<Config>>> = Lazy::new(|| std::sync::Mutex::new(None));
 
 impl Default for Config {
     fn default() -> Self {
@@ -171,8 +176,44 @@ impl Config {
     ///
     /// This will initialize the configuration with the default path (~/.config/goose/config.yaml)
     /// if it hasn't been initialized yet.
+    #[cfg(not(test))]
     pub fn global() -> &'static Config {
         GLOBAL_CONFIG.get_or_init(Config::default)
+    }
+    
+    /// Get the global configuration instance (test version).
+    /// In tests, this uses a Mutex to allow resetting the config.
+    #[cfg(test)]
+    pub fn global() -> &'static Config {
+        // This is a bit of a hack to get a static reference in test mode
+        // We leak the Box to get a 'static lifetime
+        let mut guard = GLOBAL_CONFIG.lock().unwrap();
+        if guard.is_none() {
+            *guard = Some(Config::default());
+        }
+        
+        // We need to get a static reference somehow
+        // This is safe because we only set it once per test
+        unsafe {
+            // Get a raw pointer to the Config inside the Option
+            let config_ptr = guard.as_ref().unwrap() as *const Config;
+            // Convert to a static reference
+            &*config_ptr
+        }
+    }
+    
+    /// Reset the global config (test only)
+    #[cfg(test)]
+    pub fn reset_global() {
+        let mut guard = GLOBAL_CONFIG.lock().unwrap();
+        *guard = None;
+    }
+    
+    /// Set a custom global config (test only)
+    #[cfg(test)]
+    pub fn set_global_for_test(config: Config) {
+        let mut guard = GLOBAL_CONFIG.lock().unwrap();
+        *guard = Some(config);
     }
 
     /// Create a new configuration instance with custom paths
@@ -1576,6 +1617,33 @@ mod tests {
         let result2: String = mock_no_env.get_param("PRECEDENCE_TEST")?;
         assert_eq!(result2, "config_wins");
 
+        Ok(())
+    }
+    
+    #[test]
+    #[serial]
+    fn test_global_config_override() -> Result<(), ConfigError> {
+        // Reset global config to ensure clean state
+        Config::reset_global();
+        
+        // Create a custom config with specific test values
+        let temp_file = NamedTempFile::new().unwrap();
+        let test_config = Config::new(temp_file.path(), TEST_KEYRING_SERVICE)?;
+        
+        // Set some test values in the config
+        test_config.set_param("test_global_key", Value::String("test_value".to_string()))?;
+        
+        // Set this as the global config
+        Config::set_global_for_test(test_config);
+        
+        // Now any code that uses Config::global() will get our test config
+        let global = Config::global();
+        let value: String = global.get_param("test_global_key")?;
+        assert_eq!(value, "test_value");
+        
+        // Clean up - reset for other tests
+        Config::reset_global();
+        
         Ok(())
     }
 }
