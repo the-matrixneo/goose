@@ -98,14 +98,6 @@ const menuItems: NavigationEntry[] = [
     icon: Gear,
     tooltip: 'Configure Goose settings',
   },
-  {
-    type: 'item',
-    path: '/build',
-    label: 'Build',
-    icon: Hammer,
-    tooltip: 'Build new apps'
-
-  }
 ];
 
 const AppSidebar: React.FC<SidebarProps> = ({ currentPath }) => {

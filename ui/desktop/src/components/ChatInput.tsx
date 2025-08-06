@@ -23,6 +23,7 @@ import { toastError } from '../toasts';
 import MentionPopover, { FileItemWithMatch } from './MentionPopover';
 import { useDictationSettings } from '../hooks/useDictationSettings';
 import { useChatContextManager } from './context_management/ChatContextManager';
+import LocalhostButton from './LocalhostButton';
 import { useChatContext } from '../contexts/ChatContext';
 import { COST_TRACKING_ENABLED } from '../updates';
 import { CostTracker } from './bottom_menu/CostTracker';
@@ -1257,6 +1258,9 @@ export default function ChatInput({
           </TooltipTrigger>
           <TooltipContent>Attach file or directory</TooltipContent>
         </Tooltip>
+
+        {/* Localhost viewer button */}
+        <LocalhostButton />
         <div className="w-px h-4 bg-border-default mx-2" />
 
         {/* Model selector, mode selector, alerts, summarize button */}

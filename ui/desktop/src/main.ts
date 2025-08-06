@@ -2432,21 +2432,21 @@ ipcMain.handle('open-app', async (_event, appPath: string) => {
   }
 });
 
-// Generate favicon from color combination
-function generateFavicon(bgColor: string, innerColor: string): Buffer {
-  // Create a simple 32x32 favicon as SVG, then convert to ICO format
-  // For now, we'll create a simple PNG and save it as favicon.ico
-  const svgContent = `
-    <svg width="32" height="32" xmlns="http://www.w3.org/2000/svg">
-      <rect width="32" height="32" rx="6" fill="${bgColor}" />
-      <rect x="8" y="8" width="16" height="16" rx="4" fill="${innerColor}" />
-    </svg>
-  `;
+// // Generate favicon from color combination
+// function generateFavicon(bgColor: string, innerColor: string): Buffer {
+//   // Create a simple 32x32 favicon as SVG, then convert to ICO format
+//   // For now, we'll create a simple PNG and save it as favicon.ico
+//   const svgContent = `
+//     <svg width="32" height="32" xmlns="http://www.w3.org/2000/svg">
+//       <rect width="32" height="32" rx="6" fill="${bgColor}" />
+//       <rect x="8" y="8" width="16" height="16" rx="4" fill="${innerColor}" />
+//     </svg>
+//   `;
   
-  // For now, return the SVG as a buffer - in a real implementation,
-  // you'd want to convert this to ICO format using a library like 'sharp'
-  return Buffer.from(svgContent, 'utf8');
-}
+//   // For now, return the SVG as a buffer - in a real implementation,
+//   // you'd want to convert this to ICO format using a library like 'sharp'
+//   return Buffer.from(svgContent, 'utf8');
+// }
 
 // Convert Tailwind color classes to hex colors
 function tailwindToHex(colorClass: string): string {
