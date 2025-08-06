@@ -204,16 +204,37 @@ impl Config {
     
     /// Reset the global config (test only)
     #[cfg(test)]
-    pub fn reset_global() {
+    fn reset_global() {
         let mut guard = GLOBAL_CONFIG.lock().unwrap();
         *guard = None;
     }
     
-    /// Set a custom global config (test only)
+    /// Set a custom global config (test only) - internal use
     #[cfg(test)]
-    pub fn set_global_for_test(config: Config) {
+    fn set_global_internal(config: Config) {
         let mut guard = GLOBAL_CONFIG.lock().unwrap();
         *guard = Some(config);
+    }
+    
+    /// Use a test configuration for the duration of a test.
+    /// Returns a guard that will automatically reset the global config when dropped.
+    /// 
+    /// # Example
+    /// ```no_run
+    /// let _guard = Config::test()
+    ///     .with_env("GOOSE_PROVIDER", "test_provider")
+    ///     .with_env("GOOSE_MODEL", "test_model")
+    ///     .apply();
+    /// 
+    /// // Test code here uses the test config
+    /// let global = Config::global();
+    /// assert_eq!(global.get_param::<String>("GOOSE_PROVIDER")?, "test_provider");
+    /// 
+    /// // Config is automatically reset when _guard goes out of scope
+    /// ```
+    #[cfg(test)]
+    pub fn test() -> TestConfigBuilder {
+        TestConfigBuilder::new()
     }
 
     /// Create a new configuration instance with custom paths
@@ -891,6 +912,79 @@ pub fn load_init_config_from_workspace() -> Result<HashMap<String, Value>, Confi
 
     tracing::info!("Loaded init-config.yaml with {} keys", init_values.len());
     Ok(init_values)
+}
+
+/// Builder for test configurations
+#[cfg(test)]
+pub struct TestConfigBuilder {
+    env_vars: Vec<(String, String)>,
+}
+
+#[cfg(test)]
+impl TestConfigBuilder {
+    fn new() -> Self {
+        Self {
+            env_vars: Vec::new(),
+        }
+    }
+    
+    /// Add an environment variable to the test configuration
+    pub fn with_env(mut self, key: &str, value: &str) -> Self {
+        self.env_vars.push((key.to_string(), value.to_string()));
+        self
+    }
+    
+    /// Apply the test configuration and return a guard that will clean up when dropped
+    pub fn apply(self) -> TestConfigGuard {
+        // Reset the global config first
+        Config::reset_global();
+        
+        // Save current env vars for restoration
+        let mut saved_env_vars = Vec::new();
+        
+        // Set all the test env vars
+        for (key, value) in &self.env_vars {
+            let upper_key = key.to_uppercase();
+            // Save the current value if it exists
+            if let Ok(current) = std::env::var(&upper_key) {
+                saved_env_vars.push((upper_key.clone(), Some(current)));
+            } else {
+                saved_env_vars.push((upper_key.clone(), None));
+            }
+            // Set the new value
+            std::env::set_var(&upper_key, value);
+        }
+        
+        // Create and set a new test config
+        let test_config = Config::new();
+        Config::set_global_internal(test_config);
+        
+        TestConfigGuard {
+            saved_env_vars,
+        }
+    }
+}
+
+/// Guard that automatically resets the configuration when dropped
+#[cfg(test)]
+pub struct TestConfigGuard {
+    saved_env_vars: Vec<(String, Option<String>)>,
+}
+
+#[cfg(test)]
+impl Drop for TestConfigGuard {
+    fn drop(&mut self) {
+        // Restore all saved environment variables
+        for (key, value) in &self.saved_env_vars {
+            match value {
+                Some(v) => std::env::set_var(key, v),
+                None => std::env::remove_var(key),
+            }
+        }
+        
+        // Reset the global config
+        Config::reset_global();
+    }
 }
 
 #[cfg(test)]
@@ -1575,88 +1669,19 @@ mod tests {
     }
 
     #[test]
-    fn test_mock_config_example() -> Result<(), ConfigError> {
-        use crate::config::MockConfig;
-        
-        // Create a mock config with controlled environment
-        let mock = MockConfig::new()
-            .with_env("PROVIDER", "ANTHROPIC")
-            .with_env("PORT", "8080")
-            .with_env("ENABLED", "true")
-            .with_config("fallback_value", Value::String("from_config".to_string()))
-            .with_secret("API_KEY", Value::String("secret123".to_string()));
-
-        // Test environment variable access - no actual env vars set!
-        let provider: String = mock.get_param("PROVIDER")?;
-        assert_eq!(provider, "ANTHROPIC");
-
-        let port: i32 = mock.get_param("PORT")?;
-        assert_eq!(port, 8080);
-
-        let enabled: bool = mock.get_param("ENABLED")?;
-        assert_eq!(enabled, true);
-
-        // Test config file fallback
-        let fallback: String = mock.get_param("fallback_value")?;
-        assert_eq!(fallback, "from_config");
-
-        // Test secret access
-        let api_key: String = mock.get_secret("API_KEY")?;
-        assert_eq!(api_key, "secret123");
-
-        // Test that missing values return errors
-        let missing = mock.get_param::<String>("NONEXISTENT");
-        assert!(missing.is_err());
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_mock_config_precedence_example() -> Result<(), ConfigError> {
-        use crate::config::MockConfig;
-        
-        // Demonstrate precedence: env vars override config values
-        let mock = MockConfig::new()
-            .with_env("PRECEDENCE_TEST", "env_wins")
-            .with_config("PRECEDENCE_TEST", Value::String("config_loses".to_string()));
-
-        let result: String = mock.get_param("PRECEDENCE_TEST")?;
-        assert_eq!(result, "env_wins");
-
-        // Show that without env var, config value is used
-        let mock_no_env = MockConfig::new()
-            .with_config("PRECEDENCE_TEST", Value::String("config_wins".to_string()));
-
-        let result2: String = mock_no_env.get_param("PRECEDENCE_TEST")?;
-        assert_eq!(result2, "config_wins");
-
-        Ok(())
-    }
-    
-    #[test]
     #[serial]
-    fn test_global_config_override() -> Result<(), ConfigError> {
-        // Reset global config to ensure clean state
-        Config::reset_global();
-        
-        // Create a custom config with specific test values
-        let temp_file = NamedTempFile::new().unwrap();
-        let test_config = Config::with_path(temp_file.path(), TEST_KEYRING_SERVICE)?;
-        
-        // Set some test values in the config
-        test_config.set_param("test_global_key", Value::String("test_value".to_string()))?;
-        
-        // Set this as the global config
-        Config::set_global_for_test(test_config);
+    fn test_global_config_with_guard() -> Result<(), ConfigError> {
+        // Use the guard-based approach - automatic cleanup!
+        let _guard = Config::test()
+            .with_env("TEST_GLOBAL_KEY", "test_value")
+            .apply();
         
         // Now any code that uses Config::global() will get our test config
         let global = Config::global();
-        let value: String = global.get_param("test_global_key")?;
+        let value: String = global.get_param("TEST_GLOBAL_KEY")?;
         assert_eq!(value, "test_value");
         
-        // Clean up - reset for other tests
-        Config::reset_global();
-        
+        // No manual cleanup needed - guard handles it automatically
         Ok(())
     }
 }

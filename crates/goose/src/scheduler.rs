@@ -1404,15 +1404,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_scheduled_session_has_schedule_id() -> Result<(), Box<dyn std::error::Error>> {
-        // Reset global config for test isolation
-        Config::reset_global();
-        
-        // Set up test configuration using the new testing mechanism
-        let test_config = Config::new()
+        // Use the new guard-based test configuration
+        let _guard = Config::test()
             .with_env("GOOSE_PROVIDER", "test_provider")
-            .with_env("GOOSE_MODEL", "test_model");
-        
-        Config::set_global_for_test(test_config);
+            .with_env("GOOSE_MODEL", "test_model")
+            .apply();
 
         let temp_dir = tempdir()?;
         let recipe_dir = temp_dir.path().join("recipes_for_test_scheduler");
@@ -1512,9 +1508,7 @@ mod tests {
             expected_session_path.display()
         );
 
-        // Clean up test configuration
-        Config::reset_global();
-
+        // Guard will automatically clean up when it goes out of scope
         Ok(())
     }
 }
