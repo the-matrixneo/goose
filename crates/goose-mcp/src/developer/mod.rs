@@ -1652,7 +1652,6 @@ impl Clone for DeveloperRouter {
             instructions: self.instructions.clone(),
             file_history: Arc::clone(&self.file_history),
             ignore_patterns: Arc::clone(&self.ignore_patterns),
-            editor_model: create_editor_model(),
             task_tracker: self.task_tracker.clone(),
             editor_model: create_editor_model(),
         }
