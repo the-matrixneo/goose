@@ -103,7 +103,7 @@ pub async fn check_compaction_needed(
         usage_ratio > threshold
     };
 
-    tracing::warn!(
+    debug!(
         "Compaction check: {} / {} tokens ({:.1}%), threshold: {:.1}%, needs compaction: {}, source: {}",
         current_tokens,
         context_limit,
