@@ -61,6 +61,13 @@ const menuItems: NavigationEntry[] = [
     icon: History,
     tooltip: 'View your session history',
   },
+  {
+    type: 'item',
+    path: '/build',
+    label: 'Build',
+    icon: Hammer,
+    tooltip: 'Build new apps',
+  },
   { type: 'separator' },
   {
     type: 'item',
@@ -91,6 +98,14 @@ const menuItems: NavigationEntry[] = [
     icon: Gear,
     tooltip: 'Configure Goose settings',
   },
+  {
+    type: 'item',
+    path: '/build',
+    label: 'Build',
+    icon: Hammer,
+    tooltip: 'Build new apps'
+
+  }
 ];
 
 const AppSidebar: React.FC<SidebarProps> = ({ currentPath }) => {
