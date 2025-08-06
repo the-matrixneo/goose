@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { FileText, Clock, Home, Puzzle, History } from 'lucide-react';
+import { FileText, Clock, Home, Puzzle, History, Hammer } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import {
   SidebarContent,
@@ -96,6 +96,20 @@ const AppSidebar: React.FC<SidebarProps> = ({ currentPath }) => {
                   >
                     <History className="w-4 h-4" />
                     <span>History</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </div>
+
+              <div className="sidebar-item">
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    onClick={() => navigate('/build')}
+                    isActive={isActivePath('/build')}
+                    tooltip="Build new apps"
+                    className="w-full justify-start px-3 rounded-lg h-fit hover:bg-background-medium/50 transition-all duration-200 data-[active=true]:bg-background-medium"
+                  >
+                    <Hammer className="w-4 h-4" />
+                    <span>Build</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </div>
