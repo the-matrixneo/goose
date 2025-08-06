@@ -62,12 +62,36 @@ pub enum EnvCategory {
     Tracing,
 }
 
+/// Expected type for an environment variable
+#[derive(Debug, Clone, PartialEq)]
+pub enum EnvVarType {
+    /// String value (default if not specified)
+    String,
+    /// Integer value
+    Integer,
+    /// Float value
+    Float,
+    /// Boolean value
+    Boolean,
+    /// JSON object
+    JsonObject,
+    /// JSON array
+    JsonArray,
+}
+
+impl Default for EnvVarType {
+    fn default() -> Self {
+        EnvVarType::String
+    }
+}
+
 /// Known environment variables with their categories and whether they're secrets
 pub struct EnvVarSpec {
     pub name: &'static str,
     pub category: EnvCategory,
     pub is_secret: bool,
     pub description: &'static str,
+    pub var_type: EnvVarType,
 }
 
 /// Registry of all known environment variables used by Goose
@@ -78,18 +102,21 @@ pub const KNOWN_ENV_VARS: &[EnvVarSpec] = &[
         category: EnvCategory::Provider,
         is_secret: true,
         description: "OpenAI API key",
+        var_type: EnvVarType::String,
     },
     EnvVarSpec {
         name: "ANTHROPIC_API_KEY",
         category: EnvCategory::Provider,
         is_secret: true,
         description: "Anthropic API key",
+        var_type: EnvVarType::String,
     },
     EnvVarSpec {
         name: "GOOGLE_API_KEY",
         category: EnvCategory::Provider,
         is_secret: true,
         description: "Google API key",
+        var_type: EnvVarType::String,
     },
     
     // Provider configuration
@@ -98,36 +125,42 @@ pub const KNOWN_ENV_VARS: &[EnvVarSpec] = &[
         category: EnvCategory::Provider,
         is_secret: false,
         description: "Default model to use",
+        var_type: EnvVarType::String,
     },
     EnvVarSpec {
         name: "GOOSE_LEAD_MODEL",
         category: EnvCategory::Provider,
         is_secret: false,
         description: "Lead model for multi-model setup",
+        var_type: EnvVarType::String,
     },
     EnvVarSpec {
         name: "GOOSE_LEAD_PROVIDER",
         category: EnvCategory::Provider,
         is_secret: false,
         description: "Lead provider for multi-model setup",
+        var_type: EnvVarType::String,
     },
     EnvVarSpec {
         name: "GOOSE_LEAD_TURNS",
         category: EnvCategory::Provider,
         is_secret: false,
         description: "Number of turns for lead model",
+        var_type: EnvVarType::Integer,
     },
     EnvVarSpec {
         name: "GOOSE_LEAD_FAILURE_THRESHOLD",
         category: EnvCategory::Provider,
         is_secret: false,
         description: "Failure threshold for lead model",
+        var_type: EnvVarType::Integer,
     },
     EnvVarSpec {
         name: "GOOSE_LEAD_FALLBACK_TURNS",
         category: EnvCategory::Provider,
         is_secret: false,
         description: "Fallback turns for lead model",
+        var_type: EnvVarType::Integer,
     },
     
     // Core configuration
@@ -136,42 +169,49 @@ pub const KNOWN_ENV_VARS: &[EnvVarSpec] = &[
         category: EnvCategory::Core,
         is_secret: false,
         description: "Context limit for models",
+        var_type: EnvVarType::Integer,
     },
     EnvVarSpec {
         name: "GOOSE_WORKER_CONTEXT_LIMIT",
         category: EnvCategory::Core,
         is_secret: false,
         description: "Context limit for worker models",
+        var_type: EnvVarType::Integer,
     },
     EnvVarSpec {
         name: "GOOSE_TEMPERATURE",
         category: EnvCategory::Core,
         is_secret: false,
         description: "Temperature setting for models",
+        var_type: EnvVarType::Float,
     },
     EnvVarSpec {
         name: "GOOSE_MODE",
         category: EnvCategory::Core,
         is_secret: false,
         description: "Operating mode",
+        var_type: EnvVarType::String,
     },
     EnvVarSpec {
         name: "GOOSE_DISABLE_KEYRING",
         category: EnvCategory::Core,
         is_secret: false,
         description: "Disable keyring for secret storage",
+        var_type: EnvVarType::Boolean,
     },
     EnvVarSpec {
         name: "GOOSE_CACHE_DIR",
         category: EnvCategory::Core,
         is_secret: false,
         description: "Cache directory path",
+        var_type: EnvVarType::String,
     },
     EnvVarSpec {
         name: "GOOSE_WORKING_DIR",
         category: EnvCategory::Core,
         is_secret: false,
         description: "Working directory path",
+        var_type: EnvVarType::String,
     },
     
     // Toolshim configuration
@@ -180,12 +220,14 @@ pub const KNOWN_ENV_VARS: &[EnvVarSpec] = &[
         category: EnvCategory::Core,
         is_secret: false,
         description: "Enable toolshim functionality",
+        var_type: EnvVarType::Boolean,
     },
     EnvVarSpec {
         name: "GOOSE_TOOLSHIM_OLLAMA_MODEL",
         category: EnvCategory::Core,
         is_secret: false,
         description: "Ollama model for toolshim",
+        var_type: EnvVarType::String,
     },
     
     // Router configuration
@@ -194,18 +236,21 @@ pub const KNOWN_ENV_VARS: &[EnvVarSpec] = &[
         category: EnvCategory::Core,
         is_secret: false,
         description: "Tool selection strategy for router",
+        var_type: EnvVarType::String,
     },
     EnvVarSpec {
         name: "GOOSE_EMBEDDING_MODEL_PROVIDER",
         category: EnvCategory::Provider,
         is_secret: false,
         description: "Embedding model provider",
+        var_type: EnvVarType::String,
     },
     EnvVarSpec {
         name: "GOOSE_EMBEDDING_MODEL",
         category: EnvCategory::Provider,
         is_secret: false,
         description: "Embedding model name",
+        var_type: EnvVarType::String,
     },
     
     // Interface configuration
@@ -214,18 +259,21 @@ pub const KNOWN_ENV_VARS: &[EnvVarSpec] = &[
         category: EnvCategory::Interface,
         is_secret: false,
         description: "CLI theme",
+        var_type: EnvVarType::String,
     },
     EnvVarSpec {
         name: "GOOSE_CLI_SHOW_THINKING",
         category: EnvCategory::Interface,
         is_secret: false,
         description: "Show thinking in CLI",
+        var_type: EnvVarType::Boolean,
     },
     EnvVarSpec {
         name: "GOOSE_CLI_MIN_PRIORITY",
         category: EnvCategory::Interface,
         is_secret: false,
         description: "Minimum priority for CLI display",
+        var_type: EnvVarType::Integer,
     },
     
     // Scheduler configuration
@@ -234,12 +282,14 @@ pub const KNOWN_ENV_VARS: &[EnvVarSpec] = &[
         category: EnvCategory::Scheduler,
         is_secret: false,
         description: "Scheduler type (temporal/legacy)",
+        var_type: EnvVarType::String,
     },
     EnvVarSpec {
         name: "GOOSE_TEMPORAL_BIN",
         category: EnvCategory::Scheduler,
         is_secret: false,
         description: "Path to temporal binary",
+        var_type: EnvVarType::String,
     },
     
     // Debug configuration
@@ -248,24 +298,28 @@ pub const KNOWN_ENV_VARS: &[EnvVarSpec] = &[
         category: EnvCategory::Debug,
         is_secret: false,
         description: "Enable Claude thinking mode",
+        var_type: EnvVarType::Boolean,
     },
     EnvVarSpec {
         name: "CLAUDE_THINKING_BUDGET",
         category: EnvCategory::Debug,
         is_secret: false,
         description: "Claude thinking token budget",
+        var_type: EnvVarType::Integer,
     },
     EnvVarSpec {
         name: "GOOSE_GEMINI_CLI_DEBUG",
         category: EnvCategory::Debug,
         is_secret: false,
         description: "Enable Gemini CLI debug mode",
+        var_type: EnvVarType::Boolean,
     },
     EnvVarSpec {
         name: "GOOSE_CLAUDE_CODE_DEBUG",
         category: EnvCategory::Debug,
         is_secret: false,
         description: "Enable Claude Code debug mode",
+        var_type: EnvVarType::Boolean,
     },
     
     // Tracing configuration
@@ -274,42 +328,49 @@ pub const KNOWN_ENV_VARS: &[EnvVarSpec] = &[
         category: EnvCategory::Tracing,
         is_secret: true,
         description: "Langfuse public key",
+        var_type: EnvVarType::String,
     },
     EnvVarSpec {
         name: "LANGFUSE_SECRET_KEY",
         category: EnvCategory::Tracing,
         is_secret: true,
         description: "Langfuse secret key",
+        var_type: EnvVarType::String,
     },
     EnvVarSpec {
         name: "LANGFUSE_URL",
         category: EnvCategory::Tracing,
         is_secret: false,
         description: "Langfuse URL",
+        var_type: EnvVarType::String,
     },
     EnvVarSpec {
         name: "LANGFUSE_INIT_PROJECT_PUBLIC_KEY",
         category: EnvCategory::Tracing,
         is_secret: true,
         description: "Langfuse init project public key",
+        var_type: EnvVarType::String,
     },
     EnvVarSpec {
         name: "LANGFUSE_INIT_PROJECT_SECRET_KEY",
         category: EnvCategory::Tracing,
         is_secret: true,
         description: "Langfuse init project secret key",
+        var_type: EnvVarType::String,
     },
     EnvVarSpec {
         name: "OTEL_EXPORTER_OTLP_ENDPOINT",
         category: EnvCategory::Tracing,
         is_secret: false,
         description: "OTLP exporter endpoint",
+        var_type: EnvVarType::Integer,
     },
     EnvVarSpec {
         name: "OTEL_EXPORTER_OTLP_TIMEOUT",
         category: EnvCategory::Tracing,
         is_secret: false,
         description: "OTLP exporter timeout",
+        var_type: EnvVarType::Integer,
     },
     
     // System environment
@@ -318,42 +379,49 @@ pub const KNOWN_ENV_VARS: &[EnvVarSpec] = &[
         category: EnvCategory::System,
         is_secret: false,
         description: "User home directory",
+        var_type: EnvVarType::String,
     },
     EnvVarSpec {
         name: "USER",
         category: EnvCategory::System,
         is_secret: false,
         description: "Current user name",
+        var_type: EnvVarType::String,
     },
     EnvVarSpec {
         name: "USERNAME",
         category: EnvCategory::System,
         is_secret: false,
         description: "Current user name (Windows)",
+        var_type: EnvVarType::String,
     },
     EnvVarSpec {
         name: "PATH",
         category: EnvCategory::System,
         is_secret: false,
         description: "System PATH",
+        var_type: EnvVarType::String,
     },
     EnvVarSpec {
         name: "TEMP",
         category: EnvCategory::System,
         is_secret: false,
         description: "Temporary directory",
+        var_type: EnvVarType::String,
     },
     EnvVarSpec {
         name: "DISPLAY",
         category: EnvCategory::System,
         is_secret: false,
         description: "X11 display",
+        var_type: EnvVarType::String,
     },
     EnvVarSpec {
         name: "WAYLAND_DISPLAY",
         category: EnvCategory::System,
         is_secret: false,
         description: "Wayland display",
+        var_type: EnvVarType::String,
     },
     
     // Extension/MCP configuration
@@ -362,42 +430,49 @@ pub const KNOWN_ENV_VARS: &[EnvVarSpec] = &[
         category: EnvCategory::Extension,
         is_secret: false,
         description: "Google Drive OAuth path",
+        var_type: EnvVarType::String,
     },
     EnvVarSpec {
         name: "GOOGLE_DRIVE_CREDENTIALS_PATH",
         category: EnvCategory::Extension,
         is_secret: false,
         description: "Google Drive credentials path",
+        var_type: EnvVarType::String,
     },
     EnvVarSpec {
         name: "GOOGLE_DRIVE_OAUTH_CONFIG",
         category: EnvCategory::Extension,
         is_secret: true,
         description: "Google Drive OAuth config",
+        var_type: EnvVarType::JsonObject,
     },
     EnvVarSpec {
         name: "GOOSE_EDITOR_API_KEY",
         category: EnvCategory::Extension,
         is_secret: true,
         description: "Goose editor API key",
+        var_type: EnvVarType::String,
     },
     EnvVarSpec {
         name: "GOOSE_EDITOR_HOST",
         category: EnvCategory::Extension,
         is_secret: false,
         description: "Goose editor host",
+        var_type: EnvVarType::String,
     },
     EnvVarSpec {
         name: "GOOSE_EDITOR_MODEL",
         category: EnvCategory::Extension,
         is_secret: false,
         description: "Goose editor model",
+        var_type: EnvVarType::String,
     },
     EnvVarSpec {
         name: "CONTEXT_FILE_NAMES",
         category: EnvCategory::Extension,
         is_secret: false,
         description: "Context file names for developer extension",
+        var_type: EnvVarType::String,
     },
     
     // Testing configuration
@@ -406,12 +481,14 @@ pub const KNOWN_ENV_VARS: &[EnvVarSpec] = &[
         category: EnvCategory::Debug,
         is_secret: false,
         description: "Provider for testing",
+        var_type: EnvVarType::String,
     },
     EnvVarSpec {
         name: "GITHUB_ACTIONS",
         category: EnvCategory::System,
         is_secret: false,
         description: "GitHub Actions environment indicator",
+        var_type: EnvVarType::String,
     },
     
     // Recipe configuration
@@ -420,6 +497,7 @@ pub const KNOWN_ENV_VARS: &[EnvVarSpec] = &[
         category: EnvCategory::Core,
         is_secret: false,
         description: "Recipe search path",
+        var_type: EnvVarType::String,
     },
     
     // Subagent configuration
@@ -428,6 +506,7 @@ pub const KNOWN_ENV_VARS: &[EnvVarSpec] = &[
         category: EnvCategory::Core,
         is_secret: false,
         description: "Maximum turns for subagents",
+        var_type: EnvVarType::Integer,
     },
     
     // Server configuration
@@ -436,36 +515,42 @@ pub const KNOWN_ENV_VARS: &[EnvVarSpec] = &[
         category: EnvCategory::Core,
         is_secret: true,
         description: "Server secret key",
+        var_type: EnvVarType::String,
     },
     EnvVarSpec {
         name: "GOOSE_SERVER__MEMORY",
         category: EnvCategory::Core,
         is_secret: false,
         description: "Enable server memory",
+        var_type: EnvVarType::Boolean,
     },
     EnvVarSpec {
         name: "GOOSE_SERVER__COMPUTER_CONTROLLER",
         category: EnvCategory::Core,
         is_secret: false,
         description: "Enable computer controller",
+        var_type: EnvVarType::Boolean,
     },
     EnvVarSpec {
         name: "PORT",
         category: EnvCategory::System,
         is_secret: false,
         description: "Server port",
+        var_type: EnvVarType::Integer,
     },
     EnvVarSpec {
         name: "GOOSE_PORT",
         category: EnvCategory::Core,
         is_secret: false,
         description: "Goose server port",
+        var_type: EnvVarType::Integer,
     },
     EnvVarSpec {
         name: "GOOSE_API_HOST",
         category: EnvCategory::Core,
         is_secret: false,
         description: "Goose API host",
+        var_type: EnvVarType::String,
     },
 ];
 
@@ -486,6 +571,7 @@ pub fn discover_provider_env_vars() -> Vec<EnvVarSpec> {
                 description: Box::leak(
                     format!("{} - {}", provider_metadata.display_name, config_key.name).into_boxed_str()
                 ),
+                var_type: EnvVarType::String, // Default to string for provider config
             });
         }
     }
@@ -618,10 +704,51 @@ impl EnvRegistry {
         self.parsed_values.get(&upper_key).cloned()
     }
 
-    /// Get a typed value from the environment registry - thin wrapper with deserialization
+    /// Get a typed value from the environment registry with type validation
     pub fn get_typed<T: for<'de> Deserialize<'de>>(&self, key: &str) -> Option<T> {
         let value = self.get_parsed(key)?;
+        
+        // Check if this is a known env var with a specific type
+        if let Some(spec) = self.find_spec(key) {
+            // Validate the type matches what's expected
+            if !self.validate_type(&value, &spec.var_type) {
+                tracing::warn!(
+                    "Environment variable {} expected type {:?} but got incompatible value",
+                    key, spec.var_type
+                );
+            }
+        }
+        
         serde_json::from_value(value).ok()
+    }
+    
+    /// Find the spec for a given environment variable
+    fn find_spec(&self, key: &str) -> Option<&'static EnvVarSpec> {
+        let upper_key = key.to_uppercase();
+        
+        // Check static known vars
+        for spec in KNOWN_ENV_VARS {
+            if spec.name == key || spec.name == upper_key {
+                return Some(spec);
+            }
+        }
+        
+        None
+    }
+    
+    /// Validate that a value matches the expected type
+    fn validate_type(&self, value: &Value, expected_type: &EnvVarType) -> bool {
+        match (value, expected_type) {
+            (Value::String(_), EnvVarType::String) => true,
+            (Value::Number(n), EnvVarType::Integer) => n.is_i64() || n.is_u64(),
+            (Value::Number(_), EnvVarType::Float) => true,
+            (Value::Bool(_), EnvVarType::Boolean) => true,
+            (Value::Object(_), EnvVarType::JsonObject) => true,
+            (Value::Array(_), EnvVarType::JsonArray) => true,
+            // Allow strings for any type (they can be parsed)
+            (Value::String(_), _) => true,
+            _ => false,
+        }
     }
 
     /// Get a value with its source information
@@ -1000,5 +1127,38 @@ mod tests {
         // Test source lookup with different cases
         assert_eq!(registry.get_source("test_lower"), ValueSource::Environment);
         assert_eq!(registry.get_source("TEST_LOWER"), ValueSource::Environment);
+    }
+    
+    #[test]
+    fn test_type_validation() {
+        // Test that type validation works for known env vars
+        let env_vars = HashMap::from([
+            // Integer type
+            ("GOOSE_CONTEXT_LIMIT".to_string(), "1000".to_string()),
+            // Boolean type  
+            ("GOOSE_DISABLE_KEYRING".to_string(), "true".to_string()),
+            // Float type
+            ("GOOSE_TEMPERATURE".to_string(), "0.7".to_string()),
+            // String type
+            ("GOOSE_MODEL".to_string(), "gpt-4".to_string()),
+        ]);
+
+        let registry = EnvRegistry::with_values(env_vars);
+
+        // Test integer retrieval
+        let limit: Option<i32> = registry.get_typed("GOOSE_CONTEXT_LIMIT");
+        assert_eq!(limit, Some(1000));
+
+        // Test boolean retrieval
+        let disabled: Option<bool> = registry.get_typed("GOOSE_DISABLE_KEYRING");
+        assert_eq!(disabled, Some(true));
+
+        // Test float retrieval
+        let temp: Option<f64> = registry.get_typed("GOOSE_TEMPERATURE");
+        assert_eq!(temp, Some(0.7));
+
+        // Test string retrieval
+        let model: Option<String> = registry.get_typed("GOOSE_MODEL");
+        assert_eq!(model, Some("gpt-4".to_string()));
     }
 }
