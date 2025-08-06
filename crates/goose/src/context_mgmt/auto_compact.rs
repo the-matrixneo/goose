@@ -12,8 +12,6 @@ pub struct AutoCompactResult {
     pub compacted: bool,
     /// The messages after potential compaction
     pub messages: Vec<Message>,
-    /// The token count before compaction
-    pub tokens_before: usize,
     /// Provider usage from summarization (if compaction occurred)
     /// This contains the actual token counts after compaction
     pub summarization_usage: Option<crate::providers::base::ProviderUsage>,
@@ -154,7 +152,6 @@ pub async fn check_and_compact_messages(
         return Ok(AutoCompactResult {
             compacted: false,
             messages: messages.to_vec(),
-            tokens_before: check_result.current_tokens,
             summarization_usage: None,
         });
     }
@@ -189,7 +186,6 @@ pub async fn check_and_compact_messages(
     Ok(AutoCompactResult {
         compacted: true,
         messages: compacted_messages,
-        tokens_before: check_result.current_tokens,
         summarization_usage,
     })
 }
@@ -278,7 +274,7 @@ mod tests {
     async fn test_check_compaction_needed() {
         let mock_provider = Arc::new(MockProvider {
             model_config: ModelConfig::new("test-model")
-                .expect("Failed to create model config")
+                .unwrap()
                 .with_context_limit(Some(100_000)),
         });
 
@@ -304,7 +300,7 @@ mod tests {
     async fn test_check_compaction_needed_disabled() {
         let mock_provider = Arc::new(MockProvider {
             model_config: ModelConfig::new("test-model")
-                .expect("Failed to create model config")
+                .unwrap()
                 .with_context_limit(Some(100_000)),
         });
 
@@ -332,7 +328,7 @@ mod tests {
     async fn test_auto_compact_disabled() {
         let mock_provider = Arc::new(MockProvider {
             model_config: ModelConfig::new("test-model")
-                .expect("Failed to create model config")
+                .unwrap()
                 .with_context_limit(Some(10_000)),
         });
 
@@ -362,7 +358,7 @@ mod tests {
     async fn test_auto_compact_below_threshold() {
         let mock_provider = Arc::new(MockProvider {
             model_config: ModelConfig::new("test-model")
-                .expect("Failed to create model config")
+                .unwrap()
                 .with_context_limit(Some(100_000)), // Increased to ensure overhead doesn't dominate
         });
 
@@ -443,7 +439,7 @@ mod tests {
     async fn test_auto_compact_respects_config() {
         let mock_provider = Arc::new(MockProvider {
             model_config: ModelConfig::new("test-model")
-                .expect("Failed to create model config")
+                .unwrap()
                 .with_context_limit(Some(30_000)), // Smaller context limit to make threshold easier to hit
         });
 

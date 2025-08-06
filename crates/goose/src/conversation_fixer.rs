@@ -402,7 +402,7 @@ mod tests {
             Message::user().with_text("Thanks!"),
         ];
 
-        let (fixed, issues) = run_verify(messages);
+        let (_fixed, issues) = run_verify(messages);
         assert_eq!(issues.len(), 0);
     }
 }
