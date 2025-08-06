@@ -43,47 +43,12 @@ impl TaskTracker {
     }
 
     pub fn add_task(&self, task: String) -> String {
-        // Check if it's a comma-separated list
-        if task.contains(',') {
-            let task_list: Vec<&str> = task.split(',').map(|t| t.trim()).collect();
-            let mut added_tasks = Vec::new();
-            let mut errors = Vec::new();
-
-            for task_str in task_list {
-                if task_str.is_empty() {
-                    continue;
-                }
-                if task_str.len() > 200 {
-                    errors.push(format!("Task '{}' is too long (max 200 chars)", task_str));
-                    continue;
-                }
-                let mut tasks = self.tasks.lock().unwrap();
-                tasks.insert(task_str.to_string(), TaskStatus::Todo);
-                added_tasks.push(task_str);
-            }
-
-            let mut result = Vec::new();
-            if !added_tasks.is_empty() {
-                result.push(format!(
-                    "Added {} tasks: {}",
-                    added_tasks.len(),
-                    added_tasks.join(", ")
-                ));
-            }
-            if !errors.is_empty() {
-                result.push(format!("Errors: {}", errors.join("; ")));
-            }
-
-            result.join("\n")
-        } else {
-            // Single task
-            if task.len() > 200 {
-                return "Task description is too long (max 200 chars)".to_string();
-            }
-            let mut tasks = self.tasks.lock().unwrap();
-            tasks.insert(task.clone(), TaskStatus::Todo);
-            format!("Added task: {}", task)
+        if task.len() > 200 {
+            return "Task description is too long (max 200 chars)".to_string();
         }
+        let mut tasks = self.tasks.lock().unwrap();
+        tasks.insert(task.clone(), TaskStatus::Todo);
+        format!("Added task: {}", task)
     }
 
     pub fn mark_task_wip(&self, task: String) -> String {
@@ -401,77 +366,5 @@ mod tests {
             .unwrap_err()
             .to_string()
             .contains("The task string is required"));
-    }
-
-    #[tokio::test]
-    async fn test_add_multiple_tasks_comma_separated() {
-        let tracker = TaskTracker::new();
-
-        // Add multiple tasks with comma separation
-        let result = tracker.add_task("Task 1, Task 2, Task 3".to_string());
-        assert!(result.contains("Added 3 tasks"));
-        assert!(result.contains("Task 1, Task 2, Task 3"));
-
-        let tasks = tracker.list_tasks();
-        assert_eq!(tasks.len(), 3);
-
-        // Check that all tasks are added with correct status
-        let has_task1 = tasks.iter().any(|t| t.contains("Task 1 [to do]"));
-        let has_task2 = tasks.iter().any(|t| t.contains("Task 2 [to do]"));
-        let has_task3 = tasks.iter().any(|t| t.contains("Task 3 [to do]"));
-
-        assert!(has_task1);
-        assert!(has_task2);
-        assert!(has_task3);
-    }
-
-    #[tokio::test]
-    async fn test_add_multiple_tasks_with_empty_items() {
-        let tracker = TaskTracker::new();
-
-        // Add tasks with empty items (extra commas)
-        let result = tracker.add_task("Task 1, , Task 2,  ,Task 3".to_string());
-        assert!(result.contains("Added 3 tasks"));
-
-        let tasks = tracker.list_tasks();
-        assert_eq!(tasks.len(), 3); // Empty items should be skipped
-    }
-
-    #[tokio::test]
-    async fn test_add_multiple_tasks_with_long_task() {
-        let tracker = TaskTracker::new();
-        let long_task = "a".repeat(201);
-
-        // Add multiple tasks where one is too long
-        let result = tracker.add_task(format!("Task 1, {}, Task 2", long_task));
-        assert!(result.contains("Added 2 tasks"));
-        assert!(result.contains("Errors:"));
-        assert!(result.contains("is too long"));
-
-        let tasks = tracker.list_tasks();
-        assert_eq!(tasks.len(), 2); // Only valid tasks should be added
-    }
-
-    #[tokio::test]
-    async fn test_handle_request_add_multiple_tasks() {
-        let tracker = TaskTracker::new();
-
-        let params =
-            serde_json::json!({"action": "add", "task": "Setup project, Write tests, Deploy app"});
-        let result = tracker.handle_request(params).await.unwrap();
-
-        assert_eq!(result.len(), 1);
-        match &result[0].raw {
-            rmcp::model::RawContent::Text(text_content) => {
-                assert!(text_content.text.contains("Added 3 tasks"));
-                assert!(text_content
-                    .text
-                    .contains("Setup project, Write tests, Deploy app"));
-            }
-            _ => panic!("Expected text content"),
-        }
-
-        let tasks = tracker.list_tasks();
-        assert_eq!(tasks.len(), 3);
     }
 }
