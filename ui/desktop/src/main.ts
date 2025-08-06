@@ -2253,6 +2253,185 @@ async function getAllowList(): Promise<string[]> {
   }
 }
 
+// Apps directory management
+const APPS_DIR = path.join(os.homedir(), 'goose', 'apps');
+
+// Ensure apps directory exists
+async function ensureAppsDir() {
+  try {
+    await fs.access(APPS_DIR);
+  } catch {
+    await fs.mkdir(APPS_DIR, { recursive: true });
+  }
+}
+
+// Create app from template
+ipcMain.handle('create-app', async (event, appName: string, _template?: string) => {
+  console.log(`[Main] Creating app "${appName}"`);
+  await ensureAppsDir();
+
+  const appPath = path.join(APPS_DIR, appName);
+
+  // Check if app already exists
+  try {
+    await fs.access(appPath);
+    throw new Error(`App "${appName}" already exists`);
+  } catch (err) {
+    if (err && typeof err === 'object' && 'code' in err && err.code !== 'ENOENT') throw err;
+  }
+
+  return new Promise((resolve, reject) => {
+    const command = 'npm';
+    const args = [
+      'create',
+      'cloudflare@latest',
+      '--',
+      appName,
+      '--framework=react-router',
+      '--git',
+      '--no-deploy',
+      '--lang',
+      'ts',
+    ];
+
+    const child = spawn(command, args, {
+      cwd: APPS_DIR,
+      stdio: 'pipe',
+      env: {
+        ...process.env,
+        NODE_ENV: 'production',
+        FORCE_COLOR: '0', // Disable color output for cleaner parsing
+        CI: 'true', // Some tools behave better in CI mode
+      },
+      shell: process.platform === 'win32', // Use shell on Windows
+    });
+
+    let stdout = '';
+    let stderr = '';
+    let lastOutputLine = '';
+
+    child.stdout?.on('data', (data) => {
+      const output = data.toString();
+      stdout += output;
+
+      // Get the last non-empty line for progress display
+      const lines = output
+        .trim()
+        .split('\n')
+        .filter((line: string) => line.trim());
+      if (lines.length > 0) {
+        lastOutputLine = lines[lines.length - 1].trim();
+
+        // Send progress update to renderer
+        event.sender.send('app-creation-progress', {
+          appName,
+          lastLine: lastOutputLine,
+          type: 'stdout',
+        });
+      }
+    });
+
+    child.stderr?.on('data', (data) => {
+      const output = data.toString();
+      stderr += output;
+
+      // Get the last non-empty line for progress display
+      const lines = output
+        .trim()
+        .split('\n')
+        .filter((line: string) => line.trim());
+      if (lines.length > 0) {
+        lastOutputLine = lines[lines.length - 1].trim();
+
+        // Send progress update to renderer (stderr might contain useful info, not just errors)
+        event.sender.send('app-creation-progress', {
+          appName,
+          lastLine: lastOutputLine,
+          type: 'stderr',
+        });
+      }
+    });
+
+    child.on('error', (error) => {
+      console.error(`[Main] Command spawn error:`, error);
+      reject(new Error(`Failed to start command: ${error.message}`));
+    });
+
+    child.on('close', (code) => {
+      if (code === 0) {
+        console.log(`[Main] App "${appName}" created successfully`);
+        resolve({ success: true, path: appPath });
+      } else {
+        console.error(`[Main] Command failed with code ${code}`);
+        console.error(`[Main] Error output: ${stderr}`);
+        reject(new Error(`Command failed with code ${code}: ${stderr || stdout || 'No output'}`));
+      }
+    });
+
+    // Set a timeout to prevent infinite hanging
+    setTimeout(
+      () => {
+        if (!child.killed) {
+          console.log(`[Main] Command timeout reached, killing process`);
+          child.kill('SIGTERM');
+          reject(new Error('Command timed out after 5 minutes'));
+        }
+      },
+      5 * 60 * 1000
+    ); // 5 minute timeout
+  });
+});
+
+// List apps in the apps directory
+ipcMain.handle('list-apps', async () => {
+  await ensureAppsDir();
+
+  try {
+    const entries = await fs.readdir(APPS_DIR, { withFileTypes: true });
+    const apps = [];
+
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        const appPath = path.join(APPS_DIR, entry.name);
+        const stats = await fs.stat(appPath);
+
+        // Try to read package.json for more info
+        let packageInfo = null;
+        try {
+          const packagePath = path.join(appPath, 'package.json');
+          const packageContent = await fs.readFile(packagePath, 'utf8');
+          packageInfo = JSON.parse(packageContent);
+        } catch {
+          // Ignore if package.json doesn't exist or is invalid
+        }
+
+        apps.push({
+          id: entry.name,
+          app_name: packageInfo?.name || entry.name,
+          last_edited: Math.floor(stats.mtime.getTime() / 1000),
+          path: appPath,
+        });
+      }
+    }
+
+    return apps.sort((a, b) => b.last_edited - a.last_edited);
+  } catch (err) {
+    console.error('Failed to list apps:', err);
+    return [];
+  }
+});
+
+// Open app in VS Code or default editor
+ipcMain.handle('open-app', async (_event, appPath: string) => {
+  try {
+    // Try VS Code first
+    await shell.openPath(appPath);
+    return { success: true };
+  } catch (err) {
+    throw new Error(`Failed to open app: ${err instanceof Error ? err.message : String(err)}`);
+  }
+});
+
 app.on('will-quit', async () => {
   for (const [windowId, blockerId] of windowPowerSaveBlockers.entries()) {
     try {

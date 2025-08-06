@@ -33,6 +33,13 @@ interface SaveDataUrlResponse {
   error?: string;
 }
 
+interface AppTile {
+  id: string;
+  app_name: string;
+  last_edited: number;
+  path: string;
+}
+
 const config = JSON.parse(process.argv.find((arg) => arg.startsWith('{')) || '{}');
 
 interface UpdaterEvent {
@@ -112,6 +119,10 @@ type ElectronAPI = {
   closeWindow: () => void;
   hasAcceptedRecipeBefore: (recipeConfig: Recipe) => Promise<boolean>;
   recordRecipeHash: (recipeConfig: Recipe) => Promise<boolean>;
+  // App management functions
+  createApp: (appName: string, template?: string) => Promise<{ success: boolean; path: string }>;
+  listApps: () => Promise<AppTile[]>;
+  openApp: (appPath: string) => Promise<{ success: boolean }>;
   openDirectoryInExplorer: (directoryPath: string) => Promise<boolean>;
 };
 
@@ -241,6 +252,10 @@ const electronAPI: ElectronAPI = {
     ipcRenderer.invoke('has-accepted-recipe-before', recipeConfig),
   recordRecipeHash: (recipeConfig: Recipe) =>
     ipcRenderer.invoke('record-recipe-hash', recipeConfig),
+  createApp: (appName: string, template?: string) =>
+    ipcRenderer.invoke('create-app', appName, template),
+  listApps: () => ipcRenderer.invoke('list-apps'),
+  openApp: (appPath: string) => ipcRenderer.invoke('open-app', appPath),
   openDirectoryInExplorer: (directoryPath: string) =>
     ipcRenderer.invoke('open-directory-in-explorer', directoryPath),
 };
