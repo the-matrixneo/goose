@@ -82,6 +82,9 @@ pub struct GooseConfig {
 
     /// Router configuration
     pub router: RouterConfig,
+
+    /// Editor configuration
+    pub editor: EditorConfig,
 }
 
 /// Provider configuration
@@ -453,6 +456,9 @@ pub struct ExperimentConfig {
     /// Enable Claude thinking/reasoning
     pub claude_thinking_enabled: bool,
 
+    /// Claude thinking budget (max tokens for thinking)
+    pub claude_thinking_budget: Option<u32>,
+
     /// Enable Claude code debugging
     pub claude_code_debug: bool,
 
@@ -578,6 +584,20 @@ pub struct RouterConfig {
 
     /// Tool selection strategy
     pub tool_selection_strategy: String,
+}
+
+/// Editor configuration for AI-assisted code editing
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct EditorConfig {
+    /// API key for the editor model
+    pub api_key: Option<SecretString>,
+
+    /// Host for the editor model API
+    pub host: Option<String>,
+
+    /// Model to use for editor assistance
+    pub model: Option<String>,
 }
 
 // Default implementations

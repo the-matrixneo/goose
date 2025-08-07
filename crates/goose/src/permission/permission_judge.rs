@@ -314,8 +314,13 @@ mod tests {
     fn create_mock_provider() -> Arc<dyn Provider> {
         // Clear all GOOSE environment variables to ensure clean test environment
         let goose_env_vars = [
-            "GOOSE_PROVIDER", "GOOSE_MODEL", "GOOSE_TEMPERATURE", "GOOSE_CONTEXT_LIMIT", 
-            "GOOSE_TOOLSHIM", "GOOSE_TOOLSHIM_OLLAMA_MODEL", "GOOSE_MODE",
+            "GOOSE_PROVIDER",
+            "GOOSE_MODEL",
+            "GOOSE_TEMPERATURE",
+            "GOOSE_CONTEXT_LIMIT",
+            "GOOSE_TOOLSHIM",
+            "GOOSE_TOOLSHIM_OLLAMA_MODEL",
+            "GOOSE_MODE",
         ];
 
         for var in &goose_env_vars {
@@ -402,8 +407,13 @@ mod tests {
     async fn test_detect_read_only_tools() {
         // Clear all GOOSE environment variables to ensure clean test environment
         let goose_env_vars = [
-            "GOOSE_PROVIDER", "GOOSE_MODEL", "GOOSE_TEMPERATURE", "GOOSE_CONTEXT_LIMIT", 
-            "GOOSE_TOOLSHIM", "GOOSE_TOOLSHIM_OLLAMA_MODEL", "GOOSE_MODE",
+            "GOOSE_PROVIDER",
+            "GOOSE_MODEL",
+            "GOOSE_TEMPERATURE",
+            "GOOSE_CONTEXT_LIMIT",
+            "GOOSE_TOOLSHIM",
+            "GOOSE_TOOLSHIM_OLLAMA_MODEL",
+            "GOOSE_MODE",
         ];
 
         for var in &goose_env_vars {
@@ -431,8 +441,13 @@ mod tests {
     async fn test_detect_read_only_tools_empty_requests() {
         // Clear all GOOSE environment variables to ensure clean test environment
         let goose_env_vars = [
-            "GOOSE_PROVIDER", "GOOSE_MODEL", "GOOSE_TEMPERATURE", "GOOSE_CONTEXT_LIMIT", 
-            "GOOSE_TOOLSHIM", "GOOSE_TOOLSHIM_OLLAMA_MODEL", "GOOSE_MODE",
+            "GOOSE_PROVIDER",
+            "GOOSE_MODEL",
+            "GOOSE_TEMPERATURE",
+            "GOOSE_CONTEXT_LIMIT",
+            "GOOSE_TOOLSHIM",
+            "GOOSE_TOOLSHIM_OLLAMA_MODEL",
+            "GOOSE_MODE",
         ];
 
         for var in &goose_env_vars {
@@ -452,8 +467,13 @@ mod tests {
     async fn test_check_tool_permissions_smart_approve() {
         // Clear all GOOSE environment variables to ensure clean test environment
         let goose_env_vars = [
-            "GOOSE_PROVIDER", "GOOSE_MODEL", "GOOSE_TEMPERATURE", "GOOSE_CONTEXT_LIMIT", 
-            "GOOSE_TOOLSHIM", "GOOSE_TOOLSHIM_OLLAMA_MODEL", "GOOSE_MODE",
+            "GOOSE_PROVIDER",
+            "GOOSE_MODEL",
+            "GOOSE_TEMPERATURE",
+            "GOOSE_CONTEXT_LIMIT",
+            "GOOSE_TOOLSHIM",
+            "GOOSE_TOOLSHIM_OLLAMA_MODEL",
+            "GOOSE_MODE",
         ];
 
         for var in &goose_env_vars {
@@ -534,8 +554,13 @@ mod tests {
     async fn test_check_tool_permissions_auto() {
         // Clear all GOOSE environment variables to ensure clean test environment
         let goose_env_vars = [
-            "GOOSE_PROVIDER", "GOOSE_MODEL", "GOOSE_TEMPERATURE", "GOOSE_CONTEXT_LIMIT", 
-            "GOOSE_TOOLSHIM", "GOOSE_TOOLSHIM_OLLAMA_MODEL", "GOOSE_MODE",
+            "GOOSE_PROVIDER",
+            "GOOSE_MODEL",
+            "GOOSE_TEMPERATURE",
+            "GOOSE_CONTEXT_LIMIT",
+            "GOOSE_TOOLSHIM",
+            "GOOSE_TOOLSHIM_OLLAMA_MODEL",
+            "GOOSE_MODE",
         ];
 
         for var in &goose_env_vars {

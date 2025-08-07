@@ -502,8 +502,13 @@ mod tests {
     fn test_provider_metadata_context_limits() {
         // Clear all GOOSE environment variables to ensure clean test environment
         let goose_env_vars = [
-            "GOOSE_PROVIDER", "GOOSE_MODEL", "GOOSE_TEMPERATURE", "GOOSE_CONTEXT_LIMIT", 
-            "GOOSE_TOOLSHIM", "GOOSE_TOOLSHIM_OLLAMA_MODEL", "GOOSE_MODE",
+            "GOOSE_PROVIDER",
+            "GOOSE_MODEL",
+            "GOOSE_TEMPERATURE",
+            "GOOSE_CONTEXT_LIMIT",
+            "GOOSE_TOOLSHIM",
+            "GOOSE_TOOLSHIM_OLLAMA_MODEL",
+            "GOOSE_MODE",
         ];
 
         for var in &goose_env_vars {
@@ -514,7 +519,10 @@ mod tests {
         let _ = crate::config::compat::clear();
 
         temp_env::with_vars(
-            goose_env_vars.iter().map(|var| (*var, None::<&str>)).collect::<Vec<_>>(),
+            goose_env_vars
+                .iter()
+                .map(|var| (*var, None::<&str>))
+                .collect::<Vec<_>>(),
             || {
                 // Test that ProviderMetadata::new correctly sets context limits
                 let test_models = vec!["gpt-4o", "claude-3-5-sonnet-latest", "unknown-model"];
@@ -545,7 +553,7 @@ mod tests {
 
                 // unknown model should have default limit (128k)
                 assert_eq!(*model_info.get("unknown-model").unwrap(), 128_000);
-            }
+            },
         );
     }
 

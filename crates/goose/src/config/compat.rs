@@ -163,14 +163,19 @@ pub fn clear() -> Result<()> {
 pub fn reset_for_test() {
     // Clear environment variables that might affect config
     let goose_env_vars = [
-        "GOOSE_PROVIDER", "GOOSE_MODEL", "GOOSE_TEMPERATURE", "GOOSE_CONTEXT_LIMIT", 
-        "GOOSE_TOOLSHIM", "GOOSE_TOOLSHIM_OLLAMA_MODEL", "GOOSE_MODE",
+        "GOOSE_PROVIDER",
+        "GOOSE_MODEL",
+        "GOOSE_TEMPERATURE",
+        "GOOSE_CONTEXT_LIMIT",
+        "GOOSE_TOOLSHIM",
+        "GOOSE_TOOLSHIM_OLLAMA_MODEL",
+        "GOOSE_MODE",
     ];
-    
+
     for var in &goose_env_vars {
         std::env::remove_var(var);
     }
-    
+
     // Clear the config file
     let _ = clear();
 }
@@ -282,20 +287,14 @@ mod tests {
                     // Set a string value in config
                     set("test_key", "test_value").unwrap();
                     // Environment variable should take precedence
-                    assert_eq!(
-                        get::<String>("test_key"),
-                        Some("env_value".to_string())
-                    );
+                    assert_eq!(get::<String>("test_key"), Some("env_value".to_string()));
                 });
 
                 // Test without environment variable
                 temp_env::with_var("TEST_KEY", None::<&str>, || {
                     // Set a string value
                     set("test_key", "test_value").unwrap();
-                    assert_eq!(
-                        get::<String>("test_key"),
-                        Some("test_value".to_string())
-                    );
+                    assert_eq!(get::<String>("test_key"), Some("test_value".to_string()));
 
                     // Set a boolean value
                     set("bool_key", true).unwrap();
@@ -305,7 +304,7 @@ mod tests {
                     set("num_key", 42).unwrap();
                     assert_eq!(get::<i32>("num_key"), Some(42));
                 });
-            }
+            },
         );
     }
 
@@ -336,7 +335,7 @@ mod tests {
                 set("exists", "yes").unwrap();
                 assert!(has("exists"));
                 assert!(!has("not_exists"));
-            }
+            },
         );
     }
 }

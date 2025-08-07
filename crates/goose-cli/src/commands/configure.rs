@@ -1527,7 +1527,7 @@ pub fn configure_max_turns_dialog() -> Result<(), Box<dyn Error>> {
 
 /// Handle OpenRouter authentication
 pub async fn handle_openrouter_auth() -> Result<(), Box<dyn Error>> {
-    use goose::config::{configure_openrouter, signup_openrouter::OpenRouterAuth};
+    use goose::config::signup_openrouter::OpenRouterAuth;
     use goose::conversation::message::Message;
     use goose::providers::create;
 
@@ -1537,14 +1537,25 @@ pub async fn handle_openrouter_auth() -> Result<(), Box<dyn Error>> {
         Ok(api_key) => {
             println!("\nAuthentication complete!");
 
-            // Get config instance
-            // Config::global() removed - using compat functions directly
-
-            // Use the existing configure_openrouter function to set everything up
+            // Configure OpenRouter using compat layer
             println!("\nConfiguring OpenRouter...");
-            use goose::config::Config;
-            if let Err(e) = configure_openrouter(Config::global(), api_key) {
-                eprintln!("Failed to configure OpenRouter: {}", e);
+
+            // Set the API key in secure storage
+            if let Err(e) = compat::set_secret("OPENROUTER_API_KEY", &api_key) {
+                eprintln!("Failed to save OpenRouter API key: {}", e);
+                return Err(e.into());
+            }
+
+            // Set the provider
+            if let Err(e) = compat::set("GOOSE_PROVIDER", "openrouter".to_string()) {
+                eprintln!("Failed to set provider: {}", e);
+                return Err(e.into());
+            }
+
+            // Set the default model
+            const OPENROUTER_DEFAULT_MODEL: &str = "qwen/qwen3-coder";
+            if let Err(e) = compat::set("GOOSE_MODEL", OPENROUTER_DEFAULT_MODEL.to_string()) {
+                eprintln!("Failed to set model: {}", e);
                 return Err(e.into());
             }
 

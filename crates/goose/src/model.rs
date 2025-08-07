@@ -323,7 +323,7 @@ mod tests {
                     let result = ModelConfig::new("test-model");
                     assert!(result.is_err());
                 });
-            }
+            },
         );
     }
 
@@ -353,7 +353,7 @@ mod tests {
                         assert!(msg.contains("must be one of"));
                     }
                 });
-            }
+            },
         );
     }
 

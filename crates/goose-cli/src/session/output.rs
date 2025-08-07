@@ -468,7 +468,7 @@ fn print_tool_header(call: &ToolCall) {
 // Respect NO_COLOR, as https://crates.io/crates/console already does
 pub fn env_no_color() -> bool {
     // if NO_COLOR is defined at all disable colors
-    std::env::var_os("NO_COLOR").is_none()
+    compat::var("NO_COLOR").is_err()
 }
 
 fn print_markdown(content: &str, theme: Theme) {

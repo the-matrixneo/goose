@@ -1,4 +1,5 @@
 use anyhow::Result;
+use goose::config::compat;
 use goose_cli::cli::cli;
 
 #[tokio::main]
@@ -10,7 +11,7 @@ async fn main() -> Result<()> {
     let result = cli().await;
 
     // Only wait for telemetry flush if OTLP is configured
-    if std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT").is_ok() {
+    if compat::var("OTEL_EXPORTER_OTLP_ENDPOINT").is_ok() {
         // Use a shorter, dynamic wait with max timeout
         let max_wait = tokio::time::Duration::from_millis(500);
         let start = tokio::time::Instant::now();
