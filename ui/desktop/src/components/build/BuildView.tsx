@@ -17,24 +17,45 @@ interface AppTile {
   subdomain?: string;
 }
 
+interface CreatingApp {
+  id: string;
+  displayName: string;
+  appName: string;
+  subdomain?: string;
+  progress: string;
+  log: string[];
+  hasError: boolean;
+  startTime: number;
+}
+
 const BuildView: React.FC = () => {
   // Domain configuration - easily changeable
   const DOMAIN = '.vibeplatstage.squarecdn.com';
 
   const [apps, setApps] = useState<AppTile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isCreating, setIsCreating] = useState(false);
+  const [creatingApps, setCreatingApps] = useState<CreatingApp[]>([]);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [appName, setAppName] = useState('');
+  const [displayAppName, setDisplayAppName] = useState(''); // What the user types
   const [subdomain, setSubdomain] = useState('');
   const [isCheckingSubdomain, setIsCheckingSubdomain] = useState(false);
   const [subdomainAvailable, setSubdomainAvailable] = useState<boolean | null>(null);
   const [subdomainCheckError, setSubdomainCheckError] = useState<string | null>(null);
   const [canConnectToSites, setCanConnectToSites] = useState(true);
-  const [creationProgress, setCreationProgress] = useState('');
-  const [hasError, setHasError] = useState(false);
   const [colorPickerAppId, setColorPickerAppId] = useState<string | null>(null);
   const [appColors, setAppColors] = useState<Record<string, { bg: string; inner: string }>>({});
+
+  // Helper function to convert user input to a valid app name
+  const convertToValidAppName = (input: string): string => {
+    return input
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-zA-Z0-9\s-_]/g, '') // Remove invalid characters but keep spaces
+      .replace(/\s+/g, '-') // Replace spaces with hyphens
+      .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
+      .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
+  };
 
   // Available color combinations for app icons
   const colorCombinations = [
@@ -69,11 +90,18 @@ const BuildView: React.FC = () => {
     // Listen for app creation progress
     const handleProgress = (_event: IpcRendererEvent, ...args: unknown[]) => {
       const data = args[0] as { appName: string; lastLine: string; type: 'stdout' | 'stderr' };
-      setCreationProgress(data.lastLine);
-      // Mark if we're getting stderr (potential errors)
-      if (data.type === 'stderr') {
-        setHasError(true);
-      }
+      
+      // Update the specific creating app's progress
+      setCreatingApps(prev => prev.map(app => 
+        app.appName === data.appName 
+          ? {
+              ...app,
+              progress: data.lastLine,
+              log: [...app.log, data.lastLine],
+              hasError: app.hasError || data.type === 'stderr'
+            }
+          : app
+      ));
     };
 
     window.electron.on('app-creation-progress', handleProgress);
@@ -95,6 +123,7 @@ const BuildView: React.FC = () => {
 
   const handleCreateAppClick = async () => {
     setAppName('');
+    setDisplayAppName('');
     setSubdomain('');
     setSubdomainAvailable(null);
     setSubdomainCheckError(null);
@@ -184,25 +213,48 @@ const BuildView: React.FC = () => {
       return;
     }
 
-    setIsCreating(true);
-    setCreationProgress('Starting app creation...');
-    setHasError(false);
+    // Create a placeholder app in the creating apps list
+    const creatingAppId = `creating-${Date.now()}`;
+    const newCreatingApp: CreatingApp = {
+      id: creatingAppId,
+      displayName: displayAppName || appName,
+      appName: appName.trim(),
+      subdomain: subdomain.trim() || undefined,
+      progress: 'Starting app creation...',
+      log: [],
+      hasError: false,
+      startTime: Date.now()
+    };
+
+    setCreatingApps(prev => [...prev, newCreatingApp]);
+
+    // Close dialog and reset form
+    setShowCreateDialog(false);
+    setAppName('');
+    setDisplayAppName('');
+    setSubdomain('');
+    setSubdomainAvailable(null);
+    setSubdomainCheckError(null);
 
     try {
       // The createApp function in main process will handle the path construction
       // We just pass the app name and subdomain
-      await window.electron.createApp(appName.trim(), subdomain.trim() || undefined);
+      await window.electron.createApp(newCreatingApp.appName, newCreatingApp.subdomain);
 
       // If subdomain was provided and available, claim it
-      if (subdomain.trim() && canConnectToSites && subdomainAvailable) {
+      if (newCreatingApp.subdomain && canConnectToSites && subdomainAvailable) {
         try {
-          setCreationProgress('Claiming subdomain...');
-          // The app path will be constructed in the main process
-          // We just need to pass the app name to identify it
+          // Update progress for subdomain claiming
+          setCreatingApps(prev => prev.map(app => 
+            app.id === creatingAppId 
+              ? { ...app, progress: 'Claiming subdomain...' }
+              : app
+          ));
+          
           await window.electron.ipcRenderer.invoke(
             'claim-subdomain',
-            subdomain.trim(),
-            appName.trim()
+            newCreatingApp.subdomain,
+            newCreatingApp.appName
           );
         } catch (err) {
           console.error('Failed to claim subdomain:', err);
@@ -212,40 +264,40 @@ const BuildView: React.FC = () => {
 
       toastSuccess({
         title: 'App created!',
-        msg: `Successfully created ${appName.trim()}${subdomain.trim() ? ` with subdomain ${subdomain.trim()}` : ''}`,
+        msg: `Successfully created ${newCreatingApp.displayName}${newCreatingApp.subdomain ? ` with subdomain ${newCreatingApp.subdomain}` : ''}`,
       });
-      // Reload the apps list
+
+      // Remove from creating apps and reload the apps list
+      setCreatingApps(prev => prev.filter(app => app.id !== creatingAppId));
       await loadApps();
-      // Close dialog and reset
-      setShowCreateDialog(false);
-      setAppName('');
-      setSubdomain('');
-      setSubdomainAvailable(null);
-      setCreationProgress('');
-      setHasError(false);
     } catch (err) {
       console.error('[BuildView] Failed to create app:', err);
-      setHasError(true);
-      setCreationProgress(err instanceof Error ? err.message : 'Unknown error occurred');
+      
+      // Mark the creating app as having an error
+      setCreatingApps(prev => prev.map(app => 
+        app.id === creatingAppId 
+          ? { 
+              ...app, 
+              hasError: true, 
+              progress: err instanceof Error ? err.message : 'Unknown error occurred' 
+            }
+          : app
+      ));
+
       toastError({
         title: 'Failed to create app',
         msg: err instanceof Error ? err.message : 'Unknown error occurred',
       });
-    } finally {
-      setIsCreating(false);
     }
   };
 
   const handleCancelCreate = () => {
-    if (!isCreating) {
-      setShowCreateDialog(false);
-      setAppName('');
-      setSubdomain('');
-      setSubdomainAvailable(null);
-      setSubdomainCheckError(null);
-      setCreationProgress('');
-      setHasError(false);
-    }
+    setShowCreateDialog(false);
+    setAppName('');
+    setDisplayAppName('');
+    setSubdomain('');
+    setSubdomainAvailable(null);
+    setSubdomainCheckError(null);
   };
 
   const handleAppClick = async (app: AppTile) => {
@@ -271,13 +323,12 @@ const BuildView: React.FC = () => {
             <div className="flex flex-col page-transition">
               <div className="flex justify-between items-center mb-1">
                 <h1 className="text-4xl font-light">Build</h1>
-                {/* Create App button on the right - only show when apps exist (not in empty state) */}
-                {!isLoading && apps.length > 0 && (
+                {/* Create App button on the right - show when not loading */}
+                {!isLoading && (
                   <Button
                     onClick={handleCreateAppClick}
                     variant="default"
                     className="flex items-center gap-2"
-                    disabled={isCreating}
                   >
                     <Plus className="w-4 h-4" />
                     Create a new web app
@@ -303,11 +354,64 @@ const BuildView: React.FC = () => {
                 </div>
               </div>
             </div>
-          ) : apps.length > 0 ? (
-            /* Apps exist - individual containers for each app */
+          ) : (apps.length > 0 || creatingApps.length > 0) ? (
+            /* Apps exist or creating - individual containers for each app */
             <>
+              {/* Render creating apps first (skeleton placeholders) */}
+              {creatingApps.map((creatingApp) => (
+                <div key={creatingApp.id} className="bg-background-default rounded-2xl py-6 px-6 shadow-inner animate-pulse-slow">
+                  <div className="flex flex-col h-full text-text-muted page-transition">
+                    <div className="flex flex-col items-start">
+                      {/* App image placeholder - animated skeleton */}
+                      <div className="w-8 h-8 bg-blue-100 rounded-md mb-3 flex items-center justify-center animate-pulse-slow">
+                        <div className="w-4 h-4 bg-blue-200 rounded-sm"></div>
+                      </div>
+
+                      <h3 className="text-base truncate mb-1 text-text-default">{creatingApp.displayName}</h3>
+
+                      {/* Subdomain if provided */}
+                      {creatingApp.subdomain && (
+                        <div className="flex items-center text-text-muted text-xs mb-1">
+                          <Globe className="w-3 h-3 mr-1 flex-shrink-0" />
+                          <span className="text-blue-600">
+                            {creatingApp.subdomain}
+                            {DOMAIN}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Creation progress */}
+                      <div className="flex items-center text-text-muted text-xs mb-1">
+                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-text-subtle mr-1 flex-shrink-0"></div>
+                        <span className={creatingApp.hasError ? 'text-red-600' : 'text-text-subtle'}>
+                          {creatingApp.progress}
+                        </span>
+                      </div>
+
+                      {/* Folder path placeholder */}
+                      <div className="flex items-center text-text-muted text-xs mb-4">
+                        <FolderOpen className="w-3 h-3 mr-1 flex-shrink-0" />
+                        <span className="truncate">~/goose/apps/{creatingApp.appName}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end mt-auto pt-6">
+                      <Button
+                        variant="secondary"
+                        className="flex items-center gap-2 opacity-50"
+                        disabled={true}
+                      >
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-text-subtle"></div>
+                        Creating...
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {/* Render existing apps */}
               {apps.map((app) => (
-                <div key={app.id} className="bg-background-default rounded-2xl py-6 px-6">
+                <div key={app.id} className="bg-background-default rounded-2xl py-6 px-6 shadow-lg transition-shadow duration-700 ease-out">
                   <div className="flex flex-col h-full text-text-muted page-transition">
                     <div className="flex flex-col items-start">
                       {/* App image placeholder - 32x32 rounded square */}
@@ -383,7 +487,6 @@ const BuildView: React.FC = () => {
                       onClick={handleCreateAppClick}
                       variant="default"
                       className="flex items-center gap-2"
-                      disabled={isCreating}
                     >
                       <Plus className="w-4 h-4" />
                       Create your first web app
@@ -447,81 +550,34 @@ const BuildView: React.FC = () => {
         </div>
       )}
 
-      {/* Create App Dialog */}
+      {/* Create App Dialog - Simple input form only */}
       {showCreateDialog && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/50">
           <div className="bg-background-default border border-border-subtle rounded-lg p-6 w-[500px] max-w-[90vw]">
-            <h3 className="text-lg font-medium text-text-standard mb-4">Create New App</h3>
+            <h3 className="text-lg font-medium text-text-standard mb-4">Create new web app</h3>
 
-            <div className="space-y-4">
-              <div>
-                <label
-                  htmlFor="app-name"
-                  className="block text-sm font-medium text-text-standard mb-2"
-                >
-                  App Name
-                </label>
-                <Input
-                  id="app-name"
-                  type="text"
-                  value={appName}
-                  onChange={(e) => setAppName(e.target.value)}
-                  placeholder="my-awesome-app"
-                  className="w-full"
-                  autoFocus
-                  onKeyDown={(e) => {
-                    if (
-                      e.key === 'Enter' &&
-                      appName.trim() &&
-                      (!subdomain.trim() || subdomainAvailable)
-                    ) {
-                      handleCreateApp();
-                    } else if (e.key === 'Escape') {
-                      handleCancelCreate();
-                    }
-                  }}
-                />
-                <p className="text-xs text-text-muted mt-1">
-                  Only letters, numbers, hyphens, and underscores are allowed
-                </p>
-              </div>
-
-              {/* Subdomain field */}
-              <div>
-                <label
-                  htmlFor="subdomain"
-                  className="block text-sm font-medium text-text-standard mb-2"
-                >
-                  Subdomain (Optional)
-                </label>
-                <div className="relative">
+            <div className="flex flex-col h-[320px]">
+              <div className="flex-1 space-y-4">
+                <div>
+                  <label
+                    htmlFor="app-name"
+                    className="block text-sm font-medium text-text-standard mb-2"
+                  >
+                    App Name
+                  </label>
                   <Input
-                    id="subdomain"
+                    id="app-name"
                     type="text"
-                    value={subdomain}
+                    value={displayAppName}
                     onChange={(e) => {
-                      const value = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
-                      setSubdomain(value);
-                      setSubdomainAvailable(null);
-                      setSubdomainCheckError(null);
-                      // Debounce the check
-                      if (value) {
-                        setTimeout(() => {
-                          if (value === e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '')) {
-                            checkSubdomainAvailability(value);
-                          }
-                        }, 500);
-                      }
+                      const userInput = e.target.value;
+                      setDisplayAppName(userInput);
+                      const convertedName = convertToValidAppName(userInput);
+                      setAppName(convertedName);
                     }}
-                    placeholder="my-site"
-                    className={`w-full pr-10 ${!canConnectToSites ? 'opacity-50' : ''} ${
-                      subdomain && subdomainAvailable === false
-                        ? 'border-red-500'
-                        : subdomain && subdomainAvailable === true
-                          ? 'border-green-500'
-                          : ''
-                    }`}
-                    disabled={!canConnectToSites}
+                    placeholder="My Awesome App"
+                    className="w-full"
+                    autoFocus
                     onKeyDown={(e) => {
                       if (
                         e.key === 'Enter' &&
@@ -534,96 +590,128 @@ const BuildView: React.FC = () => {
                       }
                     }}
                   />
-                  {/* Status indicator */}
-                  {subdomain && (
-                    <div className="absolute right-2 top-1/2 -translate-y-1/2">
-                      {isCheckingSubdomain ? (
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
-                      ) : subdomainAvailable === true ? (
-                        <div className="text-green-500">✓</div>
-                      ) : subdomainAvailable === false ? (
-                        <div className="text-red-500">✗</div>
-                      ) : null}
+                  {displayAppName && appName !== displayAppName && (
+                    <div className="mt-1 p-2 bg-background-muted rounded text-xs">
+                      <span className="text-text-muted">App folder name: </span>
+                      <span className="text-text-standard font-mono">{appName || '(invalid name)'}</span>
                     </div>
                   )}
-                </div>
-                {!canConnectToSites ? (
-                  <p className="text-xs text-yellow-600 mt-1">
-                    Website claiming is currently unavailable (cannot connect to service)
-                  </p>
-                ) : subdomain ? (
-                  <p className="text-xs mt-1">
-                    {isCheckingSubdomain ? (
-                      <span className="text-text-muted">Checking availability...</span>
-                    ) : subdomainAvailable === true ? (
-                      <span className="text-green-600">
-                        {subdomain}
-                        {DOMAIN} is available!
-                      </span>
-                    ) : subdomainAvailable === false ? (
-                      <span className="text-red-600">
-                        {subdomain}
-                        {DOMAIN} is already taken
-                      </span>
-                    ) : subdomainCheckError ? (
-                      <span className="text-yellow-600">{subdomainCheckError}</span>
-                    ) : (
-                      <span className="text-text-muted">
-                        Your site will be available at {subdomain}
-                        {DOMAIN}
-                      </span>
-                    )}
-                  </p>
-                ) : (
                   <p className="text-xs text-text-muted mt-1">
-                    Claim a subdomain for your app (e.g., my-site{DOMAIN})
+                    Type any name you like - we'll automatically convert it to a valid folder name
                   </p>
-                )}
+                </div>
+
+                {/* Subdomain field */}
+                <div>
+                  <label
+                    htmlFor="subdomain"
+                    className="block text-sm font-medium text-text-standard mb-2"
+                  >
+                    Subdomain (Optional)
+                  </label>
+                  <div className="relative">
+                    <Input
+                      id="subdomain"
+                      type="text"
+                      value={subdomain}
+                      onChange={(e) => {
+                        const value = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
+                        setSubdomain(value);
+                        setSubdomainAvailable(null);
+                        setSubdomainCheckError(null);
+                        // Debounce the check
+                        if (value) {
+                          setTimeout(() => {
+                            if (value === e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '')) {
+                              checkSubdomainAvailability(value);
+                            }
+                          }, 500);
+                        }
+                      }}
+                      placeholder="my-site"
+                      className={`w-full pr-10 ${!canConnectToSites ? 'opacity-50' : ''} ${
+                        subdomain && subdomainAvailable === false
+                          ? 'border-red-500'
+                          : subdomain && subdomainAvailable === true
+                            ? 'border-green-500'
+                            : ''
+                      }`}
+                      disabled={!canConnectToSites}
+                      onKeyDown={(e) => {
+                        if (
+                          e.key === 'Enter' &&
+                          appName.trim() &&
+                          (!subdomain.trim() || subdomainAvailable)
+                        ) {
+                          handleCreateApp();
+                        } else if (e.key === 'Escape') {
+                          handleCancelCreate();
+                        }
+                      }}
+                    />
+                    {/* Status indicator */}
+                    {subdomain && (
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                        {isCheckingSubdomain ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+                        ) : subdomainAvailable === true ? (
+                          <div className="text-green-500">✓</div>
+                        ) : subdomainAvailable === false ? (
+                          <div className="text-red-500">✗</div>
+                        ) : null}
+                      </div>
+                    )}
+                  </div>
+                  {!canConnectToSites ? (
+                    <p className="text-xs text-yellow-600 mt-1">
+                      Website claiming is currently unavailable (cannot connect to service)
+                    </p>
+                  ) : subdomain ? (
+                    <p className="text-xs mt-1">
+                      {isCheckingSubdomain ? (
+                        <span className="text-text-muted">Checking availability...</span>
+                      ) : subdomainAvailable === true ? (
+                        <span className="text-green-600">
+                          {subdomain}
+                          {DOMAIN} is available!
+                        </span>
+                      ) : subdomainAvailable === false ? (
+                        <span className="text-red-600">
+                          {subdomain}
+                          {DOMAIN} is already taken
+                        </span>
+                      ) : subdomainCheckError ? (
+                        <span className="text-yellow-600">{subdomainCheckError}</span>
+                      ) : (
+                        <span className="text-text-muted">
+                          Your site will be available at {subdomain}
+                          {DOMAIN}
+                        </span>
+                      )}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-text-muted mt-1">
+                      Claim a subdomain for your app (e.g., my-site{DOMAIN})
+                    </p>
+                  )}
+                </div>
               </div>
 
-              {/* Progress indicator */}
-              {isCreating && (
-                <div className="mt-3 p-3 bg-background-muted rounded-lg border border-border-subtle">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
-                    <span className="text-sm font-medium text-text-standard">
-                      {creationProgress || 'Creating app...'}
-                    </span>
-                  </div>
-                  {creationProgress && (
-                    <div
-                      className={`text-xs font-mono bg-background-default p-2 rounded border ${
-                        hasError ? 'text-red-600 border-red-300' : 'text-text-muted'
-                      }`}
-                    >
-                      {creationProgress}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div className="flex justify-end space-x-3 mt-6">
-              <Button onClick={handleCancelCreate} variant="ghost" disabled={isCreating}>
-                Cancel
-              </Button>
-              <Button
-                onClick={handleCreateApp}
-                disabled={
-                  !appName.trim() || isCreating || (!!subdomain.trim() && !subdomainAvailable)
-                }
-                variant="default"
-                className="min-w-[120px]"
-              >
-                {isCreating ? (
-                  <div className="flex items-center gap-2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    Creating...
-                  </div>
-                ) : (
-                  'Create App'
-                )}
-              </Button>
+              <div className="flex justify-end space-x-3 mt-6">
+                <Button onClick={handleCancelCreate} variant="ghost">
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleCreateApp}
+                  disabled={
+                    !appName.trim() || (!!subdomain.trim() && !subdomainAvailable)
+                  }
+                  variant="default"
+                  className="min-w-[120px]"
+                >
+                  Create App
+                </Button>
+              </div>
             </div>
           </div>
         </div>
