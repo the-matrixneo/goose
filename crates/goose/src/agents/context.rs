@@ -92,6 +92,10 @@ impl Agent {
             new_token_counts.push(assistant_message_tokens);
         }
 
-        Ok((Conversation::new_unvalidated(new_messages), new_token_counts, summarization_usage))
+        Ok((
+            Conversation::new_unvalidated(new_messages),
+            new_token_counts,
+            summarization_usage,
+        ))
     }
 }

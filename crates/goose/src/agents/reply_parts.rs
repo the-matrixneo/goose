@@ -138,7 +138,12 @@ impl Agent {
 
         // Ensure we have token counts, estimating if necessary
         usage
-            .ensure_tokens(system_prompt, messages_for_provider.messages(), &response, tools)
+            .ensure_tokens(
+                system_prompt,
+                messages_for_provider.messages(),
+                &response,
+                tools,
+            )
             .await?;
 
         crate::providers::base::set_current_model(&usage.model);

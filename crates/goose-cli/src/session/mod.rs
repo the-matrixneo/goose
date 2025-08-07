@@ -719,8 +719,10 @@ impl Session {
                         let provider = self.agent.provider().await?;
 
                         // Call the summarize_context method which uses the summarize_messages function
-                        let (summarized_messages, _token_counts, summarization_usage) =
-                            self.agent.summarize_context(self.messages.messages()).await?;
+                        let (summarized_messages, _token_counts, summarization_usage) = self
+                            .agent
+                            .summarize_context(self.messages.messages())
+                            .await?;
 
                         // Update the session messages with the summarized ones
                         self.messages = summarized_messages;
