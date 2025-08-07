@@ -495,15 +495,19 @@ where
 
             match event.event_type.as_str() {
                 "message_start" => {
+                    println!("DEBUG [Anthropic]: Received message_start event");
                     // Message started, we can extract initial metadata and usage if needed
                     if let Some(message_data) = event.data.get("message") {
                         // Extract message ID
                         if let Some(id) = message_data.get("id").and_then(|v| v.as_str()) {
+                            println!("DEBUG [Anthropic]: Message ID: {}", id);
                             message_id = Some(id.to_string());
                         }
 
                         if let Some(usage_data) = message_data.get("usage") {
                             let usage = get_usage(usage_data).unwrap_or_default();
+                            println!("DEBUG [Anthropic]: message_start usage - input: {:?}, output: {:?}, total: {:?}",
+                                    usage.input_tokens, usage.output_tokens, usage.total_tokens);
                             tracing::debug!("🔍 Anthropic message_start parsed usage: input_tokens={:?}, output_tokens={:?}, total_tokens={:?}",
                                     usage.input_tokens, usage.output_tokens, usage.total_tokens);
                             let model = message_data.get("model")
@@ -512,18 +516,21 @@ where
                                 .to_string();
                             final_usage = Some(crate::providers::base::ProviderUsage::new(model, usage));
                         } else {
+                            println!("DEBUG [Anthropic]: message_start has no usage data");
                             tracing::debug!("🔍 Anthropic message_start has no usage data");
                         }
                     }
                     continue;
                 }
                 "content_block_start" => {
+                    println!("DEBUG [Anthropic]: Received content_block_start event");
                     // A new content block started
                     if let Some(content_block) = event.data.get("content_block") {
                         if content_block.get("type") == Some(&json!("tool_use")) {
                             if let Some(id) = content_block.get("id").and_then(|v| v.as_str()) {
                                 current_tool_id = Some(id.to_string());
                                 if let Some(name) = content_block.get("name").and_then(|v| v.as_str()) {
+                                    println!("DEBUG [Anthropic]: Starting tool call - id: {}, name: {}", id, name);
                                     accumulated_tool_calls.insert(id.to_string(), (name.to_string(), String::new()));
                                 }
                             }
@@ -536,6 +543,7 @@ where
                         if delta.get("type") == Some(&json!("text_delta")) {
                             // Text content delta
                             if let Some(text) = delta.get("text").and_then(|v| v.as_str()) {
+                                println!("DEBUG [Anthropic]: Text delta: {}", text);
                                 accumulated_text.push_str(text);
 
                                 // Yield partial text message with the same ID from message_start
@@ -551,6 +559,7 @@ where
                             // Tool input delta
                             if let Some(tool_id) = &current_tool_id {
                                 if let Some(partial_json) = delta.get("partial_json").and_then(|v| v.as_str()) {
+                                    println!("DEBUG [Anthropic]: Tool input delta for {}: {}", tool_id, partial_json);
                                     if let Some((_name, args)) = accumulated_tool_calls.get_mut(tool_id) {
                                         args.push_str(partial_json);
                                     }
@@ -561,16 +570,19 @@ where
                     continue;
                 }
                 "content_block_stop" => {
+                    println!("DEBUG [Anthropic]: Received content_block_stop event");
                     // Content block finished
                     if let Some(tool_id) = current_tool_id.take() {
                         // Tool call finished, yield complete tool call
                         if let Some((name, args)) = accumulated_tool_calls.remove(&tool_id) {
+                            println!("DEBUG [Anthropic]: Completing tool call - id: {}, name: {}, args: {}", tool_id, name, args);
                             let parsed_args = if args.is_empty() {
                                 json!({})
                             } else {
                                 match serde_json::from_str::<Value>(&args) {
                                     Ok(parsed) => parsed,
-                                    Err(_) => {
+                                    Err(e) => {
+                                        println!("DEBUG [Anthropic]: Failed to parse tool arguments: {}", e);
                                         // If parsing fails, create an error tool request
                                         let error = mcp_core::handler::ToolError::InvalidParameters(
                                             format!("Could not parse tool arguments: {}", args)
@@ -594,6 +606,7 @@ where
                                 vec![MessageContent::tool_request(tool_id, Ok(tool_call))],
                             );
                             message.id = message_id.clone();
+                            println!("DEBUG [Anthropic]: Yielding tool call message");
                             yield (Some(message), None);
                         }
                     }

@@ -439,20 +439,28 @@ where
             });
 
             if chunk.choices.is_empty() {
+                println!("DEBUG: Empty choices, yielding None");
                 yield (None, usage)
             } else if let Some(tool_calls) = &chunk.choices[0].delta.tool_calls {
+                println!("DEBUG: Found tool calls in chunk: {:?}", tool_calls);
                 let mut tool_call_data: std::collections::HashMap<i32, (String, String, String)> = std::collections::HashMap::new();
 
                 for tool_call in tool_calls {
                     if let (Some(index), Some(id), Some(name)) = (tool_call.index, &tool_call.id, &tool_call.function.name) {
+                        println!("DEBUG: Adding tool call - index: {}, id: {}, name: {}", index, id, name);
                         tool_call_data.insert(index, (id.clone(), name.clone(), tool_call.function.arguments.clone()));
                     }
                 }
 
+                println!("DEBUG: Finish reason: {:?}", chunk.choices[0].finish_reason);
+
+                println!("DEBUG: Entering waiting loop");
                 let mut done = false;
                 while !done {
+                    println!("DEBUG: Waiting for next chunk in tool call loop");
                     if let Some(response_chunk) = stream.next().await {
                         if response_chunk.as_ref().is_ok_and(|s| s == "data: [DONE]") {
+                            println!("DEBUG: Received [DONE] in tool call loop, breaking outer");
                             break 'outer;
                         }
                         let response_str = response_chunk?;
@@ -460,7 +468,10 @@ where
                             let tool_chunk: StreamingChunk = serde_json::from_str(line)
                                 .map_err(|e| anyhow!("Failed to parse streaming chunk: {}: {:?}", e, &line))?;
 
+                            println!("DEBUG: Processing additional tool chunk: {:?}", tool_chunk.choices[0].finish_reason);
+
                             if let Some(delta_tool_calls) = &tool_chunk.choices[0].delta.tool_calls {
+                                println!("DEBUG: Found additional tool call deltas");
                                 for delta_call in delta_tool_calls {
                                     if let Some(index) = delta_call.index {
                                         if let Some((_, _, ref mut args)) = tool_call_data.get_mut(&index) {
@@ -471,17 +482,22 @@ where
                                     }
                                 }
                             } else {
+                                println!("DEBUG: No more tool call deltas, setting done=true");
                                 done = true;
                             }
 
                             if tool_chunk.choices[0].finish_reason == Some("tool_calls".to_string()) {
+                                println!("DEBUG: Found finish_reason=tool_calls, setting done=true");
                                 done = true;
                             }
                         }
                     } else {
+                        println!("DEBUG: No more chunks available, breaking");
                         break;
                     }
                 }
+
+                println!("DEBUG: Building message content from tool call data");
 
                 let mut contents = Vec::new();
                 let mut sorted_indices: Vec<_> = tool_call_data.keys().cloned().collect();
@@ -489,6 +505,7 @@ where
 
                 for index in sorted_indices {
                     if let Some((id, function_name, arguments)) = tool_call_data.get(&index) {
+                        println!("DEBUG: Processing tool call - index: {}, id: {}, name: {}, args: {}", index, id, function_name, arguments);
                         let parsed = if arguments.is_empty() {
                             Ok(json!({}))
                         } else {
@@ -512,6 +529,8 @@ where
                     }
                 }
 
+                println!("DEBUG: About to yield tool call message with {} contents", contents.len());
+
                 yield (
                     Some(Message {
                         id: chunk.id,
@@ -522,6 +541,7 @@ where
                     usage,
                 )
             } else if let Some(text) = &chunk.choices[0].delta.content {
+                println!("DEBUG: Found text content: {}", text);
                 yield (
                     Some(Message {
                         id: chunk.id,
@@ -536,9 +556,11 @@ where
                     },
                 )
             } else if usage.is_some() {
+                println!("DEBUG: Found usage only, yielding None with usage");
                 yield (None, usage)
             }
         }
+        println!("DEBUG: Exiting response_to_streaming_message function");
     }
 }
 
