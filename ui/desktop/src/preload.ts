@@ -126,6 +126,10 @@ type ElectronAPI = {
   saveAppColor: (appId: string, colors: { bg: string; inner: string }) => Promise<boolean>;
   loadAppColors: () => Promise<Record<string, { bg: string; inner: string }>>;
   openDirectoryInExplorer: (directoryPath: string) => Promise<boolean>;
+  // IPC handlers for subdomain checking and claiming
+  ipcRenderer: {
+    invoke: (channel: string, ...args: unknown[]) => Promise<unknown>;
+  };
 };
 
 type AppConfigAPI = {
@@ -263,6 +267,10 @@ const electronAPI: ElectronAPI = {
   loadAppColors: () => ipcRenderer.invoke('load-app-colors'),
   openDirectoryInExplorer: (directoryPath: string) =>
     ipcRenderer.invoke('open-directory-in-explorer', directoryPath),
+  // IPC handlers for subdomain checking and claiming
+  ipcRenderer: {
+    invoke: (channel: string, ...args: unknown[]) => ipcRenderer.invoke(channel, ...args),
+  },
 };
 
 const appConfigAPI: AppConfigAPI = {

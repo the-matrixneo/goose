@@ -338,7 +338,6 @@ export function SidecarProvider({ children, showSidecar = true }: SidecarProvide
     }
   };
 
-
   const showLocalhostViewer = (url = 'http://localhost:3000', title = 'Localhost Viewer') => {
     const localhostView: SidecarView = {
       id: 'localhost',
@@ -350,11 +349,7 @@ export function SidecarProvider({ children, showSidecar = true }: SidecarProvide
           onUrlChange={(newUrl) => {
             // Update the view title with the current URL
             setViews((prev) =>
-              prev.map((v) =>
-                v.id === 'localhost'
-                  ? { ...v, fileName: newUrl }
-                  : v
-              )
+              prev.map((v) => (v.id === 'localhost' ? { ...v, fileName: newUrl } : v))
             );
           }}
         />
@@ -457,7 +452,6 @@ export function Sidecar({ className = '' }: { className?: string }) {
             </div>
 
             <div className="flex items-center space-x-2">
-
               {/* View Mode Toggle - Only show for diff viewer */}
               {isDiffViewer && (
                 <div className="flex items-center space-x-1 bg-background-muted rounded-lg p-1">

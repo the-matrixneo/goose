@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { IpcRendererEvent } from 'electron';
-import { Hammer, Plus, Clock, FolderOpen } from 'lucide-react';
+import { Hammer, Plus, Clock, FolderOpen, Globe } from 'lucide-react';
 import { MainPanelLayout } from '../Layout/MainPanelLayout';
 import { Button } from '../ui/button';
-import { Card } from '../ui/card';
+// import { Card } from '../ui/card';
 // import { ScrollArea } from '../ui/scroll-area';
 import { formatMessageTimestamp } from '../../utils/timeUtils';
 import { toastSuccess, toastError } from '../../toasts';
@@ -14,19 +14,28 @@ interface AppTile {
   app_name: string;
   last_edited: number;
   path: string;
+  subdomain?: string;
 }
 
 const BuildView: React.FC = () => {
+  // Domain configuration - easily changeable
+  const DOMAIN = '.vibeplatstage.squarecdn.com';
+
   const [apps, setApps] = useState<AppTile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [appName, setAppName] = useState('');
+  const [subdomain, setSubdomain] = useState('');
+  const [isCheckingSubdomain, setIsCheckingSubdomain] = useState(false);
+  const [subdomainAvailable, setSubdomainAvailable] = useState<boolean | null>(null);
+  const [subdomainCheckError, setSubdomainCheckError] = useState<string | null>(null);
+  const [canConnectToSites, setCanConnectToSites] = useState(true);
   const [creationProgress, setCreationProgress] = useState('');
   const [hasError, setHasError] = useState(false);
   const [colorPickerAppId, setColorPickerAppId] = useState<string | null>(null);
   const [appColors, setAppColors] = useState<Record<string, { bg: string; inner: string }>>({});
-  
+
   // Available color combinations for app icons
   const colorCombinations = [
     { bg: 'bg-blue-100', inner: 'bg-blue-200', name: 'Blue' },
@@ -84,9 +93,74 @@ const BuildView: React.FC = () => {
     }
   };
 
-  const handleCreateAppClick = () => {
+  const handleCreateAppClick = async () => {
     setAppName('');
+    setSubdomain('');
+    setSubdomainAvailable(null);
+    setSubdomainCheckError(null);
     setShowCreateDialog(true);
+
+    // Check if we can connect to the sites service using a placeholder subdomain
+    // We use a placeholder that's unlikely to be available to test the connection
+    try {
+      const result = (await window.electron.ipcRenderer.invoke('check-subdomain', 'test')) as {
+        available?: boolean;
+        error?: boolean;
+        message?: string;
+      };
+      console.log('[BuildView] Connection test result:', result);
+
+      // Check if we got an error response
+      if (result.error) {
+        console.error('[BuildView] Cannot connect to sites service:', result.message);
+        setCanConnectToSites(false);
+      } else {
+        // If we got a valid response (regardless of availability), the service is working
+        setCanConnectToSites(true);
+      }
+    } catch (err) {
+      console.error('[BuildView] Cannot connect to sites service:', err);
+      // Log the full error for debugging
+      if (err instanceof Error) {
+        console.error('[BuildView] Error details:', {
+          message: err.message,
+          stack: err.stack,
+          name: err.name,
+        });
+      }
+      setCanConnectToSites(false);
+    }
+  };
+
+  const checkSubdomainAvailability = async (siteName: string) => {
+    if (!siteName || !canConnectToSites) return;
+
+    setIsCheckingSubdomain(true);
+    setSubdomainCheckError(null);
+
+    try {
+      const result = (await window.electron.ipcRenderer.invoke('check-subdomain', siteName)) as {
+        available?: boolean;
+        error?: boolean;
+        message?: string;
+      };
+
+      // Check if we got an error response
+      if (result.error) {
+        console.error('[BuildView] Subdomain check error:', result.message);
+        setSubdomainCheckError(result.message || 'Cannot connect to service');
+        setSubdomainAvailable(false);
+      } else if (result.available) {
+        setSubdomainAvailable(true);
+      } else {
+        setSubdomainAvailable(false);
+      }
+    } catch (err) {
+      console.error('Failed to check subdomain:', err);
+      setSubdomainCheckError('Cannot connect to service');
+    } finally {
+      setIsCheckingSubdomain(false);
+    }
   };
 
   const handleCreateApp = async () => {
@@ -101,22 +175,52 @@ const BuildView: React.FC = () => {
       return;
     }
 
+    // If subdomain is provided and we can connect, check if it's available
+    if (subdomain.trim() && canConnectToSites && !subdomainAvailable) {
+      toastError({
+        title: 'Subdomain not available',
+        msg: 'Please choose a different subdomain',
+      });
+      return;
+    }
+
     setIsCreating(true);
     setCreationProgress('Starting app creation...');
     setHasError(false);
 
     try {
-      await window.electron.createApp(appName.trim());
+      // The createApp function in main process will handle the path construction
+      // We just pass the app name and subdomain
+      await window.electron.createApp(appName.trim(), subdomain.trim() || undefined);
+
+      // If subdomain was provided and available, claim it
+      if (subdomain.trim() && canConnectToSites && subdomainAvailable) {
+        try {
+          setCreationProgress('Claiming subdomain...');
+          // The app path will be constructed in the main process
+          // We just need to pass the app name to identify it
+          await window.electron.ipcRenderer.invoke(
+            'claim-subdomain',
+            subdomain.trim(),
+            appName.trim()
+          );
+        } catch (err) {
+          console.error('Failed to claim subdomain:', err);
+          // Don't fail the whole operation if subdomain claim fails
+        }
+      }
 
       toastSuccess({
         title: 'App created!',
-        msg: `Successfully created ${appName.trim()}`,
+        msg: `Successfully created ${appName.trim()}${subdomain.trim() ? ` with subdomain ${subdomain.trim()}` : ''}`,
       });
       // Reload the apps list
       await loadApps();
       // Close dialog and reset
       setShowCreateDialog(false);
       setAppName('');
+      setSubdomain('');
+      setSubdomainAvailable(null);
       setCreationProgress('');
       setHasError(false);
     } catch (err) {
@@ -136,6 +240,9 @@ const BuildView: React.FC = () => {
     if (!isCreating) {
       setShowCreateDialog(false);
       setAppName('');
+      setSubdomain('');
+      setSubdomainAvailable(null);
+      setSubdomainCheckError(null);
       setCreationProgress('');
       setHasError(false);
     }
@@ -153,32 +260,7 @@ const BuildView: React.FC = () => {
     }
   };
 
-  // Component for rendering individual app tiles (similar to SessionItem)
-  const AppTile: React.FC<{ app: AppTile }> = ({ app }) => {
-    return (
-      <Card
-        className="h-full py-3 px-4 flex flex-col justify-between cursor-pointer hover:bg-background-medium/50 transition-all duration-200"
-        onClick={() => handleAppClick(app)}
-      >
-        <div className="flex-1">
-          {/* App name - matching session title exactly */}
-          <h3 className="text-base truncate mb-1">{app.app_name}</h3>
-
-          {/* Timestamp - similar to session */}
-          <div className="flex items-center text-text-muted text-xs mb-1">
-            <Clock className="w-3 h-3 mr-1 flex-shrink-0" />
-            <span>{formatMessageTimestamp(app.last_edited)}</span>
-          </div>
-
-          {/* Path */}
-          <div className="flex items-center text-text-muted text-xs mb-1">
-            <FolderOpen className="w-3 h-3 mr-1 flex-shrink-0" />
-            <span className="truncate">{app.path}</span>
-          </div>
-        </div>
-      </Card>
-    );
-  };
+  // Component for rendering individual app tiles (similar to SessionItem) - removed as not used
 
   return (
     <MainPanelLayout>
@@ -229,18 +311,31 @@ const BuildView: React.FC = () => {
                   <div className="flex flex-col h-full text-text-muted page-transition">
                     <div className="flex flex-col items-start">
                       {/* App image placeholder - 32x32 rounded square */}
-                      <div 
+                      <div
                         className={`w-8 h-8 ${appColors[app.id]?.bg || 'bg-background-medium'} rounded-md mb-3 flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity duration-200`}
                         onClick={(e) => {
                           e.stopPropagation(); // Prevent triggering the app click
                           setColorPickerAppId(app.id);
                         }}
                       >
-                        <div className={`w-4 h-4 ${appColors[app.id]?.inner || 'bg-background-strong'} rounded-sm`}></div>
+                        <div
+                          className={`w-4 h-4 ${appColors[app.id]?.inner || 'bg-background-strong'} rounded-sm`}
+                        ></div>
                       </div>
-                      
+
                       <h3 className="text-base truncate mb-1 text-text-default">{app.app_name}</h3>
-                      
+
+                      {/* Subdomain if claimed */}
+                      {app.subdomain && (
+                        <div className="flex items-center text-text-muted text-xs mb-1">
+                          <Globe className="w-3 h-3 mr-1 flex-shrink-0" />
+                          <span className="text-blue-600">
+                            {app.subdomain}
+                            {DOMAIN}
+                          </span>
+                        </div>
+                      )}
+
                       {/* Timestamp */}
                       <div className="flex items-center text-text-muted text-xs mb-1">
                         <Clock className="w-3 h-3 mr-1 flex-shrink-0" />
@@ -253,7 +348,7 @@ const BuildView: React.FC = () => {
                         <span className="truncate">{app.path}</span>
                       </div>
                     </div>
-                    
+
                     <div className="flex justify-end mt-auto pt-6">
                       <Button
                         onClick={() => handleAppClick(app)}
@@ -267,7 +362,7 @@ const BuildView: React.FC = () => {
                   </div>
                 </div>
               ))}
-              
+
               {/* Filler container - extends to fill remaining space */}
               <div className="bg-background-default rounded-2xl flex-1"></div>
             </>
@@ -279,7 +374,9 @@ const BuildView: React.FC = () => {
                 <div className="flex flex-col h-full text-text-muted page-transition">
                   <div className="flex flex-col items-start">
                     <Hammer className="h-4 w-4 mb-4 text-inverse" />
-                    <p className="text-sm">Your web apps will show up here. Create a new web app to get started in build.</p>
+                    <p className="text-sm">
+                      Your web apps will show up here. Create a new web app to get started in build.
+                    </p>
                   </div>
                   <div className="flex justify-end mt-auto pt-6">
                     <Button
@@ -294,7 +391,7 @@ const BuildView: React.FC = () => {
                   </div>
                 </div>
               </div>
-              
+
               {/* Empty container stretching the full height */}
               <div className="bg-background-default rounded-2xl flex-1"></div>
             </>
@@ -316,22 +413,24 @@ const BuildView: React.FC = () => {
                   onClick={async () => {
                     // Save color selection for the app
                     const newColors = { bg: combo.bg, inner: combo.inner };
-                    setAppColors(prev => ({
+                    setAppColors((prev) => ({
                       ...prev,
-                      [colorPickerAppId]: newColors
+                      [colorPickerAppId]: newColors,
                     }));
-                    
+
                     // Persist to storage
                     try {
                       await window.electron.saveAppColor(colorPickerAppId, newColors);
                     } catch (err) {
                       console.error('Failed to save app color:', err);
                     }
-                    
+
                     setColorPickerAppId(null);
                   }}
                 >
-                  <div className={`w-8 h-8 ${combo.bg} rounded-md mb-2 flex items-center justify-center group-hover:scale-110 transition-transform duration-200`}>
+                  <div
+                    className={`w-8 h-8 ${combo.bg} rounded-md mb-2 flex items-center justify-center group-hover:scale-110 transition-transform duration-200`}
+                  >
                     <div className={`w-4 h-4 ${combo.inner} rounded-sm`}></div>
                   </div>
                   <span className="text-xs text-text-muted">{combo.name}</span>
@@ -340,10 +439,7 @@ const BuildView: React.FC = () => {
             </div>
 
             <div className="flex justify-end">
-              <Button 
-                onClick={() => setColorPickerAppId(null)} 
-                variant="ghost"
-              >
+              <Button onClick={() => setColorPickerAppId(null)} variant="ghost">
                 Cancel
               </Button>
             </div>
@@ -354,7 +450,7 @@ const BuildView: React.FC = () => {
       {/* Create App Dialog */}
       {showCreateDialog && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/50">
-          <div className="bg-background-default border border-border-subtle rounded-lg p-6 w-[400px] max-w-[90vw]">
+          <div className="bg-background-default border border-border-subtle rounded-lg p-6 w-[500px] max-w-[90vw]">
             <h3 className="text-lg font-medium text-text-standard mb-4">Create New App</h3>
 
             <div className="space-y-4">
@@ -374,7 +470,11 @@ const BuildView: React.FC = () => {
                   className="w-full"
                   autoFocus
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' && appName.trim()) {
+                    if (
+                      e.key === 'Enter' &&
+                      appName.trim() &&
+                      (!subdomain.trim() || subdomainAvailable)
+                    ) {
                       handleCreateApp();
                     } else if (e.key === 'Escape') {
                       handleCancelCreate();
@@ -384,28 +484,123 @@ const BuildView: React.FC = () => {
                 <p className="text-xs text-text-muted mt-1">
                   Only letters, numbers, hyphens, and underscores are allowed
                 </p>
+              </div>
 
-                {/* Progress indicator */}
-                {isCreating && (
-                  <div className="mt-3 p-3 bg-background-muted rounded-lg border border-border-subtle">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
-                      <span className="text-sm font-medium text-text-standard">
-                        Creating app...
-                      </span>
+              {/* Subdomain field */}
+              <div>
+                <label
+                  htmlFor="subdomain"
+                  className="block text-sm font-medium text-text-standard mb-2"
+                >
+                  Subdomain (Optional)
+                </label>
+                <div className="relative">
+                  <Input
+                    id="subdomain"
+                    type="text"
+                    value={subdomain}
+                    onChange={(e) => {
+                      const value = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
+                      setSubdomain(value);
+                      setSubdomainAvailable(null);
+                      setSubdomainCheckError(null);
+                      // Debounce the check
+                      if (value) {
+                        setTimeout(() => {
+                          if (value === e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '')) {
+                            checkSubdomainAvailability(value);
+                          }
+                        }, 500);
+                      }
+                    }}
+                    placeholder="my-site"
+                    className={`w-full pr-10 ${!canConnectToSites ? 'opacity-50' : ''} ${
+                      subdomain && subdomainAvailable === false
+                        ? 'border-red-500'
+                        : subdomain && subdomainAvailable === true
+                          ? 'border-green-500'
+                          : ''
+                    }`}
+                    disabled={!canConnectToSites}
+                    onKeyDown={(e) => {
+                      if (
+                        e.key === 'Enter' &&
+                        appName.trim() &&
+                        (!subdomain.trim() || subdomainAvailable)
+                      ) {
+                        handleCreateApp();
+                      } else if (e.key === 'Escape') {
+                        handleCancelCreate();
+                      }
+                    }}
+                  />
+                  {/* Status indicator */}
+                  {subdomain && (
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                      {isCheckingSubdomain ? (
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+                      ) : subdomainAvailable === true ? (
+                        <div className="text-green-500">✓</div>
+                      ) : subdomainAvailable === false ? (
+                        <div className="text-red-500">✗</div>
+                      ) : null}
                     </div>
-                    {creationProgress && (
-                      <div
-                        className={`text-xs font-mono bg-background-default p-2 rounded border ${
-                          hasError ? 'text-red-600 border-red-300' : 'text-text-muted'
-                        }`}
-                      >
-                        {creationProgress}
-                      </div>
+                  )}
+                </div>
+                {!canConnectToSites ? (
+                  <p className="text-xs text-yellow-600 mt-1">
+                    Website claiming is currently unavailable (cannot connect to service)
+                  </p>
+                ) : subdomain ? (
+                  <p className="text-xs mt-1">
+                    {isCheckingSubdomain ? (
+                      <span className="text-text-muted">Checking availability...</span>
+                    ) : subdomainAvailable === true ? (
+                      <span className="text-green-600">
+                        {subdomain}
+                        {DOMAIN} is available!
+                      </span>
+                    ) : subdomainAvailable === false ? (
+                      <span className="text-red-600">
+                        {subdomain}
+                        {DOMAIN} is already taken
+                      </span>
+                    ) : subdomainCheckError ? (
+                      <span className="text-yellow-600">{subdomainCheckError}</span>
+                    ) : (
+                      <span className="text-text-muted">
+                        Your site will be available at {subdomain}
+                        {DOMAIN}
+                      </span>
                     )}
-                  </div>
+                  </p>
+                ) : (
+                  <p className="text-xs text-text-muted mt-1">
+                    Claim a subdomain for your app (e.g., my-site{DOMAIN})
+                  </p>
                 )}
               </div>
+
+              {/* Progress indicator */}
+              {isCreating && (
+                <div className="mt-3 p-3 bg-background-muted rounded-lg border border-border-subtle">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+                    <span className="text-sm font-medium text-text-standard">
+                      {creationProgress || 'Creating app...'}
+                    </span>
+                  </div>
+                  {creationProgress && (
+                    <div
+                      className={`text-xs font-mono bg-background-default p-2 rounded border ${
+                        hasError ? 'text-red-600 border-red-300' : 'text-text-muted'
+                      }`}
+                    >
+                      {creationProgress}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="flex justify-end space-x-3 mt-6">
@@ -414,7 +609,9 @@ const BuildView: React.FC = () => {
               </Button>
               <Button
                 onClick={handleCreateApp}
-                disabled={!appName.trim() || isCreating}
+                disabled={
+                  !appName.trim() || isCreating || (!!subdomain.trim() && !subdomainAvailable)
+                }
                 variant="default"
                 className="min-w-[120px]"
               >
