@@ -467,8 +467,7 @@ impl Agent {
             ToolCallResult::from(Err(ToolError::ExecutionError(
                 "Frontend tool execution required".to_string(),
             )))
-        } else if tool_call.name == ROUTER_LLM_SEARCH_TOOL_NAME
-        {
+        } else if tool_call.name == ROUTER_LLM_SEARCH_TOOL_NAME {
             match self
                 .tool_route_manager
                 .dispatch_route_search_tool(tool_call.arguments)
@@ -643,7 +642,8 @@ impl Agent {
         }
 
         // If LLM tool selection is enabled, index the tools
-        let selector: Option<Arc<Box<dyn RouterToolSelector>>> = self.tool_route_manager.get_router_tool_selector().await;
+        let selector: Option<Arc<Box<dyn RouterToolSelector>>> =
+            self.tool_route_manager.get_router_tool_selector().await;
         if ToolRouterIndexManager::is_tool_router_enabled(&selector) {
             if let Some(selector) = selector {
                 let extension_manager = self.extension_manager.read().await;
