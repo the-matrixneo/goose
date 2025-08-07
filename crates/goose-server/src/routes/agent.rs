@@ -6,15 +6,16 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use goose::config::compat;
 use goose::config::PermissionManager;
 use goose::model::ModelConfig;
 use goose::providers::create;
 use goose::recipe::Response;
+use goose::recipe::SubRecipe;
 use goose::{
     agents::{extension::ToolInfo, extension_manager::get_parameter_names},
     config::permission::PermissionLevel,
 };
-use goose::{config::Config, recipe::SubRecipe};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -180,8 +181,7 @@ async fn get_tools(
 ) -> Result<Json<Vec<ToolInfo>>, StatusCode> {
     verify_secret_key(&headers, &state)?;
 
-    let config = Config::global();
-    let goose_mode = config.get_param("GOOSE_MODE").unwrap_or("auto".to_string());
+    let goose_mode = compat::get_or("GOOSE_MODE", "auto".to_string());
     let agent = state
         .get_agent()
         .await
@@ -243,11 +243,7 @@ async fn update_agent_provider(
         .await
         .map_err(|_| StatusCode::PRECONDITION_FAILED)?;
 
-    let config = Config::global();
-    let model = match payload
-        .model
-        .or_else(|| config.get_param("GOOSE_MODEL").ok())
-    {
+    let model = match payload.model.or_else(|| compat::get("GOOSE_MODEL")) {
         Some(m) => m,
         None => return Err(StatusCode::BAD_REQUEST),
     };

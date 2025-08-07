@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use crate::config::compat;
 use arrow::array::{FixedSizeListBuilder, StringArray};
 use arrow::datatypes::{DataType, Field, Schema};
 use chrono::Local;
@@ -12,7 +13,6 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-use crate::config::Config;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolRecord {
@@ -56,10 +56,8 @@ impl ToolVectorDB {
     }
 
     pub fn get_db_path() -> Result<PathBuf> {
-        let config = Config::global();
-
         // Check for custom database path override
-        if let Ok(custom_path) = config.get_param::<String>("GOOSE_VECTOR_DB_PATH") {
+        if let Some(custom_path) = compat::get::<String>("GOOSE_VECTOR_DB_PATH") {
             let path = PathBuf::from(custom_path);
 
             // Validate the path is absolute

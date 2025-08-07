@@ -32,7 +32,7 @@ use crate::agents::tool_route_manager::ToolRouteManager;
 use crate::agents::tool_router_index_manager::ToolRouterIndexManager;
 use crate::agents::types::SessionConfig;
 use crate::agents::types::{FrontendTool, ToolResultReceiver};
-use crate::config::{Config, ExtensionConfigManager, PermissionManager};
+use crate::config::{compat, ExtensionConfigManager, PermissionManager};
 use crate::context_mgmt::auto_compact;
 use crate::conversation::{debug_conversation_fix, fix_conversation, Conversation};
 use crate::permission::permission_judge::{check_tool_permissions, PermissionCheckResult};
@@ -68,7 +68,6 @@ pub struct ReplyContext {
     pub system_prompt: String,
     pub goose_mode: String,
     pub initial_messages: Vec<Message>,
-    pub config: &'static Config,
 }
 
 pub struct ToolCategorizeResult {
@@ -234,10 +233,9 @@ impl Agent {
             );
         }
         let initial_messages = conversation.messages().clone();
-        let config = Config::global();
 
         let (tools, toolshim_tools, system_prompt) = self.prepare_tools_and_prompt().await?;
-        let goose_mode = Self::determine_goose_mode(session.as_ref(), config);
+        let goose_mode = Self::determine_goose_mode(session.as_ref());
 
         Ok(ReplyContext {
             messages: conversation,
@@ -246,7 +244,6 @@ impl Agent {
             system_prompt,
             goose_mode,
             initial_messages,
-            config,
         })
     }
 
@@ -861,7 +858,6 @@ impl Agent {
             mut system_prompt,
             goose_mode,
             initial_messages,
-            config,
         } = context;
         let reply_span = tracing::Span::current();
         self.reset_retry_attempts().await;
@@ -880,9 +876,7 @@ impl Agent {
             let max_turns = session
                 .as_ref()
                 .and_then(|s| s.max_turns)
-                .unwrap_or_else(|| {
-                    config.get_param("GOOSE_MAX_TURNS").unwrap_or(DEFAULT_MAX_TURNS)
-                });
+                .unwrap_or_else(|| compat::get_or("GOOSE_MAX_TURNS", DEFAULT_MAX_TURNS));
 
             loop {
                 if is_token_cancelled(&cancel_token) {
@@ -1140,15 +1134,13 @@ impl Agent {
         }))
     }
 
-    fn determine_goose_mode(session: Option<&SessionConfig>, config: &Config) -> String {
+    fn determine_goose_mode(session: Option<&SessionConfig>) -> String {
         let mode = session.and_then(|s| s.execution_mode.as_deref());
 
         match mode {
             Some("foreground") => "chat".to_string(),
             Some("background") => "auto".to_string(),
-            _ => config
-                .get_param("GOOSE_MODE")
-                .unwrap_or_else(|_| "auto".to_string()),
+            _ => compat::get_or("GOOSE_MODE", "auto".to_string()),
         }
     }
 
@@ -1365,10 +1357,8 @@ impl Agent {
 
         // Ideally we'd get the name of the provider we are using from the provider itself,
         // but it doesn't know and the plumbing looks complicated.
-        let config = Config::global();
-        let provider_name: String = config
-            .get_param("GOOSE_PROVIDER")
-            .expect("No provider configured. Run 'goose configure' first");
+        let provider_name: String = compat::get("GOOSE_PROVIDER")
+            .ok_or_else(|| anyhow!("No provider configured. Run 'goose configure' first"))?;
 
         let settings = Settings {
             goose_provider: Some(provider_name.clone()),

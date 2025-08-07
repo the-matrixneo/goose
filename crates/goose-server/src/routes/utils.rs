@@ -1,5 +1,5 @@
 use crate::state::AppState;
-use goose::config::Config;
+use goose::config::compat;
 use goose::providers::base::{ConfigKey, ProviderMetadata};
 use http::{HeaderMap, StatusCode};
 use serde::{Deserialize, Serialize};
@@ -40,8 +40,6 @@ pub fn verify_secret_key(headers: &HeaderMap, state: &AppState) -> Result<Status
 /// Inspects a configuration key to determine if it's set, its location, and value (for non-secret keys)
 #[allow(dead_code)]
 pub fn inspect_key(key_name: &str, is_secret: bool) -> Result<KeyInfo, Box<dyn Error>> {
-    let config = Config::global();
-
     // Check environment variable first
     let env_value = std::env::var(key_name).ok();
 
@@ -58,9 +56,11 @@ pub fn inspect_key(key_name: &str, is_secret: bool) -> Result<KeyInfo, Box<dyn E
 
     // Check config store
     let config_result = if is_secret {
-        config.get_secret(key_name).map(|v| (v, true))
+        compat::get_secret(key_name).map(|v| (v, true))
     } else {
-        config.get_param(key_name).map(|v| (v, false))
+        compat::get::<String>(key_name)
+            .map(|v| (v, false))
+            .ok_or("not found")
     };
 
     match config_result {
@@ -107,13 +107,11 @@ pub fn inspect_keys(
 }
 
 pub fn check_provider_configured(metadata: &ProviderMetadata) -> bool {
-    let config = Config::global();
-
     // Special case: Zero-config providers (no config keys)
     if metadata.config_keys.is_empty() {
         // Check if the provider has been explicitly configured via the UI
         let configured_marker = format!("{}_configured", metadata.name);
-        return config.get_param::<bool>(&configured_marker).is_ok();
+        return compat::get::<bool>(&configured_marker).unwrap_or(false);
     }
 
     // Get all required keys
@@ -130,7 +128,11 @@ pub fn check_provider_configured(metadata: &ProviderMetadata) -> bool {
 
         // Check if the key is explicitly set (either in env or config)
         let is_set_in_env = env::var(&key.name).is_ok();
-        let is_set_in_config = config.get(&key.name, key.secret).is_ok();
+        let is_set_in_config = if key.secret {
+            compat::get_secret(&key.name).is_ok()
+        } else {
+            compat::has(&key.name)
+        };
 
         return is_set_in_env || is_set_in_config;
     }
@@ -146,7 +148,7 @@ pub fn check_provider_configured(metadata: &ProviderMetadata) -> bool {
         if all_optional_with_defaults {
             // Check if the provider has been explicitly configured via the UI
             let configured_marker = format!("{}_configured", metadata.name);
-            return config.get_param::<bool>(&configured_marker).is_ok();
+            return compat::get::<bool>(&configured_marker).unwrap_or(false);
         }
     }
 
@@ -162,7 +164,11 @@ pub fn check_provider_configured(metadata: &ProviderMetadata) -> bool {
     if required_non_default_keys.is_empty() {
         return required_keys.iter().any(|key| {
             let is_set_in_env = env::var(&key.name).is_ok();
-            let is_set_in_config = config.get(&key.name, key.secret).is_ok();
+            let is_set_in_config = if key.secret {
+                compat::get_secret(&key.name).is_ok()
+            } else {
+                compat::has(&key.name)
+            };
 
             is_set_in_env || is_set_in_config
         });
@@ -171,7 +177,11 @@ pub fn check_provider_configured(metadata: &ProviderMetadata) -> bool {
     // Otherwise, all non-default keys must be set
     required_non_default_keys.iter().all(|key| {
         let is_set_in_env = env::var(&key.name).is_ok();
-        let is_set_in_config = config.get(&key.name, key.secret).is_ok();
+        let is_set_in_config = if key.secret {
+            compat::get_secret(&key.name).is_ok()
+        } else {
+            compat::has(&key.name)
+        };
 
         is_set_in_env || is_set_in_config
     })

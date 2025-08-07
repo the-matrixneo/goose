@@ -1,4 +1,5 @@
 use anyhow::Result;
+use crate::config::compat;
 use async_stream::try_stream;
 use async_trait::async_trait;
 use futures::TryStreamExt;
@@ -57,22 +58,20 @@ impl_provider_default!(OpenAiProvider);
 
 impl OpenAiProvider {
     pub fn from_env(model: ModelConfig) -> Result<Self> {
-        let config = crate::config::Config::global();
-        let api_key: String = config.get_secret("OPENAI_API_KEY")?;
-        let host: String = config
-            .get_param("OPENAI_HOST")
-            .unwrap_or_else(|_| "https://api.openai.com".to_string());
-        let base_path: String = config
-            .get_param("OPENAI_BASE_PATH")
-            .unwrap_or_else(|_| "v1/chat/completions".to_string());
-        let organization: Option<String> = config.get_param("OPENAI_ORGANIZATION").ok();
-        let project: Option<String> = config.get_param("OPENAI_PROJECT").ok();
-        let custom_headers: Option<HashMap<String, String>> = config
-            .get_secret("OPENAI_CUSTOM_HEADERS")
-            .or_else(|_| config.get_param("OPENAI_CUSTOM_HEADERS"))
-            .ok()
-            .map(parse_custom_headers);
-        let timeout_secs: u64 = config.get_param("OPENAI_TIMEOUT").unwrap_or(600);
+        let api_key: String = compat::get_secret("OPENAI_API_KEY")?;
+        let host: String = compat::get_or("OPENAI_HOST", "https://api.openai.com".to_string());
+        let base_path: String =
+            compat::get_or("OPENAI_BASE_PATH", "v1/chat/completions".to_string());
+        let organization: Option<String> = compat::get("OPENAI_ORGANIZATION");
+        let project: Option<String> = compat::get("OPENAI_PROJECT");
+        let custom_headers: Option<HashMap<String, String>> =
+            compat::get_secret("OPENAI_CUSTOM_HEADERS")
+                .or_else(|_| {
+                    compat::get("OPENAI_CUSTOM_HEADERS").ok_or(anyhow::anyhow!("Not found"))
+                })
+                .ok()
+                .map(parse_custom_headers);
+        let timeout_secs: u64 = compat::get_or("OPENAI_TIMEOUT", 600);
 
         let auth = AuthMethod::BearerToken(api_key);
         let mut api_client =
@@ -265,8 +264,10 @@ impl EmbeddingCapable for OpenAiProvider {
             return Ok(vec![]);
         }
 
-        let embedding_model = std::env::var("GOOSE_EMBEDDING_MODEL")
-            .unwrap_or_else(|_| "text-embedding-3-small".to_string());
+        let embedding_model = compat::get_or(
+            "GOOSE_EMBEDDING_MODEL",
+            "text-embedding-3-small".to_string(),
+        );
 
         let request = EmbeddingRequest {
             input: texts,

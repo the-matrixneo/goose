@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use crate::config::compat;
 
 use super::base::{ConfigKey, Provider, ProviderMetadata, ProviderUsage};
 use super::errors::ProviderError;
@@ -38,8 +39,6 @@ pub struct BedrockProvider {
 
 impl BedrockProvider {
     pub fn from_env(model: ModelConfig) -> Result<Self> {
-        let config = crate::config::Config::global();
-
         // Attempt to load config and secrets to get AWS_ prefixed keys
         // to re-export them into the environment for aws_config::load_from_env()
         let set_aws_env_vars = |res: Result<HashMap<String, Value>, _>| {
@@ -51,8 +50,8 @@ impl BedrockProvider {
             }
         };
 
-        set_aws_env_vars(config.load_values());
-        set_aws_env_vars(config.load_secrets());
+        set_aws_env_vars(compat::load_values());
+        set_aws_env_vars(compat::load_secrets());
 
         let sdk_config = futures::executor::block_on(aws_config::load_from_env());
 

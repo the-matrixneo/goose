@@ -1,4 +1,5 @@
 use super::api_client::{ApiClient, AuthMethod};
+use crate::config::compat;
 use super::errors::ProviderError;
 use super::retry::ProviderRetry;
 use super::utils::{emit_debug_trace, handle_response_google_compat, unescape_json_values};
@@ -55,11 +56,8 @@ impl_provider_default!(GoogleProvider);
 
 impl GoogleProvider {
     pub fn from_env(model: ModelConfig) -> Result<Self> {
-        let config = crate::config::Config::global();
-        let api_key: String = config.get_secret("GOOGLE_API_KEY")?;
-        let host: String = config
-            .get_param("GOOGLE_HOST")
-            .unwrap_or_else(|_| GOOGLE_API_HOST.to_string());
+        let api_key: String = compat::get_secret("GOOGLE_API_KEY")?;
+        let host: String = compat::get_or("GOOGLE_HOST", GOOGLE_API_HOST.to_string());
 
         let auth = AuthMethod::ApiKey {
             header_name: "x-goog-api-key".to_string(),

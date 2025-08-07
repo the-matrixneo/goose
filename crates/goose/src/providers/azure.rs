@@ -1,4 +1,5 @@
 use anyhow::Result;
+use crate::config::compat;
 use async_trait::async_trait;
 use serde::Serialize;
 use serde_json::Value;
@@ -72,15 +73,16 @@ impl_provider_default!(AzureProvider);
 
 impl AzureProvider {
     pub fn from_env(model: ModelConfig) -> Result<Self> {
-        let config = crate::config::Config::global();
-        let endpoint: String = config.get_param("AZURE_OPENAI_ENDPOINT")?;
-        let deployment_name: String = config.get_param("AZURE_OPENAI_DEPLOYMENT_NAME")?;
-        let api_version: String = config
-            .get_param("AZURE_OPENAI_API_VERSION")
-            .unwrap_or_else(|_| AZURE_DEFAULT_API_VERSION.to_string());
+        let endpoint: String = compat::get("AZURE_OPENAI_ENDPOINT")
+            .ok_or_else(|| anyhow::anyhow!("AZURE_OPENAI_ENDPOINT not set"))?;
+        let deployment_name: String = compat::get("AZURE_OPENAI_DEPLOYMENT_NAME")
+            .ok_or_else(|| anyhow::anyhow!("AZURE_OPENAI_DEPLOYMENT_NAME not set"))?;
+        let api_version: String = compat::get_or(
+            "AZURE_OPENAI_API_VERSION",
+            AZURE_DEFAULT_API_VERSION.to_string(),
+        );
 
-        let api_key = config
-            .get_secret("AZURE_OPENAI_API_KEY")
+        let api_key: Option<String> = compat::get_secret("AZURE_OPENAI_API_KEY")
             .ok()
             .filter(|key: &String| !key.is_empty());
         let auth = AzureAuth::new(api_key).map_err(|e| match e {

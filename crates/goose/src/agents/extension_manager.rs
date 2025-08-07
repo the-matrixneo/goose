@@ -21,12 +21,12 @@ use tokio::sync::Mutex;
 use tokio::task;
 use tokio_stream::wrappers::ReceiverStream;
 use tokio_util::sync::CancellationToken;
-use tracing::{error, warn};
+use tracing::error;
 
 use super::extension::{ExtensionConfig, ExtensionError, ExtensionInfo, ExtensionResult, ToolInfo};
 use super::tool_execution::ToolCallResult;
 use crate::agents::extension::{Envs, ProcessExit};
-use crate::config::{Config, ExtensionConfigManager};
+use crate::config::{compat, ExtensionConfigManager};
 use crate::oauth::oauth_flow;
 use crate::prompt_template;
 use mcp_client::client::{McpClient, McpClientTrait};
@@ -133,7 +133,6 @@ impl ExtensionManager {
             ext_name: &str,
         ) -> Result<HashMap<String, String>, ExtensionError> {
             let mut all_envs = envs.get_env();
-            let config_instance = Config::global();
 
             for key in env_keys {
                 // If the Envs payload already contains the key, prefer that value
@@ -142,28 +141,9 @@ impl ExtensionManager {
                     continue;
                 }
 
-                match config_instance.get(key, true) {
+                match compat::get_secret(key) {
                     Ok(value) => {
-                        if value.is_null() {
-                            warn!(
-                                key = %key,
-                                ext_name = %ext_name,
-                                "Secret key not found in config (returned null)."
-                            );
-                            continue;
-                        }
-
-                        // Try to get string value
-                        if let Some(str_val) = value.as_str() {
-                            all_envs.insert(key.clone(), str_val.to_string());
-                        } else {
-                            warn!(
-                                key = %key,
-                                ext_name = %ext_name,
-                                value_type = %value.get("type").and_then(|t| t.as_str()).unwrap_or("unknown"),
-                                "Secret value is not a string; skipping."
-                            );
-                        }
+                        all_envs.insert(key.clone(), value);
                     }
                     Err(e) => {
                         error!(

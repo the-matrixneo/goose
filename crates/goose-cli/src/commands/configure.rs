@@ -10,7 +10,7 @@ use goose::agents::{extension::Envs, ExtensionConfig};
 use goose::config::extensions::name_to_key;
 use goose::config::permission::PermissionLevel;
 use goose::config::{
-    Config, ConfigError, ExperimentManager, ExtensionConfigManager, ExtensionEntry,
+    compat, ConfigError, ExperimentManager, ExtensionConfigManager, ExtensionEntry,
     PermissionManager,
 };
 use goose::conversation::message::Message;
@@ -49,9 +49,7 @@ fn get_display_name(extension_id: &str) -> String {
 }
 
 pub async fn handle_configure() -> Result<(), Box<dyn Error>> {
-    let config = Config::global();
-
-    if !config.exists() {
+    if !compat::exists() {
         // First time setup flow
         println!();
         println!(
@@ -86,7 +84,7 @@ pub async fn handle_configure() -> Result<(), Box<dyn Error>> {
                         // OpenRouter auth already handles everything including enabling developer extension
                     }
                     Err(e) => {
-                        let _ = config.clear();
+                        let _ = compat::clear();
                         println!(
                             "\n  {} OpenRouter authentication failed: {} \n  Please try again or use manual configuration",
                             style("Error").red().italic(),
@@ -117,7 +115,7 @@ pub async fn handle_configure() -> Result<(), Box<dyn Error>> {
                         })?;
                     }
                     Ok(false) => {
-                        let _ = config.clear();
+                        let _ = compat::clear();
                         println!(
                             "\n  {}: We did not save your config, inspect your credentials\n   and run '{}' again to ensure goose can connect",
                             style("Warning").yellow().italic(),
@@ -125,7 +123,7 @@ pub async fn handle_configure() -> Result<(), Box<dyn Error>> {
                         );
                     }
                     Err(e) => {
-                        let _ = config.clear();
+                        let _ = compat::clear();
 
                         match e.downcast_ref::<ConfigError>() {
                             Some(ConfigError::NotFound(key)) => {
@@ -210,7 +208,7 @@ pub async fn handle_configure() -> Result<(), Box<dyn Error>> {
         println!(
             "{} {}",
             style("  if you prefer, you can edit it directly at").dim(),
-            config.path()
+            compat::path()
         );
         println!();
 
@@ -281,9 +279,6 @@ async fn handle_oauth_configuration(
 
 /// Dialog for configuring the AI provider and model
 pub async fn configure_provider_dialog() -> Result<bool, Box<dyn Error>> {
-    // Get global config instance
-    let config = Config::global();
-
     // Get all available providers and their metadata
     let available_providers = providers();
 
@@ -294,7 +289,7 @@ pub async fn configure_provider_dialog() -> Result<bool, Box<dyn Error>> {
         .collect();
 
     // Get current default provider if it exists
-    let current_provider: Option<String> = config.get_param("GOOSE_PROVIDER").ok();
+    let current_provider: Option<String> = compat::get("GOOSE_PROVIDER");
     let default_provider = current_provider.unwrap_or_default();
 
     // Select provider
@@ -327,23 +322,23 @@ pub async fn configure_provider_dialog() -> Result<bool, Box<dyn Error>> {
                     .interact()?
                 {
                     if key.secret {
-                        config.set_secret(&key.name, Value::String(env_value))?;
+                        compat::set_secret(&key.name, &env_value)?;
                     } else {
-                        config.set_param(&key.name, Value::String(env_value))?;
+                        compat::set(&key.name, env_value)?;
                     }
                     let _ = cliclack::log::info(format!("Saved {} to config file", key.name));
                 }
             }
             None => {
                 // No env var, check config/secret storage
-                let existing: Result<String, _> = if key.secret {
-                    config.get_secret(&key.name)
+                let existing: Option<String> = if key.secret {
+                    compat::get_secret(&key.name).ok()
                 } else {
-                    config.get_param(&key.name)
+                    compat::get(&key.name)
                 };
 
                 match existing {
-                    Ok(_) => {
+                    Some(_) => {
                         let _ = cliclack::log::info(format!("{} is already configured", key.name));
                         if cliclack::confirm("Would you like to update this value?").interact()? {
                             // Check if this key uses OAuth flow
@@ -367,14 +362,14 @@ pub async fn configure_provider_dialog() -> Result<bool, Box<dyn Error>> {
                                 };
 
                                 if key.secret {
-                                    config.set_secret(&key.name, Value::String(value))?;
+                                    compat::set_secret(&key.name, &value)?;
                                 } else {
-                                    config.set_param(&key.name, Value::String(value))?;
+                                    compat::set(&key.name, value)?;
                                 }
                             }
                         }
                     }
-                    Err(_) => {
+                    None => {
                         // Check if this key uses OAuth flow
                         if key.oauth_flow {
                             handle_oauth_configuration(provider_name, &key.name).await?;
@@ -399,9 +394,9 @@ pub async fn configure_provider_dialog() -> Result<bool, Box<dyn Error>> {
                             };
 
                             if key.secret {
-                                config.set_secret(&key.name, Value::String(value))?;
+                                compat::set_secret(&key.name, &value)?;
                             } else {
-                                config.set_param(&key.name, Value::String(value))?;
+                                compat::set(&key.name, value)?;
                             }
                         }
                     }
@@ -499,8 +494,8 @@ pub async fn configure_provider_dialog() -> Result<bool, Box<dyn Error>> {
     match result {
         Ok((_message, _usage)) => {
             // Update config with new values only if the test succeeds
-            config.set_param("GOOSE_PROVIDER", Value::String(provider_name.to_string()))?;
-            config.set_param("GOOSE_MODEL", Value::String(model.clone()))?;
+            compat::set("GOOSE_PROVIDER", provider_name.to_string())?;
+            compat::set("GOOSE_MODEL", model.clone())?;
             cliclack::outro("Configuration saved successfully")?;
             Ok(true)
         }
@@ -706,7 +701,7 @@ pub fn configure_extensions_dialog() -> Result<(), Box<dyn Error>> {
 
             let mut envs = HashMap::new();
             let mut env_keys = Vec::new();
-            let config = Config::global();
+            // Config::global() removed - using compat functions directly
 
             if add_env {
                 loop {
@@ -720,7 +715,7 @@ pub fn configure_extensions_dialog() -> Result<(), Box<dyn Error>> {
 
                     // Try to store in keychain
                     let keychain_key = key.to_string();
-                    match config.set_secret(&keychain_key, Value::String(value.clone())) {
+                    match compat::set_secret(&keychain_key, &value) {
                         Ok(_) => {
                             // Successfully stored in keychain, add to env_keys
                             env_keys.push(keychain_key);
@@ -809,7 +804,7 @@ pub fn configure_extensions_dialog() -> Result<(), Box<dyn Error>> {
 
             let mut envs = HashMap::new();
             let mut env_keys = Vec::new();
-            let config = Config::global();
+            // Config::global() removed - using compat functions directly
 
             if add_env {
                 loop {
@@ -823,7 +818,7 @@ pub fn configure_extensions_dialog() -> Result<(), Box<dyn Error>> {
 
                     // Try to store in keychain
                     let keychain_key = key.to_string();
-                    match config.set_secret(&keychain_key, Value::String(value.clone())) {
+                    match compat::set_secret(&keychain_key, &value) {
                         Ok(_) => {
                             // Successfully stored in keychain, add to env_keys
                             env_keys.push(keychain_key);
@@ -935,7 +930,7 @@ pub fn configure_extensions_dialog() -> Result<(), Box<dyn Error>> {
 
             let mut envs = HashMap::new();
             let mut env_keys = Vec::new();
-            let config = Config::global();
+            // Config::global() removed - using compat functions directly
 
             if add_env {
                 loop {
@@ -949,7 +944,7 @@ pub fn configure_extensions_dialog() -> Result<(), Box<dyn Error>> {
 
                     // Try to store in keychain
                     let keychain_key = key.to_string();
-                    match config.set_secret(&keychain_key, Value::String(value.clone())) {
+                    match compat::set_secret(&keychain_key, &value) {
                         Ok(_) => {
                             // Successfully stored in keychain, add to env_keys
                             env_keys.push(keychain_key);
@@ -1115,7 +1110,7 @@ pub async fn configure_settings_dialog() -> Result<(), Box<dyn Error>> {
 }
 
 pub fn configure_goose_mode_dialog() -> Result<(), Box<dyn Error>> {
-    let config = Config::global();
+    // Config::global() removed - using compat functions directly
 
     // Check if GOOSE_MODE is set as an environment variable
     if std::env::var("GOOSE_MODE").is_ok() {
@@ -1147,19 +1142,19 @@ pub fn configure_goose_mode_dialog() -> Result<(), Box<dyn Error>> {
 
     match mode {
         "auto" => {
-            config.set_param("GOOSE_MODE", Value::String("auto".to_string()))?;
+            compat::set("GOOSE_MODE", "auto".to_string())?;
             cliclack::outro("Set to Auto Mode - full file modification enabled")?;
         }
         "approve" => {
-            config.set_param("GOOSE_MODE", Value::String("approve".to_string()))?;
+            compat::set("GOOSE_MODE", "approve".to_string())?;
             cliclack::outro("Set to Approve Mode - all tools and modifications require approval")?;
         }
         "smart_approve" => {
-            config.set_param("GOOSE_MODE", Value::String("smart_approve".to_string()))?;
+            compat::set("GOOSE_MODE", "smart_approve".to_string())?;
             cliclack::outro("Set to Smart Approve Mode - modifications require approval")?;
         }
         "chat" => {
-            config.set_param("GOOSE_MODE", Value::String("chat".to_string()))?;
+            compat::set("GOOSE_MODE", "chat".to_string())?;
             cliclack::outro("Set to Chat Mode - no tools or modifications enabled")?;
         }
         _ => unreachable!(),
@@ -1168,7 +1163,7 @@ pub fn configure_goose_mode_dialog() -> Result<(), Box<dyn Error>> {
 }
 
 pub fn configure_goose_router_strategy_dialog() -> Result<(), Box<dyn Error>> {
-    let config = Config::global();
+    // Config::global() removed - using compat functions directly
 
     // Check if GOOSE_ROUTER_STRATEGY is set as an environment variable
     if std::env::var("GOOSE_ROUTER_TOOL_SELECTION_STRATEGY").is_ok() {
@@ -1190,18 +1185,18 @@ pub fn configure_goose_router_strategy_dialog() -> Result<(), Box<dyn Error>> {
 
     match strategy {
         "vector" => {
-            config.set_param(
+            compat::set(
                 "GOOSE_ROUTER_TOOL_SELECTION_STRATEGY",
-                Value::String("vector".to_string()),
+                "vector",
             )?;
             cliclack::outro(
                 "Set to Vector Strategy - using vector-based similarity for tool selection",
             )?;
         }
         "default" => {
-            config.set_param(
+            compat::set(
                 "GOOSE_ROUTER_TOOL_SELECTION_STRATEGY",
-                Value::String("default".to_string()),
+                "default",
             )?;
             cliclack::outro("Set to Default Strategy - using default tool selection")?;
         }
@@ -1211,7 +1206,7 @@ pub fn configure_goose_router_strategy_dialog() -> Result<(), Box<dyn Error>> {
 }
 
 pub fn configure_tool_output_dialog() -> Result<(), Box<dyn Error>> {
-    let config = Config::global();
+    // Config::global() removed - using compat functions directly
     // Check if GOOSE_CLI_MIN_PRIORITY is set as an environment variable
     if std::env::var("GOOSE_CLI_MIN_PRIORITY").is_ok() {
         let _ = cliclack::log::info("Notice: GOOSE_CLI_MIN_PRIORITY environment variable is set and will override the configuration here.");
@@ -1224,15 +1219,15 @@ pub fn configure_tool_output_dialog() -> Result<(), Box<dyn Error>> {
 
     match tool_log_level {
         "high" => {
-            config.set_param("GOOSE_CLI_MIN_PRIORITY", Value::from(0.8))?;
+            compat::set("GOOSE_CLI_MIN_PRIORITY", 0.8)?;
             cliclack::outro("Showing tool output of high importance only.")?;
         }
         "medium" => {
-            config.set_param("GOOSE_CLI_MIN_PRIORITY", Value::from(0.2))?;
+            compat::set("GOOSE_CLI_MIN_PRIORITY", 0.2)?;
             cliclack::outro("Showing tool output of medium importance.")?;
         }
         "all" => {
-            config.set_param("GOOSE_CLI_MIN_PRIORITY", Value::from(0.0))?;
+            compat::set("GOOSE_CLI_MIN_PRIORITY", 0.0)?;
             cliclack::outro("Showing all tool output.")?;
         }
         _ => unreachable!(),
@@ -1304,14 +1299,11 @@ pub async fn configure_tool_permissions_dialog() -> Result<(), Box<dyn Error>> {
 
     // Fetch tools for the selected extension
     // Load config and get provider/model
-    let config = Config::global();
 
-    let provider_name: String = config
-        .get_param("GOOSE_PROVIDER")
+    let provider_name: String = compat::get("GOOSE_PROVIDER")
         .expect("No provider configured. Please set model provider first");
 
-    let model: String = config
-        .get_param("GOOSE_MODEL")
+    let model: String = compat::get("GOOSE_MODEL")
         .expect("No model configured. Please set model first");
     let model_config = goose::model::ModelConfig::new(&model)?;
 
@@ -1441,10 +1433,9 @@ pub async fn configure_tool_permissions_dialog() -> Result<(), Box<dyn Error>> {
 
 fn configure_recipe_dialog() -> Result<(), Box<dyn Error>> {
     let key_name = GOOSE_RECIPE_GITHUB_REPO_CONFIG_KEY;
-    let config = Config::global();
     let default_recipe_repo = std::env::var(key_name)
         .ok()
-        .or_else(|| config.get_param(key_name).unwrap_or(None));
+        .or_else(|| compat::get::<String>(key_name));
     let mut recipe_repo_input = cliclack::input(
         "Enter your Goose Recipe Github repo (owner/repo): eg: my_org/goose-recipes",
     )
@@ -1455,15 +1446,15 @@ fn configure_recipe_dialog() -> Result<(), Box<dyn Error>> {
     let input_value: String = recipe_repo_input.interact()?;
     // if input is blank, it clears the recipe github repo settings in the config file
     if input_value.clone().trim().is_empty() {
-        config.delete(key_name)?;
+        compat::delete(key_name)?;
     } else {
-        config.set_param(key_name, Value::String(input_value))?;
+        compat::set(key_name, input_value)?;
     }
     Ok(())
 }
 
 fn configure_scheduler_dialog() -> Result<(), Box<dyn Error>> {
-    let config = Config::global();
+    // Config::global() removed - using compat functions directly
 
     // Check if GOOSE_SCHEDULER_TYPE is set as an environment variable
     if std::env::var("GOOSE_SCHEDULER_TYPE").is_ok() {
@@ -1471,9 +1462,7 @@ fn configure_scheduler_dialog() -> Result<(), Box<dyn Error>> {
     }
 
     // Get current scheduler type from config for display
-    let current_scheduler: String = config
-        .get_param("GOOSE_SCHEDULER_TYPE")
-        .unwrap_or_else(|_| "legacy".to_string());
+    let current_scheduler: String = compat::get_or("GOOSE_SCHEDULER_TYPE", "legacy".to_string());
 
     println!(
         "Current scheduler type: {}",
@@ -1489,15 +1478,15 @@ fn configure_scheduler_dialog() -> Result<(), Box<dyn Error>> {
 
     match scheduler_type {
         "legacy" => {
-            config.set_param("GOOSE_SCHEDULER_TYPE", Value::String("legacy".to_string()))?;
+            compat::set("GOOSE_SCHEDULER_TYPE", "legacy".to_string())?;
             cliclack::outro(
                 "Set to Built-in Cron scheduler - simple and reliable for basic scheduling",
             )?;
         }
         "temporal" => {
-            config.set_param(
+            compat::set(
                 "GOOSE_SCHEDULER_TYPE",
-                Value::String("temporal".to_string()),
+                "temporal",
             )?;
             cliclack::outro(
                 "Set to Temporal scheduler - advanced workflow engine for complex scheduling",
@@ -1517,9 +1506,7 @@ fn configure_scheduler_dialog() -> Result<(), Box<dyn Error>> {
 }
 
 pub fn configure_max_turns_dialog() -> Result<(), Box<dyn Error>> {
-    let config = Config::global();
-
-    let current_max_turns: u32 = config.get_param("GOOSE_MAX_TURNS").unwrap_or(1000);
+    let current_max_turns: u32 = compat::get_or("GOOSE_MAX_TURNS", 1000);
 
     let max_turns_input: String =
         cliclack::input("Set maximum number of agent turns without user input:")
@@ -1538,7 +1525,7 @@ pub fn configure_max_turns_dialog() -> Result<(), Box<dyn Error>> {
             .interact()?;
 
     let max_turns: u32 = max_turns_input.parse()?;
-    config.set_param("GOOSE_MAX_TURNS", Value::from(max_turns))?;
+    compat::set("GOOSE_MAX_TURNS", max_turns)?;
 
     cliclack::outro(format!(
         "Set maximum turns to {} - Goose will ask for input after {} consecutive actions",
@@ -1561,11 +1548,12 @@ pub async fn handle_openrouter_auth() -> Result<(), Box<dyn Error>> {
             println!("\nAuthentication complete!");
 
             // Get config instance
-            let config = Config::global();
+            // Config::global() removed - using compat functions directly
 
             // Use the existing configure_openrouter function to set everything up
             println!("\nConfiguring OpenRouter...");
-            if let Err(e) = configure_openrouter(config, api_key) {
+            use goose::config::Config;
+            if let Err(e) = configure_openrouter(Config::global(), api_key) {
                 eprintln!("Failed to configure OpenRouter: {}", e);
                 return Err(e.into());
             }
@@ -1575,7 +1563,8 @@ pub async fn handle_openrouter_auth() -> Result<(), Box<dyn Error>> {
 
             // Test configuration - get the model that was configured
             println!("\nTesting configuration...");
-            let configured_model: String = config.get_param("GOOSE_MODEL")?;
+            let configured_model: String = compat::get("GOOSE_MODEL")
+                .ok_or_else(|| anyhow::anyhow!("No model configured"))?;
             let model_config = match goose::model::ModelConfig::new(&configured_model) {
                 Ok(config) => config,
                 Err(e) => {

@@ -82,19 +82,19 @@ pub async fn handle_web(port: u16, host: String, open: bool) -> Result<()> {
     crate::logging::setup_logging(Some("goose-web"), None)?;
 
     // Load config and create agent just like the CLI does
-    let config = goose::config::Config::global();
+    use goose::config::compat;
 
-    let provider_name: String = match config.get_param("GOOSE_PROVIDER") {
-        Ok(p) => p,
-        Err(_) => {
+    let provider_name: String = match compat::get("GOOSE_PROVIDER") {
+        Some(p) => p,
+        None => {
             eprintln!("No provider configured. Run 'goose configure' first");
             std::process::exit(1);
         }
     };
 
-    let model: String = match config.get_param("GOOSE_MODEL") {
-        Ok(m) => m,
-        Err(_) => {
+    let model: String = match compat::get("GOOSE_MODEL") {
+        Some(m) => m,
+        None => {
             eprintln!("No model configured. Run 'goose configure' first");
             std::process::exit(1);
         }

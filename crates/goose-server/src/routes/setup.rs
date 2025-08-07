@@ -1,7 +1,7 @@
 use crate::state::AppState;
 use axum::{extract::State, http::StatusCode, routing::post, Json, Router};
+use goose::config::compat;
 use goose::config::signup_openrouter::OpenRouterAuth;
-use goose::config::{configure_openrouter, Config};
 use serde::Serialize;
 use std::sync::Arc;
 
@@ -33,13 +33,30 @@ async fn start_openrouter_setup(
         Ok(api_key) => {
             tracing::info!("Got API key, configuring OpenRouter...");
 
-            let config = Config::global();
-
-            if let Err(e) = configure_openrouter(config, api_key) {
-                tracing::error!("Failed to configure OpenRouter: {}", e);
+            // Configure OpenRouter using compat functions
+            if let Err(e) = compat::set_secret("OPENROUTER_API_KEY", &api_key) {
+                tracing::error!("Failed to set OpenRouter API key: {}", e);
                 return Ok(Json(SetupResponse {
                     success: false,
-                    message: format!("Failed to configure OpenRouter: {}", e),
+                    message: format!("Failed to set OpenRouter API key: {}", e),
+                }));
+            }
+
+            if let Err(e) = compat::set("GOOSE_PROVIDER", "openrouter") {
+                tracing::error!("Failed to set provider: {}", e);
+                return Ok(Json(SetupResponse {
+                    success: false,
+                    message: format!("Failed to set provider: {}", e),
+                }));
+            }
+
+            // Use the default model from the original function
+            const OPENROUTER_DEFAULT_MODEL: &str = "anthropic/claude-3.5-sonnet";
+            if let Err(e) = compat::set("GOOSE_MODEL", OPENROUTER_DEFAULT_MODEL) {
+                tracing::error!("Failed to set model: {}", e);
+                return Ok(Json(SetupResponse {
+                    success: false,
+                    message: format!("Failed to set model: {}", e),
                 }));
             }
 

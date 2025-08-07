@@ -7,9 +7,10 @@ use axum::{
     Json, Router,
 };
 use etcetera::{choose_app_strategy, AppStrategy};
+use goose::config::compat;
+use goose::config::ConfigError;
 use goose::config::APP_STRATEGY;
 use goose::config::{extensions::name_to_key, PermissionManager};
-use goose::config::{Config, ConfigError};
 use goose::config::{ExtensionConfigManager, ExtensionEntry};
 use goose::model::ModelConfig;
 use goose::providers::base::ProviderMetadata;
@@ -96,8 +97,11 @@ pub async fn upsert_config(
 ) -> Result<Json<Value>, StatusCode> {
     verify_secret_key(&headers, &state)?;
 
-    let config = Config::global();
-    let result = config.set(&query.key, query.value, query.is_secret);
+    let result = if query.is_secret {
+        compat::set_secret(&query.key, &query.value.to_string())
+    } else {
+        compat::set(&query.key, query.value.clone())
+    };
 
     match result {
         Ok(_) => Ok(Json(Value::String(format!("Upserted key {}", query.key)))),
@@ -122,12 +126,10 @@ pub async fn remove_config(
 ) -> Result<Json<String>, StatusCode> {
     verify_secret_key(&headers, &state)?;
 
-    let config = Config::global();
-
     let result = if query.is_secret {
-        config.delete_secret(&query.key)
+        compat::delete_secret(&query.key)
     } else {
-        config.delete(&query.key)
+        compat::delete(&query.key)
     };
 
     match result {
@@ -159,24 +161,18 @@ pub async fn read_config(
         ));
     }
 
-    let config = Config::global();
-    let response_value = match config.get(&query.key, query.is_secret) {
-        Ok(value) => {
-            if query.is_secret {
-                Value::Bool(true)
-            } else {
-                value
-            }
+    let response_value = if query.is_secret {
+        // For secrets, just return whether it exists
+        if compat::get_secret(&query.key).is_ok() {
+            Value::Bool(true)
+        } else {
+            Value::Bool(false)
         }
-        Err(ConfigError::NotFound(_)) => {
-            if query.is_secret {
-                Value::Bool(false)
-            } else {
-                Value::Null
-            }
-        }
-        Err(_) => return Err(StatusCode::INTERNAL_SERVER_ERROR),
+    } else {
+        // For non-secrets, return the actual value
+        compat::get::<Value>(&query.key).unwrap_or(Value::Null)
     };
+
     Ok(Json(response_value))
 }
 
@@ -284,11 +280,7 @@ pub async fn read_all_config(
 ) -> Result<Json<ConfigResponse>, StatusCode> {
     verify_secret_key(&headers, &state)?;
 
-    let config = Config::global();
-
-    let values = config
-        .load_values()
-        .map_err(|_| StatusCode::UNPROCESSABLE_ENTITY)?;
+    let values = compat::load_values().map_err(|_| StatusCode::UNPROCESSABLE_ENTITY)?;
 
     Ok(Json(ConfigResponse { config: values }))
 }
@@ -459,18 +451,22 @@ pub async fn init_config(
 ) -> Result<Json<String>, StatusCode> {
     verify_secret_key(&headers, &state)?;
 
-    let config = Config::global();
-
-    if config.exists() {
+    if compat::exists() {
         return Ok(Json("Config already exists".to_string()));
     }
 
     // Use the shared function to load init-config.yaml
     match goose::config::base::load_init_config_from_workspace() {
-        Ok(init_values) => match config.save_values(init_values) {
-            Ok(_) => Ok(Json("Config initialized successfully".to_string())),
-            Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
-        },
+        Ok(init_values) => {
+            // Save each value from init config
+            for (key, value) in init_values {
+                if let Err(e) = compat::set(&key, value) {
+                    tracing::error!("Failed to set config key {}: {}", key, e);
+                    return Err(StatusCode::INTERNAL_SERVER_ERROR);
+                }
+            }
+            Ok(Json("Config initialized successfully".to_string()))
+        }
         Err(_) => Ok(Json(
             "No init-config.yaml found, using default configuration".to_string(),
         )),
@@ -557,10 +553,8 @@ pub async fn recover_config(
 ) -> Result<Json<String>, StatusCode> {
     verify_secret_key(&headers, &state)?;
 
-    let config = Config::global();
-
     // Force a reload which will trigger recovery if needed
-    match config.load_values() {
+    match compat::load_values() {
         Ok(values) => {
             let recovered_keys: Vec<String> = values.keys().cloned().collect();
             if recovered_keys.is_empty() {

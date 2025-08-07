@@ -1,7 +1,7 @@
 use console::style;
 use goose::agents::types::RetryConfig;
 use goose::agents::Agent;
-use goose::config::{Config, ExtensionConfig, ExtensionConfigManager};
+use goose::config::{compat, ExtensionConfig, ExtensionConfigManager};
 use goose::providers::create;
 use goose::recipe::{Response, SubRecipe};
 use goose::session;
@@ -174,8 +174,6 @@ pub struct SessionSettings {
 
 pub async fn build_session(session_config: SessionBuilderConfig) -> Session {
     // Load config and get provider/model
-    let config = Config::global();
-
     let provider_name = session_config
         .provider
         .or_else(|| {
@@ -184,7 +182,7 @@ pub async fn build_session(session_config: SessionBuilderConfig) -> Session {
                 .as_ref()
                 .and_then(|s| s.goose_provider.clone())
         })
-        .or_else(|| config.get_param("GOOSE_PROVIDER").ok())
+        .or_else(|| compat::get("GOOSE_PROVIDER"))
         .expect("No provider configured. Run 'goose configure' first");
 
     let model_name = session_config
@@ -195,7 +193,7 @@ pub async fn build_session(session_config: SessionBuilderConfig) -> Session {
                 .as_ref()
                 .and_then(|s| s.goose_model.clone())
         })
-        .or_else(|| config.get_param("GOOSE_MODEL").ok())
+        .or_else(|| compat::get("GOOSE_MODEL"))
         .expect("No model configured. Run 'goose configure' first");
 
     let temperature = session_config.settings.as_ref().and_then(|s| s.temperature);
@@ -391,17 +389,16 @@ pub async fn build_session(session_config: SessionBuilderConfig) -> Session {
     }
 
     // Determine editor mode
-    let edit_mode = config
-        .get_param::<String>("EDIT_MODE")
-        .ok()
-        .and_then(|edit_mode| match edit_mode.to_lowercase().as_str() {
+    let edit_mode = compat::get::<String>("EDIT_MODE").and_then(|edit_mode| {
+        match edit_mode.to_lowercase().as_str() {
             "emacs" => Some(EditMode::Emacs),
             "vi" => Some(EditMode::Vi),
             _ => {
                 eprintln!("Invalid EDIT_MODE specified, defaulting to Emacs");
                 None
             }
-        });
+        }
+    });
 
     // Create new session
     let mut session = Session::new(
@@ -560,7 +557,7 @@ pub async fn build_session(session_config: SessionBuilderConfig) -> Session {
     }
 
     // Only override system prompt if a system override exists
-    let system_prompt_file: Option<String> = config.get_param("GOOSE_SYSTEM_PROMPT_FILE_PATH").ok();
+    let system_prompt_file: Option<String> = compat::get("GOOSE_SYSTEM_PROMPT_FILE_PATH");
     if let Some(ref path) = system_prompt_file {
         let override_prompt =
             std::fs::read_to_string(path).expect("Failed to read system prompt file");

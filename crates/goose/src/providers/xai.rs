@@ -1,4 +1,5 @@
 use super::api_client::{ApiClient, AuthMethod};
+use crate::config::compat;
 use super::errors::ProviderError;
 use super::retry::ProviderRetry;
 use super::utils::{get_model, handle_response_openai_compat};
@@ -47,11 +48,8 @@ impl_provider_default!(XaiProvider);
 
 impl XaiProvider {
     pub fn from_env(model: ModelConfig) -> Result<Self> {
-        let config = crate::config::Config::global();
-        let api_key: String = config.get_secret("XAI_API_KEY")?;
-        let host: String = config
-            .get_param("XAI_HOST")
-            .unwrap_or_else(|_| XAI_API_HOST.to_string());
+        let api_key: String = compat::get_secret("XAI_API_KEY")?;
+        let host: String = compat::get_or("XAI_HOST", XAI_API_HOST.to_string());
 
         let auth = AuthMethod::BearerToken(api_key);
         let api_client = ApiClient::new(host, auth)?;

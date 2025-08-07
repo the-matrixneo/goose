@@ -1,7 +1,7 @@
 use anyhow::Result;
 use console::style;
 use etcetera::{choose_app_strategy, AppStrategy};
-use goose::config::Config;
+use goose::config::compat;
 use serde_yaml;
 
 fn print_aligned(label: &str, value: &str, width: usize) {
@@ -15,13 +15,12 @@ pub fn handle_info(verbose: bool) -> Result<()> {
         .unwrap_or_else(|| data_dir.in_data_dir("logs"));
     let sessions_dir = data_dir.in_data_dir("sessions");
 
-    // Get paths using a stored reference to the global config
-    let config = Config::global();
-    let config_file = config.path();
+    // Get config file path
+    let config_file = compat::path();
 
     // Define the labels and their corresponding path values once.
     let paths = [
-        ("Config file:", config_file.to_string()),
+        ("Config file:", config_file),
         ("Sessions dir:", sessions_dir.display().to_string()),
         ("Logs dir:", logs_dir.display().to_string()),
     ];
@@ -43,7 +42,7 @@ pub fn handle_info(verbose: bool) -> Result<()> {
     // Print verbose info if requested
     if verbose {
         println!("\n{}", style("Goose Configuration:").cyan().bold());
-        match config.load_values() {
+        match compat::load_values() {
             Ok(values) => {
                 if values.is_empty() {
                     println!("  No configuration values set");

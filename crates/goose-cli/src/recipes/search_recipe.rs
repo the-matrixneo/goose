@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use goose::config::Config;
+use goose::config::compat;
 use goose::recipe::read_recipe_file_content::{read_recipe_file, RecipeFile};
 use goose::recipe::template_recipe::parse_recipe_content;
 use std::env;
@@ -93,11 +93,7 @@ fn retrieve_recipe_from_local_path(recipe_name: &str) -> Result<RecipeFile> {
 }
 
 fn configured_github_recipe_repo() -> Option<String> {
-    let config = Config::global();
-    match config.get_param(GOOSE_RECIPE_GITHUB_REPO_CONFIG_KEY) {
-        Ok(Some(recipe_repo_full_name)) => Some(recipe_repo_full_name),
-        _ => None,
-    }
+    compat::get::<String>(GOOSE_RECIPE_GITHUB_REPO_CONFIG_KEY)
 }
 
 /// Lists all available recipes from local paths and GitHub repositories

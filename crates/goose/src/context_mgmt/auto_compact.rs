@@ -2,7 +2,7 @@ use crate::conversation::message::Message;
 use crate::conversation::Conversation;
 use crate::{
     agents::Agent,
-    config::Config,
+    config::compat,
     context_mgmt::{
         common::{SYSTEM_PROMPT_TOKEN_OVERHEAD, TOOLS_TOKEN_OVERHEAD},
         get_messages_token_counts_async,
@@ -64,11 +64,8 @@ pub async fn check_compaction_needed(
     session_metadata: Option<&crate::session::storage::SessionMetadata>,
 ) -> Result<CompactionCheckResult> {
     // Get threshold from config or use override
-    let config = Config::global();
     let threshold = threshold_override.unwrap_or_else(|| {
-        config
-            .get_param::<f64>("GOOSE_AUTO_COMPACT_THRESHOLD")
-            .unwrap_or(0.3) // Default to 30%
+        compat::get::<f64>("GOOSE_AUTO_COMPACT_THRESHOLD").unwrap_or(0.3) // Default to 30%
     });
 
     let provider = agent.provider().await?;
@@ -540,11 +537,9 @@ mod tests {
             )));
         }
 
-        // Set config value
-        let config = Config::global();
-        config
-            .set_param("GOOSE_AUTO_COMPACT_THRESHOLD", serde_json::Value::from(0.1))
-            .unwrap();
+        // Set config value - store original to restore later
+        let orig_threshold = compat::get::<f64>("GOOSE_AUTO_COMPACT_THRESHOLD");
+        compat::set("GOOSE_AUTO_COMPACT_THRESHOLD", 0.1).unwrap();
 
         // Should use config value when no override provided
         let result = check_and_compact_messages(&agent, &messages, None, None)
@@ -571,10 +566,12 @@ mod tests {
         // With such a low threshold (10%), it should compact
         assert!(result.compacted);
 
-        // Clean up config
-        config
-            .set_param("GOOSE_AUTO_COMPACT_THRESHOLD", serde_json::Value::from(0.3))
-            .unwrap();
+        // Clean up test overrides - restore original value
+        if let Some(threshold) = orig_threshold {
+            compat::set("GOOSE_AUTO_COMPACT_THRESHOLD", threshold).unwrap();
+        } else {
+            compat::set("GOOSE_AUTO_COMPACT_THRESHOLD", 0.3).unwrap(); // Default value
+        }
     }
 
     #[tokio::test]

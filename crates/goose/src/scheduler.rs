@@ -14,7 +14,7 @@ use tokio_cron_scheduler::{job::JobId, Job, JobScheduler as TokioJobScheduler};
 
 use crate::agents::AgentEvent;
 use crate::agents::{Agent, SessionConfig};
-use crate::config::{self, Config};
+use crate::config::{self, compat};
 use crate::conversation::message::Message;
 use crate::conversation::Conversation;
 use crate::providers::base::Provider as GooseProvider; // Alias to avoid conflict in test section
@@ -1121,10 +1121,9 @@ async fn run_scheduled_job_internal(
     if let Some(provider) = provider_override {
         agent_provider = provider;
     } else {
-        let global_config = Config::global();
-        let provider_name: String = match global_config.get_param("GOOSE_PROVIDER") {
-            Ok(name) => name,
-            Err(_) => return Err(JobExecutionError {
+        let provider_name: String = match compat::get::<String>("GOOSE_PROVIDER") {
+            Some(name) => name,
+            None => return Err(JobExecutionError {
                 job_id: job.id.clone(),
                 error:
                     "GOOSE_PROVIDER not configured globally. Run 'goose configure' or set env var."
@@ -1132,9 +1131,9 @@ async fn run_scheduled_job_internal(
             }),
         };
         let model_name: String =
-            match global_config.get_param("GOOSE_MODEL") {
-                Ok(name) => name,
-                Err(_) => return Err(JobExecutionError {
+            match compat::get::<String>("GOOSE_MODEL") {
+                Some(name) => name,
+                None => return Err(JobExecutionError {
                     job_id: job.id.clone(),
                     error:
                         "GOOSE_MODEL not configured globally. Run 'goose configure' or set env var."
@@ -1423,9 +1422,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_scheduled_session_has_schedule_id() -> Result<(), Box<dyn std::error::Error>> {
-        // Set environment variables for the test
-        env::set_var("GOOSE_PROVIDER", "test_provider");
-        env::set_var("GOOSE_MODEL", "test_model");
+        // Set environment variables for the test using compat
+        // Store original values to restore later
+        let orig_provider = compat::get::<String>("GOOSE_PROVIDER");
+        let orig_model = compat::get::<String>("GOOSE_MODEL");
+
+        compat::set("GOOSE_PROVIDER", "test_provider")?;
+        compat::set("GOOSE_MODEL", "test_model")?;
 
         let temp_dir = tempdir()?;
         let recipe_dir = temp_dir.path().join("recipes_for_test_scheduler");
@@ -1517,9 +1520,17 @@ mod tests {
             expected_session_path.display()
         );
 
-        // Clean up environment variables
-        env::remove_var("GOOSE_PROVIDER");
-        env::remove_var("GOOSE_MODEL");
+        // Clean up test overrides - restore original values
+        if let Some(provider) = orig_provider {
+            compat::set("GOOSE_PROVIDER", provider)?;
+        } else {
+            compat::remove("GOOSE_PROVIDER").ok();
+        }
+        if let Some(model) = orig_model {
+            compat::set("GOOSE_MODEL", model)?;
+        } else {
+            compat::remove("GOOSE_MODEL").ok();
+        }
 
         Ok(())
     }

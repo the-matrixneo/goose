@@ -30,7 +30,7 @@ use etcetera::{choose_app_strategy, AppStrategy};
 use goose::agents::extension::{Envs, ExtensionConfig};
 use goose::agents::types::RetryConfig;
 use goose::agents::{Agent, SessionConfig};
-use goose::config::Config;
+use goose::config::compat;
 use goose::providers::pricing::initialize_pricing_cache;
 use goose::session;
 use input::InputResult;
@@ -41,7 +41,6 @@ use rmcp::model::ServerNotification;
 use goose::conversation::message::{Message, MessageContent};
 use rand::{distributions::Alphanumeric, Rng};
 use rustyline::EditMode;
-use serde_json::Value;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -605,7 +604,6 @@ impl Session {
                 input::InputResult::GooseMode(mode) => {
                     save_history(&mut editor);
 
-                    let config = Config::global();
                     let mode = mode.to_lowercase();
 
                     // Check if mode is valid
@@ -617,9 +615,7 @@ impl Session {
                         continue;
                     }
 
-                    config
-                        .set_param("GOOSE_MODE", Value::String(mode.to_string()))
-                        .unwrap();
+                    compat::set("GOOSE_MODE", mode.to_string()).unwrap();
                     output::goose_mode_message(&format!("Goose mode set to '{}'", mode));
                     continue;
                 }
@@ -809,13 +805,9 @@ impl Session {
                     output::render_act_on_plan();
                     self.run_mode = RunMode::Normal;
                     // set goose mode: auto if that isn't already the case
-                    let config = Config::global();
-                    let curr_goose_mode =
-                        config.get_param("GOOSE_MODE").unwrap_or("auto".to_string());
+                    let curr_goose_mode = compat::get_or("GOOSE_MODE", "auto".to_string());
                     if curr_goose_mode != "auto" {
-                        config
-                            .set_param("GOOSE_MODE", Value::String("auto".to_string()))
-                            .unwrap();
+                        compat::set("GOOSE_MODE", "auto".to_string()).unwrap();
                     }
 
                     // clear the messages before acting on the plan
@@ -831,9 +823,7 @@ impl Session {
 
                     // Reset run & goose mode
                     if curr_goose_mode != "auto" {
-                        config
-                            .set_param("GOOSE_MODE", Value::String(curr_goose_mode.to_string()))
-                            .unwrap();
+                        compat::set("GOOSE_MODE", curr_goose_mode.to_string()).unwrap();
                     }
                 } else {
                     // add the plan response (assistant message) & carry the conversation forward
@@ -954,9 +944,7 @@ impl Session {
                                 output::hide_thinking();
 
                                 // Check for user-configured default context strategy
-                                let config = Config::global();
-                                let context_strategy = config.get_param::<String>("GOOSE_CONTEXT_STRATEGY")
-                                    .unwrap_or_else(|_| if interactive { "prompt".to_string() } else { "summarize".to_string() });
+                                let context_strategy = compat::get_or("GOOSE_CONTEXT_STRATEGY", if interactive { "prompt".to_string() } else { "summarize".to_string() });
 
                                 let selected = match context_strategy.as_str() {
                                     "clear" => "clear",
@@ -1120,11 +1108,7 @@ impl Session {
                                                     }
                                                     Some("response_generated") => {
                                                         // Check verbosity setting for subagent response content
-                                                        let config = Config::global();
-                                                        let min_priority = config
-                                                            .get_param::<f32>("GOOSE_CLI_MIN_PRIORITY")
-                                                            .ok()
-                                                            .unwrap_or(0.5);
+                                                        let min_priority = compat::get_or("GOOSE_CLI_MIN_PRIORITY", 0.5_f32);
 
                                                         if min_priority > 0.1 && !self.debug {
                                                             // High/Medium verbosity: show truncated response
@@ -1471,14 +1455,9 @@ impl Session {
         let model_config = provider.get_model_config();
         let context_limit = model_config.context_limit();
 
-        let config = Config::global();
-        let show_cost = config
-            .get_param::<bool>("GOOSE_CLI_SHOW_COST")
-            .unwrap_or(false);
+        let show_cost = compat::get_or("GOOSE_CLI_SHOW_COST", false);
 
-        let provider_name = config
-            .get_param::<String>("GOOSE_PROVIDER")
-            .unwrap_or_else(|_| "unknown".to_string());
+        let provider_name = compat::get_or("GOOSE_PROVIDER", "unknown".to_string());
 
         // Initialize pricing cache on startup
         tracing::info!("Initializing pricing cache...");
@@ -1628,26 +1607,22 @@ fn get_reasoner() -> Result<Arc<dyn Provider>, anyhow::Error> {
     use goose::model::ModelConfig;
     use goose::providers::create;
 
-    let config = Config::global();
-
     // Try planner-specific provider first, fallback to default provider
-    let provider = if let Ok(provider) = config.get_param::<String>("GOOSE_PLANNER_PROVIDER") {
+    let provider = if let Some(provider) = compat::get::<String>("GOOSE_PLANNER_PROVIDER") {
         provider
     } else {
         println!("WARNING: GOOSE_PLANNER_PROVIDER not found. Using default provider...");
-        config
-            .get_param::<String>("GOOSE_PROVIDER")
-            .expect("No provider configured. Run 'goose configure' first")
+        compat::get("GOOSE_PROVIDER")
+            .ok_or_else(|| anyhow::anyhow!("No provider configured. Run 'goose configure' first"))?
     };
 
     // Try planner-specific model first, fallback to default model
-    let model = if let Ok(model) = config.get_param::<String>("GOOSE_PLANNER_MODEL") {
+    let model = if let Some(model) = compat::get::<String>("GOOSE_PLANNER_MODEL") {
         model
     } else {
         println!("WARNING: GOOSE_PLANNER_MODEL not found. Using default model...");
-        config
-            .get_param::<String>("GOOSE_MODEL")
-            .expect("No model configured. Run 'goose configure' first")
+        compat::get("GOOSE_MODEL")
+            .ok_or_else(|| anyhow::anyhow!("No model configured. Run 'goose configure' first"))?
     };
 
     let model_config =

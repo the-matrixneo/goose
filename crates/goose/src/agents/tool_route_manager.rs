@@ -1,4 +1,5 @@
 use crate::agents::extension_manager::ExtensionManager;
+use crate::config::compat;
 use crate::agents::router_tool_selector::{
     create_tool_selector, RouterToolSelectionStrategy, RouterToolSelector,
 };
@@ -6,7 +7,6 @@ use crate::agents::router_tools::{self};
 use crate::agents::tool_execution::ToolCallResult;
 use crate::agents::tool_router_index_manager::ToolRouterIndexManager;
 use crate::agents::tool_vectordb::generate_table_id;
-use crate::config::Config;
 use crate::conversation::message::ToolRequest;
 use crate::providers::base::Provider;
 use anyhow::{anyhow, Result};
@@ -73,10 +73,10 @@ impl ToolRouteManager {
             return None;
         }
 
-        let config = Config::global();
-        let router_tool_selection_strategy = config
-            .get_param("GOOSE_ROUTER_TOOL_SELECTION_STRATEGY")
-            .unwrap_or_else(|_| "default".to_string());
+        let router_tool_selection_strategy = compat::get_or(
+            "GOOSE_ROUTER_TOOL_SELECTION_STRATEGY",
+            "default".to_string(),
+        );
 
         match router_tool_selection_strategy.to_lowercase().as_str() {
             "vector" => Some(RouterToolSelectionStrategy::Vector),

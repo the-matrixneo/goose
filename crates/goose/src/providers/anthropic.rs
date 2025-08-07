@@ -1,4 +1,5 @@
 use anyhow::Result;
+use crate::config::compat;
 use async_stream::try_stream;
 use async_trait::async_trait;
 use futures::TryStreamExt;
@@ -48,11 +49,9 @@ impl_provider_default!(AnthropicProvider);
 
 impl AnthropicProvider {
     pub fn from_env(model: ModelConfig) -> Result<Self> {
-        let config = crate::config::Config::global();
-        let api_key: String = config.get_secret("ANTHROPIC_API_KEY")?;
-        let host: String = config
-            .get_param("ANTHROPIC_HOST")
-            .unwrap_or_else(|_| "https://api.anthropic.com".to_string());
+        let api_key: String = compat::get_secret("ANTHROPIC_API_KEY")?;
+        let host: String =
+            compat::get_or("ANTHROPIC_HOST", "https://api.anthropic.com".to_string());
 
         let auth = AuthMethod::ApiKey {
             header_name: "x-api-key".to_string(),
@@ -68,7 +67,7 @@ impl AnthropicProvider {
     fn get_conditional_headers(&self) -> Vec<(&str, &str)> {
         let mut headers = Vec::new();
 
-        let is_thinking_enabled = std::env::var("CLAUDE_THINKING_ENABLED").is_ok();
+        let is_thinking_enabled = compat::var("CLAUDE_THINKING_ENABLED").is_ok();
         if self.model.model_name.starts_with("claude-3-7-sonnet-") {
             if is_thinking_enabled {
                 headers.push(("anthropic-beta", "output-128k-2025-02-19"));

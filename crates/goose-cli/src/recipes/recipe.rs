@@ -5,7 +5,7 @@ use crate::recipes::print_recipe::{
 use crate::recipes::search_recipe::retrieve_recipe_file;
 use crate::recipes::secret_discovery::{discover_recipe_secrets, SecretRequirement};
 use anyhow::Result;
-use goose::config::Config;
+use goose::config::compat;
 use goose::recipe::build_recipe::{
     apply_values_to_parameters, build_recipe_from_template, validate_recipe_parameters, RecipeError,
 };
@@ -72,11 +72,10 @@ pub fn collect_missing_secrets(requirements: &[SecretRequirement]) -> Result<()>
         return Ok(());
     }
 
-    let config = Config::global();
     let mut missing_secrets = Vec::new();
 
     for req in requirements {
-        match config.get_secret::<String>(&req.key) {
+        match compat::get_secret::<String>(&req.key) {
             Ok(_) => continue, // Secret exists
             Err(_) => missing_secrets.push(req),
         }
@@ -105,7 +104,7 @@ pub fn collect_missing_secrets(requirements: &[SecretRequirement]) -> Result<()>
         .unwrap_or_else(|_| String::new());
 
         if !value.trim().is_empty() {
-            config.set_secret(&req.key, Value::String(value))?;
+            compat::set_secret(&req.key, &value)?;
             println!("✅ Secret stored securely for {}", req.extension_name);
         } else {
             println!("⏭️  Skipped {} for {}", req.key, req.extension_name);

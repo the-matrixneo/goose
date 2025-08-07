@@ -1,7 +1,7 @@
 use anstream::println;
 use bat::WrappingMode;
 use console::{style, Color};
-use goose::config::Config;
+use goose::config::compat;
 use goose::conversation::message::{Message, MessageContent, ToolRequest, ToolResponse};
 use goose::providers::pricing::get_model_pricing;
 use goose::providers::pricing::parse_model_id;
@@ -55,10 +55,10 @@ impl Theme {
 
 thread_local! {
     static CURRENT_THEME: RefCell<Theme> = RefCell::new(
-        std::env::var("GOOSE_CLI_THEME").ok()
+        compat::var("GOOSE_CLI_THEME")
             .map(|val| Theme::from_config_str(&val))
             .unwrap_or_else(||
-                Config::global().get_param::<String>("GOOSE_CLI_THEME").ok()
+                compat::get::<String>("GOOSE_CLI_THEME")
                     .map(|val| Theme::from_config_str(&val))
                     .unwrap_or(Theme::Dark)
             )
@@ -66,20 +66,16 @@ thread_local! {
 }
 
 pub fn set_theme(theme: Theme) {
-    let config = Config::global();
-    config
-        .set_param("GOOSE_CLI_THEME", Value::String(theme.as_config_string()))
-        .expect("Failed to set theme");
+    compat::set("GOOSE_CLI_THEME", theme.as_config_string()).expect("Failed to set theme");
     CURRENT_THEME.with(|t| *t.borrow_mut() = theme);
 
-    let config = Config::global();
     let theme_str = match theme {
         Theme::Light => "light",
         Theme::Dark => "dark",
         Theme::Ansi => "ansi",
     };
 
-    if let Err(e) = config.set_param("GOOSE_CLI_THEME", Value::String(theme_str.to_string())) {
+    if let Err(e) = compat::set("GOOSE_CLI_THEME", theme_str.to_string()) {
         eprintln!("Failed to save theme setting to config: {}", e);
     }
 }
@@ -97,10 +93,7 @@ pub struct ThinkingIndicator {
 impl ThinkingIndicator {
     pub fn show(&mut self) {
         let spinner = cliclack::spinner();
-        if Config::global()
-            .get_param("RANDOM_THINKING_MESSAGES")
-            .unwrap_or(true)
-        {
+        if compat::get_or("RANDOM_THINKING_MESSAGES", true) {
             spinner.start(format!(
                 "{}...",
                 super::thinking::get_random_thinking_message()
@@ -173,7 +166,7 @@ pub fn render_message(message: &Message, debug: bool) {
                 println!("Image: [data: {}, type: {}]", image.data, image.mime_type);
             }
             MessageContent::Thinking(thinking) => {
-                if std::env::var("GOOSE_CLI_SHOW_THINKING").is_ok()
+                if compat::var("GOOSE_CLI_SHOW_THINKING").is_some()
                     && std::io::stdout().is_terminal()
                 {
                     println!("\n{}", style("Thinking:").dim().italic());
@@ -255,8 +248,6 @@ fn render_tool_request(req: &ToolRequest, theme: Theme, debug: bool) {
 }
 
 fn render_tool_response(resp: &ToolResponse, theme: Theme, debug: bool) {
-    let config = Config::global();
-
     match &resp.tool_result {
         Ok(contents) => {
             for content in contents {
@@ -266,10 +257,7 @@ fn render_tool_response(resp: &ToolResponse, theme: Theme, debug: bool) {
                     }
                 }
 
-                let min_priority = config
-                    .get_param::<f32>("GOOSE_CLI_MIN_PRIORITY")
-                    .ok()
-                    .unwrap_or(0.5);
+                let min_priority = compat::get_or("GOOSE_CLI_MIN_PRIORITY", 0.5_f32);
 
                 if content
                     .priority()
@@ -502,10 +490,7 @@ fn print_markdown(content: &str, theme: Theme) {
 const INDENT: &str = "    ";
 
 fn get_tool_params_max_length() -> usize {
-    Config::global()
-        .get_param::<usize>("GOOSE_CLI_TOOL_PARAMS_TRUNCATION_MAX_LENGTH")
-        .ok()
-        .unwrap_or(40)
+    compat::get_or("GOOSE_CLI_TOOL_PARAMS_TRUNCATION_MAX_LENGTH", 40)
 }
 
 fn print_value(value: &Value, debug: bool) {

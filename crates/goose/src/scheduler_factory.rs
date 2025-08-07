@@ -1,7 +1,7 @@
 use std::path::PathBuf;
+use crate::config::compat;
 use std::sync::Arc;
 
-use crate::config::Config;
 use crate::scheduler::{Scheduler, SchedulerError};
 use crate::scheduler_trait::SchedulerTrait;
 use crate::temporal_scheduler::TemporalScheduler;
@@ -13,14 +13,12 @@ pub enum SchedulerType {
 
 impl SchedulerType {
     pub fn from_config() -> Self {
-        let config = Config::global();
-
         // Debug logging to help troubleshoot environment variable issues
         tracing::debug!("Checking scheduler configuration...");
 
         // Check scheduler type preference from GOOSE_SCHEDULER_TYPE
-        match config.get_param::<String>("GOOSE_SCHEDULER_TYPE") {
-            Ok(scheduler_type) => {
+        match compat::get::<String>("GOOSE_SCHEDULER_TYPE") {
+            Some(scheduler_type) => {
                 tracing::debug!(
                     "Found GOOSE_SCHEDULER_TYPE environment variable: '{}'",
                     scheduler_type
@@ -37,7 +35,7 @@ impl SchedulerType {
                     }
                 }
             }
-            Err(_) => {
+            None => {
                 tracing::debug!("GOOSE_SCHEDULER_TYPE environment variable not found");
                 // When no explicit scheduler type is set, default to legacy scheduler
                 tracing::info!("No scheduler type specified, defaulting to legacy scheduler");
