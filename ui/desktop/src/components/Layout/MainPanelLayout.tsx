@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Sidecar, useSidecar } from '../SidecarLayout';
 import { GripVertical } from 'lucide-react';
 
@@ -7,8 +8,12 @@ export const MainPanelLayout: React.FC<{
   removeTopPadding?: boolean;
   backgroundColor?: string;
 }> = ({ children, removeTopPadding = false, backgroundColor = 'bg-background-default' }) => {
+  const location = useLocation();
   const sidecar = useSidecar();
-  const isVisible = sidecar?.activeView && sidecar?.views.find((v) => v.id === sidecar.activeView);
+  
+  // Only show sidecar on chat-related pages
+  const shouldShowSidecar = location.pathname === '/' || location.pathname === '/chat' || location.pathname === '/pair';
+  const isVisible = shouldShowSidecar && sidecar?.activeView && sidecar?.views.find((v) => v.id === sidecar.activeView);
 
   // State for resizing
   const [sidecarWidth, setSidecarWidth] = useState(50); // Percentage

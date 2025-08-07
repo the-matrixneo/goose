@@ -27,7 +27,14 @@ export function LocalhostButton({ className = '', size = 'sm' }: LocalhostButton
       formattedUrl = `http://${urlToOpen.trim()}`;
     }
 
-    sidecar.showLocalhostViewer(formattedUrl, 'Localhost Viewer');
+    console.log('LocalhostButton: Opening URL:', formattedUrl);
+    console.log('LocalhostButton: Sidecar available:', !!sidecar);
+    
+    if (sidecar) {
+      sidecar.showLocalhostViewer(formattedUrl, 'Localhost Viewer');
+    } else {
+      console.error('LocalhostButton: No sidecar available');
+    }
     setShowInput(false);
   };
 
@@ -77,7 +84,7 @@ export function LocalhostButton({ className = '', size = 'sm' }: LocalhostButton
             variant="ghost"
             size={size}
             onClick={() => setShowInput(true)}
-            className="p-1 h-8 w-8 text-textSubtle hover:text-primary"
+            className="p-1 h-8 w-8 text-red-500 hover:text-red-600"
           >
             <Globe size={size === 'sm' ? 14 : 16} />
           </Button>
