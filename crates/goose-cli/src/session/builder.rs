@@ -1,7 +1,8 @@
 use console::style;
+use goose::agents::extension::ExtensionConfig;
 use goose::agents::types::RetryConfig;
 use goose::agents::Agent;
-use goose::config::{compat, ExtensionConfig, ExtensionConfigManager};
+use goose::config::{compat, ExtensionConfigManager};
 use goose::providers::create;
 use goose::recipe::{Response, SubRecipe};
 use goose::session;

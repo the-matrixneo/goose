@@ -412,20 +412,20 @@ impl ConfigBuilder {
     fn merge_values(&self, base: Value, overlay: Value) -> ConfigResult<Value> {
         match self.merge_strategy {
             MergeStrategy::Replace => Ok(overlay),
-            MergeStrategy::Deep => self.deep_merge(base, overlay, false),
-            MergeStrategy::DeepWithArrays => self.deep_merge(base, overlay, true),
+            MergeStrategy::Deep => Self::deep_merge(base, overlay, false),
+            MergeStrategy::DeepWithArrays => Self::deep_merge(base, overlay, true),
         }
     }
 
     /// Perform deep merge of two JSON values
-    fn deep_merge(&self, base: Value, overlay: Value, merge_arrays: bool) -> ConfigResult<Value> {
+    fn deep_merge(base: Value, overlay: Value, merge_arrays: bool) -> ConfigResult<Value> {
         match (base, overlay) {
             (Value::Object(mut base_map), Value::Object(overlay_map)) => {
                 for (key, overlay_value) in overlay_map {
                     match base_map.get(&key) {
                         Some(base_value) => {
                             let merged =
-                                self.deep_merge(base_value.clone(), overlay_value, merge_arrays)?;
+                                Self::deep_merge(base_value.clone(), overlay_value, merge_arrays)?;
                             base_map.insert(key, merged);
                         }
                         None => {

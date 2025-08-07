@@ -17,7 +17,6 @@ use goose::conversation::message::Message;
 use goose::providers::{create, providers};
 use rmcp::model::{Tool, ToolAnnotations};
 use rmcp::object;
-use serde_json::Value;
 use std::collections::HashMap;
 use std::error::Error;
 
@@ -1185,19 +1184,13 @@ pub fn configure_goose_router_strategy_dialog() -> Result<(), Box<dyn Error>> {
 
     match strategy {
         "vector" => {
-            compat::set(
-                "GOOSE_ROUTER_TOOL_SELECTION_STRATEGY",
-                "vector",
-            )?;
+            compat::set("GOOSE_ROUTER_TOOL_SELECTION_STRATEGY", "vector")?;
             cliclack::outro(
                 "Set to Vector Strategy - using vector-based similarity for tool selection",
             )?;
         }
         "default" => {
-            compat::set(
-                "GOOSE_ROUTER_TOOL_SELECTION_STRATEGY",
-                "default",
-            )?;
+            compat::set("GOOSE_ROUTER_TOOL_SELECTION_STRATEGY", "default")?;
             cliclack::outro("Set to Default Strategy - using default tool selection")?;
         }
         _ => unreachable!(),
@@ -1303,8 +1296,8 @@ pub async fn configure_tool_permissions_dialog() -> Result<(), Box<dyn Error>> {
     let provider_name: String = compat::get("GOOSE_PROVIDER")
         .expect("No provider configured. Please set model provider first");
 
-    let model: String = compat::get("GOOSE_MODEL")
-        .expect("No model configured. Please set model first");
+    let model: String =
+        compat::get("GOOSE_MODEL").expect("No model configured. Please set model first");
     let model_config = goose::model::ModelConfig::new(&model)?;
 
     // Create the agent
@@ -1484,10 +1477,7 @@ fn configure_scheduler_dialog() -> Result<(), Box<dyn Error>> {
             )?;
         }
         "temporal" => {
-            compat::set(
-                "GOOSE_SCHEDULER_TYPE",
-                "temporal",
-            )?;
+            compat::set("GOOSE_SCHEDULER_TYPE", "temporal")?;
             cliclack::outro(
                 "Set to Temporal scheduler - advanced workflow engine for complex scheduling",
             )?;
@@ -1563,8 +1553,8 @@ pub async fn handle_openrouter_auth() -> Result<(), Box<dyn Error>> {
 
             // Test configuration - get the model that was configured
             println!("\nTesting configuration...");
-            let configured_model: String = compat::get("GOOSE_MODEL")
-                .ok_or_else(|| anyhow::anyhow!("No model configured"))?;
+            let configured_model: String =
+                compat::get("GOOSE_MODEL").ok_or_else(|| anyhow::anyhow!("No model configured"))?;
             let model_config = match goose::model::ModelConfig::new(&configured_model) {
                 Ok(config) => config,
                 Err(e) => {

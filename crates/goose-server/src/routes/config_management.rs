@@ -8,7 +8,6 @@ use axum::{
 };
 use etcetera::{choose_app_strategy, AppStrategy};
 use goose::config::compat;
-use goose::config::ConfigError;
 use goose::config::APP_STRATEGY;
 use goose::config::{extensions::name_to_key, PermissionManager};
 use goose::config::{ExtensionConfigManager, ExtensionEntry};

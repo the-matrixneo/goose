@@ -1,5 +1,5 @@
-use anyhow::Result;
 use crate::config::compat;
+use anyhow::Result;
 use async_trait::async_trait;
 use serde::Serialize;
 use serde_json::Value;

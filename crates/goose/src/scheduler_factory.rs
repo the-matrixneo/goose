@@ -1,5 +1,5 @@
-use std::path::PathBuf;
 use crate::config::compat;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use crate::scheduler::{Scheduler, SchedulerError};

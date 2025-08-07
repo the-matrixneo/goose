@@ -56,7 +56,9 @@ pub fn inspect_key(key_name: &str, is_secret: bool) -> Result<KeyInfo, Box<dyn E
 
     // Check config store
     let config_result = if is_secret {
-        compat::get_secret(key_name).map(|v| (v, true))
+        compat::get_secret(key_name)
+            .map(|v| (v, true))
+            .map_err(|_| "not found")
     } else {
         compat::get::<String>(key_name)
             .map(|v| (v, false))

@@ -1362,7 +1362,6 @@ mod tests {
     use crate::session::storage::read_metadata;
 
     use crate::conversation::message::{Message, MessageContent};
-    use std::env;
     use std::fs::{self, File};
     use std::io::Write;
     use tempfile::tempdir;

@@ -1,8 +1,8 @@
 use super::api_client::{ApiClient, AuthMethod};
-use crate::config::compat;
 use super::errors::ProviderError;
 use super::retry::ProviderRetry;
 use super::utils::{get_model, handle_response_openai_compat};
+use crate::config::compat;
 use crate::conversation::message::Message;
 use crate::impl_provider_default;
 use crate::model::ModelConfig;

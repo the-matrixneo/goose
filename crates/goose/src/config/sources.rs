@@ -154,7 +154,7 @@ impl PartialConfig {
             && self.timeout_seconds.is_none()
             && self.max_retries.is_none()
             && self.proxy_url.is_none()
-            && self.custom.as_ref().map_or(true, |c| c.is_empty())
+            && self.custom.as_ref().is_none_or(|c| c.is_empty())
     }
 }
 

@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use crate::config::compat;
+use std::collections::HashMap;
 
 use super::base::{ConfigKey, Provider, ProviderMetadata, ProviderUsage};
 use super::errors::ProviderError;

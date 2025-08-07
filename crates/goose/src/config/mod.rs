@@ -19,7 +19,10 @@ pub mod sources;
 // Re-export core configuration types
 pub use base::{Config, ConfigError, APP_STRATEGY};
 pub use experiments::ExperimentManager;
-pub use extensions::{name_to_key, ExtensionConfigManager, ExtensionEntry, DEFAULT_EXTENSION};
+pub use extensions::{
+    name_to_key, ExtensionConfigManager, ExtensionEntry, DEFAULT_EXTENSION,
+    DEFAULT_EXTENSION_DESCRIPTION,
+};
 pub use permission::{PermissionLevel, PermissionManager};
 
 // Re-export builder and schema types

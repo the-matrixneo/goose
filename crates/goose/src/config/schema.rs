@@ -10,7 +10,7 @@ use std::fmt;
 use std::path::PathBuf;
 
 /// Custom type for secret strings that won't leak in Debug output
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Default, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct SecretString(String);
 
@@ -40,14 +40,8 @@ impl fmt::Display for SecretString {
     }
 }
 
-impl Default for SecretString {
-    fn default() -> Self {
-        SecretString(String::new())
-    }
-}
-
 /// Main configuration structure for Goose
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct GooseConfig {
     /// Provider configuration
@@ -91,7 +85,7 @@ pub struct GooseConfig {
 }
 
 /// Provider configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ProviderConfig {
     /// Active provider name (e.g., "openai", "anthropic", "groq")
@@ -176,7 +170,7 @@ pub struct XAIConfig {
 }
 
 /// Snowflake provider configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct SnowflakeConfig {
     pub host: SecretString,
@@ -253,7 +247,7 @@ pub struct OllamaConfig {
 }
 
 /// SageMaker configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct SageMakerConfig {
     pub endpoint_name: String,
@@ -305,7 +299,7 @@ pub struct ModelConfig {
 }
 
 /// Session configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct SessionConfig {
     /// Session name or identifier
@@ -362,7 +356,7 @@ pub struct ServerConfig {
 }
 
 /// Extension configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ExtensionConfig {
     /// List of enabled extensions
@@ -388,7 +382,7 @@ pub struct ExtensionInstanceConfig {
 }
 
 /// Experimental features configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ExperimentConfig {
     /// Enable Claude thinking/reasoning
@@ -405,7 +399,7 @@ pub struct ExperimentConfig {
 }
 
 /// Permission configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct PermissionConfig {
     /// Tools that are always allowed
@@ -425,7 +419,7 @@ pub struct PermissionConfig {
 }
 
 /// System configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct SystemConfig {
     /// Custom system prompt file path
@@ -499,47 +493,6 @@ pub struct RouterConfig {
 
 // Default implementations
 
-impl Default for GooseConfig {
-    fn default() -> Self {
-        GooseConfig {
-            provider: ProviderConfig::default(),
-            model: ModelConfig::default(),
-            session: SessionConfig::default(),
-            cli: CliConfig::default(),
-            server: ServerConfig::default(),
-            extensions: ExtensionConfig::default(),
-            experiments: ExperimentConfig::default(),
-            permissions: PermissionConfig::default(),
-            system: SystemConfig::default(),
-            context: ContextConfig::default(),
-            scheduler: SchedulerConfig::default(),
-            recipe: RecipeConfig::default(),
-            router: RouterConfig::default(),
-        }
-    }
-}
-
-impl Default for ProviderConfig {
-    fn default() -> Self {
-        ProviderConfig {
-            goose_provider: None,
-            openai: OpenAIConfig::default(),
-            anthropic: AnthropicConfig::default(),
-            groq: GroqConfig::default(),
-            xai: XAIConfig::default(),
-            snowflake: SnowflakeConfig::default(),
-            litellm: LiteLLMConfig::default(),
-            venice: VeniceConfig::default(),
-            azure_openai: AzureOpenAIConfig::default(),
-            google: GoogleConfig::default(),
-            databricks: DatabricksConfig::default(),
-            openrouter: OpenRouterConfig::default(),
-            ollama: OllamaConfig::default(),
-            sagemaker: SageMakerConfig::default(),
-        }
-    }
-}
-
 impl Default for OpenAIConfig {
     fn default() -> Self {
         OpenAIConfig {
@@ -578,15 +531,6 @@ impl Default for XAIConfig {
         XAIConfig {
             api_key: SecretString::default(),
             host: "https://api.x.ai".to_string(),
-        }
-    }
-}
-
-impl Default for SnowflakeConfig {
-    fn default() -> Self {
-        SnowflakeConfig {
-            host: SecretString::default(),
-            token: SecretString::default(),
         }
     }
 }
@@ -667,14 +611,6 @@ impl Default for OllamaConfig {
     }
 }
 
-impl Default for SageMakerConfig {
-    fn default() -> Self {
-        SageMakerConfig {
-            endpoint_name: String::new(),
-        }
-    }
-}
-
 impl Default for ModelConfig {
     fn default() -> Self {
         ModelConfig {
@@ -696,19 +632,6 @@ impl Default for ModelConfig {
             planner_provider: None,
             planner_context_limit: None,
             worker_context_limit: None,
-        }
-    }
-}
-
-impl Default for SessionConfig {
-    fn default() -> Self {
-        SessionConfig {
-            session_name: None,
-            working_dir: None,
-            max_turns: None,
-            subagent_max_turns: None,
-            resume: false,
-            no_session: false,
         }
     }
 }
@@ -735,16 +658,6 @@ impl Default for ServerConfig {
     }
 }
 
-impl Default for ExtensionConfig {
-    fn default() -> Self {
-        ExtensionConfig {
-            enabled: vec![],
-            configs: HashMap::new(),
-            extensions_override: None,
-        }
-    }
-}
-
 impl Default for ExtensionInstanceConfig {
     fn default() -> Self {
         ExtensionInstanceConfig {
@@ -754,42 +667,6 @@ impl Default for ExtensionInstanceConfig {
             uri: None,
             env_vars: HashMap::new(),
             timeout: 30,
-        }
-    }
-}
-
-impl Default for ExperimentConfig {
-    fn default() -> Self {
-        ExperimentConfig {
-            claude_thinking_enabled: false,
-            claude_code_debug: false,
-            gemini_cli_debug: false,
-            random_thinking_messages: false,
-        }
-    }
-}
-
-impl Default for PermissionConfig {
-    fn default() -> Self {
-        PermissionConfig {
-            always_allow: vec![],
-            ask_before: vec![],
-            never_allow: vec![],
-            allowlist: None,
-            allowlist_bypass: false,
-        }
-    }
-}
-
-impl Default for SystemConfig {
-    fn default() -> Self {
-        SystemConfig {
-            system_prompt_file_path: None,
-            additional_system_prompt: None,
-            cache_dir: None,
-            vector_db_path: None,
-            disable_keyring: false,
-            mode: None,
         }
     }
 }
@@ -870,7 +747,7 @@ impl GooseConfig {
 
         // Validate temperature if set
         if let Some(temp) = self.model.temperature {
-            if temp < 0.0 || temp > 2.0 {
+            if !(0.0..=2.0).contains(&temp) {
                 errors.push(format!(
                     "Temperature must be between 0.0 and 2.0, got {}",
                     temp

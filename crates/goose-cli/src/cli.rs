@@ -1,7 +1,8 @@
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand};
 
-use goose::config::{Config, ExtensionConfig};
+use goose::agents::extension::ExtensionConfig;
+use goose::config::Config;
 
 use crate::commands::bench::agent_generator;
 use crate::commands::configure::handle_configure;

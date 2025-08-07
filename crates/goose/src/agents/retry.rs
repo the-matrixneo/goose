@@ -1,5 +1,5 @@
-use anyhow::Result;
 use crate::config::compat;
+use anyhow::Result;
 use std::process::Stdio;
 use std::sync::Arc;
 use std::time::Duration;

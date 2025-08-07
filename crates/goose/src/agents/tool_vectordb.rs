@@ -1,5 +1,5 @@
-use anyhow::{Context, Result};
 use crate::config::compat;
+use anyhow::{Context, Result};
 use arrow::array::{FixedSizeListBuilder, StringArray};
 use arrow::datatypes::{DataType, Field, Schema};
 use chrono::Local;
@@ -12,7 +12,6 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolRecord {

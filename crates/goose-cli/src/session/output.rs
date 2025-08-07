@@ -57,7 +57,7 @@ thread_local! {
     static CURRENT_THEME: RefCell<Theme> = RefCell::new(
         compat::var("GOOSE_CLI_THEME")
             .map(|val| Theme::from_config_str(&val))
-            .unwrap_or_else(||
+            .unwrap_or_else(|_|
                 compat::get::<String>("GOOSE_CLI_THEME")
                     .map(|val| Theme::from_config_str(&val))
                     .unwrap_or(Theme::Dark)
@@ -144,7 +144,7 @@ pub fn is_showing_thinking() -> bool {
     THINKING.with(|t| t.borrow().is_shown())
 }
 
-pub fn set_thinking_message(s: &String) {
+pub fn set_thinking_message(s: &str) {
     if std::io::stdout().is_terminal() {
         THINKING.with(|t| {
             if let Some(spinner) = t.borrow_mut().spinner.as_mut() {
@@ -166,8 +166,7 @@ pub fn render_message(message: &Message, debug: bool) {
                 println!("Image: [data: {}, type: {}]", image.data, image.mime_type);
             }
             MessageContent::Thinking(thinking) => {
-                if compat::var("GOOSE_CLI_SHOW_THINKING").is_some()
-                    && std::io::stdout().is_terminal()
+                if compat::var("GOOSE_CLI_SHOW_THINKING").is_ok() && std::io::stdout().is_terminal()
                 {
                     println!("\n{}", style("Thinking:").dim().italic());
                     print_markdown(&thinking.thinking, theme);

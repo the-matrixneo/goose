@@ -12,7 +12,6 @@ use goose::recipe::build_recipe::{
 use goose::recipe::read_recipe_file_content::RecipeFile;
 use goose::recipe::template_recipe::render_recipe_for_preview;
 use goose::recipe::Recipe;
-use serde_json::Value;
 use std::collections::HashMap;
 
 pub const RECIPE_FILE_EXTENSIONS: &[&str] = &["yaml", "json"];
@@ -75,7 +74,7 @@ pub fn collect_missing_secrets(requirements: &[SecretRequirement]) -> Result<()>
     let mut missing_secrets = Vec::new();
 
     for req in requirements {
-        match compat::get_secret::<String>(&req.key) {
+        match compat::get_secret(&req.key) {
             Ok(_) => continue, // Secret exists
             Err(_) => missing_secrets.push(req),
         }
