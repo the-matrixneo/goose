@@ -309,7 +309,32 @@ mod tests {
     }
 
     fn create_mock_provider() -> Result<Arc<dyn Provider>> {
-        let mock_model_config = ModelConfig::new("test-model")?.with_context_limit(200_000.into());
+        // Clear all GOOSE environment variables to ensure clean test environment
+        let goose_env_vars = [
+            "GOOSE_TEMPERATURE",
+            "GOOSE_CONTEXT_LIMIT",
+            "GOOSE_TOOLSHIM",
+            "GOOSE_TOOLSHIM_OLLAMA_MODEL",
+            "GOOSE_MODE",
+        ];
+
+        for var in &goose_env_vars {
+            std::env::remove_var(var);
+        }
+
+        let mock_model_config = ModelConfig::new("test-model")
+            .unwrap_or_else(|_| {
+                // If ModelConfig::new fails, create a basic config manually
+                ModelConfig {
+                    model_name: "test-model".to_string(),
+                    context_limit: Some(200_000),
+                    temperature: None,
+                    max_tokens: None,
+                    toolshim: false,
+                    toolshim_model: None,
+                }
+            })
+            .with_context_limit(Some(200_000));
 
         Ok(Arc::new(MockProvider {
             model_config: mock_model_config,
@@ -533,11 +558,34 @@ mod tests {
 
     #[tokio::test]
     async fn test_summarize_messages_fallback_on_oneshot_failure() {
+        // Clear all GOOSE environment variables to ensure clean test environment
+        let goose_env_vars = [
+            "GOOSE_TEMPERATURE",
+            "GOOSE_CONTEXT_LIMIT",
+            "GOOSE_TOOLSHIM",
+            "GOOSE_TOOLSHIM_OLLAMA_MODEL",
+            "GOOSE_MODE",
+        ];
+
+        for var in &goose_env_vars {
+            std::env::remove_var(var);
+        }
+
         let call_count = Arc::new(std::sync::Mutex::new(0));
         let provider = Arc::new(FailingOneshotProvider {
             model_config: ModelConfig::new("test-model")
-                .unwrap()
-                .with_context_limit(200_000.into()),
+                .unwrap_or_else(|_| {
+                    // If ModelConfig::new fails, create a basic config manually
+                    ModelConfig {
+                        model_name: "test-model".to_string(),
+                        context_limit: Some(200_000),
+                        temperature: None,
+                        max_tokens: None,
+                        toolshim: false,
+                        toolshim_model: None,
+                    }
+                })
+                .with_context_limit(Some(200_000)),
             call_count: Arc::clone(&call_count),
         });
         let token_counter = TokenCounter::new();

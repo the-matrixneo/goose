@@ -1,4 +1,3 @@
-use std::env;
 use std::path::Path;
 use std::sync::Arc;
 use std::sync::OnceLock;
@@ -7,6 +6,7 @@ use super::utils::verify_secret_key;
 use crate::state::AppState;
 use axum::{extract::State, routing::post, Json, Router};
 use goose::agents::{extension::Envs, ExtensionConfig};
+use goose::config::compat;
 use http::{HeaderMap, StatusCode};
 use rmcp::model::Tool;
 use serde::{Deserialize, Serialize};
@@ -348,7 +348,7 @@ static ALLOWED_EXTENSIONS: OnceLock<Option<AllowedExtensions>> = OnceLock::new()
 /// Fetches and parses the allowed extensions from the URL specified in GOOSE_ALLOWLIST env var
 #[allow(dead_code)]
 fn fetch_allowed_extensions() -> Option<AllowedExtensions> {
-    match env::var("GOOSE_ALLOWLIST") {
+    match compat::var("GOOSE_ALLOWLIST") {
         Err(_) => {
             // Environment variable not set, no allowlist to enforce
             None
@@ -389,7 +389,7 @@ fn get_allowed_extensions() -> &'static Option<AllowedExtensions> {
 #[allow(dead_code)]
 fn is_command_allowed(cmd: &str, args: &[String]) -> bool {
     // Check if bypass is enabled
-    if let Ok(bypass_value) = env::var("GOOSE_ALLOWLIST_BYPASS") {
+    if let Ok(bypass_value) = compat::var("GOOSE_ALLOWLIST_BYPASS") {
         if bypass_value.to_lowercase() == "true" {
             // Bypass the allowlist check
             println!("Allowlist check bypassed due to GOOSE_ALLOWLIST_BYPASS=true");
@@ -1120,7 +1120,7 @@ mod tests {
             }
 
             // This is what we're testing - a direct call that simulates what happens in is_command_allowed
-            let result = if let Ok(bypass) = env::var("GOOSE_ALLOWLIST_BYPASS") {
+            let result = if let Ok(bypass) = compat::var("GOOSE_ALLOWLIST_BYPASS") {
                 if bypass.to_lowercase() == "true" {
                     true
                 } else {

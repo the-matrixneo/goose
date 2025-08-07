@@ -498,36 +498,55 @@ mod tests {
     }
 
     #[test]
+    #[serial_test::serial]
     fn test_provider_metadata_context_limits() {
-        // Test that ProviderMetadata::new correctly sets context limits
-        let test_models = vec!["gpt-4o", "claude-3-5-sonnet-latest", "unknown-model"];
-        let metadata = ProviderMetadata::new(
-            "test",
-            "Test Provider",
-            "Test Description",
-            "gpt-4o",
-            test_models,
-            "https://example.com",
-            vec![],
+        // Clear all GOOSE environment variables to ensure clean test environment
+        let goose_env_vars = [
+            "GOOSE_PROVIDER", "GOOSE_MODEL", "GOOSE_TEMPERATURE", "GOOSE_CONTEXT_LIMIT", 
+            "GOOSE_TOOLSHIM", "GOOSE_TOOLSHIM_OLLAMA_MODEL", "GOOSE_MODE",
+        ];
+
+        for var in &goose_env_vars {
+            std::env::remove_var(var);
+        }
+
+        // Clear global config state
+        let _ = crate::config::compat::clear();
+
+        temp_env::with_vars(
+            goose_env_vars.iter().map(|var| (*var, None::<&str>)).collect::<Vec<_>>(),
+            || {
+                // Test that ProviderMetadata::new correctly sets context limits
+                let test_models = vec!["gpt-4o", "claude-3-5-sonnet-latest", "unknown-model"];
+                let metadata = ProviderMetadata::new(
+                    "test",
+                    "Test Provider",
+                    "Test Description",
+                    "gpt-4o",
+                    test_models,
+                    "https://example.com",
+                    vec![],
+                );
+
+                let model_info: HashMap<String, usize> = metadata
+                    .known_models
+                    .into_iter()
+                    .map(|m| (m.name, m.context_limit))
+                    .collect();
+
+                // gpt-4o should have 128k limit
+                assert_eq!(*model_info.get("gpt-4o").unwrap(), 128_000);
+
+                // claude-3-5-sonnet-latest should have 200k limit
+                assert_eq!(
+                    *model_info.get("claude-3-5-sonnet-latest").unwrap(),
+                    200_000
+                );
+
+                // unknown model should have default limit (128k)
+                assert_eq!(*model_info.get("unknown-model").unwrap(), 128_000);
+            }
         );
-
-        let model_info: HashMap<String, usize> = metadata
-            .known_models
-            .into_iter()
-            .map(|m| (m.name, m.context_limit))
-            .collect();
-
-        // gpt-4o should have 128k limit
-        assert_eq!(*model_info.get("gpt-4o").unwrap(), 128_000);
-
-        // claude-3-5-sonnet-latest should have 200k limit
-        assert_eq!(
-            *model_info.get("claude-3-5-sonnet-latest").unwrap(),
-            200_000
-        );
-
-        // unknown model should have default limit (128k)
-        assert_eq!(*model_info.get("unknown-model").unwrap(), 128_000);
     }
 
     #[test]

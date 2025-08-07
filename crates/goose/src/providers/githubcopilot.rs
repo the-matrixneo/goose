@@ -17,7 +17,6 @@ use super::formats::openai::{create_request, get_usage, response_to_message};
 use super::retry::ProviderRetry;
 use super::utils::{emit_debug_trace, get_model, handle_response_openai_compat, ImageFormat};
 
-use crate::config::{Config, ConfigError};
 use crate::conversation::message::Message;
 use crate::impl_provider_default;
 use crate::model::ModelConfig;
@@ -227,20 +226,17 @@ impl GithubCopilotProvider {
     }
 
     async fn refresh_api_info(&self) -> Result<CopilotTokenInfo> {
-        let config = Config::global();
-        let token = match config.get_secret::<String>("GITHUB_COPILOT_TOKEN") {
+        use crate::config::compat;
+        let token = match compat::get_secret("GITHUB_COPILOT_TOKEN") {
             Ok(token) => token,
-            Err(err) => match err {
-                ConfigError::NotFound(_) => {
-                    let token = self
-                        .get_access_token()
-                        .await
-                        .context("unable to login into github")?;
-                    config.set_secret("GITHUB_COPILOT_TOKEN", Value::String(token.clone()))?;
-                    token
-                }
-                _ => return Err(err.into()),
-            },
+            Err(_err) => {
+                let token = self
+                    .get_access_token()
+                    .await
+                    .context("unable to login into github")?;
+                compat::set_secret("GITHUB_COPILOT_TOKEN", &token)?;
+                token
+            }
         };
         let resp = self
             .client
@@ -473,10 +469,10 @@ impl Provider for GithubCopilotProvider {
     }
 
     async fn configure_oauth(&self) -> Result<(), ProviderError> {
-        let config = Config::global();
+        use crate::config::compat;
 
         // Check if token already exists and is valid
-        if config.get_secret::<String>("GITHUB_COPILOT_TOKEN").is_ok() {
+        if compat::get_secret("GITHUB_COPILOT_TOKEN").is_ok() {
             // Try to refresh API info to validate the token
             match self.refresh_api_info().await {
                 Ok(_) => return Ok(()), // Token is valid
@@ -494,8 +490,7 @@ impl Provider for GithubCopilotProvider {
             .map_err(|e| ProviderError::Authentication(format!("OAuth flow failed: {}", e)))?;
 
         // Save the token
-        config
-            .set_secret("GITHUB_COPILOT_TOKEN", Value::String(token))
+        compat::set_secret("GITHUB_COPILOT_TOKEN", &token)
             .map_err(|e| ProviderError::ExecutionError(format!("Failed to save token: {}", e)))?;
 
         Ok(())

@@ -7,11 +7,11 @@ use async_trait::async_trait;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::collections::VecDeque;
-use std::env;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use crate::agents::tool_vectordb::ToolVectorDB;
+use crate::config::compat;
 use crate::conversation::message::Message;
 use crate::model::ModelConfig;
 use crate::providers::{self, base::Provider};
@@ -42,13 +42,13 @@ impl VectorToolSelector {
     pub async fn new(provider: Arc<dyn Provider>, table_name: String) -> Result<Self> {
         let vector_db = ToolVectorDB::new(Some(table_name)).await?;
 
-        let embedding_provider = if env::var("GOOSE_EMBEDDING_MODEL_PROVIDER").is_ok() {
+        let embedding_provider = if compat::var("GOOSE_EMBEDDING_MODEL_PROVIDER").is_ok() {
             // If env var is set, create a new provider for embeddings
             // Get embedding model and provider from environment variables
-            let embedding_model = env::var("GOOSE_EMBEDDING_MODEL")
+            let embedding_model = compat::var("GOOSE_EMBEDDING_MODEL")
                 .unwrap_or_else(|_| "text-embedding-3-small".to_string());
-            let embedding_provider_name =
-                env::var("GOOSE_EMBEDDING_MODEL_PROVIDER").unwrap_or_else(|_| "openai".to_string());
+            let embedding_provider_name = compat::var("GOOSE_EMBEDDING_MODEL_PROVIDER")
+                .unwrap_or_else(|_| "openai".to_string());
 
             // Create the provider using the factory
             let model_config = ModelConfig::new(embedding_model.as_str())

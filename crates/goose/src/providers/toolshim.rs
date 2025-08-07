@@ -83,10 +83,8 @@ impl OllamaInterpreter {
 
     /// Get the Ollama base URL from existing config or use default values
     fn get_ollama_base_url() -> Result<String, ProviderError> {
-        let config = crate::config::Config::global();
-        let host: String = config
-            .get_param("OLLAMA_HOST")
-            .unwrap_or_else(|_| OLLAMA_HOST.to_string());
+        use crate::config::compat;
+        let host: String = compat::get_string("OLLAMA_HOST", OLLAMA_HOST);
 
         // Format the URL correctly with http:// prefix if needed
         let base = if host.starts_with("http://") || host.starts_with("https://") {

@@ -310,7 +310,7 @@ pub async fn configure_provider_dialog() -> Result<bool, Box<dyn Error>> {
         }
 
         // First check if the value is set via environment variable
-        let from_env = std::env::var(&key.name).ok();
+        let from_env = compat::var(&key.name).ok();
 
         match from_env {
             Some(env_value) => {
@@ -1112,7 +1112,7 @@ pub fn configure_goose_mode_dialog() -> Result<(), Box<dyn Error>> {
     // Config::global() removed - using compat functions directly
 
     // Check if GOOSE_MODE is set as an environment variable
-    if std::env::var("GOOSE_MODE").is_ok() {
+    if compat::var("GOOSE_MODE").is_ok() {
         let _ = cliclack::log::info("Notice: GOOSE_MODE environment variable is set and will override the configuration here.");
     }
 
@@ -1165,7 +1165,7 @@ pub fn configure_goose_router_strategy_dialog() -> Result<(), Box<dyn Error>> {
     // Config::global() removed - using compat functions directly
 
     // Check if GOOSE_ROUTER_STRATEGY is set as an environment variable
-    if std::env::var("GOOSE_ROUTER_TOOL_SELECTION_STRATEGY").is_ok() {
+    if compat::var("GOOSE_ROUTER_TOOL_SELECTION_STRATEGY").is_ok() {
         let _ = cliclack::log::info("Notice: GOOSE_ROUTER_TOOL_SELECTION_STRATEGY environment variable is set. Configuration will override this.");
     }
 
@@ -1201,7 +1201,7 @@ pub fn configure_goose_router_strategy_dialog() -> Result<(), Box<dyn Error>> {
 pub fn configure_tool_output_dialog() -> Result<(), Box<dyn Error>> {
     // Config::global() removed - using compat functions directly
     // Check if GOOSE_CLI_MIN_PRIORITY is set as an environment variable
-    if std::env::var("GOOSE_CLI_MIN_PRIORITY").is_ok() {
+    if compat::var("GOOSE_CLI_MIN_PRIORITY").is_ok() {
         let _ = cliclack::log::info("Notice: GOOSE_CLI_MIN_PRIORITY environment variable is set and will override the configuration here.");
     }
     let tool_log_level = cliclack::select("Which tool output would you like to show?")
@@ -1450,7 +1450,7 @@ fn configure_scheduler_dialog() -> Result<(), Box<dyn Error>> {
     // Config::global() removed - using compat functions directly
 
     // Check if GOOSE_SCHEDULER_TYPE is set as an environment variable
-    if std::env::var("GOOSE_SCHEDULER_TYPE").is_ok() {
+    if compat::var("GOOSE_SCHEDULER_TYPE").is_ok() {
         let _ = cliclack::log::info("Notice: GOOSE_SCHEDULER_TYPE environment variable is set and will override the configuration here.");
     }
 

@@ -158,6 +158,23 @@ pub fn clear() -> Result<()> {
         .map_err(|e| anyhow::anyhow!("Failed to clear config: {}", e))
 }
 
+/// Reset global config state for testing
+#[cfg(test)]
+pub fn reset_for_test() {
+    // Clear environment variables that might affect config
+    let goose_env_vars = [
+        "GOOSE_PROVIDER", "GOOSE_MODEL", "GOOSE_TEMPERATURE", "GOOSE_CONTEXT_LIMIT", 
+        "GOOSE_TOOLSHIM", "GOOSE_TOOLSHIM_OLLAMA_MODEL", "GOOSE_MODE",
+    ];
+    
+    for var in &goose_env_vars {
+        std::env::remove_var(var);
+    }
+    
+    // Clear the config file
+    let _ = clear();
+}
+
 /// Get the configuration file path
 pub fn path() -> String {
     use crate::config::Config;
@@ -229,6 +246,7 @@ macro_rules! env_or_config {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use temp_env;
 
     #[test]
     fn test_var_function() {
@@ -243,31 +261,82 @@ mod tests {
     }
 
     #[test]
+    #[serial_test::serial]
     fn test_get_set_functions() {
-        // Set a string value
-        set("test_key", "test_value").unwrap();
-        assert_eq!(get::<String>("test_key"), Some("test_value".to_string()));
+        // Reset global state for clean test environment
+        reset_for_test();
 
-        // Set a boolean value
-        set("bool_key", true).unwrap();
-        assert_eq!(get::<bool>("bool_key"), Some(true));
+        temp_env::with_vars(
+            [
+                ("GOOSE_PROVIDER", None::<&str>),
+                ("GOOSE_MODEL", None::<&str>),
+                ("GOOSE_TEMPERATURE", None::<&str>),
+                ("GOOSE_CONTEXT_LIMIT", None::<&str>),
+                ("GOOSE_TOOLSHIM", None::<&str>),
+                ("GOOSE_TOOLSHIM_OLLAMA_MODEL", None::<&str>),
+                ("GOOSE_MODE", None::<&str>),
+            ],
+            || {
+                // Test with environment variable override to verify precedence
+                temp_env::with_var("TEST_KEY", Some("env_value"), || {
+                    // Set a string value in config
+                    set("test_key", "test_value").unwrap();
+                    // Environment variable should take precedence
+                    assert_eq!(
+                        get::<String>("test_key"),
+                        Some("env_value".to_string())
+                    );
+                });
 
-        // Set a number value
-        set("num_key", 42).unwrap();
-        assert_eq!(get::<i32>("num_key"), Some(42));
+                // Test without environment variable
+                temp_env::with_var("TEST_KEY", None::<&str>, || {
+                    // Set a string value
+                    set("test_key", "test_value").unwrap();
+                    assert_eq!(
+                        get::<String>("test_key"),
+                        Some("test_value".to_string())
+                    );
+
+                    // Set a boolean value
+                    set("bool_key", true).unwrap();
+                    assert_eq!(get::<bool>("bool_key"), Some(true));
+
+                    // Set a number value
+                    set("num_key", 42).unwrap();
+                    assert_eq!(get::<i32>("num_key"), Some(42));
+                });
+            }
+        );
     }
 
     #[test]
+    #[serial_test::serial]
     fn test_convenience_functions() {
-        // Test with defaults
-        assert_eq!(get_string("missing_key_str", "default"), "default");
-        assert_eq!(get_bool("missing_key_bool", true), true);
-        assert_eq!(get_int("missing_key_int", 100), 100);
-        assert_eq!(get_float("missing_key_float", 3.14), 3.14);
+        // Reset global state for clean test environment
+        reset_for_test();
 
-        // Test has function
-        set("exists", "yes").unwrap();
-        assert!(has("exists"));
-        assert!(!has("not_exists"));
+        temp_env::with_vars(
+            [
+                ("GOOSE_PROVIDER", None::<&str>),
+                ("GOOSE_MODEL", None::<&str>),
+                ("GOOSE_TEMPERATURE", None::<&str>),
+                ("GOOSE_CONTEXT_LIMIT", None::<&str>),
+                ("GOOSE_TOOLSHIM", None::<&str>),
+                ("GOOSE_TOOLSHIM_OLLAMA_MODEL", None::<&str>),
+                ("GOOSE_MODE", None::<&str>),
+            ],
+            || {
+                // Test with defaults
+                assert_eq!(get_string("missing_key_str", "default"), "default");
+                assert_eq!(get_bool("missing_key_bool", true), true);
+                assert_eq!(get_int("missing_key_int", 100), 100);
+                assert_eq!(get_float("missing_key_float", 3.14), 3.14);
+
+                // Test has function
+                set("exists", "yes").unwrap();
+                assert!(has("exists"));
+                assert!(!has("not_exists"));
+            }
+        );
     }
 }

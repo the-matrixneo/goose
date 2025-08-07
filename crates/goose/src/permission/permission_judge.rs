@@ -312,8 +312,31 @@ mod tests {
     }
 
     fn create_mock_provider() -> Arc<dyn Provider> {
-        let config = ModelConfig::new_or_fail("test-model");
-        let mock_model_config = config.with_context_limit(200_000.into());
+        // Clear all GOOSE environment variables to ensure clean test environment
+        let goose_env_vars = [
+            "GOOSE_PROVIDER", "GOOSE_MODEL", "GOOSE_TEMPERATURE", "GOOSE_CONTEXT_LIMIT", 
+            "GOOSE_TOOLSHIM", "GOOSE_TOOLSHIM_OLLAMA_MODEL", "GOOSE_MODE",
+        ];
+
+        for var in &goose_env_vars {
+            std::env::remove_var(var);
+        }
+
+        // Clear global config state
+        let _ = crate::config::compat::clear();
+
+        let config = ModelConfig::new("test-model").unwrap_or_else(|_| {
+            // If ModelConfig::new fails, create a basic config manually
+            ModelConfig {
+                model_name: "test-model".to_string(),
+                context_limit: Some(200_000),
+                temperature: None,
+                max_tokens: None,
+                toolshim: false,
+                toolshim_model: None,
+            }
+        });
+        let mock_model_config = config.with_context_limit(Some(200_000));
         Arc::new(MockProvider {
             model_config: mock_model_config,
         })
@@ -375,7 +398,21 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_detect_read_only_tools() {
+        // Clear all GOOSE environment variables to ensure clean test environment
+        let goose_env_vars = [
+            "GOOSE_PROVIDER", "GOOSE_MODEL", "GOOSE_TEMPERATURE", "GOOSE_CONTEXT_LIMIT", 
+            "GOOSE_TOOLSHIM", "GOOSE_TOOLSHIM_OLLAMA_MODEL", "GOOSE_MODE",
+        ];
+
+        for var in &goose_env_vars {
+            std::env::remove_var(var);
+        }
+
+        // Clear global config state
+        let _ = crate::config::compat::clear();
+
         let provider = create_mock_provider();
         let tool_request = ToolRequest {
             id: "tool_1".to_string(),
@@ -390,14 +427,42 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_detect_read_only_tools_empty_requests() {
+        // Clear all GOOSE environment variables to ensure clean test environment
+        let goose_env_vars = [
+            "GOOSE_PROVIDER", "GOOSE_MODEL", "GOOSE_TEMPERATURE", "GOOSE_CONTEXT_LIMIT", 
+            "GOOSE_TOOLSHIM", "GOOSE_TOOLSHIM_OLLAMA_MODEL", "GOOSE_MODE",
+        ];
+
+        for var in &goose_env_vars {
+            std::env::remove_var(var);
+        }
+
+        // Clear global config state
+        let _ = crate::config::compat::clear();
+
         let provider = create_mock_provider();
         let result = detect_read_only_tools(provider, vec![]).await;
         assert!(result.is_empty());
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_check_tool_permissions_smart_approve() {
+        // Clear all GOOSE environment variables to ensure clean test environment
+        let goose_env_vars = [
+            "GOOSE_PROVIDER", "GOOSE_MODEL", "GOOSE_TEMPERATURE", "GOOSE_CONTEXT_LIMIT", 
+            "GOOSE_TOOLSHIM", "GOOSE_TOOLSHIM_OLLAMA_MODEL", "GOOSE_MODE",
+        ];
+
+        for var in &goose_env_vars {
+            std::env::remove_var(var);
+        }
+
+        // Clear global config state
+        let _ = crate::config::compat::clear();
+
         // Setup mocks
         let temp_file = NamedTempFile::new().unwrap();
         let temp_path = temp_file.path();
@@ -465,7 +530,21 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_check_tool_permissions_auto() {
+        // Clear all GOOSE environment variables to ensure clean test environment
+        let goose_env_vars = [
+            "GOOSE_PROVIDER", "GOOSE_MODEL", "GOOSE_TEMPERATURE", "GOOSE_CONTEXT_LIMIT", 
+            "GOOSE_TOOLSHIM", "GOOSE_TOOLSHIM_OLLAMA_MODEL", "GOOSE_MODE",
+        ];
+
+        for var in &goose_env_vars {
+            std::env::remove_var(var);
+        }
+
+        // Clear global config state
+        let _ = crate::config::compat::clear();
+
         // Setup mocks
         let temp_file = NamedTempFile::new().unwrap();
         let temp_path = temp_file.path();

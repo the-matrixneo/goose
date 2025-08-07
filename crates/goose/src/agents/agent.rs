@@ -1349,8 +1349,8 @@ impl Agent {
             .collect();
 
         let author = Author {
-            contact: std::env::var("USER")
-                .or_else(|_| std::env::var("USERNAME"))
+            contact: compat::var("USER")
+                .or_else(|_| compat::var("USERNAME"))
                 .ok(),
             metadata: None,
         };

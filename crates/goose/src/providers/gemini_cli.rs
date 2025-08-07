@@ -30,10 +30,8 @@ impl_provider_default!(GeminiCliProvider);
 
 impl GeminiCliProvider {
     pub fn from_env(model: ModelConfig) -> Result<Self> {
-        let config = crate::config::Config::global();
-        let command: String = config
-            .get_param("GEMINI_CLI_COMMAND")
-            .unwrap_or_else(|_| "gemini".to_string());
+        use crate::config::compat;
+        let command: String = compat::get_string("GEMINI_CLI_COMMAND", "gemini");
 
         let resolved_command = if !command.contains('/') {
             Self::find_gemini_executable(&command).unwrap_or(command)

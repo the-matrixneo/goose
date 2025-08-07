@@ -2,7 +2,6 @@ use anyhow::Result;
 use clap::{Args, Parser, Subcommand};
 
 use goose::agents::extension::ExtensionConfig;
-use goose::config::Config;
 
 use crate::commands::bench::agent_generator;
 use crate::commands::configure::handle_configure;
@@ -1134,7 +1133,7 @@ pub async fn cli() -> Result<()> {
             return Ok(());
         }
         None => {
-            return if !Config::global().exists() {
+            return if !goose::config::compat::exists() {
                 let _ = handle_configure().await;
                 Ok(())
             } else {

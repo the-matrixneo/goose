@@ -298,31 +298,63 @@ mod tests {
     }
 
     #[test]
-    #[serial]
+    #[serial_test::serial]
     fn test_invalid_temperature() {
-        with_var("GOOSE_TEMPERATURE", Some("hot"), || {
-            let result = ModelConfig::new("test-model");
-            assert!(result.is_err());
-        });
+        // Reset global state for clean test environment
+        crate::config::compat::reset_for_test();
 
-        with_var("GOOSE_TEMPERATURE", Some("-1.0"), || {
-            let result = ModelConfig::new("test-model");
-            assert!(result.is_err());
-        });
+        temp_env::with_vars(
+            [
+                ("GOOSE_PROVIDER", None::<&str>),
+                ("GOOSE_MODEL", None::<&str>),
+                ("GOOSE_TEMPERATURE", None::<&str>),
+                ("GOOSE_CONTEXT_LIMIT", None::<&str>),
+                ("GOOSE_TOOLSHIM", None::<&str>),
+                ("GOOSE_TOOLSHIM_OLLAMA_MODEL", None::<&str>),
+                ("GOOSE_MODE", None::<&str>),
+            ],
+            || {
+                temp_env::with_var("GOOSE_TEMPERATURE", Some("hot"), || {
+                    let result = ModelConfig::new("test-model");
+                    assert!(result.is_err());
+                });
+
+                temp_env::with_var("GOOSE_TEMPERATURE", Some("-1.0"), || {
+                    let result = ModelConfig::new("test-model");
+                    assert!(result.is_err());
+                });
+            }
+        );
     }
 
     #[test]
-    #[serial]
+    #[serial_test::serial]
     fn test_invalid_toolshim() {
-        with_var("GOOSE_TOOLSHIM", Some("maybe"), || {
-            let result = ModelConfig::new("test-model");
-            assert!(result.is_err());
-            if let Err(ConfigError::InvalidValue(var, val, msg)) = result {
-                assert_eq!(var, "GOOSE_TOOLSHIM");
-                assert_eq!(val, "maybe");
-                assert!(msg.contains("must be one of"));
+        // Reset global state for clean test environment
+        crate::config::compat::reset_for_test();
+
+        temp_env::with_vars(
+            [
+                ("GOOSE_PROVIDER", None::<&str>),
+                ("GOOSE_MODEL", None::<&str>),
+                ("GOOSE_TEMPERATURE", None::<&str>),
+                ("GOOSE_CONTEXT_LIMIT", None::<&str>),
+                ("GOOSE_TOOLSHIM", None::<&str>),
+                ("GOOSE_TOOLSHIM_OLLAMA_MODEL", None::<&str>),
+                ("GOOSE_MODE", None::<&str>),
+            ],
+            || {
+                temp_env::with_var("GOOSE_TOOLSHIM", Some("maybe"), || {
+                    let result = ModelConfig::new("test-model");
+                    assert!(result.is_err());
+                    if let Err(ConfigError::InvalidValue(var, val, msg)) = result {
+                        assert_eq!(var, "GOOSE_TOOLSHIM");
+                        assert_eq!(val, "maybe");
+                        assert!(msg.contains("must be one of"));
+                    }
+                });
             }
-        });
+        );
     }
 
     #[test]

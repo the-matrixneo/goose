@@ -3,7 +3,6 @@ use goose::config::compat;
 use goose::providers::base::{ConfigKey, ProviderMetadata};
 use http::{HeaderMap, StatusCode};
 use serde::{Deserialize, Serialize};
-use std::env;
 use std::error::Error;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -41,7 +40,7 @@ pub fn verify_secret_key(headers: &HeaderMap, state: &AppState) -> Result<Status
 #[allow(dead_code)]
 pub fn inspect_key(key_name: &str, is_secret: bool) -> Result<KeyInfo, Box<dyn Error>> {
     // Check environment variable first
-    let env_value = std::env::var(key_name).ok();
+    let env_value = compat::var(key_name).ok();
 
     if let Some(value) = env_value {
         return Ok(KeyInfo {
@@ -129,7 +128,7 @@ pub fn check_provider_configured(metadata: &ProviderMetadata) -> bool {
         let key = &required_keys[0];
 
         // Check if the key is explicitly set (either in env or config)
-        let is_set_in_env = env::var(&key.name).is_ok();
+        let is_set_in_env = compat::var(&key.name).is_ok();
         let is_set_in_config = if key.secret {
             compat::get_secret(&key.name).is_ok()
         } else {
@@ -165,7 +164,7 @@ pub fn check_provider_configured(metadata: &ProviderMetadata) -> bool {
     // If there are no non-default keys, this provider needs at least one key explicitly set
     if required_non_default_keys.is_empty() {
         return required_keys.iter().any(|key| {
-            let is_set_in_env = env::var(&key.name).is_ok();
+            let is_set_in_env = compat::var(&key.name).is_ok();
             let is_set_in_config = if key.secret {
                 compat::get_secret(&key.name).is_ok()
             } else {
@@ -178,7 +177,7 @@ pub fn check_provider_configured(metadata: &ProviderMetadata) -> bool {
 
     // Otherwise, all non-default keys must be set
     required_non_default_keys.iter().all(|key| {
-        let is_set_in_env = env::var(&key.name).is_ok();
+        let is_set_in_env = compat::var(&key.name).is_ok();
         let is_set_in_config = if key.secret {
             compat::get_secret(&key.name).is_ok()
         } else {
