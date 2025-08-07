@@ -92,7 +92,7 @@ impl ToolRouteManager {
         let strategy = self.get_router_tool_selection_strategy().await;
         let selector = match strategy {
             Some(RouterToolSelectionStrategy::Llm) => {
-                let selector = create_tool_selector(strategy, provider.clone(), None)
+                let selector = create_tool_selector(strategy, provider.clone())
                     .await
                     .map_err(|e| anyhow!("Failed to create tool selector: {}", e))?;
                 Arc::new(selector)

@@ -162,7 +162,6 @@ impl RouterToolSelector for LLMToolSelector {
 pub async fn create_tool_selector(
     strategy: Option<RouterToolSelectionStrategy>,
     provider: Arc<dyn Provider>,
-    _table_name: Option<String>,
 ) -> Result<Box<dyn RouterToolSelector>> {
     match strategy {
         Some(RouterToolSelectionStrategy::Llm) => {

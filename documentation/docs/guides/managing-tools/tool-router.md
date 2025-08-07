@@ -10,14 +10,14 @@ import TabItem from '@theme/TabItem';
 import { PanelLeft } from 'lucide-react';
 
 :::info Preview Feature
-The Tool Selection Strategy is currently in preview. The LLM-based selection strategy provides intelligent tool selection using natural language understanding.
+The Tool Selection Strategy is currently in preview. The Vector selection strategy is currently limited to Claude models served on Databricks.
 :::
 
 When you enable an [extension](/docs/getting-started/using-extensions), you gain access to all of its tools. For example, the Google Drive extension provides tools for reading documents, updating permissions, managing comments, and more. By default, Goose loads all tools into context when interacting with the LLM.
 
 Enabling multiple extensions gives you access to a wider range of tools, but loading a lot of tools into context can be inefficient and confusing for the LLM. It's like having every tool in your workshop spread out on your bench when you only need one or two. 
 
-Choosing an intelligent tool selection strategy helps avoid this problem. Instead of loading all tools for every interaction, it loads only the tools needed for your current task. The LLM-based strategy ensures that only the functionality you need is loaded into context, so you can keep more of your favorite extensions enabled. This strategy provides:
+Choosing an intelligent tool selection strategy helps avoid this problem. Instead of loading all tools for every interaction, it loads only the tools needed for your current task. Both vector and LLM-based strategies ensure that only the functionality you need is loaded into context, so you can keep more of your favorite extensions enabled. These strategies provide:
 
 - Reduced token consumption
 - Improved LLM performance
@@ -29,15 +29,31 @@ Choosing an intelligent tool selection strategy helps avoid this problem. Instea
 | Strategy | Speed | Best For | Example Query |
 |----------|-------|----------|---------------|
 | **Default** | Fastest | Few extensions, simple setups | Any query (loads all tools) |
+| **Vector** | Fast | Keyword-based matching | "read pdf file" |
 | **LLM-based** | Slower | Complex, ambiguous queries | "analyze document contents" |
 
 ### Default Strategy
-The default strategy loads all tools from enabled extensions into context, which works well if you only have a few extensions enabled. When you have more than a few extensions enabled, you should use the LLM-based strategy for intelligent tool selection.
+The default strategy loads all tools from enabled extensions into context, which works well if you only have a few extensions enabled. When you have more than a few extensions enabled, you should use the vector or LLM-based strategy for intelligent tool selection.
 
 **Best for:**
 - Simple setups with few extensions
 - When you want all tools available at all times
 - Maximum tool availability without selection logic
+
+### Vector Strategy
+The vector strategy uses mathematical similarity between embeddings to find relevant tools, providing efficient matching based on vector similarity between your query and available tools.
+
+**Best for:**
+- Situations where fast response times are critical
+- Queries with keywords that match tool names or descriptions
+
+**Example:**
+- Prompt: "read pdf file"
+- Result: Quickly matches with PDF-related tools based on keyword similarity
+
+:::info Embedding Model
+The default embedding model is `text-embedding-3-small`. You can change it using [environment variables](/docs/guides/environment-variables#tool-selection-strategy).
+:::
 
 ### LLM-based Strategy
 The LLM-based strategy leverages natural language understanding to analyze tools and queries semantically, making selections based on the full meaning of your request.
@@ -60,6 +76,7 @@ The LLM-based strategy leverages natural language understanding to analyze tools
     3. Click `Chat`
     4. Under `Tool Selection Strategy`, select your preferred strategy:
        - `Default`
+       - `Vector`
        - `LLM-based`
   </TabItem>
   <TabItem value="cli" label="Goose CLI">
@@ -80,7 +97,7 @@ The LLM-based strategy leverages natural language understanding to analyze tools
     // highlight-start
     │  ● Goose Settings (Set the Goose Mode, Tool Output, Tool Permissions, Experiment, Goose recipe github repo and more)
     // highlight-end
-    └
+    └ 
     ```
 
     3. Select `Router Tool Selection Strategy`:
