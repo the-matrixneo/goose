@@ -9,7 +9,7 @@ export const MainPanelLayout: React.FC<{
 }> = ({ children, removeTopPadding = false, backgroundColor = 'bg-background-default' }) => {
   const sidecar = useSidecar();
   const isVisible = sidecar?.activeView && sidecar?.views.find((v) => v.id === sidecar.activeView);
-  
+
   // State for resizing
   const [sidecarWidth, setSidecarWidth] = useState(50); // Percentage
   const [isResizing, setIsResizing] = useState(false);
@@ -18,14 +18,14 @@ export const MainPanelLayout: React.FC<{
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     setIsResizing(true);
-    
+
     const handleMouseMove = (e: MouseEvent) => {
       if (!containerRef.current) return;
-      
+
       const containerRect = containerRef.current.getBoundingClientRect();
       const containerWidth = containerRect.width;
       const mouseX = e.clientX - containerRect.left;
-      
+
       // Calculate percentage, with constraints
       const newPercentage = Math.max(20, Math.min(80, (mouseX / containerWidth) * 100));
       setSidecarWidth(100 - newPercentage); // Invert because we want sidecar width
@@ -49,11 +49,11 @@ export const MainPanelLayout: React.FC<{
         className={`flex ${backgroundColor} flex-1 min-w-0 h-full min-h-0 ${removeTopPadding ? '' : 'pt-[32px]'}`}
       >
         {/* Main Content Area */}
-        <div 
+        <div
           className="flex flex-col min-w-0 transition-all duration-300 ease-out"
-          style={{ 
+          style={{
             width: isVisible ? `${100 - sidecarWidth}%` : '100%',
-            transition: isResizing ? 'none' : 'width 300ms ease-out'
+            transition: isResizing ? 'none' : 'width 300ms ease-out',
           }}
         >
           {children}
@@ -67,22 +67,22 @@ export const MainPanelLayout: React.FC<{
             }`}
             onMouseDown={handleMouseDown}
           >
-            <GripVertical 
-              size={12} 
+            <GripVertical
+              size={12}
               className={`text-textSubtle group-hover:text-textStandard transition-colors ${
                 isResizing ? 'text-textStandard' : ''
-              }`} 
+              }`}
             />
           </div>
         )}
 
         {/* Sidecar Panel */}
         {isVisible && (
-          <div 
+          <div
             className="transition-all duration-300 ease-out h-full"
-            style={{ 
+            style={{
               width: `${sidecarWidth}%`,
-              transition: isResizing ? 'none' : 'width 300ms ease-out'
+              transition: isResizing ? 'none' : 'width 300ms ease-out',
             }}
           >
             <Sidecar />

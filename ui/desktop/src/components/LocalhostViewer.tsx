@@ -25,16 +25,19 @@ function formatUrl(input: string): string {
   if (/^\d+$/.test(input.trim())) {
     return `http://localhost:${input.trim()}`;
   }
-  
+
   // If it starts with localhost: or 127.0.0.1: without protocol
   if (/^(localhost|127\.0\.0\.1):\d+/.test(input.trim())) {
     return `http://${input.trim()}`;
   }
-  
+
   return input.trim();
 }
 
-export function LocalhostViewer({ initialUrl = 'http://localhost:3000', onUrlChange }: LocalhostViewerProps) {
+export function LocalhostViewer({
+  initialUrl = 'http://localhost:3000',
+  onUrlChange,
+}: LocalhostViewerProps) {
   const [url, setUrl] = useState(initialUrl);
   const [inputUrl, setInputUrl] = useState(initialUrl);
   const [isLoading, setIsLoading] = useState(false);
@@ -51,12 +54,12 @@ export function LocalhostViewer({ initialUrl = 'http://localhost:3000', onUrlCha
 
   const handleUrlSubmit = (newUrl: string) => {
     const formattedUrl = formatUrl(newUrl);
-    
+
     if (!isValidLocalhostUrl(formattedUrl)) {
       setError('Only localhost URLs are allowed (e.g., http://localhost:3000)');
       return;
     }
-    
+
     setError(null);
     setUrl(formattedUrl);
     setInputUrl(formattedUrl);
@@ -103,7 +106,7 @@ export function LocalhostViewer({ initialUrl = 'http://localhost:3000', onUrlCha
   const handleIframeLoad = () => {
     setIsLoading(false);
     setError(null);
-    
+
     // Try to update navigation state (may not work due to CORS)
     try {
       if (iframeRef.current?.contentWindow) {
@@ -158,12 +161,7 @@ export function LocalhostViewer({ initialUrl = 'http://localhost:3000', onUrlCha
 
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleRefresh}
-                className="p-1 h-8 w-8"
-              >
+              <Button variant="ghost" size="sm" onClick={handleRefresh} className="p-1 h-8 w-8">
                 <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
               </Button>
             </TooltipTrigger>
@@ -194,12 +192,7 @@ export function LocalhostViewer({ initialUrl = 'http://localhost:3000', onUrlCha
         {/* External link button */}
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleOpenInBrowser}
-              className="p-1 h-8 w-8"
-            >
+            <Button variant="ghost" size="sm" onClick={handleOpenInBrowser} className="p-1 h-8 w-8">
               <ExternalLink size={14} />
             </Button>
           </TooltipTrigger>
@@ -225,7 +218,7 @@ export function LocalhostViewer({ initialUrl = 'http://localhost:3000', onUrlCha
           onError={handleIframeError}
           sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation allow-top-navigation-by-user-activation"
         />
-        
+
         {/* Loading overlay */}
         {isLoading && (
           <div className="absolute inset-0 bg-background-default/80 flex items-center justify-center">

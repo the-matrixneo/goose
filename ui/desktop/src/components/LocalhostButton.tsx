@@ -18,7 +18,7 @@ export function LocalhostButton({ className = '', size = 'sm' }: LocalhostButton
 
   const handleOpenLocalhost = (inputUrl?: string) => {
     const urlToOpen = inputUrl || url;
-    
+
     // Format the URL - if it's just a number, prepend localhost
     let formattedUrl = urlToOpen;
     if (/^\d+$/.test(urlToOpen.trim())) {
@@ -26,7 +26,7 @@ export function LocalhostButton({ className = '', size = 'sm' }: LocalhostButton
     } else if (/^(localhost|127\.0\.0\.1):\d+/.test(urlToOpen.trim())) {
       formattedUrl = `http://${urlToOpen.trim()}`;
     }
-    
+
     sidecar.showLocalhostViewer(formattedUrl, 'Localhost Viewer');
     setShowInput(false);
   };
@@ -84,7 +84,7 @@ export function LocalhostButton({ className = '', size = 'sm' }: LocalhostButton
         </TooltipTrigger>
         <TooltipContent side="top">Open Localhost Site</TooltipContent>
       </Tooltip>
-      
+
       {/* Quick access buttons for common ports */}
       <div className="ml-1 flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
         <Button
