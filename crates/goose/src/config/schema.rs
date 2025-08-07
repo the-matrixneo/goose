@@ -129,6 +129,18 @@ pub struct ProviderConfig {
 
     /// SageMaker configuration
     pub sagemaker: SageMakerConfig,
+
+    /// DeepSeek configuration
+    pub deepseek: DeepSeekConfig,
+
+    /// Cohere configuration
+    pub cohere: CohereConfig,
+
+    /// Bedrock configuration
+    pub bedrock: BedrockConfig,
+
+    /// Vertex AI configuration
+    pub vertex: VertexConfig,
 }
 
 /// OpenAI provider configuration
@@ -253,6 +265,44 @@ pub struct SageMakerConfig {
     pub endpoint_name: String,
 }
 
+/// DeepSeek configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct DeepSeekConfig {
+    pub api_key: SecretString,
+    pub host: String,
+    pub timeout: u64,
+}
+
+/// Cohere configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct CohereConfig {
+    pub api_key: SecretString,
+    pub host: String,
+    pub timeout: u64,
+}
+
+/// Bedrock configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct BedrockConfig {
+    pub region: String,
+    pub access_key_id: SecretString,
+    pub secret_access_key: SecretString,
+    pub session_token: Option<SecretString>,
+    pub profile: Option<String>,
+}
+
+/// Vertex AI configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct VertexConfig {
+    pub project_id: String,
+    pub location: String,
+    pub credentials_path: Option<PathBuf>,
+}
+
 /// Model configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
@@ -314,6 +364,12 @@ pub struct SessionConfig {
     /// Maximum turns for sub-agents
     pub subagent_max_turns: Option<u32>,
 
+    /// Operating mode (e.g., "chat", "agent", "auto")
+    pub mode: Option<String>,
+
+    /// Maximum number of times a tool can be repeated in a single turn
+    pub max_tool_repetitions: Option<u32>,
+
     /// Resume previous session
     pub resume: bool,
 
@@ -339,6 +395,15 @@ pub struct CliConfig {
 
     /// Maximum length for tool parameter truncation
     pub tool_params_truncation_max_length: usize,
+
+    /// Edit mode for CLI input (e.g., "vi", "emacs")
+    pub edit_mode: Option<String>,
+
+    /// Enable debug mode for verbose output
+    pub debug_mode: bool,
+
+    /// Enable quiet mode for minimal output
+    pub quiet_mode: bool,
 }
 
 /// Server configuration
@@ -437,8 +502,32 @@ pub struct SystemConfig {
     /// Disable keyring usage
     pub disable_keyring: bool,
 
-    /// Operating mode
+    /// Operating mode (moved from session for backwards compatibility)
     pub mode: Option<String>,
+
+    /// Log level (e.g., "debug", "info", "warn", "error")
+    pub log_level: Option<String>,
+
+    /// Log file path
+    pub log_file: Option<PathBuf>,
+
+    /// Enable telemetry
+    pub telemetry_enabled: bool,
+
+    /// Telemetry endpoint
+    pub telemetry_endpoint: Option<String>,
+
+    /// Custom configuration directory
+    pub config_dir: Option<PathBuf>,
+
+    /// Data directory for persistent storage
+    pub data_dir: Option<PathBuf>,
+
+    /// Enable auto-update checks
+    pub auto_update: bool,
+
+    /// Update channel (e.g., "stable", "beta", "nightly")
+    pub update_channel: Option<String>,
 }
 
 /// Context management configuration
@@ -611,6 +700,48 @@ impl Default for OllamaConfig {
     }
 }
 
+impl Default for DeepSeekConfig {
+    fn default() -> Self {
+        DeepSeekConfig {
+            api_key: SecretString::default(),
+            host: "https://api.deepseek.com".to_string(),
+            timeout: 600,
+        }
+    }
+}
+
+impl Default for CohereConfig {
+    fn default() -> Self {
+        CohereConfig {
+            api_key: SecretString::default(),
+            host: "https://api.cohere.ai".to_string(),
+            timeout: 600,
+        }
+    }
+}
+
+impl Default for BedrockConfig {
+    fn default() -> Self {
+        BedrockConfig {
+            region: "us-east-1".to_string(),
+            access_key_id: SecretString::default(),
+            secret_access_key: SecretString::default(),
+            session_token: None,
+            profile: None,
+        }
+    }
+}
+
+impl Default for VertexConfig {
+    fn default() -> Self {
+        VertexConfig {
+            project_id: String::new(),
+            location: "us-central1".to_string(),
+            credentials_path: None,
+        }
+    }
+}
+
 impl Default for ModelConfig {
     fn default() -> Self {
         ModelConfig {
@@ -644,6 +775,9 @@ impl Default for CliConfig {
             show_thinking: false,
             min_priority: 0.5,
             tool_params_truncation_max_length: 40,
+            edit_mode: None,
+            debug_mode: false,
+            quiet_mode: false,
         }
     }
 }

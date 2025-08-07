@@ -1,3 +1,4 @@
+use crate::config::compat;
 use anyhow::Result;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -13,7 +14,7 @@ const CACHE_TTL_DAYS: u64 = 7; // Cache for 7 days
 
 /// Get the cache directory path
 fn get_cache_dir() -> Result<PathBuf> {
-    let cache_dir = if let Ok(goose_dir) = std::env::var("GOOSE_CACHE_DIR") {
+    let cache_dir = if let Ok(goose_dir) = compat::var("GOOSE_CACHE_DIR") {
         PathBuf::from(goose_dir)
     } else {
         dirs::cache_dir()

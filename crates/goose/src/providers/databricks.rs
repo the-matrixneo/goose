@@ -108,11 +108,12 @@ impl_provider_default!(DatabricksProvider);
 
 impl DatabricksProvider {
     pub fn from_env(model: ModelConfig) -> Result<Self> {
-        let config = crate::config::Config::global();
+        use crate::config::compat;
 
-        let mut host: Result<String, ConfigError> = config.get_param("DATABRICKS_HOST");
+        let mut host: Result<String> = compat::get::<String>("DATABRICKS_HOST")
+            .ok_or_else(|| anyhow::anyhow!("DATABRICKS_HOST not found"));
         if host.is_err() {
-            host = config.get_secret("DATABRICKS_HOST")
+            host = compat::get_secret("DATABRICKS_HOST")
         }
 
         if host.is_err() {
@@ -123,9 +124,9 @@ impl DatabricksProvider {
         }
 
         let host = host?;
-        let retry_config = Self::load_retry_config(config);
+        let retry_config = Self::load_retry_config();
 
-        let auth = if let Ok(api_key) = config.get_secret("DATABRICKS_TOKEN") {
+        let auth = if let Ok(api_key) = compat::get_secret("DATABRICKS_TOKEN") {
             DatabricksAuth::token(api_key)
         } else {
             DatabricksAuth::oauth(host.clone())
@@ -146,29 +147,23 @@ impl DatabricksProvider {
         })
     }
 
-    fn load_retry_config(config: &crate::config::Config) -> RetryConfig {
-        let max_retries = config
-            .get_param("DATABRICKS_MAX_RETRIES")
-            .ok()
-            .and_then(|v: String| v.parse::<usize>().ok())
+    fn load_retry_config() -> RetryConfig {
+        use crate::config::compat;
+
+        let max_retries = compat::get::<String>("DATABRICKS_MAX_RETRIES")
+            .and_then(|v| v.parse::<usize>().ok())
             .unwrap_or(DEFAULT_MAX_RETRIES);
 
-        let initial_interval_ms = config
-            .get_param("DATABRICKS_INITIAL_RETRY_INTERVAL_MS")
-            .ok()
-            .and_then(|v: String| v.parse::<u64>().ok())
+        let initial_interval_ms = compat::get::<String>("DATABRICKS_INITIAL_RETRY_INTERVAL_MS")
+            .and_then(|v| v.parse::<u64>().ok())
             .unwrap_or(DEFAULT_INITIAL_RETRY_INTERVAL_MS);
 
-        let backoff_multiplier = config
-            .get_param("DATABRICKS_BACKOFF_MULTIPLIER")
-            .ok()
-            .and_then(|v: String| v.parse::<f64>().ok())
+        let backoff_multiplier = compat::get::<String>("DATABRICKS_BACKOFF_MULTIPLIER")
+            .and_then(|v| v.parse::<f64>().ok())
             .unwrap_or(DEFAULT_BACKOFF_MULTIPLIER);
 
-        let max_interval_ms = config
-            .get_param("DATABRICKS_MAX_RETRY_INTERVAL_MS")
-            .ok()
-            .and_then(|v: String| v.parse::<u64>().ok())
+        let max_interval_ms = compat::get::<String>("DATABRICKS_MAX_RETRY_INTERVAL_MS")
+            .and_then(|v| v.parse::<u64>().ok())
             .unwrap_or(DEFAULT_MAX_RETRY_INTERVAL_MS);
 
         RetryConfig {

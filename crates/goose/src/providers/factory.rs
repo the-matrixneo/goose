@@ -63,10 +63,10 @@ pub fn providers() -> Vec<ProviderMetadata> {
 }
 
 pub fn create(name: &str, model: ModelConfig) -> Result<Arc<dyn Provider>> {
-    let config = crate::config::Config::global();
+    use crate::config::compat;
 
     // Check for lead model environment variables
-    if let Ok(lead_model_name) = config.get_param::<String>("GOOSE_LEAD_MODEL") {
+    if let Some(lead_model_name) = compat::get::<String>("GOOSE_LEAD_MODEL") {
         tracing::info!("Creating lead/worker provider from environment variables");
 
         return create_lead_worker_from_env(name, &model, &lead_model_name);
@@ -80,23 +80,17 @@ fn create_lead_worker_from_env(
     default_model: &ModelConfig,
     lead_model_name: &str,
 ) -> Result<Arc<dyn Provider>> {
-    let config = crate::config::Config::global();
+    use crate::config::compat;
 
     // Get lead provider (optional, defaults to main provider)
-    let lead_provider_name = config
-        .get_param::<String>("GOOSE_LEAD_PROVIDER")
-        .unwrap_or_else(|_| default_provider_name.to_string());
+    let lead_provider_name = compat::get_string("GOOSE_LEAD_PROVIDER", default_provider_name);
 
     // Get configuration parameters with defaults
-    let lead_turns = config
-        .get_param::<usize>("GOOSE_LEAD_TURNS")
-        .unwrap_or(default_lead_turns());
-    let failure_threshold = config
-        .get_param::<usize>("GOOSE_LEAD_FAILURE_THRESHOLD")
-        .unwrap_or(default_failure_threshold());
-    let fallback_turns = config
-        .get_param::<usize>("GOOSE_LEAD_FALLBACK_TURNS")
-        .unwrap_or(default_fallback_turns());
+    let lead_turns = compat::get::<usize>("GOOSE_LEAD_TURNS").unwrap_or(default_lead_turns());
+    let failure_threshold =
+        compat::get::<usize>("GOOSE_LEAD_FAILURE_THRESHOLD").unwrap_or(default_failure_threshold());
+    let fallback_turns =
+        compat::get::<usize>("GOOSE_LEAD_FALLBACK_TURNS").unwrap_or(default_fallback_turns());
 
     let lead_model_config = ModelConfig::new_with_context_env(
         lead_model_name.to_string(),
@@ -115,14 +109,14 @@ fn create_lead_worker_from_env(
             .with_toolshim_model(default_model.toolshim_model.clone());
 
         // Apply environment variable overrides with proper precedence
-        let global_config = crate::config::Config::global();
+        use crate::config::compat;
 
         // Check for worker-specific context limit
-        if let Ok(limit_str) = global_config.get_param::<String>("GOOSE_WORKER_CONTEXT_LIMIT") {
+        if let Some(limit_str) = compat::get::<String>("GOOSE_WORKER_CONTEXT_LIMIT") {
             if let Ok(limit) = limit_str.parse::<usize>() {
                 worker_config = worker_config.with_context_limit(Some(limit));
             }
-        } else if let Ok(limit_str) = global_config.get_param::<String>("GOOSE_CONTEXT_LIMIT") {
+        } else if let Some(limit_str) = compat::get::<String>("GOOSE_CONTEXT_LIMIT") {
             // Check for general context limit if worker-specific is not set
             if let Ok(limit) = limit_str.parse::<usize>() {
                 worker_config = worker_config.with_context_limit(Some(limit));

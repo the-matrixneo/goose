@@ -42,11 +42,10 @@ impl_provider_default!(OpenRouterProvider);
 
 impl OpenRouterProvider {
     pub fn from_env(model: ModelConfig) -> Result<Self> {
-        let config = crate::config::Config::global();
-        let api_key: String = config.get_secret("OPENROUTER_API_KEY")?;
-        let host: String = config
-            .get_param("OPENROUTER_HOST")
-            .unwrap_or_else(|_| "https://openrouter.ai".to_string());
+        use crate::config::compat;
+
+        let api_key: String = compat::get_secret("OPENROUTER_API_KEY")?;
+        let host: String = compat::get_string("OPENROUTER_HOST", "https://openrouter.ai");
 
         let auth = AuthMethod::BearerToken(api_key);
         let api_client = ApiClient::new(host, auth)?

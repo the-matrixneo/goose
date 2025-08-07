@@ -1,3 +1,4 @@
+use crate::config::compat;
 use anyhow::Result;
 use async_trait::async_trait;
 use serde_json::{json, Value};
@@ -29,22 +30,19 @@ impl_provider_default!(LiteLLMProvider);
 
 impl LiteLLMProvider {
     pub fn from_env(model: ModelConfig) -> Result<Self> {
-        let config = crate::config::Config::global();
-        let api_key: String = config
-            .get_secret("LITELLM_API_KEY")
-            .unwrap_or_else(|_| String::new());
-        let host: String = config
-            .get_param("LITELLM_HOST")
-            .unwrap_or_else(|_| "https://api.litellm.ai".to_string());
-        let base_path: String = config
-            .get_param("LITELLM_BASE_PATH")
-            .unwrap_or_else(|_| "v1/chat/completions".to_string());
-        let custom_headers: Option<HashMap<String, String>> = config
-            .get_secret("LITELLM_CUSTOM_HEADERS")
-            .or_else(|_| config.get_param("LITELLM_CUSTOM_HEADERS"))
-            .ok()
-            .map(parse_custom_headers);
-        let timeout_secs: u64 = config.get_param("LITELLM_TIMEOUT").unwrap_or(600);
+        let api_key: String =
+            compat::get_secret("LITELLM_API_KEY").unwrap_or_else(|_| String::new());
+        let host: String = compat::get_string("LITELLM_HOST", "https://api.litellm.ai");
+        let base_path: String = compat::get_string("LITELLM_BASE_PATH", "v1/chat/completions");
+        let custom_headers: Option<HashMap<String, String>> =
+            compat::get_secret("LITELLM_CUSTOM_HEADERS")
+                .or_else(|_| {
+                    compat::get::<String>("LITELLM_CUSTOM_HEADERS")
+                        .ok_or(anyhow::anyhow!("not found"))
+                })
+                .ok()
+                .map(parse_custom_headers);
+        let timeout_secs: u64 = compat::get_int("LITELLM_TIMEOUT", 600) as u64;
 
         let auth = if api_key.is_empty() {
             AuthMethod::Custom(Box::new(NoAuth))
@@ -226,7 +224,7 @@ impl Provider for LiteLLMProvider {
 #[async_trait]
 impl EmbeddingCapable for LiteLLMProvider {
     async fn create_embeddings(&self, texts: Vec<String>) -> Result<Vec<Vec<f32>>, anyhow::Error> {
-        let embedding_model = std::env::var("GOOSE_EMBEDDING_MODEL")
+        let embedding_model = compat::var("GOOSE_EMBEDDING_MODEL")
             .unwrap_or_else(|_| "text-embedding-3-small".to_string());
 
         let payload = json!({

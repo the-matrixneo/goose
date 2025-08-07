@@ -44,10 +44,12 @@ impl_provider_default!(SnowflakeProvider);
 
 impl SnowflakeProvider {
     pub fn from_env(model: ModelConfig) -> Result<Self> {
-        let config = crate::config::Config::global();
-        let mut host: Result<String, ConfigError> = config.get_param("SNOWFLAKE_HOST");
+        use crate::config::compat;
+
+        let mut host: Result<String> = compat::get::<String>("SNOWFLAKE_HOST")
+            .ok_or_else(|| anyhow::anyhow!("SNOWFLAKE_HOST not found"));
         if host.is_err() {
-            host = config.get_secret("SNOWFLAKE_HOST")
+            host = compat::get_secret("SNOWFLAKE_HOST")
         }
         if host.is_err() {
             return Err(ConfigError::NotFound(
@@ -66,10 +68,11 @@ impl SnowflakeProvider {
             host = format!("{}.snowflakecomputing.com", host);
         }
 
-        let mut token: Result<String, ConfigError> = config.get_param("SNOWFLAKE_TOKEN");
+        let mut token: Result<String> = compat::get::<String>("SNOWFLAKE_TOKEN")
+            .ok_or_else(|| anyhow::anyhow!("SNOWFLAKE_TOKEN not found"));
 
         if token.is_err() {
-            token = config.get_secret("SNOWFLAKE_TOKEN")
+            token = compat::get_secret("SNOWFLAKE_TOKEN")
         }
 
         if token.is_err() {

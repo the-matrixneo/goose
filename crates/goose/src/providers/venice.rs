@@ -84,17 +84,13 @@ impl_provider_default!(VeniceProvider);
 
 impl VeniceProvider {
     pub fn from_env(mut model: ModelConfig) -> Result<Self> {
-        let config = crate::config::Config::global();
-        let api_key: String = config.get_secret("VENICE_API_KEY")?;
-        let host: String = config
-            .get_param("VENICE_HOST")
-            .unwrap_or_else(|_| VENICE_DEFAULT_HOST.to_string());
-        let base_path: String = config
-            .get_param("VENICE_BASE_PATH")
-            .unwrap_or_else(|_| VENICE_DEFAULT_BASE_PATH.to_string());
-        let models_path: String = config
-            .get_param("VENICE_MODELS_PATH")
-            .unwrap_or_else(|_| VENICE_DEFAULT_MODELS_PATH.to_string());
+        use crate::config::compat;
+
+        let api_key: String = compat::get_secret("VENICE_API_KEY")?;
+        let host: String = compat::get_string("VENICE_HOST", VENICE_DEFAULT_HOST);
+        let base_path: String = compat::get_string("VENICE_BASE_PATH", VENICE_DEFAULT_BASE_PATH);
+        let models_path: String =
+            compat::get_string("VENICE_MODELS_PATH", VENICE_DEFAULT_MODELS_PATH);
 
         // Ensure we only keep the bare model id internally
         model.model_name = strip_flags(&model.model_name).to_string();

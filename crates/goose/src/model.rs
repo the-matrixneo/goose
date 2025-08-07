@@ -1,3 +1,4 @@
+use crate::config::compat;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -108,11 +109,11 @@ impl ModelConfig {
         custom_env_var: Option<&str>,
     ) -> Result<Option<usize>, ConfigError> {
         if let Some(env_var) = custom_env_var {
-            if let Ok(val) = std::env::var(env_var) {
+            if let Ok(val) = compat::var(env_var) {
                 return Self::validate_context_limit(&val, env_var).map(Some);
             }
         }
-        if let Ok(val) = std::env::var("GOOSE_CONTEXT_LIMIT") {
+        if let Ok(val) = compat::var("GOOSE_CONTEXT_LIMIT") {
             return Self::validate_context_limit(&val, "GOOSE_CONTEXT_LIMIT").map(Some);
         }
         Ok(Self::get_model_specific_limit(model_name))
@@ -138,7 +139,7 @@ impl ModelConfig {
     }
 
     fn parse_temperature() -> Result<Option<f32>, ConfigError> {
-        if let Ok(val) = std::env::var("GOOSE_TEMPERATURE") {
+        if let Ok(val) = compat::var("GOOSE_TEMPERATURE") {
             let temp = val.parse::<f32>().map_err(|_| {
                 ConfigError::InvalidValue(
                     "GOOSE_TEMPERATURE".to_string(),
@@ -159,7 +160,7 @@ impl ModelConfig {
     }
 
     fn parse_toolshim() -> Result<bool, ConfigError> {
-        if let Ok(val) = std::env::var("GOOSE_TOOLSHIM") {
+        if let Ok(val) = compat::var("GOOSE_TOOLSHIM") {
             match val.to_lowercase().as_str() {
                 "1" | "true" | "yes" | "on" => Ok(true),
                 "0" | "false" | "no" | "off" => Ok(false),
@@ -175,7 +176,7 @@ impl ModelConfig {
     }
 
     fn parse_toolshim_model() -> Result<Option<String>, ConfigError> {
-        match std::env::var("GOOSE_TOOLSHIM_OLLAMA_MODEL") {
+        match compat::var("GOOSE_TOOLSHIM_OLLAMA_MODEL") {
             Ok(val) if val.trim().is_empty() => Err(ConfigError::InvalidValue(
                 "GOOSE_TOOLSHIM_OLLAMA_MODEL".to_string(),
                 val,

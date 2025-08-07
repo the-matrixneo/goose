@@ -433,7 +433,7 @@ pub async fn configure_provider_dialog() -> Result<bool, Box<dyn Error>> {
             .to_string(),
         Ok(None) => {
             let default_model =
-                std::env::var("GOOSE_MODEL").unwrap_or(provider_meta.default_model.clone());
+                compat::var("GOOSE_MODEL").unwrap_or(provider_meta.default_model.clone());
             cliclack::input("Enter a model from that provider:")
                 .default_input(&default_model)
                 .interact()?
@@ -445,14 +445,14 @@ pub async fn configure_provider_dialog() -> Result<bool, Box<dyn Error>> {
     spin.start("Checking your configuration...");
 
     // Create model config with env var settings
-    let toolshim_enabled = std::env::var("GOOSE_TOOLSHIM")
+    let toolshim_enabled = compat::var("GOOSE_TOOLSHIM")
         .map(|val| val == "1" || val.to_lowercase() == "true")
         .unwrap_or(false);
 
     let model_config = goose::model::ModelConfig::new(&model)?
         .with_max_tokens(Some(50))
         .with_toolshim(toolshim_enabled)
-        .with_toolshim_model(std::env::var("GOOSE_TOOLSHIM_OLLAMA_MODEL").ok());
+        .with_toolshim_model(compat::var("GOOSE_TOOLSHIM_OLLAMA_MODEL").ok());
 
     let provider = create(provider_name, model_config)?;
 
@@ -1426,7 +1426,7 @@ pub async fn configure_tool_permissions_dialog() -> Result<(), Box<dyn Error>> {
 
 fn configure_recipe_dialog() -> Result<(), Box<dyn Error>> {
     let key_name = GOOSE_RECIPE_GITHUB_REPO_CONFIG_KEY;
-    let default_recipe_repo = std::env::var(key_name)
+    let default_recipe_repo = compat::var(key_name)
         .ok()
         .or_else(|| compat::get::<String>(key_name));
     let mut recipe_repo_input = cliclack::input(
