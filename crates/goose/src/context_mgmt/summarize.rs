@@ -1,4 +1,4 @@
-use crate::message::Message;
+use crate::conversation::message::Message;
 use crate::prompt_template::render_global_file;
 use crate::providers::base::Provider;
 
@@ -62,9 +62,9 @@ pub async fn summarize_messages(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::message::{Message, MessageContent};
+    use crate::conversation::message::{Message, MessageContent};
     use crate::model::ModelConfig;
-    use crate::providers::base::{Provider, ProviderMetadata, ProviderUsage, Usage};
+    use crate::providers::base::{ProviderMetadata, ProviderUsage, Usage};
     use crate::providers::errors::ProviderError;
     use chrono::Utc;
     use rmcp::model::Role;

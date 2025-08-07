@@ -1,5 +1,7 @@
+use crate::conversation::message::Message;
+use crate::conversation::Conversation;
 use crate::{
-    agents::Agent, config::Config, context_mgmt::get_messages_token_counts_async, message::Message,
+    agents::Agent, config::Config, context_mgmt::get_messages_token_counts_async,
     token_counter::create_async_token_counter,
 };
 use anyhow::Result;
@@ -11,7 +13,7 @@ pub struct AutoCompactResult {
     /// Whether compaction was performed
     pub compacted: bool,
     /// The messages after potential compaction
-    pub messages: Vec<Message>,
+    pub messages: Conversation,
     /// Provider usage from summarization (if compaction occurred)
     /// This contains the actual token counts after compaction
     pub summarization_usage: Option<crate::providers::base::ProviderUsage>,
@@ -151,7 +153,7 @@ pub async fn check_and_compact_messages(
         );
         return Ok(AutoCompactResult {
             compacted: false,
-            messages: messages.to_vec(),
+            messages: Conversation::new_unvalidated(messages.to_vec()),
             summarization_usage: None,
         });
     }
@@ -193,9 +195,9 @@ pub async fn check_and_compact_messages(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::conversation::message::{Message, MessageContent};
     use crate::{
         agents::Agent,
-        message::{Message, MessageContent},
         model::ModelConfig,
         providers::base::{Provider, ProviderMetadata, ProviderUsage, Usage},
         providers::errors::ProviderError,

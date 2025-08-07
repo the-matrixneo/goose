@@ -1,4 +1,4 @@
-use crate::message::Message;
+use crate::conversation::message::Message;
 use crate::providers::base::ProviderUsage;
 use crate::token_counter::create_async_token_counter;
 use anyhow::Result;
@@ -50,7 +50,7 @@ pub async fn ensure_usage_tokens(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::message::Message;
+    use crate::conversation::message::Message;
     use crate::providers::base::Usage;
 
     #[tokio::test]

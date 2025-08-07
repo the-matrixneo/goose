@@ -1,6 +1,7 @@
 use anyhow::Ok;
 
-use crate::message::Message;
+use crate::conversation::message::Message;
+use crate::conversation::Conversation;
 use crate::token_counter::create_async_token_counter;
 
 use crate::context_mgmt::summarize::summarize_messages;
@@ -14,7 +15,7 @@ impl Agent {
     pub async fn truncate_context(
         &self,
         messages: &[Message], // last message is a user msg that led to assistant message with_context_length_exceeded
-    ) -> Result<(Vec<Message>, Vec<usize>), anyhow::Error> {
+    ) -> Result<(Conversation, Vec<usize>), anyhow::Error> {
         let provider = self.provider().await?;
         let token_counter = create_async_token_counter()
             .await
@@ -54,7 +55,7 @@ impl Agent {
         messages: &[Message], // last message is a user msg that led to assistant message with_context_length_exceeded
     ) -> Result<
         (
-            Vec<Message>,
+            Conversation,
             Vec<usize>,
             Option<crate::providers::base::ProviderUsage>,
         ),
@@ -77,7 +78,7 @@ impl Agent {
             None => {
                 // No summary was generated (empty input)
                 tracing::warn!("Summarization failed. Returning empty messages.");
-                return Ok((vec![], vec![], None));
+                return Ok((Conversation::empty(), vec![], None));
             }
         };
 
@@ -91,6 +92,6 @@ impl Agent {
             new_token_counts.push(assistant_message_tokens);
         }
 
-        Ok((new_messages, new_token_counts, summarization_usage))
+        Ok((Conversation::new_unvalidated(new_messages), new_token_counts, summarization_usage))
     }
 }

@@ -5,8 +5,10 @@ use std::sync::Arc;
 use async_stream::try_stream;
 use futures::stream::StreamExt;
 
+use super::super::agents::Agent;
 use crate::agents::router_tool_selector::RouterToolSelectionStrategy;
-use crate::message::{Message, MessageContent, ToolRequest};
+use crate::conversation::message::{Message, MessageContent, ToolRequest};
+use crate::conversation::Conversation;
 use crate::providers::base::{stream_from_single_message, MessageStream, Provider, ProviderUsage};
 use crate::providers::errors::ProviderError;
 use crate::providers::toolshim::{
@@ -16,8 +18,6 @@ use crate::providers::toolshim::{
 
 use crate::session;
 use rmcp::model::Tool;
-
-use super::super::agents::Agent;
 
 async fn toolshim_postprocess(
     response: Message,
@@ -128,17 +128,17 @@ impl Agent {
         let messages_for_provider = if config.toolshim {
             convert_tool_messages_to_text(messages)
         } else {
-            messages.to_vec()
+            Conversation::new_unvalidated(messages.to_vec())
         };
 
         // Call the provider to get a response
         let (mut response, mut usage) = provider
-            .complete(system_prompt, &messages_for_provider, tools)
+            .complete(system_prompt, messages_for_provider.messages(), tools)
             .await?;
 
         // Ensure we have token counts, estimating if necessary
         usage
-            .ensure_tokens(system_prompt, &messages_for_provider, &response, tools)
+            .ensure_tokens(system_prompt, messages_for_provider.messages(), &response, tools)
             .await?;
 
         crate::providers::base::set_current_model(&usage.model);
@@ -165,7 +165,7 @@ impl Agent {
         let messages_for_provider = if config.toolshim {
             convert_tool_messages_to_text(messages)
         } else {
-            messages.to_vec()
+            Conversation::new_unvalidated(messages.to_vec())
         };
 
         // Clone owned data to move into the async stream
@@ -176,18 +176,26 @@ impl Agent {
 
         let mut stream = if provider.supports_streaming() {
             provider
-                .stream(system_prompt.as_str(), &messages_for_provider, &tools)
+                .stream(
+                    system_prompt.as_str(),
+                    messages_for_provider.messages(),
+                    &tools,
+                )
                 .await?
         } else {
             let (message, mut usage) = provider
-                .complete(system_prompt.as_str(), &messages_for_provider, &tools)
+                .complete(
+                    system_prompt.as_str(),
+                    messages_for_provider.messages(),
+                    &tools,
+                )
                 .await?;
 
             // Ensure we have token counts for non-streaming case
             usage
                 .ensure_tokens(
                     system_prompt.as_str(),
-                    &messages_for_provider,
+                    messages_for_provider.messages(),
                     &message,
                     &tools,
                 )
