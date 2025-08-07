@@ -53,6 +53,7 @@ export const MainPanelLayout: React.FC<{
           className="flex flex-col min-w-0 transition-all duration-300 ease-out"
           style={{
             width: isVisible ? `${100 - sidecarWidth}%` : '100%',
+            minWidth: '450px', // Ensure main content never goes below 450px
             transition: isResizing ? 'none' : 'width 300ms ease-out',
           }}
         >
