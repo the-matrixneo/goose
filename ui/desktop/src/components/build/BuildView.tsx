@@ -358,6 +358,7 @@ const BuildView: React.FC = () => {
       } catch (err) {
         console.warn('Failed to get port from manage_server, using default 3000', err);
       }
+      localStorage.setItem('goose-sidecar-url', `http://localhost:${port}`);
 
       // 1) Navigate to ChatView
       window.location.hash = '#/pair';
