@@ -95,7 +95,7 @@ impl RouterToolSelector for LLMToolSelector {
             let user_message = Message::user().with_text(&user_prompt);
             let response = self
                 .llm_provider
-                .complete("", &[user_message], &[])
+                .complete("system", &[user_message], &[])
                 .await
                 .map_err(|e| ToolError::ExecutionError(format!("Failed to search tools: {}", e)))?;
 
