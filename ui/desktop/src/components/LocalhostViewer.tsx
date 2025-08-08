@@ -45,19 +45,20 @@ export function LocalhostViewer({
     }
     return initialUrl;
   });
-  
+
   const [inputUrl, setInputUrl] = useState(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('goose-sidecar-url') || initialUrl;
     }
     return initialUrl;
   });
-  
+
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [canGoBack, setCanGoBack] = useState(false);
   const [canGoForward, setCanGoForward] = useState(false);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
+  // eslint-disable-next-line no-undef
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
   useEffect(() => {
     if (onUrlChange) {
@@ -77,7 +78,7 @@ export function LocalhostViewer({
     setUrl(formattedUrl);
     setInputUrl(formattedUrl);
     setIsLoading(true);
-    
+
     // Save to localStorage
     if (typeof window !== 'undefined') {
       localStorage.setItem('goose-sidecar-url', formattedUrl);
@@ -93,7 +94,10 @@ export function LocalhostViewer({
   const handleRefresh = () => {
     if (iframeRef.current) {
       setIsLoading(true);
-      iframeRef.current.src = iframeRef.current.src;
+      // Create a new URL to force refresh
+      const currentSrc = iframeRef.current.src;
+      iframeRef.current.src = '';
+      iframeRef.current.src = currentSrc;
     }
   };
 

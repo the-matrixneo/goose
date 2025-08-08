@@ -87,7 +87,7 @@ const AppLayoutContent: React.FC<AppLayoutProps> = ({ setIsGoosehintsModalOpen }
     console.log('Right globe button clicked');
     console.log('Sidecar available:', !!sidecar);
     console.log('Current pathname:', location.pathname);
-    
+
     if (sidecar) {
       console.log('Calling sidecar.showLocalhostViewer...');
       sidecar.showLocalhostViewer('http://localhost:3000', 'Localhost Viewer');
@@ -98,14 +98,14 @@ const AppLayoutContent: React.FC<AppLayoutProps> = ({ setIsGoosehintsModalOpen }
 
   // Listen for programmatic request to show the sidecar localhost viewer
   React.useEffect(() => {
-    const handler = (e: Event) => {
+    const handler = (e: globalThis.Event) => {
       if (!sidecar) return;
       const ce = e as CustomEvent<{ url?: string }>;
       const url = ce.detail?.url || 'http://localhost:3000';
       sidecar.showLocalhostViewer(url, 'Localhost Viewer');
     };
-    window.addEventListener('open-sidecar-localhost', handler as EventListener);
-    return () => window.removeEventListener('open-sidecar-localhost', handler as EventListener);
+    window.addEventListener('open-sidecar-localhost', handler);
+    return () => window.removeEventListener('open-sidecar-localhost', handler);
   }, [sidecar]);
 
   return (
@@ -124,29 +124,33 @@ const AppLayoutContent: React.FC<AppLayoutProps> = ({ setIsGoosehintsModalOpen }
               size="xs"
               title="Start a new session in a new window"
             >
-              {safeIsMacOS ? <AppWindowMac className="w-4 h-4" /> : <AppWindow className="w-4 h-4" />}
+              {safeIsMacOS ? (
+                <AppWindowMac className="w-4 h-4" />
+              ) : (
+                <AppWindow className="w-4 h-4" />
+              )}
             </Button>
           </div>
-          
+
           {/* Right side globe button - show on chat-related pages (not home/hub) and hide when sidecar is open */}
-          {(location.pathname === '/chat' || location.pathname === '/pair') && 
-           !(sidecar?.activeView && sidecar?.views.find((v) => v.id === sidecar.activeView)) && (
-            <div className="absolute top-3 right-4 z-100">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    onClick={handleGlobeClick}
-                    className="no-drag hover:!bg-background-medium"
-                    variant="ghost"
-                    size="xs"
-                  >
-                    <Globe className="w-4 h-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="top">Open Localhost Site</TooltipContent>
-              </Tooltip>
-            </div>
-          )}
+          {(location.pathname === '/chat' || location.pathname === '/pair') &&
+            !(sidecar?.activeView && sidecar?.views.find((v) => v.id === sidecar.activeView)) && (
+              <div className="absolute top-3 right-4 z-100">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      onClick={handleGlobeClick}
+                      className="no-drag hover:!bg-background-medium"
+                      variant="ghost"
+                      size="xs"
+                    >
+                      <Globe className="w-4 h-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">Open Localhost Site</TooltipContent>
+                </Tooltip>
+              </div>
+            )}
         </>
       )}
       <Sidebar variant="inset" collapsible="offcanvas">

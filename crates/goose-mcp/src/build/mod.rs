@@ -286,7 +286,7 @@ impl BuildRouter {
             ));
             (project, child_opt)
         };
-        
+
         // kill outside lock
         if let Some(child) = child_opt {
             self.terminate_child_process(child).await;
@@ -343,7 +343,8 @@ impl BuildRouter {
                             let mut s = self.state.lock().unwrap();
                             s.logs.push(format!(
                                 "[{}] Timeout waiting for pid {} to exit, sending SIGKILL...\n",
-                                Utc::now(), pid
+                                Utc::now(),
+                                pid
                             ));
                         }
                         let _ = child.kill().await; // SIGKILL

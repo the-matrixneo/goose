@@ -1639,7 +1639,7 @@ ipcMain.handle('read-file', (_event, filePath) => {
       resolve({ file: output, filePath: expandedPath, error: null, found: true });
     });
 
-    cat.on('error', (error) => {
+    cat.on('error', (error: unknown) => {
       console.error('Error reading file:', error);
       resolve({ file: '', filePath: expandedPath, error, found: false });
     });
@@ -2623,14 +2623,11 @@ ipcMain.handle('check-subdomain', async (_event, subdomain: string) => {
   try {
     console.log(`[Main] Checking subdomain availability for: ${subdomain}`);
 
-    const response = await fetch(
-      'https://goose-dev-sites.stage.sqprod.co/api/v1/check',
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ site_name: subdomain }),
-      }
-    );
+    const response = await fetch('https://goose-dev-sites.stage.sqprod.co/api/v1/check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ site_name: subdomain }),
+    });
 
     // Get the response as text first to handle both JSON and plain text responses
     const responseText = await response.text();
@@ -2699,6 +2696,7 @@ ipcMain.handle('claim-subdomain', async (_event, subdomain: string, appName: str
     // Save subdomain metadata after successful claim
     try {
       const metadataPath = path.join(appPath, '.goose-metadata.json');
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let metadata: any = {};
 
       // Try to read existing metadata
