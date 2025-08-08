@@ -1,6 +1,7 @@
 use anyhow::Result;
 use goose_mcp::{
-    ComputerControllerRouter, BuildRouter, DeveloperRouter, GoogleDriveRouter, MemoryRouter, TutorialRouter,
+    BuildRouter, ComputerControllerRouter, DeveloperRouter, GoogleDriveRouter, MemoryRouter,
+    TutorialRouter,
 };
 use mcp_server::router::RouterService;
 use mcp_server::{BoundedService, ByteTransport, Server};
