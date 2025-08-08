@@ -2,12 +2,12 @@ use mcp_core::ToolError;
 use rmcp::model::Content;
 use rmcp::model::Tool;
 
+use crate::config::unified as uconfig;
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::collections::VecDeque;
-use std::env;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -42,19 +42,17 @@ impl VectorToolSelector {
     pub async fn new(provider: Arc<dyn Provider>, table_name: String) -> Result<Self> {
         let vector_db = ToolVectorDB::new(Some(table_name)).await?;
 
-        let embedding_provider = if env::var("GOOSE_EMBEDDING_MODEL_PROVIDER").is_ok() {
-            // If env var is set, create a new provider for embeddings
-            // Get embedding model and provider from environment variables
-            let embedding_model = env::var("GOOSE_EMBEDDING_MODEL")
-                .unwrap_or_else(|_| "text-embedding-3-small".to_string());
-            let embedding_provider_name =
-                env::var("GOOSE_EMBEDDING_MODEL_PROVIDER").unwrap_or_else(|_| "openai".to_string());
-
+        // Prefer explicit embeddings.* settings via unified config; otherwise reuse base provider
+        let embedding_provider = if let Ok(embedding_provider_name) =
+            uconfig::get::<String>("embeddings.provider")
+        {
+            let embedding_model =
+                uconfig::get_or::<String>("embeddings.model", "text-embedding-3-small".to_string());
             // Create the provider using the factory
             let model_config = ModelConfig::new(embedding_model.as_str())
                 .context("Failed to create model config for embedding provider")?;
             providers::create(&embedding_provider_name, model_config).context(format!(
-                "Failed to create {} provider for embeddings. If using OpenAI, make sure OPENAI_API_KEY env var is set or that you have configured the OpenAI provider via Goose before.",
+                "Failed to create {} provider for embeddings. If using OpenAI, make sure OPENAI_API_KEY is set or configure the provider via goose configure.",
                 embedding_provider_name
             ))?
         } else {

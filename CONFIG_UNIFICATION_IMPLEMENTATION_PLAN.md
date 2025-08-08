@@ -1,6 +1,68 @@
 # Goose Unified Configuration — Implementation Plan
 [Status: Phase 1 shipped]
 
+[Status update: Phase 2 — in progress]
+
+Changes landed in this commit series (Phase 2 kick-off):
+
+- Registry expansion (unified/config/unified/registry.rs)
+  - Added canonical keys and aliases for:
+    - agent.mode (GOOSE_MODE) with enum validator
+[Phase 2 status update — partial complete]
+
+- Implemented in this pass:
+  - Migrated allowlist to unified: security.allowlist.url, security.allowlist.bypass in goose-server
+  - Unified CLI preferences: cli.theme, cli.show_cost, cli.show_thinking in goose-cli render paths
+  - Scheduler type migration in goose-cli schedule commands via scheduler.type
+  - Registry expanded further: providers.openai.api_key; added cli.show_thinking
+  - Regenerated Desktop OpenAPI schema; /config/effective present
+  - All unit/integration tests pass (provider E2E requiring external services still flaky/skipped)
+
+- Remaining for Phase 2 closeout:
+  - Migrate remaining env reads listed in CONFIG_BRAINSTORM “reader_migrator” (model.temperature/toolshim, editor.* in MCP dev server)
+  - Add docs updates: environment-variables.md and unified-configuration.md reflect cli.* keys and allowlist keys, with alias notes
+  - Quick integration tests for cli.theme and scheduler.type precedence (overlay/env/file/default)
+
+
+    - router.tool_selection_strategy (GOOSE_ROUTER_TOOL_SELECTION_STRATEGY) with enum validator
+    - server.host, server.port (port validator), server.secret_key (GOOSE_SERVER__SECRET_KEY, secret)
+    - security.allowlist.url (GOOSE_ALLOWLIST, URL validator) and security.allowlist.bypass (GOOSE_ALLOWLIST_BYPASS)
+    - tracing.langfuse.url (URL validator), tracing.otlp.endpoint, tracing.otlp.timeout_ms
+    - model.context_limit, lead.context_limit, worker.context_limit (numeric validators)
+    - planner.provider/model/context_limit
+    - embeddings.provider/model
+    - editor.api_key (secret), editor.host (URL validator), editor.model
+    - cli.theme, cli.show_cost, cli.min_priority
+    - scheduler.type (enum validator), scheduler.temporal.bin
+  - Introduced simple validator helpers (enum/url/port/range)
+
+- Code migration
+  - Tool router strategy now resolves via unified config: router.tool_selection_strategy
+  - Vector embedding provider/model selection now resolves via unified config: embeddings.provider, embeddings.model
+
+- Tests
+  - Added unit assertions for enum validators (agent.mode, scheduler.type)
+
+What remains in Phase 2:
+- Expand registry with remaining high‑value keys from reports (goose mode already done; add router/context strategies if separate, editor/planner fine‑tuning, tracing/OTLP extra knobs if any left)
+- Migrate more read paths to unified API:
+  - Allowlist enforcement (server) → use security.allowlist.*
+  - CLI theme/show-cost reads → unify behind cli.*
+  - Scheduler type reads in goose-cli and others → use scheduler.type
+  - Model/temperature/toolshim reads where appropriate
+- Desktop/Server: run `just generate-openapi`, plumb /config/effective to Desktop where needed
+- Docs: update guides to reference canonical keys and GOOSE_* mappings
+
+Execution checklist (Phase 2):
+- [x] Expand registry with next tranche of keys (agent.mode, router strategy, editor API, scheduler, allowlist, context limits, tracing/OTLP)
+- [x] Swap read sites to unified::get/get_or for some keys (router strategy, embeddings)
+- [ ] Swap additional read sites (allowlist, cli.theme/show_cost, scheduler.type, context_limit fallbacks)
+- [x] Add/extend tests for validators
+- [ ] Update docs/examples to show canonical keys and GOOSE_* mappings
+- [ ] Run `just generate-openapi` and verify Desktop consumes /config/effective
+
+---
+
 - Implemented unified resolver + static registry + CLI overlay
 - Added non-interactive `goose configure` subcommands: show/get/set/unset
 - Wired call sites (session + web + server.port) to unified reads
@@ -352,3 +414,50 @@ Exit criteria for Phase 2:
 - Registry covers all frequently used keys with aliases
 - configure --show provides a comprehensive overview for users; desktop shows the same
 - Documentation clearly points to canonical keys and the unified flow
+
+---
+
+## Phase 3 prompt (for Goose)
+
+You are Goose working inside this repository. Continue the unified configuration migration (Phase 3) using subagents to accelerate work. Partition the remaining tasks, run them incrementally, and have each subagent write a concise progress summary to /tmp/gooseconfigoverhaul/<subagent_name>.md after each task chunk.
+
+Ground rules:
+- Always prefer canonical keys with unified::get/get_or/resolve and unified::set/set_secret
+- Map any remaining direct env reads to canonical keys via registry aliases; remove direct std::env::var usage where safe
+- Keep PRs incremental and compiling; run cargo fmt, clippy script, and unit/integration tests relevant to touched areas
+- Update docs where user‑facing keys change; avoid breaking changes by using aliases
+- When tests depend on external services, mark them as ignored in CI and focus on unit/integration that do not require creds
+
+Subagents and tasks:
+1) registry_agent
+   - Fill remaining registry gaps identified in reports (temperature, toolshim, editor.*, otlp headers/protocol if present)
+   - Add/adjust validators (ranges for temperature, booleans, urls)
+   - Summary: /tmp/gooseconfigoverhaul/registry_agent.md (include table of keys/aliases)
+
+2) reader_migrator
+   - Migrate remaining direct reads to unified API:
+     - model.rs temperature/toolshim/ollama model envs → canonical keys (e.g., model.temperature, toolshim.enabled, toolshim.model)
+     - MCP developer editor models in goose-mcp → editor.* keys
+     - providers/openai embeddings env to embeddings.model via unified
+   - Summary: /tmp/gooseconfigoverhaul/reader_migrator.md (paths and replacements)
+
+3) server_desktop_agent
+   - Confirm /config/effective route parameters cover filter/only_changed/include_sources; ensure Desktop consumes sources/redaction fields
+   - Create follow‑up TODOs if Desktop needs UI changes (lightweight)
+   - Summary: /tmp/gooseconfigoverhaul/server_desktop_agent.md
+
+4) docs_agent
+   - Update docs to reference canonical keys and GOOSE_* mappings, noting legacy aliases
+   - Ensure unified-configuration.md examples use unified::get/get_or and show precedence
+   - Summary: /tmp/gooseconfigoverhaul/docs_agent.md (pages updated)
+
+5) tests_agent
+   - Add unit tests for new validators and integration assertions for cli.theme and scheduler.type resolution precedence (CLI overlay > env > file > default)
+   - Add a couple of quick integration tests for allowlist bypass and URL resolution via unified
+   - Summary: /tmp/gooseconfigoverhaul/tests_agent.md (test names)
+
+Exit criteria for Phase 3:
+- All remaining high‑value env reads migrated to unified API
+- Registry covers keys used by server/CLI/Desktop happy‑path flows including editor/toolshim/temperature
+- Docs reflect canonical keys with alias notes
+- All checks green (cargo check/fmt/clippy/test) and OpenAPI regenerated

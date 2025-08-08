@@ -1,4 +1,49 @@
 # Unified configuration migration prompt (for Goose)
+# Phase 2(b) prompt for Goose (self)
+
+You are Goose working inside this repository. Continue Phase 2 of the unified configuration migration using subagents to accelerate work. Coordinate the following tasks and have your subagents write concise progress summaries to /tmp/gooseconfigoverhaul/<subagent_name>.md after each task chunk.
+
+Ground rules:
+- Always prefer canonical keys with unified::get/get_or/resolve and unified::set/set_secret.
+- When touching env reads, map them to canonical keys via registry aliases; remove direct std::env::var usage where safe.
+- Keep PRs incremental and compiling. Run cargo fmt, clippy script, and relevant unit tests.
+- Update docs where user-facing keys change. Avoid breaking changes; use aliases.
+
+Subagents and tasks:
+1) registry_agent
+   - Expand the registry with any missing keys referenced in CONFIG_REPORT.md and FINAL_* reports, particularly:
+     - tracings.otlp.* additional knobs (headers? protocol?), editor.* refinements, planner/embeddings defaults, CLI extras (show_thinking), router context strategy if present.
+   - Add validators for URL/port/enums where appropriate.
+   - Write summary to /tmp/gooseconfigoverhaul/registry_agent.md with a table of keys added and aliases.
+
+2) reader_migrator
+   - Migrate remaining direct reads to unified API:
+     - Allowlist in goose-server routes/extension.rs → security.allowlist.url and security.allowlist.bypass
+     - CLI theme/show_cost reads in goose-cli and session output → cli.theme, cli.show_cost
+     - Scheduler type in goose, goose-cli → scheduler.type
+     - Context limit fallbacks in providers/factory.rs and model.rs to use unified keys (model.context_limit, lead/worker/planner.context_limit)
+   - Write summary to /tmp/gooseconfigoverhaul/reader_migrator.md with file paths and replacements.
+
+3) server_desktop_agent
+   - Ensure /config/effective route remains correct; run just generate-openapi to refresh Desktop API types.
+   - Add (or verify) Desktop UI consumes sources/redaction fields; prepare a follow-up note if UI changes are needed.
+   - Write summary to /tmp/gooseconfigoverhaul/server_desktop_agent.md.
+
+4) docs_agent
+   - Update documentation pages to reference canonical keys and GOOSE_* mappings, noting legacy aliases.
+   - Update unified-configuration.md examples to use unified::get/get_or.
+   - Write summary to /tmp/gooseconfigoverhaul/docs_agent.md listing pages updated.
+
+5) tests_agent
+   - Add unit tests for new validators and a couple of integration assertions for cli/theme and scheduler.type resolution precedence (CLI overlay > env > file > default).
+   - Write summary to /tmp/gooseconfigoverhaul/tests_agent.md with test names.
+
+Exit criteria for this phase:
+- Majority of env-based reads migrated to unified API for the items above.
+- Registry covers keys exercised by the server/CLI/Desktop happy-path flows.
+- Docs reflect canonical keys with alias notes.
+- All checks green (cargo check/fmt/clippy/test) and Desktop OpenAPI is regenerated.
+
 
 You are the Goose developer assistant working inside this repository. Begin Phase 2 of the unified configuration migration.
 

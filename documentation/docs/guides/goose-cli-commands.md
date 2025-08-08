@@ -21,10 +21,76 @@ goose --help
 
 ### configure [options]
 
-Configure Goose settings - providers, extensions, etc.
+Configure Goose settings, view effective configuration, and manage values and secrets.
 
-**Usage:**
+Core subcommands:
+- goose configure --show [--format table|json|yaml] [--filter PREFIX] [--only-changed] [--sources]
+- goose configure --get KEY [--raw] [--show-secret]
+- goose configure --set KEY=VALUE [--secret]   # repeatable
+- goose configure --unset KEY [--secret]
+
+Global non-persistent overlay (must be before subcommand):
+- goose --set KEY=VALUE [--set KEY2=VALUE2] configure --get KEY --raw
+- goose --set KEY=VALUE session ...
+
+Usage examples:
+
+Show effective configuration (redacts secrets by default):
 ```bash
+# Table output (default)
+goose configure --show
+
+# JSON with sources and only-changed keys
+goose configure --show --format json --only-changed --sources
+
+# Filter to a namespace
+goose configure --show --filter llm.
+```
+
+Get a single key:
+```bash
+# Value (redacted if secret)
+goose configure --get llm.provider
+
+# Raw string only (no key= prefix)
+goose configure --get llm.provider --raw
+
+# Reveal secret (use cautiously)
+goose configure --get providers.openai.api_key --show-secret --raw
+```
+
+Set and unset values:
+```bash
+# Set non-secret value (persisted to config file)
+goose configure --set llm.model=gpt-4o
+
+# Set secret (persisted to keychain/file)
+goose configure --set providers.openai.api_key="sk-..." --secret
+
+# Unset a value
+goose configure --unset llm.model
+
+# Unset a secret
+goose configure --unset providers.openai.api_key --secret
+```
+
+Ephemeral overlay for a single command (highest precedence):
+```bash
+# Must come before the subcommand
+goose --set llm.provider=anthropic configure --get llm.provider --raw   # prints: anthropic
+
+# Applies to other commands too
+goose --set llm.provider=anthropic session --name my-session
+```
+
+Notes:
+- Precedence: overlay --set > environment (GOOSE_* then aliases) > config/secrets file > default
+- Secrets are redacted by default everywhere; use --show-secret on --get to reveal
+- The overlay flag here is non-persistent and must be specified before the subcommand (e.g., "goose --set ... configure ..."). The configure --set subcommand is for persistence.
+
+Interactive provider/extension setup:
+```bash
+# Launch the interactive configure TUI
 goose configure
 ```
 

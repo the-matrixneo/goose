@@ -513,7 +513,7 @@ impl Config {
     /// 1. First attempts JSON parsing (for structured data)
     /// 2. If that fails, tries primitive type parsing for common cases
     /// 3. Falls back to string if nothing else works
-    fn parse_env_value(val: &str) -> Result<Value, ConfigError> {
+    pub fn parse_env_value(val: &str) -> Result<Value, ConfigError> {
         // First try JSON parsing - this handles quoted strings, objects, arrays, etc.
         if let Ok(json_value) = serde_json::from_str(val) {
             return Ok(json_value);

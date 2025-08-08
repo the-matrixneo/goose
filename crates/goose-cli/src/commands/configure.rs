@@ -1,4 +1,237 @@
+use anyhow::Result;
+use clap::ValueEnum;
 use cliclack::spinner;
+use goose::config::unified as unified_config;
+use goose::config::unified::registry;
+use goose::config::unified::{effective_config, Source, UnifiedConfigError};
+use serde::Serialize;
+
+#[derive(Clone, ValueEnum, Debug)]
+pub enum OutputFormat {
+    Table,
+    Json,
+    Yaml,
+}
+
+#[derive(Serialize)]
+struct ShowEntry {
+    key: String,
+    value: serde_json::Value,
+    redacted: bool,
+    is_secret: bool,
+    source: String,
+    env_name: Option<String>,
+    alias_used: Option<bool>,
+}
+
+fn source_to_display(source: &Source) -> (String, Option<String>, Option<bool>) {
+    match source {
+        Source::Cli => ("Cli".to_string(), None, None),
+        Source::Env { name, alias_used } => {
+            ("Env".to_string(), Some(name.clone()), Some(*alias_used))
+        }
+        Source::File => ("File".to_string(), None, None),
+        Source::Default => ("Default".to_string(), None, None),
+    }
+}
+
+pub fn handle_config_show(
+    format: OutputFormat,
+    filter: Option<String>,
+    only_changed: bool,
+    include_sources: bool,
+) -> Result<()> {
+    let entries = effective_config(filter.as_deref(), only_changed, include_sources);
+
+    // Keep output stable by mapping to the old ShowEntry shape for JSON/YAML
+    let display_entries: Vec<ShowEntry> = entries
+        .iter()
+        .map(|e| ShowEntry {
+            key: e.key.clone(),
+            value: e.value.clone(),
+            redacted: e.redacted,
+            is_secret: e.is_secret,
+            source: if include_sources {
+                match &e.source {
+                    Source::Cli => "Cli".to_string(),
+                    Source::Env { .. } => "Env".to_string(),
+                    Source::File => "File".to_string(),
+                    Source::Default => "Default".to_string(),
+                }
+            } else {
+                String::new()
+            },
+            env_name: if include_sources {
+                e.env_name.clone()
+            } else {
+                None
+            },
+            alias_used: if include_sources { e.alias_used } else { None },
+        })
+        .collect();
+
+    match format {
+        OutputFormat::Json => {
+            println!("{}", serde_json::to_string_pretty(&display_entries)?);
+        }
+        OutputFormat::Yaml => {
+            println!("{}", serde_yaml::to_string(&display_entries)?);
+        }
+        OutputFormat::Table => {
+            use console::style;
+            println!(
+                "{:<35} {:<40} {:<12} {:<6}{}",
+                style("Key").bold(),
+                style("Value").bold(),
+                style("Source").bold(),
+                style("Alias?").bold(),
+                if include_sources { " (env)" } else { "" }
+            );
+            for e in entries {
+                let value_str = match &e.value {
+                    serde_json::Value::String(s) => s.clone(),
+                    other => other.to_string(),
+                };
+                if include_sources {
+                    let alias = e
+                        .alias_used
+                        .map(|b| if b { "yes" } else { "no" })
+                        .unwrap_or("");
+                    let source = match e.source {
+                        Source::Cli => "Cli".to_string(),
+                        Source::Env { .. } => "Env".to_string(),
+                        Source::File => "File".to_string(),
+                        Source::Default => "Default".to_string(),
+                    };
+                    let env_name = e.env_name.unwrap_or_default();
+                    println!(
+                        "{:<35} {:<40} {:<12} {:<6} {}",
+                        e.key, value_str, source, alias, env_name
+                    );
+                } else {
+                    println!("{:<35} {:<40}", e.key, value_str);
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+pub fn handle_config_get(key: &str, raw: bool, show_secret: bool) -> Result<()> {
+    let resolved = unified_config::resolve::<serde_json::Value>(key)?;
+
+    let value = if resolved.is_secret && !show_secret {
+        serde_json::Value::String("***".to_string())
+    } else {
+        resolved.value
+    };
+
+    if raw {
+        match value {
+            serde_json::Value::String(s) => println!("{}", s),
+            other => println!("{}", other),
+        }
+    } else {
+        let (src, env_name, alias_used) = source_to_display(&resolved.source);
+        println!(
+            "{} = {}",
+            key,
+            match &value {
+                serde_json::Value::String(s) => s.clone(),
+                v => v.to_string(),
+            }
+        );
+        println!(
+            "source: {}{}{}",
+            src,
+            env_name
+                .map(|n| format!(
+                    " ({}{})",
+                    n,
+                    if alias_used.unwrap_or(false) {
+                        ", alias"
+                    } else {
+                        ""
+                    }
+                ))
+                .unwrap_or_default(),
+            if resolved.is_secret && !show_secret {
+                " (redacted)"
+            } else {
+                ""
+            }
+        );
+    }
+
+    Ok(())
+}
+
+pub fn handle_config_set(pairs: Vec<String>, force_secret: bool) -> Result<()> {
+    if pairs.is_empty() {
+        anyhow::bail!("no KEY=VALUE pairs provided");
+    }
+
+    for p in pairs {
+        let (key, raw_val) = p
+            .split_once('=')
+            .ok_or_else(|| anyhow::anyhow!("invalid KEY=VALUE: {}", p))?;
+        let key = key.trim();
+        let spec = registry::find_spec(key)
+            .ok_or_else(|| anyhow::anyhow!("unknown configuration key: {}", key))?;
+        let json_val = goose::config::Config::parse_env_value(raw_val)
+            .unwrap_or(serde_json::Value::String(raw_val.to_string()));
+
+        if force_secret {
+            if let Err(e) = unified_config::set_secret(key, json_val) {
+                match e {
+                    UnifiedConfigError::InvalidValue { key: k, reason } => {
+                        anyhow::bail!("invalid value for {}: {}", k, reason)
+                    }
+                    other => return Err(anyhow::anyhow!(other)),
+                }
+            }
+        } else if let Err(e) = unified_config::set(key, json_val) {
+            match e {
+                UnifiedConfigError::InvalidValue { key: k, reason } => {
+                    anyhow::bail!("invalid value for {}: {}", k, reason)
+                }
+                other => return Err(anyhow::anyhow!(other)),
+            }
+        }
+
+        println!(
+            "set {} ({}): OK",
+            key,
+            if force_secret || spec.secret {
+                "secret"
+            } else {
+                "value"
+            }
+        );
+    }
+
+    Ok(())
+}
+
+pub fn handle_config_unset(key: &str, force_secret: bool) -> Result<()> {
+    let spec = registry::find_spec(key)
+        .ok_or_else(|| anyhow::anyhow!("unknown configuration key: {}", key))?;
+
+    if force_secret && !spec.secret {
+        // Explicitly remove from secrets store if user insists
+        goose::config::Config::global()
+            .delete_secret(key)
+            .or_else(|_| unified_config::unset(key).map_err(|e| anyhow::anyhow!(e)))?;
+        println!("unset {} from secrets store", key);
+        return Ok(());
+    }
+
+    unified_config::unset(key)?;
+    println!("unset {}", key);
+    Ok(())
+}
+
 use console::style;
 use goose::agents::extension::ToolInfo;
 use goose::agents::extension_manager::get_parameter_names;

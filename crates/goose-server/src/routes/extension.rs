@@ -348,12 +348,11 @@ static ALLOWED_EXTENSIONS: OnceLock<Option<AllowedExtensions>> = OnceLock::new()
 /// Fetches and parses the allowed extensions from the URL specified in GOOSE_ALLOWLIST env var
 #[allow(dead_code)]
 fn fetch_allowed_extensions() -> Option<AllowedExtensions> {
-    match env::var("GOOSE_ALLOWLIST") {
-        Err(_) => {
-            // Environment variable not set, no allowlist to enforce
-            None
-        }
-        Ok(url) => match reqwest::blocking::get(&url) {
+    // Prefer unified configuration for allowlist URL
+    let url_opt = goose::config::unified::get::<String>("security.allowlist.url").ok();
+    match url_opt {
+        None => None,
+        Some(url) => match reqwest::blocking::get(&url) {
             Err(e) => {
                 eprintln!("Failed to fetch allowlist: {}", e);
                 None
@@ -388,13 +387,10 @@ fn get_allowed_extensions() -> &'static Option<AllowedExtensions> {
 /// Checks if a command is allowed based on the allowlist
 #[allow(dead_code)]
 fn is_command_allowed(cmd: &str, args: &[String]) -> bool {
-    // Check if bypass is enabled
-    if let Ok(bypass_value) = env::var("GOOSE_ALLOWLIST_BYPASS") {
-        if bypass_value.to_lowercase() == "true" {
-            // Bypass the allowlist check
-            println!("Allowlist check bypassed due to GOOSE_ALLOWLIST_BYPASS=true");
-            return true;
-        }
+    // Check if bypass is enabled via unified config
+    if goose::config::unified::get_or::<bool>("security.allowlist.bypass", false) {
+        println!("Allowlist check bypassed due to security.allowlist.bypass=true");
+        return true;
     }
 
     // Proceed with normal allowlist check

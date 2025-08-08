@@ -1472,9 +1472,7 @@ impl Session {
         let context_limit = model_config.context_limit();
 
         let config = Config::global();
-        let show_cost = config
-            .get_param::<bool>("GOOSE_CLI_SHOW_COST")
-            .unwrap_or(false);
+        let show_cost = goose::config::unified::get_or::<bool>("cli.show_cost", false);
 
         let provider_name = config
             .get_param::<String>("GOOSE_PROVIDER")

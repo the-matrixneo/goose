@@ -6,7 +6,7 @@ use crate::agents::router_tools::{self};
 use crate::agents::tool_execution::ToolCallResult;
 use crate::agents::tool_router_index_manager::ToolRouterIndexManager;
 use crate::agents::tool_vectordb::generate_table_id;
-use crate::config::Config;
+use crate::config::unified as uconfig;
 use crate::conversation::message::ToolRequest;
 use crate::providers::base::Provider;
 use anyhow::{anyhow, Result};
@@ -73,10 +73,9 @@ impl ToolRouteManager {
             return None;
         }
 
-        let config = Config::global();
-        let router_tool_selection_strategy = config
-            .get_param("GOOSE_ROUTER_TOOL_SELECTION_STRATEGY")
-            .unwrap_or_else(|_| "default".to_string());
+        let strategy_key = "router.tool_selection_strategy";
+        let router_tool_selection_strategy =
+            uconfig::get_or::<String>(strategy_key, "default".to_string());
 
         match router_tool_selection_strategy.to_lowercase().as_str() {
             "vector" => Some(RouterToolSelectionStrategy::Vector),

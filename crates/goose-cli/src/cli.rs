@@ -1,4 +1,11 @@
+use crate::commands::configure::{
+    handle_config_get, handle_config_set, handle_config_show, handle_config_unset, OutputFormat,
+};
 use anyhow::Result;
+
+use goose::config::unified as goose_config;
+use serde_json::Value as JsonValue;
+
 use clap::{Args, Parser, Subcommand};
 
 use goose::config::{Config, ExtensionConfig};
@@ -33,6 +40,16 @@ use std::path::PathBuf;
 struct Cli {
     #[command(subcommand)]
     command: Option<Command>,
+
+    /// Unified config overlay (repeatable): --set key=value
+    #[arg(
+        long = "set",
+        value_name = "KEY=VALUE",
+        help = "Ephemeral config overlay (repeatable)",
+        action = clap::ArgAction::Append,
+        value_parser = parse_key_val,
+    )]
+    overlay: Vec<(String, String)>,
 }
 
 #[derive(Args, Debug)]
@@ -272,7 +289,41 @@ enum RecipeCommand {
 enum Command {
     /// Configure Goose settings
     #[command(about = "Configure Goose settings")]
-    Configure {},
+    Configure {
+        /// Show current configuration
+        #[arg(long, action = clap::ArgAction::SetTrue, help = "Show current configuration")]
+        show: bool,
+        /// Output format (table|json|yaml)
+        #[arg(long, value_enum, default_value_t = OutputFormat::Table)]
+        format: OutputFormat,
+        /// Filter by key prefix (e.g., llm., server.)
+        #[arg(long, value_name = "PREFIX")]
+        filter: Option<String>,
+        /// Only show values that differ from defaults
+        #[arg(long, action = clap::ArgAction::SetTrue)]
+        only_changed: bool,
+        /// Include detailed source information
+        #[arg(long, action = clap::ArgAction::SetTrue)]
+        sources: bool,
+        /// Get a single key
+        #[arg(long, value_name = "KEY")]
+        get: Option<String>,
+        /// Print raw value for get
+        #[arg(long, action = clap::ArgAction::SetTrue)]
+        raw: bool,
+        /// Reveal secret value (use cautiously)
+        #[arg(long = "show-secret", action = clap::ArgAction::SetTrue)]
+        show_secret: bool,
+        /// Set key=value pairs (can be repeated)
+        #[arg(long = "set", value_name = "KEY=VALUE", action = clap::ArgAction::Append)]
+        set_pairs: Vec<String>,
+        /// Mark values as secret when setting
+        #[arg(long = "secret", action = clap::ArgAction::SetTrue)]
+        secret: bool,
+        /// Unset a key
+        #[arg(long = "unset", value_name = "KEY")]
+        unset_key: Option<String>,
+    },
 
     /// Display Goose configuration information
     #[command(about = "Display Goose information")]
@@ -695,13 +746,25 @@ pub struct RecipeInfo {
 pub async fn cli() -> Result<()> {
     let cli = Cli::parse();
 
+    // Apply global --set overlay to unified resolver
+    if !cli.overlay.is_empty() {
+        let mut map = std::collections::HashMap::new();
+        for (k, v) in &cli.overlay {
+            // Parse like env parsing (JSON first, then primitives, else string)
+            let parsed = goose::config::base::Config::parse_env_value(v)
+                .unwrap_or(JsonValue::String(v.clone()));
+            map.insert(k.clone(), parsed);
+        }
+        goose_config::set_cli_overlay(map);
+    }
+
     // Track the current directory in projects.json
     if let Err(e) = crate::project_tracker::update_project_tracker(None, None) {
         eprintln!("Warning: Failed to update project tracker: {}", e);
     }
 
     let command_name = match &cli.command {
-        Some(Command::Configure {}) => "configure",
+        Some(Command::Configure { .. }) => "configure",
         Some(Command::Info { .. }) => "info",
         Some(Command::Mcp { .. }) => "mcp",
         Some(Command::Session { .. }) => "session",
@@ -723,7 +786,36 @@ pub async fn cli() -> Result<()> {
     );
 
     match cli.command {
-        Some(Command::Configure {}) => {
+        Some(Command::Configure {
+            show,
+            format,
+            filter,
+            only_changed,
+            sources,
+            get,
+            raw,
+            show_secret,
+            set_pairs,
+            secret,
+            unset_key,
+        }) => {
+            // Dispatch subcommands for unified config
+            if let Some(key) = get {
+                handle_config_get(&key, raw, show_secret)?;
+                return Ok(());
+            }
+            if !set_pairs.is_empty() {
+                handle_config_set(set_pairs, secret)?;
+                return Ok(());
+            }
+            if let Some(key) = unset_key {
+                handle_config_unset(&key, secret)?;
+                return Ok(());
+            }
+            if show {
+                handle_config_show(format, filter, only_changed, sources)?;
+                return Ok(());
+            }
             let _ = handle_configure().await;
             return Ok(());
         }

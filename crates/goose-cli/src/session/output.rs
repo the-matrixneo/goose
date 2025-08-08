@@ -55,13 +55,9 @@ impl Theme {
 
 thread_local! {
     static CURRENT_THEME: RefCell<Theme> = RefCell::new(
-        std::env::var("GOOSE_CLI_THEME").ok()
+        goose::config::unified::get::<String>("cli.theme").ok()
             .map(|val| Theme::from_config_str(&val))
-            .unwrap_or_else(||
-                Config::global().get_param::<String>("GOOSE_CLI_THEME").ok()
-                    .map(|val| Theme::from_config_str(&val))
-                    .unwrap_or(Theme::Dark)
-            )
+            .unwrap_or(Theme::Dark)
     );
 }
 
@@ -173,7 +169,7 @@ pub fn render_message(message: &Message, debug: bool) {
                 println!("Image: [data: {}, type: {}]", image.data, image.mime_type);
             }
             MessageContent::Thinking(thinking) => {
-                if std::env::var("GOOSE_CLI_SHOW_THINKING").is_ok()
+                if goose::config::unified::get_or::<bool>("cli.show_thinking", false)
                     && std::io::stdout().is_terminal()
                 {
                     println!("\n{}", style("Thinking:").dim().italic());

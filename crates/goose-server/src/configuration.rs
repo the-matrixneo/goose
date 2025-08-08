@@ -71,7 +71,8 @@ fn default_host() -> String {
 }
 
 fn default_port() -> u16 {
-    3000
+    // Prefer unified config if available, fall back to 3000
+    goose::config::unified::get_or::<u16>("server.port", 3000)
 }
 
 #[cfg(test)]

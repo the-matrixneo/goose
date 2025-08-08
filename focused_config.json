@@ -1,0 +1,1581 @@
+{
+  "summary": {
+    "total_items": 139,
+    "by_type": {
+      "config_param": 69,
+      "env_var": 47,
+      "secret": 12,
+      "cli_flag": 11
+    }
+  },
+  "items": {
+    "GOOSE_TEMPORAL_BIN": {
+      "key": "GOOSE_TEMPORAL_BIN",
+      "config_type": "env_var",
+      "method": "std::env::var",
+      "locations": [
+        "crates/goose/src/temporal_scheduler.rs:458"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GOOSE_PROVIDER": {
+      "key": "GOOSE_PROVIDER",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/scheduler.rs:1125",
+        "crates/goose/src/scheduler.rs:1427",
+        "crates/goose/src/agents/agent.rs:1370",
+        "crates/goose/src/config/signup_openrouter/mod.rs:169",
+        "crates/goose-cli/src/commands/configure.rs:297",
+        "crates/goose-cli/src/commands/configure.rs:1310",
+        "crates/goose-cli/src/commands/configure.rs:502",
+        "crates/goose-cli/src/commands/web.rs:87",
+        "crates/goose-cli/src/session/builder.rs:187"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GOOSE_MODEL": {
+      "key": "GOOSE_MODEL",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/scheduler.rs:1135",
+        "crates/goose/src/scheduler.rs:1428",
+        "crates/goose/src/config/signup_openrouter/mod.rs:170",
+        "crates/goose-cli/src/commands/configure.rs:1578",
+        "crates/goose-cli/src/commands/configure.rs:1314",
+        "crates/goose-cli/src/commands/configure.rs:503",
+        "crates/goose-cli/src/commands/configure.rs:442",
+        "crates/goose-cli/src/commands/web.rs:95",
+        "crates/goose-cli/src/session/builder.rs:198",
+        "crates/goose-server/src/routes/agent.rs:249"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GOOSE_CONTEXT_LIMIT": {
+      "key": "GOOSE_CONTEXT_LIMIT",
+      "config_type": "env_var",
+      "method": "std::env::var",
+      "locations": [
+        "crates/goose/src/model.rs:115",
+        "crates/goose/src/providers/factory.rs:399",
+        "crates/goose/src/providers/factory.rs:423"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GOOSE_TEMPERATURE": {
+      "key": "GOOSE_TEMPERATURE",
+      "config_type": "env_var",
+      "method": "std::env::var",
+      "locations": [
+        "crates/goose/src/model.rs:141"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GOOSE_TOOLSHIM": {
+      "key": "GOOSE_TOOLSHIM",
+      "config_type": "env_var",
+      "method": "std::env::var",
+      "locations": [
+        "crates/goose/src/model.rs:162",
+        "crates/goose-cli/src/commands/configure.rs:454"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GOOSE_TOOLSHIM_OLLAMA_MODEL": {
+      "key": "GOOSE_TOOLSHIM_OLLAMA_MODEL",
+      "config_type": "env_var",
+      "method": "std::env::var",
+      "locations": [
+        "crates/goose/src/model.rs:178",
+        "crates/goose/src/providers/toolshim.rs:282",
+        "crates/goose-cli/src/commands/configure.rs:461"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "OTEL_EXPORTER_OTLP_ENDPOINT": {
+      "key": "OTEL_EXPORTER_OTLP_ENDPOINT",
+      "config_type": "env_var",
+      "method": "env::var",
+      "locations": [
+        "crates/goose/src/tracing/otlp_layer.rs:35",
+        "crates/goose/src/tracing/otlp_layer.rs:249",
+        "crates/goose/src/tracing/otlp_layer.rs:255",
+        "crates/goose/src/tracing/otlp_layer.rs:263",
+        "crates/goose-cli/src/main.rs:13"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "OTEL_EXPORTER_OTLP_TIMEOUT": {
+      "key": "OTEL_EXPORTER_OTLP_TIMEOUT",
+      "config_type": "env_var",
+      "method": "env::var",
+      "locations": [
+        "crates/goose/src/tracing/otlp_layer.rs:41",
+        "crates/goose/src/tracing/otlp_layer.rs:250",
+        "crates/goose/src/tracing/otlp_layer.rs:256",
+        "crates/goose/src/tracing/otlp_layer.rs:267"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "LANGFUSE_PUBLIC_KEY": {
+      "key": "LANGFUSE_PUBLIC_KEY",
+      "config_type": "env_var",
+      "method": "env::var",
+      "locations": [
+        "crates/goose/src/tracing/langfuse_layer.rs:156",
+        "crates/goose/src/tracing/langfuse_layer.rs:413",
+        "crates/goose/src/tracing/langfuse_layer.rs:449",
+        "crates/goose-cli/src/logging.rs:461",
+        "crates/goose-cli/src/logging.rs:483"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "LANGFUSE_INIT_PROJECT_PUBLIC_KEY": {
+      "key": "LANGFUSE_INIT_PROJECT_PUBLIC_KEY",
+      "config_type": "env_var",
+      "method": "env::var",
+      "locations": [
+        "crates/goose/src/tracing/langfuse_layer.rs:157",
+        "crates/goose/src/tracing/langfuse_layer.rs:431",
+        "crates/goose/src/tracing/langfuse_layer.rs:463",
+        "crates/goose-cli/src/logging.rs:466",
+        "crates/goose-cli/src/logging.rs:490"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "LANGFUSE_SECRET_KEY": {
+      "key": "LANGFUSE_SECRET_KEY",
+      "config_type": "env_var",
+      "method": "env::var",
+      "locations": [
+        "crates/goose/src/tracing/langfuse_layer.rs:160",
+        "crates/goose/src/tracing/langfuse_layer.rs:422",
+        "crates/goose/src/tracing/langfuse_layer.rs:450",
+        "crates/goose-cli/src/logging.rs:462",
+        "crates/goose-cli/src/logging.rs:484"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "LANGFUSE_INIT_PROJECT_SECRET_KEY": {
+      "key": "LANGFUSE_INIT_PROJECT_SECRET_KEY",
+      "config_type": "env_var",
+      "method": "env::var",
+      "locations": [
+        "crates/goose/src/tracing/langfuse_layer.rs:161",
+        "crates/goose/src/tracing/langfuse_layer.rs:440",
+        "crates/goose/src/tracing/langfuse_layer.rs:464",
+        "crates/goose-cli/src/logging.rs:470",
+        "crates/goose-cli/src/logging.rs:491"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "LANGFUSE_URL": {
+      "key": "LANGFUSE_URL",
+      "config_type": "env_var",
+      "method": "env::var",
+      "locations": [
+        "crates/goose/src/tracing/langfuse_layer.rs:169",
+        "crates/goose/src/tracing/langfuse_layer.rs:451",
+        "crates/goose-cli/src/logging.rs:463"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "OPENAI_API_KEY": {
+      "key": "OPENAI_API_KEY",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/config/base.rs:88",
+        "crates/goose/src/providers/openai.rs:61",
+        "crates/goose-server/src/routes/audio.rs:100"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "server": {
+      "key": "server",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/config/base.rs:97"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "test_key": {
+      "key": "test_key",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/config/base.rs:810",
+        "crates/goose/src/config/base.rs:815",
+        "crates/goose/src/config/base.rs:807"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "complex_key": {
+      "key": "complex_key",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/config/base.rs:841",
+        "crates/goose/src/config/base.rs:833"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "nonexistent_key": {
+      "key": "nonexistent_key",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/config/base.rs:853"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "key": {
+      "key": "key",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/config/base.rs:880",
+        "crates/goose/src/config/base.rs:885",
+        "crates/goose/src/config/base.rs:878",
+        "crates/goose/src/config/base.rs:899",
+        "crates/goose/src/config/base.rs:904",
+        "crates/goose/src/config/base.rs:897",
+        "crates/goose/src/config/base.rs:902"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "provider": {
+      "key": "provider",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/config/base.rs:1409"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "port": {
+      "key": "port",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/config/base.rs:1414"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "enabled": {
+      "key": "enabled",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/config/base.rs:1419"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "config": {
+      "key": "config",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/config/base.rs:1429"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "test_precedence": {
+      "key": "test_precedence",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/config/base.rs:1451",
+        "crates/goose/src/config/base.rs:1458",
+        "crates/goose/src/config/base.rs:1448"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "key1": {
+      "key": "key1",
+      "config_type": "config_param",
+      "method": "set_param",
+      "locations": [
+        "crates/goose/src/config/base.rs:862",
+        "crates/goose/src/config/base.rs:1044",
+        "crates/goose/src/config/base.rs:1192",
+        "crates/goose/src/config/base.rs:949",
+        "crates/goose/src/config/base.rs:958",
+        "crates/goose/src/config/base.rs:945",
+        "crates/goose/src/config/base.rs:955"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "key2": {
+      "key": "key2",
+      "config_type": "config_param",
+      "method": "set_param",
+      "locations": [
+        "crates/goose/src/config/base.rs:863",
+        "crates/goose/src/config/base.rs:1054",
+        "crates/goose/src/config/base.rs:950",
+        "crates/goose/src/config/base.rs:959",
+        "crates/goose/src/config/base.rs:946"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "test_key_backup": {
+      "key": "test_key_backup",
+      "config_type": "config_param",
+      "method": "set_param",
+      "locations": [
+        "crates/goose/src/config/base.rs:1148"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "another_key": {
+      "key": "another_key",
+      "config_type": "config_param",
+      "method": "set_param",
+      "locations": [
+        "crates/goose/src/config/base.rs:1149"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "third_key": {
+      "key": "third_key",
+      "config_type": "config_param",
+      "method": "set_param",
+      "locations": [
+        "crates/goose/src/config/base.rs:1156"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "version": {
+      "key": "version",
+      "config_type": "config_param",
+      "method": "set_param",
+      "locations": [
+        "crates/goose/src/config/base.rs:1213"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "api_key": {
+      "key": "api_key",
+      "config_type": "secret",
+      "method": "get_secret",
+      "locations": [
+        "crates/goose/src/config/base.rs:919",
+        "crates/goose/src/config/base.rs:924",
+        "crates/goose/src/config/base.rs:930",
+        "crates/goose/src/config/base.rs:918",
+        "crates/goose/src/config/base.rs:929"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GOOSE_DISABLE_KEYRING": {
+      "key": "GOOSE_DISABLE_KEYRING",
+      "config_type": "env_var",
+      "method": "env::var",
+      "locations": [
+        "crates/goose/src/config/base.rs:132"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "API_KEY": {
+      "key": "API_KEY",
+      "config_type": "env_var",
+      "method": "std::env::set_var",
+      "locations": [
+        "crates/goose/src/config/base.rs:923"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "extensions": {
+      "key": "extensions",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/config/extensions.rs:36",
+        "crates/goose/src/config/extensions.rs:72",
+        "crates/goose/src/config/extensions.rs:130",
+        "crates/goose/src/config/extensions.rs:89",
+        "crates/goose/src/config/extensions.rs:104",
+        "crates/goose/src/config/extensions.rs:117",
+        "crates/goose/src/config/extensions.rs:142",
+        "crates/goose/src/config/extensions.rs:150",
+        "crates/goose/src/config/extensions.rs:53",
+        "crates/goose/src/config/extensions.rs:95",
+        "crates/goose/src/config/extensions.rs:108",
+        "crates/goose/src/config/extensions.rs:122"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "experiments": {
+      "key": "experiments",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/config/experiments.rs:23",
+        "crates/goose/src/config/experiments.rs:33",
+        "crates/goose/src/config/experiments.rs:38"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GCP_PROJECT_ID": {
+      "key": "GCP_PROJECT_ID",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/providers/gcpvertexai.rs:108"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GCP_MAX_RETRIES": {
+      "key": "GCP_MAX_RETRIES",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/providers/gcpvertexai.rs:136"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GCP_INITIAL_RETRY_INTERVAL_MS": {
+      "key": "GCP_INITIAL_RETRY_INTERVAL_MS",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/providers/gcpvertexai.rs:142"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GCP_BACKOFF_MULTIPLIER": {
+      "key": "GCP_BACKOFF_MULTIPLIER",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/providers/gcpvertexai.rs:148"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GCP_MAX_RETRY_INTERVAL_MS": {
+      "key": "GCP_MAX_RETRY_INTERVAL_MS",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/providers/gcpvertexai.rs:154"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GCP_LOCATION": {
+      "key": "GCP_LOCATION",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/providers/gcpvertexai.rs:174"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GOOGLE_HOST": {
+      "key": "GOOGLE_HOST",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/providers/google.rs:61"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GOOGLE_API_KEY": {
+      "key": "GOOGLE_API_KEY",
+      "config_type": "secret",
+      "method": "get_secret",
+      "locations": [
+        "crates/goose/src/providers/google.rs:59"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "OLLAMA_HOST": {
+      "key": "OLLAMA_HOST",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/providers/toolshim.rs:88",
+        "crates/goose/src/providers/ollama.rs:41"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GOOSE_LEAD_MODEL": {
+      "key": "GOOSE_LEAD_MODEL",
+      "config_type": "env_var",
+      "method": "env::var",
+      "locations": [
+        "crates/goose/src/providers/factory.rs:236",
+        "crates/goose/src/providers/factory.rs:286",
+        "crates/goose/src/providers/factory.rs:342",
+        "crates/goose/src/providers/factory.rs:394",
+        "crates/goose/src/providers/factory.rs:241",
+        "crates/goose/src/providers/factory.rs:269",
+        "crates/goose/src/providers/factory.rs:305",
+        "crates/goose/src/providers/factory.rs:372",
+        "crates/goose/src/providers/factory.rs:408"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GOOSE_LEAD_PROVIDER": {
+      "key": "GOOSE_LEAD_PROVIDER",
+      "config_type": "env_var",
+      "method": "env::var",
+      "locations": [
+        "crates/goose/src/providers/factory.rs:237",
+        "crates/goose/src/providers/factory.rs:287",
+        "crates/goose/src/providers/factory.rs:343",
+        "crates/goose/src/providers/factory.rs:261",
+        "crates/goose/src/providers/factory.rs:273",
+        "crates/goose/src/providers/factory.rs:375"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GOOSE_LEAD_TURNS": {
+      "key": "GOOSE_LEAD_TURNS",
+      "config_type": "env_var",
+      "method": "env::var",
+      "locations": [
+        "crates/goose/src/providers/factory.rs:238",
+        "crates/goose/src/providers/factory.rs:288",
+        "crates/goose/src/providers/factory.rs:344",
+        "crates/goose/src/providers/factory.rs:262",
+        "crates/goose/src/providers/factory.rs:277",
+        "crates/goose/src/providers/factory.rs:323",
+        "crates/goose/src/providers/factory.rs:378"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GOOSE_LEAD_FAILURE_THRESHOLD": {
+      "key": "GOOSE_LEAD_FAILURE_THRESHOLD",
+      "config_type": "env_var",
+      "method": "env::var",
+      "locations": [
+        "crates/goose/src/providers/factory.rs:291",
+        "crates/goose/src/providers/factory.rs:345",
+        "crates/goose/src/providers/factory.rs:324",
+        "crates/goose/src/providers/factory.rs:381"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GOOSE_LEAD_FALLBACK_TURNS": {
+      "key": "GOOSE_LEAD_FALLBACK_TURNS",
+      "config_type": "env_var",
+      "method": "env::var",
+      "locations": [
+        "crates/goose/src/providers/factory.rs:295",
+        "crates/goose/src/providers/factory.rs:346",
+        "crates/goose/src/providers/factory.rs:325",
+        "crates/goose/src/providers/factory.rs:384"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GOOSE_WORKER_CONTEXT_LIMIT": {
+      "key": "GOOSE_WORKER_CONTEXT_LIMIT",
+      "config_type": "env_var",
+      "method": "env::var",
+      "locations": [
+        "crates/goose/src/providers/factory.rs:397",
+        "crates/goose/src/providers/factory.rs:418"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "OPENROUTER_HOST": {
+      "key": "OPENROUTER_HOST",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/providers/openrouter.rs:48"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "OPENROUTER_API_KEY": {
+      "key": "OPENROUTER_API_KEY",
+      "config_type": "secret",
+      "method": "get_secret",
+      "locations": [
+        "crates/goose/src/providers/openrouter.rs:46",
+        "crates/goose/src/config/signup_openrouter/mod.rs:168"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "AZURE_OPENAI_ENDPOINT": {
+      "key": "AZURE_OPENAI_ENDPOINT",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/providers/azure.rs:76"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "AZURE_OPENAI_DEPLOYMENT_NAME": {
+      "key": "AZURE_OPENAI_DEPLOYMENT_NAME",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/providers/azure.rs:77"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "AZURE_OPENAI_API_VERSION": {
+      "key": "AZURE_OPENAI_API_VERSION",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/providers/azure.rs:79"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "AZURE_OPENAI_API_KEY": {
+      "key": "AZURE_OPENAI_API_KEY",
+      "config_type": "secret",
+      "method": "get_secret",
+      "locations": [
+        "crates/goose/src/providers/azure.rs:83"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GITHUB_COPILOT_TOKEN": {
+      "key": "GITHUB_COPILOT_TOKEN",
+      "config_type": "secret",
+      "method": "set_secret",
+      "locations": [
+        "crates/goose/src/providers/githubcopilot.rs:239",
+        "crates/goose/src/providers/githubcopilot.rs:498"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "SAGEMAKER_ENDPOINT_NAME": {
+      "key": "SAGEMAKER_ENDPOINT_NAME",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/providers/sagemaker_tgi.rs:40"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GOOSE_MODE": {
+      "key": "GOOSE_MODE",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/providers/claude_code.rs:538",
+        "crates/goose/src/providers/claude_code.rs:535",
+        "crates/goose/src/providers/ollama.rs:134",
+        "crates/goose/src/agents/prompt_manager.rs:141",
+        "crates/goose/src/agents/agent.rs:1150",
+        "crates/goose-cli/src/commands/configure.rs:1150",
+        "crates/goose-cli/src/commands/configure.rs:1154",
+        "crates/goose-cli/src/commands/configure.rs:1158",
+        "crates/goose-cli/src/commands/configure.rs:1162",
+        "crates/goose-cli/src/commands/configure.rs:1121",
+        "crates/goose-cli/src/session/mod.rs:814",
+        "crates/goose-cli/src/session/mod.rs:621",
+        "crates/goose-cli/src/session/mod.rs:817",
+        "crates/goose-cli/src/session/mod.rs:835",
+        "crates/goose-server/src/routes/agent.rs:184"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "CLAUDE_CODE_COMMAND": {
+      "key": "CLAUDE_CODE_COMMAND",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/providers/claude_code.rs:36"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "HOME": {
+      "key": "HOME",
+      "config_type": "env_var",
+      "method": "std::env::var",
+      "locations": [
+        "crates/goose/src/providers/claude_code.rs:53",
+        "crates/goose/src/providers/gemini_cli.rs:52",
+        "crates/goose-cli/src/logging.rs:206",
+        "crates/goose-cli/src/logging.rs:258",
+        "crates/goose-cli/src/session/output.rs:885",
+        "crates/goose-cli/src/session/output.rs:888",
+        "crates/goose-cli/src/session/output.rs:903"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "PATH": {
+      "key": "PATH",
+      "config_type": "env_var",
+      "method": "std::env::var",
+      "locations": [
+        "crates/goose/src/providers/claude_code.rs:86",
+        "crates/goose/src/providers/gemini_cli.rs:90"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GOOSE_CLAUDE_CODE_DEBUG": {
+      "key": "GOOSE_CLAUDE_CODE_DEBUG",
+      "config_type": "env_var",
+      "method": "std::env::var",
+      "locations": [
+        "crates/goose/src/providers/claude_code.rs:310",
+        "crates/goose/src/providers/claude_code.rs:429"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "OLLAMA_TIMEOUT": {
+      "key": "OLLAMA_TIMEOUT",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/providers/ollama.rs:45"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "DATABRICKS_HOST": {
+      "key": "DATABRICKS_HOST",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/providers/databricks.rs:113",
+        "crates/goose/src/providers/databricks.rs:115"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "DATABRICKS_MAX_RETRIES": {
+      "key": "DATABRICKS_MAX_RETRIES",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/providers/databricks.rs:151"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "DATABRICKS_INITIAL_RETRY_INTERVAL_MS": {
+      "key": "DATABRICKS_INITIAL_RETRY_INTERVAL_MS",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/providers/databricks.rs:157"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "DATABRICKS_BACKOFF_MULTIPLIER": {
+      "key": "DATABRICKS_BACKOFF_MULTIPLIER",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/providers/databricks.rs:163"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "DATABRICKS_MAX_RETRY_INTERVAL_MS": {
+      "key": "DATABRICKS_MAX_RETRY_INTERVAL_MS",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/providers/databricks.rs:169"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "DATABRICKS_TOKEN": {
+      "key": "DATABRICKS_TOKEN",
+      "config_type": "secret",
+      "method": "get_secret",
+      "locations": [
+        "crates/goose/src/providers/databricks.rs:128"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GEMINI_CLI_COMMAND": {
+      "key": "GEMINI_CLI_COMMAND",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/providers/gemini_cli.rs:35"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GOOSE_GEMINI_CLI_DEBUG": {
+      "key": "GOOSE_GEMINI_CLI_DEBUG",
+      "config_type": "env_var",
+      "method": "std::env::var",
+      "locations": [
+        "crates/goose/src/providers/gemini_cli.rs:161",
+        "crates/goose/src/providers/gemini_cli.rs:280"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GOOSE_CACHE_DIR": {
+      "key": "GOOSE_CACHE_DIR",
+      "config_type": "env_var",
+      "method": "std::env::var",
+      "locations": [
+        "crates/goose/src/providers/pricing.rs:16"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "SNOWFLAKE_HOST": {
+      "key": "SNOWFLAKE_HOST",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/providers/snowflake.rs:48",
+        "crates/goose/src/providers/snowflake.rs:50"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "SNOWFLAKE_TOKEN": {
+      "key": "SNOWFLAKE_TOKEN",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/providers/snowflake.rs:69",
+        "crates/goose/src/providers/snowflake.rs:72"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "XAI_HOST": {
+      "key": "XAI_HOST",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/providers/xai.rs:53"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "XAI_API_KEY": {
+      "key": "XAI_API_KEY",
+      "config_type": "secret",
+      "method": "get_secret",
+      "locations": [
+        "crates/goose/src/providers/xai.rs:51"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "ANTHROPIC_HOST": {
+      "key": "ANTHROPIC_HOST",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/providers/anthropic.rs:54"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "ANTHROPIC_API_KEY": {
+      "key": "ANTHROPIC_API_KEY",
+      "config_type": "secret",
+      "method": "get_secret",
+      "locations": [
+        "crates/goose/src/providers/anthropic.rs:52"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "CLAUDE_THINKING_ENABLED": {
+      "key": "CLAUDE_THINKING_ENABLED",
+      "config_type": "env_var",
+      "method": "std::env::var",
+      "locations": [
+        "crates/goose/src/providers/anthropic.rs:71",
+        "crates/goose/src/providers/formats/databricks.rs:560",
+        "crates/goose/src/providers/formats/anthropic.rs:416",
+        "crates/goose/src/providers/formats/anthropic.rs:915",
+        "crates/goose/src/providers/formats/anthropic.rs:916",
+        "crates/goose/src/providers/formats/anthropic.rs:944"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GROQ_HOST": {
+      "key": "GROQ_HOST",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/providers/groq.rs:40"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GROQ_API_KEY": {
+      "key": "GROQ_API_KEY",
+      "config_type": "secret",
+      "method": "get_secret",
+      "locations": [
+        "crates/goose/src/providers/groq.rs:38"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "LITELLM_CUSTOM_HEADERS": {
+      "key": "LITELLM_CUSTOM_HEADERS",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/providers/litellm.rs:44",
+        "crates/goose/src/providers/litellm.rs:43"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "LITELLM_TIMEOUT": {
+      "key": "LITELLM_TIMEOUT",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/providers/litellm.rs:47"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "LITELLM_HOST": {
+      "key": "LITELLM_HOST",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/providers/litellm.rs:37"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "LITELLM_BASE_PATH": {
+      "key": "LITELLM_BASE_PATH",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/providers/litellm.rs:40"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "LITELLM_API_KEY": {
+      "key": "LITELLM_API_KEY",
+      "config_type": "secret",
+      "method": "get_secret",
+      "locations": [
+        "crates/goose/src/providers/litellm.rs:34"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GOOSE_EMBEDDING_MODEL": {
+      "key": "GOOSE_EMBEDDING_MODEL",
+      "config_type": "env_var",
+      "method": "std::env::var",
+      "locations": [
+        "crates/goose/src/providers/litellm.rs:229",
+        "crates/goose/src/providers/openai.rs:268",
+        "crates/goose/src/agents/router_tool_selector.rs:48"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "OPENAI_ORGANIZATION": {
+      "key": "OPENAI_ORGANIZATION",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/providers/openai.rs:68"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "OPENAI_PROJECT": {
+      "key": "OPENAI_PROJECT",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/providers/openai.rs:69"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "OPENAI_CUSTOM_HEADERS": {
+      "key": "OPENAI_CUSTOM_HEADERS",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/providers/openai.rs:72",
+        "crates/goose/src/providers/openai.rs:71"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "OPENAI_TIMEOUT": {
+      "key": "OPENAI_TIMEOUT",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/providers/openai.rs:75"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "OPENAI_HOST": {
+      "key": "OPENAI_HOST",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/providers/openai.rs:63"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "OPENAI_BASE_PATH": {
+      "key": "OPENAI_BASE_PATH",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/providers/openai.rs:66"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "VENICE_HOST": {
+      "key": "VENICE_HOST",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/providers/venice.rs:90"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "VENICE_BASE_PATH": {
+      "key": "VENICE_BASE_PATH",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/providers/venice.rs:93"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "VENICE_MODELS_PATH": {
+      "key": "VENICE_MODELS_PATH",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/providers/venice.rs:96"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "VENICE_API_KEY": {
+      "key": "VENICE_API_KEY",
+      "config_type": "secret",
+      "method": "get_secret",
+      "locations": [
+        "crates/goose/src/providers/venice.rs:88"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GOOSE_VECTOR_DB_PATH": {
+      "key": "GOOSE_VECTOR_DB_PATH",
+      "config_type": "env_var",
+      "method": "env::set_var",
+      "locations": [
+        "crates/goose/src/agents/tool_vectordb.rs:554",
+        "crates/goose/src/agents/tool_vectordb.rs:568"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GOOSE_ROUTER_TOOL_SELECTION_STRATEGY": {
+      "key": "GOOSE_ROUTER_TOOL_SELECTION_STRATEGY",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/agents/tool_route_manager.rs:78",
+        "crates/goose-cli/src/commands/configure.rs:1193",
+        "crates/goose-cli/src/commands/configure.rs:1202",
+        "crates/goose-cli/src/commands/configure.rs:1174"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GOOSE_EMBEDDING_MODEL_PROVIDER": {
+      "key": "GOOSE_EMBEDDING_MODEL_PROVIDER",
+      "config_type": "env_var",
+      "method": "env::var",
+      "locations": [
+        "crates/goose/src/agents/router_tool_selector.rs:45",
+        "crates/goose/src/agents/router_tool_selector.rs:51"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GOOSE_MAX_TURNS": {
+      "key": "GOOSE_MAX_TURNS",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose/src/agents/agent.rs:884",
+        "crates/goose-cli/src/commands/configure.rs:1522",
+        "crates/goose-cli/src/commands/configure.rs:1541"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "USER": {
+      "key": "USER",
+      "config_type": "env_var",
+      "method": "std::env::var",
+      "locations": [
+        "crates/goose/src/agents/agent.rs:1360"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GOOSE_AUTO_COMPACT_THRESHOLD": {
+      "key": "GOOSE_AUTO_COMPACT_THRESHOLD",
+      "config_type": "config_param",
+      "method": "set_param",
+      "locations": [
+        "crates/goose/src/context_mgmt/auto_compact.rs:546",
+        "crates/goose/src/context_mgmt/auto_compact.rs:576"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "CLAUDE_THINKING_BUDGET": {
+      "key": "CLAUDE_THINKING_BUDGET",
+      "config_type": "env_var",
+      "method": "std::env::var",
+      "locations": [
+        "crates/goose/src/providers/formats/databricks.rs:563",
+        "crates/goose/src/providers/formats/anthropic.rs:419"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "CONTEXT_FILE_NAMES": {
+      "key": "CONTEXT_FILE_NAMES",
+      "config_type": "env_var",
+      "method": "std::env::var",
+      "locations": [
+        "crates/goose-mcp/src/developer/mod.rs:406",
+        "crates/goose-mcp/src/developer/mod.rs:1714",
+        "crates/goose-mcp/src/developer/mod.rs:1731"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GOOSE_WORKING_DIR": {
+      "key": "GOOSE_WORKING_DIR",
+      "config_type": "env_var",
+      "method": "std::env::var",
+      "locations": [
+        "crates/goose-mcp/src/memory/mod.rs:228"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GOOGLE_DRIVE_OAUTH_PATH": {
+      "key": "GOOGLE_DRIVE_OAUTH_PATH",
+      "config_type": "env_var",
+      "method": "env::var",
+      "locations": [
+        "crates/goose-mcp/src/google_drive/mod.rs:102"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GOOGLE_DRIVE_CREDENTIALS_PATH": {
+      "key": "GOOGLE_DRIVE_CREDENTIALS_PATH",
+      "config_type": "env_var",
+      "method": "env::var",
+      "locations": [
+        "crates/goose-mcp/src/google_drive/mod.rs:104"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GOOGLE_DRIVE_OAUTH_CONFIG": {
+      "key": "GOOGLE_DRIVE_OAUTH_CONFIG",
+      "config_type": "env_var",
+      "method": "env::var",
+      "locations": [
+        "crates/goose-mcp/src/google_drive/mod.rs:119"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "WAYLAND_DISPLAY": {
+      "key": "WAYLAND_DISPLAY",
+      "config_type": "env_var",
+      "method": "std::env::var",
+      "locations": [
+        "crates/goose-mcp/src/computercontroller/platform/linux.rs:44"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GOOSE_EDITOR_API_KEY": {
+      "key": "GOOSE_EDITOR_API_KEY",
+      "config_type": "env_var",
+      "method": "std::env::var",
+      "locations": [
+        "crates/goose-mcp/src/developer/editor_models/mod.rs:78"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GOOSE_EDITOR_HOST": {
+      "key": "GOOSE_EDITOR_HOST",
+      "config_type": "env_var",
+      "method": "std::env::var",
+      "locations": [
+        "crates/goose-mcp/src/developer/editor_models/mod.rs:79"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GOOSE_EDITOR_MODEL": {
+      "key": "GOOSE_EDITOR_MODEL",
+      "config_type": "env_var",
+      "method": "std::env::var",
+      "locations": [
+        "crates/goose-mcp/src/developer/editor_models/mod.rs:80"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "--max-tool-repetitions": {
+      "key": "--max-tool-repetitions",
+      "config_type": "cli_flag",
+      "method": "clap_long",
+      "locations": [
+        "crates/goose-cli/src/cli.rs:327",
+        "crates/goose-cli/src/cli.rs:483"
+      ],
+      "description": "Maximum number of consecutive identical tool calls allowed",
+      "default_value": null
+    },
+    "--text": {
+      "key": "--text",
+      "config_type": "cli_flag",
+      "method": "clap_long",
+      "locations": [
+        "crates/goose-cli/src/cli.rs:408"
+      ],
+      "description": "Input text to provide to Goose directly",
+      "default_value": null
+    },
+    "-t": {
+      "key": "-t",
+      "config_type": "cli_flag",
+      "method": "clap_short",
+      "locations": [
+        "crates/goose-cli/src/cli.rs:408"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "--system": {
+      "key": "--system",
+      "config_type": "cli_flag",
+      "method": "clap_long",
+      "locations": [
+        "crates/goose-cli/src/cli.rs:420"
+      ],
+      "description": "Additional system prompt to customize agent behavior",
+      "default_value": null
+    },
+    "--interactive": {
+      "key": "--interactive",
+      "config_type": "cli_flag",
+      "method": "clap_long",
+      "locations": [
+        "crates/goose-cli/src/cli.rs:452"
+      ],
+      "description": "Continue in interactive mode after processing initial input",
+      "default_value": null
+    },
+    "-s": {
+      "key": "-s",
+      "config_type": "cli_flag",
+      "method": "clap_short",
+      "locations": [
+        "crates/goose-cli/src/cli.rs:452"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "--no-session": {
+      "key": "--no-session",
+      "config_type": "cli_flag",
+      "method": "clap_long",
+      "locations": [
+        "crates/goose-cli/src/cli.rs:460"
+      ],
+      "description": "Run without storing a session file",
+      "default_value": null
+    },
+    "--explain": {
+      "key": "--explain",
+      "config_type": "cli_flag",
+      "method": "clap_long",
+      "locations": [
+        "crates/goose-cli/src/cli.rs:469"
+      ],
+      "description": "Show the recipe title, description, and parameters",
+      "default_value": null
+    },
+    "--render-recipe": {
+      "key": "--render-recipe",
+      "config_type": "cli_flag",
+      "method": "clap_long",
+      "locations": [
+        "crates/goose-cli/src/cli.rs:476"
+      ],
+      "description": "Print the rendered recipe instead of running it.",
+      "default_value": null
+    },
+    "--quiet": {
+      "key": "--quiet",
+      "config_type": "cli_flag",
+      "method": "clap_long",
+      "locations": [
+        "crates/goose-cli/src/cli.rs:563"
+      ],
+      "description": "Quiet mode. Suppress non-response output, printing only the model response to stdout",
+      "default_value": null
+    },
+    "-q": {
+      "key": "-q",
+      "config_type": "cli_flag",
+      "method": "clap_short",
+      "locations": [
+        "crates/goose-cli/src/cli.rs:563"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GOOSE_TEST_PROVIDER": {
+      "key": "GOOSE_TEST_PROVIDER",
+      "config_type": "env_var",
+      "method": "std::env::var",
+      "locations": [
+        "crates/goose-cli/src/scenario_tests/scenario_runner.rs:52"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GITHUB_ACTIONS": {
+      "key": "GITHUB_ACTIONS",
+      "config_type": "env_var",
+      "method": "std::env::var",
+      "locations": [
+        "crates/goose-cli/src/scenario_tests/scenario_runner.rs:170"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GOOSE_SCHEDULER_TYPE": {
+      "key": "GOOSE_SCHEDULER_TYPE",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose-cli/src/commands/configure.rs:1475",
+        "crates/goose-cli/src/commands/configure.rs:1492",
+        "crates/goose-cli/src/commands/configure.rs:1498",
+        "crates/goose-cli/src/commands/configure.rs:1469",
+        "crates/goose-cli/src/commands/schedule.rs:266",
+        "crates/goose-cli/src/commands/schedule.rs:304"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GOOSE_CLI_MIN_PRIORITY": {
+      "key": "GOOSE_CLI_MIN_PRIORITY",
+      "config_type": "config_param",
+      "method": "set_param",
+      "locations": [
+        "crates/goose-cli/src/commands/configure.rs:1227",
+        "crates/goose-cli/src/commands/configure.rs:1231",
+        "crates/goose-cli/src/commands/configure.rs:1235",
+        "crates/goose-cli/src/commands/configure.rs:1216"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "RANDOM_THINKING_MESSAGES": {
+      "key": "RANDOM_THINKING_MESSAGES",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose-cli/src/session/output.rs:101"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GOOSE_CLI_THEME": {
+      "key": "GOOSE_CLI_THEME",
+      "config_type": "config_param",
+      "method": "set_param",
+      "locations": [
+        "crates/goose-cli/src/session/output.rs:71",
+        "crates/goose-cli/src/session/output.rs:82",
+        "crates/goose-cli/src/session/output.rs:58"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GOOSE_CLI_SHOW_THINKING": {
+      "key": "GOOSE_CLI_SHOW_THINKING",
+      "config_type": "env_var",
+      "method": "std::env::var",
+      "locations": [
+        "crates/goose-cli/src/session/output.rs:176"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GOOSE_SYSTEM_PROMPT_FILE_PATH": {
+      "key": "GOOSE_SYSTEM_PROMPT_FILE_PATH",
+      "config_type": "config_param",
+      "method": "get_param",
+      "locations": [
+        "crates/goose-cli/src/session/builder.rs:563"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "CARGO_MANIFEST_DIR": {
+      "key": "CARGO_MANIFEST_DIR",
+      "config_type": "env_var",
+      "method": "env::var",
+      "locations": [
+        "crates/goose-server/src/bin/generate_schema.rs:9"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GOOSE_SERVER__SECRET_KEY": {
+      "key": "GOOSE_SERVER__SECRET_KEY",
+      "config_type": "env_var",
+      "method": "std::env::var",
+      "locations": [
+        "crates/goose-server/src/commands/agent.rs:31"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "ELEVENLABS_API_KEY": {
+      "key": "ELEVENLABS_API_KEY",
+      "config_type": "secret",
+      "method": "get_secret",
+      "locations": [
+        "crates/goose-server/src/routes/audio.rs:212"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GOOSE_ALLOWLIST": {
+      "key": "GOOSE_ALLOWLIST",
+      "config_type": "env_var",
+      "method": "env::var",
+      "locations": [
+        "crates/goose-server/src/routes/extension.rs:351",
+        "crates/goose-server/src/routes/extension.rs:1057"
+      ],
+      "description": null,
+      "default_value": null
+    },
+    "GOOSE_ALLOWLIST_BYPASS": {
+      "key": "GOOSE_ALLOWLIST_BYPASS",
+      "config_type": "env_var",
+      "method": "env::var",
+      "locations": [
+        "crates/goose-server/src/routes/extension.rs:392",
+        "crates/goose-server/src/routes/extension.rs:1123",
+        "crates/goose-server/src/routes/extension.rs:1096",
+        "crates/goose-server/src/routes/extension.rs:1105",
+        "crates/goose-server/src/routes/extension.rs:1119"
+      ],
+      "description": null,
+      "default_value": null
+    }
+  }
+}

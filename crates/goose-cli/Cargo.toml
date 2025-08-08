@@ -68,3 +68,5 @@ tempfile = "3"
 temp-env = { version = "0.3.6", features = ["async_closure"] }
 test-case = "3.3"
 tokio = { version = "1.43", features = ["rt", "macros"] }
+assert_cmd = "2.0"
+predicates = "3.1"
