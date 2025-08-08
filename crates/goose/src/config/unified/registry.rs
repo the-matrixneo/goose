@@ -1007,6 +1007,27 @@ pub static REGISTRY: Lazy<Vec<KeySpec>> = Lazy::new(|| {
             default: false,
             env_aliases: ["RANDOM_THINKING_MESSAGES"],
         },
+        // cli.tool_params_truncation_max_length
+        key_spec! {
+            key: "cli.tool_params_truncation_max_length",
+            ty: U32,
+            default: 40u32,
+            env_aliases: ["GOOSE_CLI_TOOL_PARAMS_TRUNCATION_MAX_LENGTH"],
+            validator: validate_nonzero_u32,
+        },
+        // cli.edit_mode
+        key_spec! {
+            key: "cli.edit_mode",
+            ty: String,
+            default: "emacs",
+            env_aliases: ["EDIT_MODE"],
+        },
+        // session.context_strategy
+        key_spec! {
+            key: "session.context_strategy",
+            ty: String,
+            env_aliases: ["GOOSE_CONTEXT_STRATEGY"],
+        },
         // display.no_color
         key_spec! {
             key: "display.no_color",

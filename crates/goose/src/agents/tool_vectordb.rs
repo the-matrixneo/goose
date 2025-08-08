@@ -543,27 +543,24 @@ mod tests {
     #[test]
     #[serial_test::serial]
     fn test_custom_db_path_override() -> Result<()> {
-        use std::env;
         use tempfile::TempDir;
 
         let temp_dir = TempDir::new().unwrap();
         let custom_path = temp_dir.path().join("custom_vector_db");
 
-        env::set_var("GOOSE_VECTOR_DB_PATH", custom_path.to_str().unwrap());
+        unified::set("vector_db.path", custom_path.to_str().unwrap()).unwrap();
 
         let db_path = ToolVectorDB::get_db_path()?;
         assert_eq!(db_path, custom_path);
 
-        env::remove_var("GOOSE_VECTOR_DB_PATH");
+        unified::unset("vector_db.path");
         Ok(())
     }
 
     #[test]
     #[serial_test::serial]
     fn test_custom_db_path_validation() {
-        use std::env;
-
-        env::set_var("GOOSE_VECTOR_DB_PATH", "relative/path");
+        unified::set("vector_db.path", "relative/path").unwrap();
 
         let result = ToolVectorDB::get_db_path();
         assert!(
@@ -576,15 +573,13 @@ mod tests {
             .to_string()
             .contains("must be an absolute path"));
 
-        env::remove_var("GOOSE_VECTOR_DB_PATH");
+        unified::unset("vector_db.path");
     }
 
     #[test]
     #[serial_test::serial]
     fn test_fallback_to_default_path() -> Result<()> {
-        use std::env;
-
-        env::remove_var("GOOSE_VECTOR_DB_PATH");
+        unified::unset("vector_db.path");
 
         let db_path = ToolVectorDB::get_db_path()?;
         assert!(

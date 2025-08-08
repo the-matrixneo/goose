@@ -1,7 +1,7 @@
 use console::style;
 use goose::agents::types::RetryConfig;
 use goose::agents::Agent;
-use goose::config::{Config, ExtensionConfig, ExtensionConfigManager};
+use goose::config::{ExtensionConfig, ExtensionConfigManager};
 use goose::providers::create;
 use goose::recipe::{Response, SubRecipe};
 use goose::session;
@@ -174,7 +174,6 @@ pub struct SessionSettings {
 
 pub async fn build_session(session_config: SessionBuilderConfig) -> Session {
     // Load config and get provider/model
-    let config = Config::global();
 
     let provider_name = session_config
         .provider
@@ -391,8 +390,7 @@ pub async fn build_session(session_config: SessionBuilderConfig) -> Session {
     }
 
     // Determine editor mode
-    let edit_mode = config
-        .get_param::<String>("EDIT_MODE")
+    let edit_mode = goose::config::unified::get::<String>("cli.edit_mode")
         .ok()
         .and_then(|edit_mode| match edit_mode.to_lowercase().as_str() {
             "emacs" => Some(EditMode::Emacs),

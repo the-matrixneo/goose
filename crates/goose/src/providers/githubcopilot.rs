@@ -17,7 +17,6 @@ use super::formats::openai::{create_request, get_usage, response_to_message};
 use super::retry::ProviderRetry;
 use super::utils::{emit_debug_trace, get_model, handle_response_openai_compat, ImageFormat};
 
-use crate::config::{Config, ConfigError};
 use crate::conversation::message::Message;
 use crate::impl_provider_default;
 use crate::model::ModelConfig;
@@ -227,24 +226,21 @@ impl GithubCopilotProvider {
     }
 
     async fn refresh_api_info(&self) -> Result<CopilotTokenInfo> {
-        let config = Config::global();
-        let token = match config.get_secret::<String>("providers.githubcopilot.token") {
-            Ok(token) => token,
-            Err(err) => match err {
-                ConfigError::NotFound(_) => {
+        let token =
+            match crate::config::unified::get_secret::<String>("providers.githubcopilot.token") {
+                Ok(token) => token,
+                Err(_) => {
                     let token = self
                         .get_access_token()
                         .await
                         .context("unable to login into github")?;
-                    config.set_secret(
+                    crate::config::unified::set_secret(
                         "providers.githubcopilot.token",
-                        Value::String(token.clone()),
+                        serde_json::Value::String(token.clone()),
                     )?;
                     token
                 }
-                _ => return Err(err.into()),
-            },
-        };
+            };
         let resp = self
             .client
             .get(GITHUB_COPILOT_API_KEY_URL)
@@ -476,13 +472,8 @@ impl Provider for GithubCopilotProvider {
     }
 
     async fn configure_oauth(&self) -> Result<(), ProviderError> {
-        let config = Config::global();
-
         // Check if token already exists and is valid
-        if config
-            .get_secret::<String>("providers.githubcopilot.token")
-            .is_ok()
-        {
+        if crate::config::unified::get_secret::<String>("providers.githubcopilot.token").is_ok() {
             // Try to refresh API info to validate the token
             match self.refresh_api_info().await {
                 Ok(_) => return Ok(()), // Token is valid
@@ -500,9 +491,11 @@ impl Provider for GithubCopilotProvider {
             .map_err(|e| ProviderError::Authentication(format!("OAuth flow failed: {}", e)))?;
 
         // Save the token
-        config
-            .set_secret("providers.githubcopilot.token", Value::String(token))
-            .map_err(|e| ProviderError::ExecutionError(format!("Failed to save token: {}", e)))?;
+        crate::config::unified::set_secret(
+            "providers.githubcopilot.token",
+            serde_json::Value::String(token),
+        )
+        .map_err(|e| ProviderError::ExecutionError(format!("Failed to save token: {}", e)))?;
 
         Ok(())
     }

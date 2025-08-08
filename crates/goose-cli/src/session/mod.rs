@@ -30,7 +30,7 @@ use etcetera::{choose_app_strategy, AppStrategy};
 use goose::agents::extension::{Envs, ExtensionConfig};
 use goose::agents::types::RetryConfig;
 use goose::agents::{Agent, SessionConfig};
-use goose::config::{unified, Config};
+use goose::config::unified;
 use goose::providers::pricing::initialize_pricing_cache;
 use goose::session;
 use input::InputResult;
@@ -947,8 +947,7 @@ impl Session {
                                 output::hide_thinking();
 
                                 // Check for user-configured default context strategy
-                                let config = Config::global();
-                                let context_strategy = config.get_param::<String>("GOOSE_CONTEXT_STRATEGY")
+                                let context_strategy = goose::config::unified::get::<String>("session.context_strategy")
                                     .unwrap_or_else(|_| if interactive { "prompt".to_string() } else { "summarize".to_string() });
 
                                 let selected = match context_strategy.as_str() {
@@ -1615,25 +1614,19 @@ fn get_reasoner() -> Result<Arc<dyn Provider>, anyhow::Error> {
     use goose::model::ModelConfig;
     use goose::providers::create;
 
-    let config = Config::global();
-
     // Try planner-specific provider first, fallback to default provider
-    let provider = if let Ok(provider) = config.get_param::<String>("GOOSE_PLANNER_PROVIDER") {
-        provider
-    } else {
-        println!("WARNING: GOOSE_PLANNER_PROVIDER not found. Using default provider...");
+    let provider = goose::config::unified::get::<String>("planner.provider").unwrap_or_else(|_| {
+        println!("WARNING: planner.provider not found. Using default provider...");
         unified::get::<String>("llm.provider")
             .expect("No provider configured. Run 'goose configure' first")
-    };
+    });
 
     // Try planner-specific model first, fallback to default model
-    let model = if let Ok(model) = config.get_param::<String>("GOOSE_PLANNER_MODEL") {
-        model
-    } else {
-        println!("WARNING: GOOSE_PLANNER_MODEL not found. Using default model...");
+    let model = goose::config::unified::get::<String>("planner.model").unwrap_or_else(|_| {
+        println!("WARNING: planner.model not found. Using default model...");
         unified::get::<String>("llm.model")
             .expect("No model configured. Run 'goose configure' first")
-    };
+    });
 
     let model_config =
         ModelConfig::new_with_context_env(model, Some("GOOSE_PLANNER_CONTEXT_LIMIT"))?;

@@ -1345,8 +1345,6 @@ pub async fn configure_settings_dialog() -> Result<(), Box<dyn Error>> {
 }
 
 pub fn configure_goose_mode_dialog() -> Result<(), Box<dyn Error>> {
-    let config = Config::global();
-
     // Check if GOOSE_MODE is set as an environment variable
     if std::env::var("GOOSE_MODE").is_ok() {
         let _ = cliclack::log::info("Notice: GOOSE_MODE environment variable is set and will override the configuration here.");
@@ -1377,19 +1375,19 @@ pub fn configure_goose_mode_dialog() -> Result<(), Box<dyn Error>> {
 
     match mode {
         "auto" => {
-            config.set_param("GOOSE_MODE", Value::String("auto".to_string()))?;
+            unified::set("agent.mode", Value::String("auto".to_string()))?;
             cliclack::outro("Set to Auto Mode - full file modification enabled")?;
         }
         "approve" => {
-            config.set_param("GOOSE_MODE", Value::String("approve".to_string()))?;
+            unified::set("agent.mode", Value::String("approve".to_string()))?;
             cliclack::outro("Set to Approve Mode - all tools and modifications require approval")?;
         }
         "smart_approve" => {
-            config.set_param("GOOSE_MODE", Value::String("smart_approve".to_string()))?;
+            unified::set("agent.mode", Value::String("smart_approve".to_string()))?;
             cliclack::outro("Set to Smart Approve Mode - modifications require approval")?;
         }
         "chat" => {
-            config.set_param("GOOSE_MODE", Value::String("chat".to_string()))?;
+            unified::set("agent.mode", Value::String("chat".to_string()))?;
             cliclack::outro("Set to Chat Mode - no tools or modifications enabled")?;
         }
         _ => unreachable!(),
@@ -1398,9 +1396,7 @@ pub fn configure_goose_mode_dialog() -> Result<(), Box<dyn Error>> {
 }
 
 pub fn configure_goose_router_strategy_dialog() -> Result<(), Box<dyn Error>> {
-    let config = Config::global();
-
-    // Check if GOOSE_ROUTER_STRATEGY is set as an environment variable
+    // Check if GOOSE_ROUTER_TOOL_SELECTION_STRATEGY is set as an environment variable
     if std::env::var("GOOSE_ROUTER_TOOL_SELECTION_STRATEGY").is_ok() {
         let _ = cliclack::log::info("Notice: GOOSE_ROUTER_TOOL_SELECTION_STRATEGY environment variable is set. Configuration will override this.");
     }
@@ -1420,7 +1416,7 @@ pub fn configure_goose_router_strategy_dialog() -> Result<(), Box<dyn Error>> {
 
     match strategy {
         "vector" => {
-            config.set_param(
+            unified::set(
                 "router.tool_selection_strategy",
                 Value::String("vector".to_string()),
             )?;
@@ -1429,7 +1425,7 @@ pub fn configure_goose_router_strategy_dialog() -> Result<(), Box<dyn Error>> {
             )?;
         }
         "default" => {
-            config.set_param(
+            unified::set(
                 "router.tool_selection_strategy",
                 Value::String("default".to_string()),
             )?;
@@ -1688,17 +1684,13 @@ fn configure_recipe_dialog() -> Result<(), Box<dyn Error>> {
 }
 
 fn configure_scheduler_dialog() -> Result<(), Box<dyn Error>> {
-    let config = Config::global();
-
     // Check if GOOSE_SCHEDULER_TYPE is set as an environment variable
     if std::env::var("GOOSE_SCHEDULER_TYPE").is_ok() {
         let _ = cliclack::log::info("Notice: GOOSE_SCHEDULER_TYPE environment variable is set and will override the configuration here.");
     }
 
     // Get current scheduler type from config for display
-    let current_scheduler: String = config
-        .get_param("GOOSE_SCHEDULER_TYPE")
-        .unwrap_or_else(|_| "legacy".to_string());
+    let current_scheduler: String = unified::get_or("scheduler.type", "legacy".to_string());
 
     println!(
         "Current scheduler type: {}",
@@ -1714,16 +1706,13 @@ fn configure_scheduler_dialog() -> Result<(), Box<dyn Error>> {
 
     match scheduler_type {
         "legacy" => {
-            config.set_param("GOOSE_SCHEDULER_TYPE", Value::String("legacy".to_string()))?;
+            unified::set("scheduler.type", Value::String("legacy".to_string()))?;
             cliclack::outro(
                 "Set to Built-in Cron scheduler - simple and reliable for basic scheduling",
             )?;
         }
         "temporal" => {
-            config.set_param(
-                "GOOSE_SCHEDULER_TYPE",
-                Value::String("temporal".to_string()),
-            )?;
+            unified::set("scheduler.type", Value::String("temporal".to_string()))?;
             cliclack::outro(
                 "Set to Temporal scheduler - advanced workflow engine for complex scheduling",
             )?;
@@ -1742,9 +1731,7 @@ fn configure_scheduler_dialog() -> Result<(), Box<dyn Error>> {
 }
 
 pub fn configure_max_turns_dialog() -> Result<(), Box<dyn Error>> {
-    let config = Config::global();
-
-    let current_max_turns: u32 = config.get_param("session.max_turns").unwrap_or(1000);
+    let current_max_turns: u32 = unified::get_or("session.max_turns", 1000);
 
     let max_turns_input: String =
         cliclack::input("Set maximum number of agent turns without user input:")
@@ -1763,7 +1750,7 @@ pub fn configure_max_turns_dialog() -> Result<(), Box<dyn Error>> {
             .interact()?;
 
     let max_turns: u32 = max_turns_input.parse()?;
-    config.set_param("GOOSE_MAX_TURNS", Value::from(max_turns))?;
+    unified::set("session.max_turns", Value::from(max_turns))?;
 
     cliclack::outro(format!(
         "Set maximum turns to {} - Goose will ask for input after {} consecutive actions",

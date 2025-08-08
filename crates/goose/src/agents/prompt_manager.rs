@@ -5,8 +5,9 @@ use std::collections::HashMap;
 use crate::agents::extension::ExtensionInfo;
 use crate::agents::router_tool_selector::RouterToolSelectionStrategy;
 use crate::agents::router_tools::{llm_search_tool_prompt, vector_search_tool_prompt};
+use crate::config::unified;
+use crate::prompt_template;
 use crate::providers::base::get_current_model;
-use crate::{config::Config, prompt_template};
 
 pub struct PromptManager {
     system_prompt_override: Option<String>,
@@ -137,8 +138,7 @@ impl PromptManager {
         };
 
         let mut system_prompt_extras = self.system_prompt_extras.clone();
-        let config = Config::global();
-        let goose_mode = config.get_param("agent.mode").unwrap_or("auto".to_string());
+        let goose_mode: String = unified::get("agent.mode").unwrap_or("auto".to_string());
         if goose_mode == "chat" {
             system_prompt_extras.push(
                 "Right now you are in the chat only mode, no access to any tool use and system."

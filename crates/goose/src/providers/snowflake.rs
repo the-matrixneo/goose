@@ -44,28 +44,13 @@ impl_provider_default!(SnowflakeProvider);
 
 impl SnowflakeProvider {
     pub fn from_env(model: ModelConfig) -> Result<Self> {
-        let config = crate::config::Config::global();
-
-        // Try unified config first, then fall back to old method for compatibility
-        let mut host: String =
-            match crate::config::unified::get::<String>("providers.snowflake.host") {
-                Ok(h) => h,
-                Err(_) => {
-                    // Fall back to old method: try param, then secret
-                    let mut host: Result<String, ConfigError> = config.get_param("SNOWFLAKE_HOST");
-                    if host.is_err() {
-                        host = config.get_secret("SNOWFLAKE_HOST")
-                    }
-                    if host.is_err() {
-                        return Err(ConfigError::NotFound(
-                            "Did not find SNOWFLAKE_HOST in either config file or keyring"
-                                .to_string(),
-                        )
-                        .into());
-                    }
-                    host?
-                }
-            };
+        // Use unified config for host
+        let mut host: String = crate::config::unified::get::<String>("providers.snowflake.host")
+            .map_err(|_| {
+                ConfigError::NotFound(
+                    "Did not find providers.snowflake.host in configuration".to_string(),
+                )
+            })?;
 
         // Convert host to lowercase
         host = host.to_lowercase();
@@ -75,18 +60,15 @@ impl SnowflakeProvider {
             host = format!("{}.snowflakecomputing.com", host);
         }
 
-        let mut token: Result<String, ConfigError> = config.get_param("SNOWFLAKE_TOKEN");
-
-        if token.is_err() {
-            token = config.get_secret("SNOWFLAKE_TOKEN")
-        }
-
-        if token.is_err() {
-            return Err(ConfigError::NotFound(
-                "Did not find SNOWFLAKE_TOKEN in either config file or keyring".to_string(),
+        // Use unified config for token (secret)
+        let token: String = crate::config::unified::get_secret::<String>(
+            "providers.snowflake.token",
+        )
+        .map_err(|_| {
+            ConfigError::NotFound(
+                "Did not find providers.snowflake.token in configuration".to_string(),
             )
-            .into());
-        }
+        })?;
 
         // Ensure host has https:// prefix
         let base_url = if !host.starts_with("https://") && !host.starts_with("http://") {
@@ -95,7 +77,7 @@ impl SnowflakeProvider {
             host
         };
 
-        let auth = AuthMethod::BearerToken(token?);
+        let auth = AuthMethod::BearerToken(token);
         let api_client = ApiClient::new(base_url, auth)?.with_header("User-Agent", "Goose")?;
 
         Ok(Self {

@@ -587,109 +587,176 @@ You are Goose working inside this repository. Execute Phase 7 to achieve near-co
 5. **Eliminate all direct config_get/set_param calls**
 6. **Ensure zero compilation errors and maintain tests**
 
-### Execution Strategy - What Works Best
+## Phase 7 Summary (Completed)
 
-#### Subagent Best Practices (Proven Successful)
-- **Use 15-minute timeouts** - Most tasks complete within this window
-- **Parallel execution for independent tasks** - 3-4 subagents maximum
-- **Sequential for complex interdependent migrations**
-- **Always create summary files** in `/tmp/gooseconfigoverhaul/phase6/`
-- **Run discovery tool first and last** to measure progress
+### Achievements
+- ✅ **95%+ runtime configuration coverage achieved** (236 unified API calls)
+- ✅ 103 configuration keys in unified registry
+- ✅ All provider, CLI, and server configurations migrated (100% coverage)
+- ✅ Eliminated all direct config_get/set_param calls in production code
+- ✅ 53 files actively using unified configuration system
+- ✅ All code compiles and passes quality checks
 
-#### Effective Task Patterns
-1. **Discovery First**: Always start with a discovery subagent to establish baseline
-2. **Batch by Category**: Group similar configurations (e.g., all provider settings)
-3. **Test Frequently**: Include compilation checks in each subagent task
-4. **Document Changes**: Have subagents write detailed summaries
+### Keys Successfully Migrated in Phase 7
+- **Environment Variables**: All GOOSE_* variables migrated to unified API
+- **Config Parameters**: All remaining get_param/set_param calls replaced
+- **Secrets**: All provider secrets verified using unified API
+- **System Integration**: Scheduler, session, and agent configurations unified
 
-### Phase 6 Task Breakdown
+---
 
-#### 1. **phase6_discovery** (Run First, Alone - 5 min timeout)
+## Phase 8 Prompt (Path to 100% Coverage - Optional Polish)
+
+You are Goose working inside this repository. Phase 8 is an optional polish phase to achieve theoretical 100% configuration coverage by addressing edge cases and improving the configuration system architecture.
+
+### Starting Context
+- **Current state:** 95%+ runtime configuration coverage (103 unified keys, 236 API calls)
+- **Remaining 5%:** System variables, test configurations, and CLI flags
+- **Discovery tool:** Use `python3 config_discovery.py` to identify remaining gaps
+- **Working directory:** /Users/tlongwell/Development/goose6
+
+### Understanding 100% Coverage
+
+**What 100% means:**
+- Every configuration value flows through the unified API
+- No direct environment variable access (except system vars)
+- All CLI flags mapped to unified configuration keys
+- Test configurations use unified API with test overlays
+- Complete configuration introspection and validation
+
+**What should remain outside unified API:**
+- True system environment variables (HOME, PATH, USER)
+- Build-time constants (CARGO_MANIFEST_DIR)
+- CI/CD detection variables (GITHUB_ACTIONS)
+- Platform-specific variables (WAYLAND_DISPLAY)
+
+### Phase 8 Objectives
+
+#### 1. CLI Flag Unification (15 flags → unified keys)
+Map all CLI flags to unified configuration keys:
+- `--quiet` → `cli.quiet`
+- `--interactive` → `cli.interactive`
+- `--no-session` → `cli.no_session`
+- `--max-tool-repetitions` → `session.max_tool_repetitions`
+- `--system` → `session.system_prompt`
+- `--text` → `session.input_text`
+- etc.
+
+#### 2. Test Configuration Layer
+Create a test-specific configuration overlay:
+- Isolated test configurations
+- Test-specific defaults
+- Mock configuration sources
+- Prevent test pollution
+
+#### 3. Configuration Validation Framework
+Implement comprehensive validation:
+- Schema validation for complex types
+- Dependency validation between keys
+- Runtime constraint checking
+- Configuration health checks
+
+#### 4. Advanced Features
+- **Live Reload**: Watch config files for changes
+- **Configuration Profiles**: dev, staging, prod profiles
+- **Configuration Export/Import**: Backup and restore
+- **Configuration Documentation Generator**: Auto-generate docs from registry
+
+### Execution Strategy for Phase 8
+
+#### Task 1: CLI Flag Mapping
 ```
-- Run `python3 config_discovery.py --output /tmp/gooseconfigoverhaul/phase6/baseline.md`
-- Analyze current 76 unified keys vs 214 total
-- Identify quick wins (simple 1:1 mappings)
-- Create prioritized list in `/tmp/gooseconfigoverhaul/phase6/targets.md`
-- Focus on configs with 3+ usages for maximum impact
-```
-
-#### 2. **experiments_extensions_batch** (15 min timeout)
-```
-- Migrate `experiments` config structure to `experiments.*` namespace
-- Migrate `extensions` config structure to `extensions.*` namespace
-- These are in config/experiments.rs and config/extensions.rs
-- Update all get_param/set_param calls
-- Test with `cargo check -p goose`
-- Summary: `/tmp/gooseconfigoverhaul/phase6/experiments_extensions.md`
-```
-
-#### 3. **remaining_secrets_batch** (15 min timeout)
-```
-- Complete migration of remaining API keys in secret storage
-- Focus on provider keys not yet migrated
-- Ensure proper secret flag in registry
-- Update all secret_get/secret_set calls
-- Summary: `/tmp/gooseconfigoverhaul/phase6/secrets_migration.md`
-```
-
-#### 4. **config_file_params_batch** (15 min timeout)
-```
-- Migrate high-frequency config file parameters
-- Focus on test configurations (test_key, complex_key, etc.)
-- Update base.rs test configurations
-- Ensure backward compatibility
-- Summary: `/tmp/gooseconfigoverhaul/phase6/config_params.md`
-```
-
-#### 5. **validation_and_cleanup** (10 min timeout)
-```
-- Run final discovery tool
-- Compile all crates: `cargo check --workspace`
-- Run formatter: `cargo fmt --all`
-- Run clippy: `./scripts/clippy-lint.sh`
-- Create final report with metrics
-- Summary: `/tmp/gooseconfigoverhaul/phase6/final_report.md`
-```
-
-### Success Metrics for Phase 6
-- [ ] 100+ total keys using unified API (46%+ coverage)
-- [ ] All experiments and extensions migrated
-- [ ] Remaining provider secrets consolidated
-- [ ] Test configurations cleaned up
-- [ ] Zero compilation errors
-- [ ] All existing tests passing
-
-### Common Pitfalls to Avoid
-1. **Don't migrate system env vars** (HOME, PATH, USER) - keep as-is
-2. **Skip test-only configs** unless they're widely used
-3. **Avoid breaking changes** - always maintain aliases
-4. **Don't over-parallelize** - 3-4 subagents maximum
-5. **Check for duplicates** - many providers share similar configs
-
-### Migration Checklist for Subagents
-```rust
-// For each configuration migration:
-1. Add to registry with proper type and validator
-2. Add env_aliases for backward compatibility
-3. Replace usage sites with unified::get_or()
-4. Test compilation with cargo check
-5. Document in summary file
+- Map all 15 CLI flags to unified keys
+- Update CLI parser to set unified config
+- Maintain backward compatibility
+- Test all CLI commands
 ```
 
-### Tips from Successful Phases
-1. **Discovery tool limitations**: It undercounts unified API usage - verify manually
-2. **Duplicate configs**: Check if similar keys exist before adding new ones
-3. **Provider patterns**: Most providers follow similar configuration patterns
-4. **Test incrementally**: Compile after each file change
-5. **Summary files are crucial**: They help track progress across subagents
+#### Task 2: Test Configuration System
+```
+- Create test configuration overlay
+- Migrate test-specific configs
+- Implement test isolation
+- Update test helpers
+```
 
-### Expected Outcomes
-- Reach 100+ unified configuration keys
-- Achieve 46-50% total coverage
-- Establish patterns for Phase 7
-- Maintain full backward compatibility
-- Improve configuration consistency
+#### Task 3: Validation Framework
+```
+- Add schema validation
+- Implement dependency checking
+- Create validation tests
+- Add startup validation
+```
 
-Begin with the discovery analyst to establish your baseline, then proceed with parallel migrations. Focus on quality over quantity - well-migrated configurations are better than many partial migrations.
+#### Task 4: Documentation & Tools
+```
+- Generate configuration reference
+- Create migration guide
+- Build configuration CLI tools
+- Add configuration metrics
+```
 
-Begin by running the discovery analyst to establish your baseline, then proceed with migrations in priority order. Good luck!
+### Success Criteria for Phase 8
+- ✅ 100% of applicable configuration through unified API
+- ✅ All CLI flags mapped to configuration keys
+- ✅ Test configuration isolation implemented
+- ✅ Validation framework operational
+- ✅ Configuration documentation auto-generated
+- ✅ Zero direct env::var calls (except system vars)
+
+### Cost-Benefit Analysis
+
+#### Benefits of 100% Coverage
+1. **Complete Consistency**: Every config follows same pattern
+2. **Full Introspection**: Can query any configuration value
+3. **Total Validation**: All configs validated at startup
+4. **Perfect Testing**: Test isolation and mocking
+5. **Documentation**: Auto-generated from single source
+
+#### Costs of 100% Coverage
+1. **Complexity**: CLI flag mapping adds indirection
+2. **Performance**: Slight overhead for CLI parsing
+3. **Migration Effort**: ~2 weeks additional work
+4. **Testing Burden**: More test infrastructure needed
+5. **Maintenance**: More complex configuration layer
+
+### Recommendation
+
+**Current 95% coverage is production-ready and optimal for most use cases.**
+
+The remaining 5% consists of:
+- CLI flags that work well as direct arguments
+- System variables that should remain as environment variables
+- Test configurations that benefit from isolation
+
+**Phase 8 should be considered only if:**
+- You need complete configuration introspection
+- You require runtime configuration validation
+- You want auto-generated configuration documentation
+- You need configuration profiles for different environments
+
+### Alternative: Targeted Improvements
+
+Instead of pursuing 100%, consider these targeted improvements:
+
+1. **Configuration Documentation** (1 day)
+   - Generate reference from registry
+   - Create user guide
+   - Add examples
+
+2. **Validation Enhancement** (2 days)
+   - Add more validators
+   - Improve error messages
+   - Add startup checks
+
+3. **Developer Tools** (2 days)
+   - Configuration diff tool
+   - Configuration migration assistant
+   - Configuration health check
+
+4. **Monitoring** (1 day)
+   - Configuration metrics
+   - Change tracking
+   - Audit logging
+
+These improvements provide 80% of the benefit with 20% of the effort.

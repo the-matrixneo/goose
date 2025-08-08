@@ -164,7 +164,6 @@ mod tests {
     use crate::providers::base::{ProviderMetadata, ProviderUsage, Usage};
     use chrono::Utc;
     use rmcp::model::{AnnotateAble, RawTextContent, Role};
-    use std::env;
 
     #[allow(dead_code)]
     #[derive(Clone)]
@@ -218,13 +217,13 @@ mod tests {
 
     #[test]
     fn test_create_lead_worker_provider() {
-        // Save current env vars
-        let saved_lead = env::var("GOOSE_LEAD_MODEL").ok();
-        let saved_provider = env::var("GOOSE_LEAD_PROVIDER").ok();
-        let saved_turns = env::var("GOOSE_LEAD_TURNS").ok();
+        // Save current config state
+        let saved_lead = unified::get::<String>("lead.model").ok();
+        let saved_provider = unified::get::<String>("lead.provider").ok();
+        let saved_turns = unified::get::<usize>("lead.turns").ok();
 
         // Test with basic lead model configuration
-        env::set_var("GOOSE_LEAD_MODEL", "gpt-4o");
+        unified::set("lead.model", "gpt-4o").unwrap();
 
         // This will try to create a lead/worker provider
         let gpt4mini_config = ModelConfig::new_or_fail("gpt-4o-mini");
@@ -251,51 +250,48 @@ mod tests {
         }
 
         // Test with different lead provider
-        env::set_var("GOOSE_LEAD_PROVIDER", "anthropic");
-        env::set_var("GOOSE_LEAD_TURNS", "5");
+        unified::set("lead.provider", "anthropic").unwrap();
+        unified::set("lead.turns", 5usize).unwrap();
 
         let _result = create("openai", gpt4mini_config);
         // Similar validation as above - will fail due to missing API keys but confirms the logic
 
-        // Restore env vars
-        match saved_lead {
-            Some(val) => env::set_var("GOOSE_LEAD_MODEL", val),
-            None => env::remove_var("GOOSE_LEAD_MODEL"),
+        // Restore config state
+        if let Some(val) = saved_lead {
+            unified::set("lead.model", val).unwrap();
+        } else {
+            unified::unset("lead.model");
         }
-        match saved_provider {
-            Some(val) => env::set_var("GOOSE_LEAD_PROVIDER", val),
-            None => env::remove_var("GOOSE_LEAD_PROVIDER"),
+        if let Some(val) = saved_provider {
+            unified::set("lead.provider", val).unwrap();
+        } else {
+            unified::unset("lead.provider");
         }
-        match saved_turns {
-            Some(val) => env::set_var("GOOSE_LEAD_TURNS", val),
-            None => env::remove_var("GOOSE_LEAD_TURNS"),
+        if let Some(val) = saved_turns {
+            unified::set("lead.turns", val).unwrap();
+        } else {
+            unified::unset("lead.turns");
         }
     }
 
     #[test]
     fn test_lead_model_env_vars_with_defaults() {
-        // Save current env vars
-        let saved_vars = [
-            ("GOOSE_LEAD_MODEL", env::var("GOOSE_LEAD_MODEL").ok()),
-            ("GOOSE_LEAD_PROVIDER", env::var("GOOSE_LEAD_PROVIDER").ok()),
-            ("GOOSE_LEAD_TURNS", env::var("GOOSE_LEAD_TURNS").ok()),
-            (
-                "GOOSE_LEAD_FAILURE_THRESHOLD",
-                env::var("GOOSE_LEAD_FAILURE_THRESHOLD").ok(),
-            ),
-            (
-                "GOOSE_LEAD_FALLBACK_TURNS",
-                env::var("GOOSE_LEAD_FALLBACK_TURNS").ok(),
-            ),
-        ];
+        // Save current config state as strings
+        let saved_model = unified::get::<String>("lead.model").ok();
+        let saved_provider = unified::get::<String>("lead.provider").ok();
+        let saved_turns = unified::get::<usize>("lead.turns").ok();
+        let saved_threshold = unified::get::<usize>("lead.failure_threshold").ok();
+        let saved_fallback = unified::get::<usize>("lead.fallback_turns").ok();
 
-        // Clear all lead env vars
-        for (key, _) in &saved_vars {
-            env::remove_var(key);
-        }
+        // Clear all lead config vars
+        unified::unset("lead.model");
+        unified::unset("lead.provider");
+        unified::unset("lead.turns");
+        unified::unset("lead.failure_threshold");
+        unified::unset("lead.fallback_turns");
 
         // Set only the required lead model
-        env::set_var("GOOSE_LEAD_MODEL", "grok-3");
+        unified::set("lead.model", "grok-3").unwrap();
 
         // This should use defaults for all other values
         let result = create("openai", ModelConfig::new_or_fail("gpt-4o-mini"));
@@ -319,37 +315,56 @@ mod tests {
         }
 
         // Test with custom values
-        env::set_var("GOOSE_LEAD_TURNS", "7");
-        env::set_var("GOOSE_LEAD_FAILURE_THRESHOLD", "4");
-        env::set_var("GOOSE_LEAD_FALLBACK_TURNS", "3");
+        unified::set("lead.turns", 7usize).unwrap();
+        unified::set("lead.failure_threshold", 4usize).unwrap();
+        unified::set("lead.fallback_turns", 3usize).unwrap();
 
         let _result = create("openai", ModelConfig::new_or_fail("gpt-4o-mini"));
         // Should still attempt to create lead/worker provider with custom settings
 
-        // Restore all env vars
-        for (key, value) in saved_vars {
-            match value {
-                Some(val) => env::set_var(key, val),
-                None => env::remove_var(key),
-            }
+        // Restore all config vars
+        if let Some(val) = saved_model {
+            unified::set("lead.model", val).unwrap();
+        } else {
+            unified::unset("lead.model");
+        }
+        if let Some(val) = saved_provider {
+            unified::set("lead.provider", val).unwrap();
+        } else {
+            unified::unset("lead.provider");
+        }
+        if let Some(val) = saved_turns {
+            unified::set("lead.turns", val).unwrap();
+        } else {
+            unified::unset("lead.turns");
+        }
+        if let Some(val) = saved_threshold {
+            unified::set("lead.failure_threshold", val).unwrap();
+        } else {
+            unified::unset("lead.failure_threshold");
+        }
+        if let Some(val) = saved_fallback {
+            unified::set("lead.fallback_turns", val).unwrap();
+        } else {
+            unified::unset("lead.fallback_turns");
         }
     }
 
     #[test]
     fn test_create_regular_provider_without_lead_config() {
-        // Save current env vars
-        let saved_lead = env::var("GOOSE_LEAD_MODEL").ok();
-        let saved_provider = env::var("GOOSE_LEAD_PROVIDER").ok();
-        let saved_turns = env::var("GOOSE_LEAD_TURNS").ok();
-        let saved_threshold = env::var("GOOSE_LEAD_FAILURE_THRESHOLD").ok();
-        let saved_fallback = env::var("GOOSE_LEAD_FALLBACK_TURNS").ok();
+        // Save current config state
+        let saved_lead = unified::get::<String>("lead.model").ok();
+        let saved_provider = unified::get::<String>("lead.provider").ok();
+        let saved_turns = unified::get::<usize>("lead.turns").ok();
+        let saved_threshold = unified::get::<usize>("lead.failure_threshold").ok();
+        let saved_fallback = unified::get::<usize>("lead.fallback_turns").ok();
 
-        // Ensure all GOOSE_LEAD_* variables are not set
-        env::remove_var("GOOSE_LEAD_MODEL");
-        env::remove_var("GOOSE_LEAD_PROVIDER");
-        env::remove_var("GOOSE_LEAD_TURNS");
-        env::remove_var("GOOSE_LEAD_FAILURE_THRESHOLD");
-        env::remove_var("GOOSE_LEAD_FALLBACK_TURNS");
+        // Ensure all lead config variables are not set
+        unified::unset("lead.model");
+        unified::unset("lead.provider");
+        unified::unset("lead.turns");
+        unified::unset("lead.failure_threshold");
+        unified::unset("lead.fallback_turns");
 
         // This should try to create a regular provider
         let result = create("openai", ModelConfig::new_or_fail("gpt-4o-mini"));
@@ -374,46 +389,36 @@ mod tests {
         }
 
         if let Some(val) = saved_lead {
-            env::set_var("GOOSE_LEAD_MODEL", val);
+            unified::set("lead.model", val).unwrap();
         }
         if let Some(val) = saved_provider {
-            env::set_var("GOOSE_LEAD_PROVIDER", val);
+            unified::set("lead.provider", val).unwrap();
         }
         if let Some(val) = saved_turns {
-            env::set_var("GOOSE_LEAD_TURNS", val);
+            unified::set("lead.turns", val).unwrap();
         }
         if let Some(val) = saved_threshold {
-            env::set_var("GOOSE_LEAD_FAILURE_THRESHOLD", val);
+            unified::set("lead.failure_threshold", val).unwrap();
         }
         if let Some(val) = saved_fallback {
-            env::set_var("GOOSE_LEAD_FALLBACK_TURNS", val);
+            unified::set("lead.fallback_turns", val).unwrap();
         }
     }
 
     #[test]
     fn test_worker_model_preserves_original_context_limit() {
-        use std::env;
+        // Save current config state
+        let saved_lead = unified::get::<String>("lead.model").ok();
+        let saved_worker_limit = unified::get::<usize>("worker.context_limit").ok();
+        let saved_model_limit = unified::get::<usize>("model.context_limit").ok();
 
-        // Save current env vars
-        let saved_vars = [
-            ("GOOSE_LEAD_MODEL", env::var("GOOSE_LEAD_MODEL").ok()),
-            (
-                "GOOSE_WORKER_CONTEXT_LIMIT",
-                env::var("GOOSE_WORKER_CONTEXT_LIMIT").ok(),
-            ),
-            (
-                "GOOSE_MODEL_CONTEXT_LIMIT",
-                env::var("GOOSE_MODEL_CONTEXT_LIMIT").ok(),
-            ),
-        ];
-
-        // Clear env vars to ensure clean test
-        for (key, _) in &saved_vars {
-            env::remove_var(key);
-        }
+        // Clear config vars to ensure clean test
+        unified::unset("lead.model");
+        unified::unset("worker.context_limit");
+        unified::unset("model.context_limit");
 
         // Set up lead model to trigger lead/worker mode
-        env::set_var("GOOSE_LEAD_MODEL", "gpt-4o");
+        unified::set("lead.model", "gpt-4o").unwrap();
 
         // Create a default model with explicit context_limit
         let default_model =
@@ -422,22 +427,31 @@ mod tests {
         // Test case 1: No environment variables - should preserve original context_limit
         let result = create_lead_worker_from_env("openai", &default_model, "gpt-4o");
 
-        // Test case 2: With GOOSE_WORKER_CONTEXT_LIMIT - should override original
-        env::set_var("GOOSE_WORKER_CONTEXT_LIMIT", "32000");
+        // Test case 2: With worker.context_limit - should override original
+        unified::set("worker.context_limit", 32000usize).unwrap();
         let _result = create_lead_worker_from_env("openai", &default_model, "gpt-4o");
-        env::remove_var("GOOSE_WORKER_CONTEXT_LIMIT");
+        unified::unset("worker.context_limit");
 
-        // Test case 3: With GOOSE_MODEL_CONTEXT_LIMIT - should override original
-        env::set_var("GOOSE_MODEL_CONTEXT_LIMIT", "64000");
+        // Test case 3: With model.context_limit - should override original
+        unified::set("model.context_limit", 64000usize).unwrap();
         let _result = create_lead_worker_from_env("openai", &default_model, "gpt-4o");
-        env::remove_var("GOOSE_MODEL_CONTEXT_LIMIT");
+        unified::unset("model.context_limit");
 
-        // Restore env vars
-        for (key, value) in saved_vars {
-            match value {
-                Some(val) => env::set_var(key, val),
-                None => env::remove_var(key),
-            }
+        // Restore config state
+        if let Some(val) = saved_lead {
+            unified::set("lead.model", val).unwrap();
+        } else {
+            unified::unset("lead.model");
+        }
+        if let Some(val) = saved_worker_limit {
+            unified::set("worker.context_limit", val).unwrap();
+        } else {
+            unified::unset("worker.context_limit");
+        }
+        if let Some(val) = saved_model_limit {
+            unified::set("model.context_limit", val).unwrap();
+        } else {
+            unified::unset("model.context_limit");
         }
 
         // The main verification is that the function doesn't panic and handles

@@ -1,7 +1,6 @@
 use anstream::println;
 use bat::WrappingMode;
 use console::{style, Color};
-use goose::config::Config;
 use goose::conversation::message::{Message, MessageContent, ToolRequest, ToolResponse};
 use goose::providers::pricing::get_model_pricing;
 use goose::providers::pricing::parse_model_id;
@@ -43,14 +42,6 @@ impl Theme {
             Theme::Dark
         }
     }
-
-    fn as_config_string(&self) -> String {
-        match self {
-            Theme::Light => "light".to_string(),
-            Theme::Dark => "dark".to_string(),
-            Theme::Ansi => "ansi".to_string(),
-        }
-    }
 }
 
 thread_local! {
@@ -62,22 +53,18 @@ thread_local! {
 }
 
 pub fn set_theme(theme: Theme) {
-    let config = Config::global();
-    config
-        .set_param("GOOSE_CLI_THEME", Value::String(theme.as_config_string()))
-        .expect("Failed to set theme");
-    CURRENT_THEME.with(|t| *t.borrow_mut() = theme);
-
-    let config = Config::global();
+    use goose::config::unified;
     let theme_str = match theme {
         Theme::Light => "light",
         Theme::Dark => "dark",
         Theme::Ansi => "ansi",
     };
 
-    if let Err(e) = config.set_param("GOOSE_CLI_THEME", Value::String(theme_str.to_string())) {
+    if let Err(e) = unified::set("cli.theme", Value::String(theme_str.to_string())) {
         eprintln!("Failed to save theme setting to config: {}", e);
     }
+
+    CURRENT_THEME.with(|t| *t.borrow_mut() = theme);
 }
 
 pub fn get_theme() -> Theme {
@@ -93,10 +80,7 @@ pub struct ThinkingIndicator {
 impl ThinkingIndicator {
     pub fn show(&mut self) {
         let spinner = cliclack::spinner();
-        if Config::global()
-            .get_param("cli.random_thinking_messages")
-            .unwrap_or(true)
-        {
+        if goose::config::unified::get_or::<bool>("cli.random_thinking_messages", false) {
             spinner.start(format!(
                 "{}...",
                 super::thinking::get_random_thinking_message()
@@ -494,10 +478,7 @@ fn print_markdown(content: &str, theme: Theme) {
 const INDENT: &str = "    ";
 
 fn get_tool_params_max_length() -> usize {
-    Config::global()
-        .get_param::<usize>("GOOSE_CLI_TOOL_PARAMS_TRUNCATION_MAX_LENGTH")
-        .ok()
-        .unwrap_or(40)
+    goose::config::unified::get_or::<u32>("cli.tool_params_truncation_max_length", 40) as usize
 }
 
 fn print_value(value: &Value, debug: bool) {

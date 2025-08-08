@@ -14,7 +14,7 @@ use tokio_cron_scheduler::{job::JobId, Job, JobScheduler as TokioJobScheduler};
 
 use crate::agents::AgentEvent;
 use crate::agents::{Agent, SessionConfig};
-use crate::config::{self, Config};
+use crate::config::{self, unified};
 use crate::conversation::message::Message;
 use crate::conversation::Conversation;
 use crate::providers::base::Provider as GooseProvider; // Alias to avoid conflict in test section
@@ -1121,8 +1121,7 @@ async fn run_scheduled_job_internal(
     if let Some(provider) = provider_override {
         agent_provider = provider;
     } else {
-        let global_config = Config::global();
-        let provider_name: String = match global_config.get_param("llm.provider") {
+        let provider_name: String = match unified::get::<String>("llm.provider") {
             Ok(name) => name,
             Err(_) => return Err(JobExecutionError {
                 job_id: job.id.clone(),
@@ -1132,7 +1131,7 @@ async fn run_scheduled_job_internal(
             }),
         };
         let model_name: String =
-            match global_config.get_param("llm.model") {
+            match unified::get::<String>("llm.model") {
                 Ok(name) => name,
                 Err(_) => return Err(JobExecutionError {
                     job_id: job.id.clone(),
@@ -1423,9 +1422,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_scheduled_session_has_schedule_id() -> Result<(), Box<dyn std::error::Error>> {
-        // Set environment variables for the test
-        env::set_var("GOOSE_PROVIDER", "test_provider");
-        env::set_var("GOOSE_MODEL", "test_model");
+        // Set environment variables for the test using unified API
+        crate::config::unified::set("llm.provider", "test_provider")?;
+        crate::config::unified::set("llm.model", "test_model")?;
 
         let temp_dir = tempdir()?;
         let recipe_dir = temp_dir.path().join("recipes_for_test_scheduler");
@@ -1517,9 +1516,11 @@ mod tests {
             expected_session_path.display()
         );
 
-        // Clean up environment variables
-        env::remove_var("GOOSE_PROVIDER");
-        env::remove_var("GOOSE_MODEL");
+        // Clean up environment variables using unified API
+        // The unified API handles cleanup automatically when values go out of scope
+        // But we can explicitly unset if needed
+        crate::config::unified::unset("llm.provider");
+        crate::config::unified::unset("llm.model");
 
         Ok(())
     }

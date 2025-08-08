@@ -10,7 +10,7 @@ use tokio::process::Command;
 use super::base::{ConfigKey, Provider, ProviderMetadata, ProviderUsage, Usage};
 use super::errors::ProviderError;
 use super::utils::emit_debug_trace;
-use crate::config::Config;
+use crate::config::unified;
 use crate::conversation::message::{Message, MessageContent};
 use crate::impl_provider_default;
 use crate::model::ModelConfig;
@@ -31,9 +31,7 @@ impl_provider_default!(ClaudeCodeProvider);
 
 impl ClaudeCodeProvider {
     pub fn from_env(model: ModelConfig) -> Result<Self> {
-        let config = crate::config::Config::global();
-        let command: String = config
-            .get_param("providers.claude_code.command")
+        let command: String = unified::get::<String>("providers.claude_code.command")
             .unwrap_or_else(|_| "claude".to_string());
 
         let resolved_command = if !command.contains('/') {
@@ -341,8 +339,7 @@ impl ClaudeCodeProvider {
         cmd.arg("--verbose").arg("--output-format").arg("json");
 
         // Add permission mode based on agent.mode setting
-        let config = Config::global();
-        if let Ok(goose_mode) = config.get_param::<String>("agent.mode") {
+        if let Ok(goose_mode) = unified::get::<String>("agent.mode") {
             if goose_mode.as_str() == "auto" {
                 cmd.arg("--permission-mode").arg("acceptEdits");
             }
@@ -536,13 +533,12 @@ mod tests {
     #[test]
     fn test_permission_mode_flag_construction() {
         // Test that in auto mode, the --permission-mode acceptEdits flag is added
-        std::env::set_var("GOOSE_MODE", "auto");
+        crate::config::unified::set("agent.mode", "auto").unwrap();
 
-        let config = Config::global();
-        let goose_mode: String = config.get_param("agent.mode").unwrap();
+        let goose_mode: String = unified::get("agent.mode").unwrap();
         assert_eq!(goose_mode, "auto");
 
-        std::env::remove_var("GOOSE_MODE");
+        crate::config::unified::unset("agent.mode");
     }
 
     #[test]
