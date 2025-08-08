@@ -1362,7 +1362,6 @@ mod tests {
     use crate::session::storage::read_metadata;
 
     use crate::conversation::message::{Message, MessageContent};
-    use std::env;
     use std::fs::{self, File};
     use std::io::Write;
     use tempfile::tempdir;
@@ -1423,8 +1422,8 @@ mod tests {
     #[tokio::test]
     async fn test_scheduled_session_has_schedule_id() -> Result<(), Box<dyn std::error::Error>> {
         // Set environment variables for the test using unified API
-        crate::config::unified::set("llm.provider", "test_provider")?;
-        crate::config::unified::set("llm.model", "test_model")?;
+        crate::config::unified::set("llm.provider", serde_json::json!("test_provider"))?;
+        crate::config::unified::set("llm.model", serde_json::json!("test_model"))?;
 
         let temp_dir = tempdir()?;
         let recipe_dir = temp_dir.path().join("recipes_for_test_scheduler");
@@ -1519,8 +1518,8 @@ mod tests {
         // Clean up environment variables using unified API
         // The unified API handles cleanup automatically when values go out of scope
         // But we can explicitly unset if needed
-        crate::config::unified::unset("llm.provider");
-        crate::config::unified::unset("llm.model");
+        let _ = crate::config::unified::unset("llm.provider");
+        let _ = crate::config::unified::unset("llm.model");
 
         Ok(())
     }

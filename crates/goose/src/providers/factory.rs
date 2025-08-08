@@ -223,7 +223,7 @@ mod tests {
         let saved_turns = unified::get::<usize>("lead.turns").ok();
 
         // Test with basic lead model configuration
-        unified::set("lead.model", "gpt-4o").unwrap();
+        unified::set("lead.model", serde_json::json!("gpt-4o")).unwrap();
 
         // This will try to create a lead/worker provider
         let gpt4mini_config = ModelConfig::new_or_fail("gpt-4o-mini");
@@ -250,27 +250,27 @@ mod tests {
         }
 
         // Test with different lead provider
-        unified::set("lead.provider", "anthropic").unwrap();
-        unified::set("lead.turns", 5usize).unwrap();
+        unified::set("lead.provider", serde_json::json!("anthropic")).unwrap();
+        unified::set("lead.turns", serde_json::json!(5usize)).unwrap();
 
         let _result = create("openai", gpt4mini_config);
         // Similar validation as above - will fail due to missing API keys but confirms the logic
 
         // Restore config state
         if let Some(val) = saved_lead {
-            unified::set("lead.model", val).unwrap();
+            unified::set("lead.model", serde_json::json!(val)).unwrap();
         } else {
-            unified::unset("lead.model");
+            let _ = unified::unset("lead.model");
         }
         if let Some(val) = saved_provider {
-            unified::set("lead.provider", val).unwrap();
+            unified::set("lead.provider", serde_json::json!(val)).unwrap();
         } else {
-            unified::unset("lead.provider");
+            let _ = unified::unset("lead.provider");
         }
         if let Some(val) = saved_turns {
-            unified::set("lead.turns", val).unwrap();
+            unified::set("lead.turns", serde_json::json!(val)).unwrap();
         } else {
-            unified::unset("lead.turns");
+            let _ = unified::unset("lead.turns");
         }
     }
 
@@ -284,14 +284,14 @@ mod tests {
         let saved_fallback = unified::get::<usize>("lead.fallback_turns").ok();
 
         // Clear all lead config vars
-        unified::unset("lead.model");
-        unified::unset("lead.provider");
-        unified::unset("lead.turns");
-        unified::unset("lead.failure_threshold");
-        unified::unset("lead.fallback_turns");
+        let _ = unified::unset("lead.model");
+        let _ = unified::unset("lead.provider");
+        let _ = unified::unset("lead.turns");
+        let _ = unified::unset("lead.failure_threshold");
+        let _ = unified::unset("lead.fallback_turns");
 
         // Set only the required lead model
-        unified::set("lead.model", "grok-3").unwrap();
+        unified::set("lead.model", serde_json::json!("grok-3")).unwrap();
 
         // This should use defaults for all other values
         let result = create("openai", ModelConfig::new_or_fail("gpt-4o-mini"));
@@ -315,38 +315,38 @@ mod tests {
         }
 
         // Test with custom values
-        unified::set("lead.turns", 7usize).unwrap();
-        unified::set("lead.failure_threshold", 4usize).unwrap();
-        unified::set("lead.fallback_turns", 3usize).unwrap();
+        unified::set("lead.turns", serde_json::json!(7usize)).unwrap();
+        unified::set("lead.failure_threshold", serde_json::json!(4usize)).unwrap();
+        unified::set("lead.fallback_turns", serde_json::json!(3usize)).unwrap();
 
         let _result = create("openai", ModelConfig::new_or_fail("gpt-4o-mini"));
         // Should still attempt to create lead/worker provider with custom settings
 
         // Restore all config vars
         if let Some(val) = saved_model {
-            unified::set("lead.model", val).unwrap();
+            unified::set("lead.model", serde_json::json!(val)).unwrap();
         } else {
-            unified::unset("lead.model");
+            let _ = unified::unset("lead.model");
         }
         if let Some(val) = saved_provider {
-            unified::set("lead.provider", val).unwrap();
+            unified::set("lead.provider", serde_json::json!(val)).unwrap();
         } else {
-            unified::unset("lead.provider");
+            let _ = unified::unset("lead.provider");
         }
         if let Some(val) = saved_turns {
-            unified::set("lead.turns", val).unwrap();
+            unified::set("lead.turns", serde_json::json!(val)).unwrap();
         } else {
-            unified::unset("lead.turns");
+            let _ = unified::unset("lead.turns");
         }
         if let Some(val) = saved_threshold {
-            unified::set("lead.failure_threshold", val).unwrap();
+            unified::set("lead.failure_threshold", serde_json::json!(val)).unwrap();
         } else {
-            unified::unset("lead.failure_threshold");
+            let _ = unified::unset("lead.failure_threshold");
         }
         if let Some(val) = saved_fallback {
-            unified::set("lead.fallback_turns", val).unwrap();
+            unified::set("lead.fallback_turns", serde_json::json!(val)).unwrap();
         } else {
-            unified::unset("lead.fallback_turns");
+            let _ = unified::unset("lead.fallback_turns");
         }
     }
 
@@ -360,11 +360,11 @@ mod tests {
         let saved_fallback = unified::get::<usize>("lead.fallback_turns").ok();
 
         // Ensure all lead config variables are not set
-        unified::unset("lead.model");
-        unified::unset("lead.provider");
-        unified::unset("lead.turns");
-        unified::unset("lead.failure_threshold");
-        unified::unset("lead.fallback_turns");
+        let _ = unified::unset("lead.model");
+        let _ = unified::unset("lead.provider");
+        let _ = unified::unset("lead.turns");
+        let _ = unified::unset("lead.failure_threshold");
+        let _ = unified::unset("lead.fallback_turns");
 
         // This should try to create a regular provider
         let result = create("openai", ModelConfig::new_or_fail("gpt-4o-mini"));
@@ -389,19 +389,19 @@ mod tests {
         }
 
         if let Some(val) = saved_lead {
-            unified::set("lead.model", val).unwrap();
+            unified::set("lead.model", serde_json::json!(val)).unwrap();
         }
         if let Some(val) = saved_provider {
-            unified::set("lead.provider", val).unwrap();
+            unified::set("lead.provider", serde_json::json!(val)).unwrap();
         }
         if let Some(val) = saved_turns {
-            unified::set("lead.turns", val).unwrap();
+            unified::set("lead.turns", serde_json::json!(val)).unwrap();
         }
         if let Some(val) = saved_threshold {
-            unified::set("lead.failure_threshold", val).unwrap();
+            unified::set("lead.failure_threshold", serde_json::json!(val)).unwrap();
         }
         if let Some(val) = saved_fallback {
-            unified::set("lead.fallback_turns", val).unwrap();
+            unified::set("lead.fallback_turns", serde_json::json!(val)).unwrap();
         }
     }
 
@@ -413,12 +413,12 @@ mod tests {
         let saved_model_limit = unified::get::<usize>("model.context_limit").ok();
 
         // Clear config vars to ensure clean test
-        unified::unset("lead.model");
-        unified::unset("worker.context_limit");
-        unified::unset("model.context_limit");
+        let _ = unified::unset("lead.model");
+        let _ = unified::unset("worker.context_limit");
+        let _ = unified::unset("model.context_limit");
 
         // Set up lead model to trigger lead/worker mode
-        unified::set("lead.model", "gpt-4o").unwrap();
+        unified::set("lead.model", serde_json::json!("gpt-4o")).unwrap();
 
         // Create a default model with explicit context_limit
         let default_model =
@@ -428,30 +428,30 @@ mod tests {
         let result = create_lead_worker_from_env("openai", &default_model, "gpt-4o");
 
         // Test case 2: With worker.context_limit - should override original
-        unified::set("worker.context_limit", 32000usize).unwrap();
+        unified::set("worker.context_limit", serde_json::json!(32000usize)).unwrap();
         let _result = create_lead_worker_from_env("openai", &default_model, "gpt-4o");
-        unified::unset("worker.context_limit");
+        let _ = unified::unset("worker.context_limit");
 
         // Test case 3: With model.context_limit - should override original
-        unified::set("model.context_limit", 64000usize).unwrap();
+        unified::set("model.context_limit", serde_json::json!(64000usize)).unwrap();
         let _result = create_lead_worker_from_env("openai", &default_model, "gpt-4o");
-        unified::unset("model.context_limit");
+        let _ = unified::unset("model.context_limit");
 
         // Restore config state
         if let Some(val) = saved_lead {
-            unified::set("lead.model", val).unwrap();
+            unified::set("lead.model", serde_json::json!(val)).unwrap();
         } else {
-            unified::unset("lead.model");
+            let _ = unified::unset("lead.model");
         }
         if let Some(val) = saved_worker_limit {
-            unified::set("worker.context_limit", val).unwrap();
+            unified::set("worker.context_limit", serde_json::json!(val)).unwrap();
         } else {
-            unified::unset("worker.context_limit");
+            let _ = unified::unset("worker.context_limit");
         }
         if let Some(val) = saved_model_limit {
-            unified::set("model.context_limit", val).unwrap();
+            unified::set("model.context_limit", serde_json::json!(val)).unwrap();
         } else {
-            unified::unset("model.context_limit");
+            let _ = unified::unset("model.context_limit");
         }
 
         // The main verification is that the function doesn't panic and handles

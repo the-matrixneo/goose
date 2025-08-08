@@ -533,12 +533,12 @@ mod tests {
     #[test]
     fn test_permission_mode_flag_construction() {
         // Test that in auto mode, the --permission-mode acceptEdits flag is added
-        crate::config::unified::set("agent.mode", "auto").unwrap();
+        crate::config::unified::set("agent.mode", serde_json::json!("auto")).unwrap();
 
         let goose_mode: String = unified::get("agent.mode").unwrap();
         assert_eq!(goose_mode, "auto");
 
-        crate::config::unified::unset("agent.mode");
+        let _ = crate::config::unified::unset("agent.mode");
     }
 
     #[test]

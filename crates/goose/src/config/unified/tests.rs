@@ -597,7 +597,6 @@ mod effective_config_tests {
 #[cfg(test)]
 mod registry_coverage_tests {
     use super::*;
-    use crate::config::unified::registry::REGISTRY;
 
     #[test]
     fn test_all_phase3_keys_present() {

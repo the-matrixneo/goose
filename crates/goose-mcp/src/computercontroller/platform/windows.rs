@@ -21,7 +21,9 @@ impl SystemAutomation for WindowsAutomation {
     }
 
     fn get_temp_path(&self) -> PathBuf {
-        std::env::var("TEMP")
+        // Try unified config first, then TEMP env var, then Windows default
+        goose::config::unified::get::<String>("system.temp_dir")
+            .or_else(|_| std::env::var("TEMP"))
             .map(PathBuf::from)
             .unwrap_or_else(|_| PathBuf::from(r"C:\Windows\Temp"))
     }

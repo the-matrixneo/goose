@@ -548,19 +548,19 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let custom_path = temp_dir.path().join("custom_vector_db");
 
-        unified::set("vector_db.path", custom_path.to_str().unwrap()).unwrap();
+        unified::set("vector_db.path", serde_json::json!(custom_path.to_str().unwrap())).unwrap();
 
         let db_path = ToolVectorDB::get_db_path()?;
         assert_eq!(db_path, custom_path);
 
-        unified::unset("vector_db.path");
+        let _ = unified::unset("vector_db.path");
         Ok(())
     }
 
     #[test]
     #[serial_test::serial]
     fn test_custom_db_path_validation() {
-        unified::set("vector_db.path", "relative/path").unwrap();
+        unified::set("vector_db.path", serde_json::json!("relative/path")).unwrap();
 
         let result = ToolVectorDB::get_db_path();
         assert!(
@@ -573,13 +573,13 @@ mod tests {
             .to_string()
             .contains("must be an absolute path"));
 
-        unified::unset("vector_db.path");
+        let _ = unified::unset("vector_db.path");
     }
 
     #[test]
     #[serial_test::serial]
     fn test_fallback_to_default_path() -> Result<()> {
-        unified::unset("vector_db.path");
+        let _ = unified::unset("vector_db.path");
 
         let db_path = ToolVectorDB::get_db_path()?;
         assert!(

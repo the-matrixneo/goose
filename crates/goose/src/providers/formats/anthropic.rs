@@ -678,7 +678,6 @@ mod tests {
     use crate::conversation::message::Message;
     use rmcp::object;
     use serde_json::json;
-    use std::env;
 
     #[test]
     fn test_parse_text_response() -> Result<()> {

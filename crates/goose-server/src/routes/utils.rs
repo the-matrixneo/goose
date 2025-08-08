@@ -40,54 +40,55 @@ pub fn verify_secret_key(headers: &HeaderMap, state: &AppState) -> Result<Status
 /// Inspects a configuration key to determine if it's set, its location, and value (for non-secret keys)
 #[allow(dead_code)]
 pub fn inspect_key(key_name: &str, is_secret: bool) -> Result<KeyInfo, Box<dyn Error>> {
-    let config = Config::global();
-
-    // Check environment variable first
-    let env_value = std::env::var(key_name).ok();
-
-    if let Some(value) = env_value {
-        return Ok(KeyInfo {
-            name: key_name.to_string(),
-            is_set: true,
-            location: KeyLocation::Environment,
-            is_secret,
-            // Only include value for non-secret keys
-            value: if !is_secret { Some(value) } else { None },
-        });
-    }
-
-    // Check config store
-    let config_result = if is_secret {
-        config.get_secret(key_name).map(|v| (v, true))
-    } else {
-        config.get_param(key_name).map(|v| (v, false))
-    };
-
-    match config_result {
-        Ok((value, is_secret_actual)) => {
-            // Determine location based on whether it's a secret value
-            let location = if is_secret_actual {
-                KeyLocation::Keychain
-            } else {
-                KeyLocation::ConfigFile
+    // Try to resolve through unified config first
+    // This will check env vars, config files, etc. in the right order
+    match goose::config::unified::resolve::<String>(key_name) {
+        Ok(resolved) => {
+            // Map unified Source to our KeyLocation
+            let location = match resolved.source {
+                goose::config::unified::Source::Env { .. } => KeyLocation::Environment,
+                goose::config::unified::Source::File => KeyLocation::ConfigFile,
+                _ => {
+                    if resolved.is_secret {
+                        KeyLocation::Keychain
+                    } else {
+                        KeyLocation::ConfigFile
+                    }
+                }
             };
 
             Ok(KeyInfo {
                 name: key_name.to_string(),
                 is_set: true,
                 location,
-                is_secret: is_secret_actual,
-                // Only include value for non-secret keys
-                value: if !is_secret_actual { Some(value) } else { None },
+                is_secret: resolved.is_secret,
+                value: if !resolved.is_secret {
+                    Some(resolved.value.to_string())
+                } else {
+                    None
+                },
             })
         }
-        Err(_) => Ok(KeyInfo {
-            name: key_name.to_string(),
-            is_set: false,
-            location: KeyLocation::NotFound,
-            is_secret,
-            value: None,
-        }),
+        Err(_) => {
+            // Fall back to checking environment variable directly for backward compatibility
+            if let Ok(value) = std::env::var(key_name) {
+                return Ok(KeyInfo {
+                    name: key_name.to_string(),
+                    is_set: true,
+                    location: KeyLocation::Environment,
+                    is_secret,
+                    value: if !is_secret { Some(value) } else { None },
+                });
+            }
+
+            Ok(KeyInfo {
+                name: key_name.to_string(),
+                is_set: false,
+                location: KeyLocation::NotFound,
+                is_secret,
+                value: None,
+            })
+        }
     }
 }
 

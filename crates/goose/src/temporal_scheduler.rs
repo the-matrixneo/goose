@@ -123,24 +123,22 @@ impl TemporalScheduler {
     async fn discover_http_port(http_client: &Client) -> Result<u16, SchedulerError> {
         info!("Discovering Temporal service port...");
 
-        // Check PORT environment variable first
-        if let Ok(port_str) = std::env::var("PORT") {
-            if let Ok(port) = port_str.parse::<u16>() {
-                if Self::is_temporal_service_running(http_client, port).await {
-                    info!(
-                        "Found running Temporal service on PORT environment variable: {}",
-                        port
-                    );
-                    return Ok(port);
-                } else if Self::is_port_free(port).await {
-                    info!("Using PORT environment variable for new service: {}", port);
-                    return Ok(port);
-                } else {
-                    warn!(
-                        "PORT environment variable {} is occupied by non-Temporal service",
-                        port
-                    );
-                }
+        // Check server.port configuration first (can come from PORT env var)
+        if let Ok(port) = crate::config::unified::get::<u16>("server.port") {
+            if Self::is_temporal_service_running(http_client, port).await {
+                info!(
+                    "Found running Temporal service on configured port: {}",
+                    port
+                );
+                return Ok(port);
+            } else if Self::is_port_free(port).await {
+                info!("Using configured port for new service: {}", port);
+                return Ok(port);
+            } else {
+                warn!(
+                    "Configured port {} is occupied by non-Temporal service",
+                    port
+                );
             }
         }
 

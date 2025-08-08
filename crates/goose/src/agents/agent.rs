@@ -1351,7 +1351,7 @@ impl Agent {
             .collect();
 
         let author = Author {
-            // Use unified config for system.user
+            // Use unified config for system.user, fall back to USERNAME env var
             contact: crate::config::unified::get::<String>("system.user")
                 .or_else(|_| std::env::var("USERNAME"))
                 .ok(),

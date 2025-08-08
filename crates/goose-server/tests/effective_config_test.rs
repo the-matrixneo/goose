@@ -1,5 +1,6 @@
 use axum::http::{Request, StatusCode};
 use axum::Router;
+use goose::agents::Agent;
 use goose_server::routes;
 use goose_server::state::AppState;
 use std::sync::Arc;
@@ -7,8 +8,12 @@ use tower::ServiceExt;
 
 #[tokio::test]
 async fn test_effective_config_endpoint() {
-    // Create app state
-    let state = Arc::new(AppState::new());
+    // Create a mock agent
+    let agent = Arc::new(Agent::new());
+    
+    // Create app state with mock values
+    let secret_key = "test-secret-key".to_string();
+    let state = AppState::new(agent, secret_key.clone()).await;
 
     // Create router with routes
     let app = Router::new().merge(routes::effective_config::routes(state.clone()));
@@ -27,16 +32,13 @@ async fn test_effective_config_endpoint() {
 
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
 
-    // Test with auth header
-    let secret_key =
-        std::env::var("GOOSE_SERVER__SECRET_KEY").unwrap_or_else(|_| "test-secret-key".to_string());
-
+    // Test with auth header using the same secret key we initialized AppState with
     let response = app
         .clone()
         .oneshot(
             Request::builder()
                 .uri("/config/effective?filter=llm&only_changed=false&include_sources=true")
-                .header("X-Secret-Key", secret_key)
+                .header("X-Secret-Key", &secret_key)
                 .body(axum::body::Body::empty())
                 .unwrap(),
         )
@@ -70,17 +72,19 @@ async fn test_effective_config_secret_redaction() {
     // Set a test secret in environment
     std::env::set_var("OPENAI_API_KEY", "sk-test-secret-key");
 
-    let state = Arc::new(AppState::new());
+    // Create a mock agent
+    let agent = Arc::new(Agent::new());
+    
+    // Create app state with mock values
+    let secret_key = "test-secret-key".to_string();
+    let state = AppState::new(agent, secret_key.clone()).await;
     let app = Router::new().merge(routes::effective_config::routes(state.clone()));
-
-    let secret_key =
-        std::env::var("GOOSE_SERVER__SECRET_KEY").unwrap_or_else(|_| "test-secret-key".to_string());
 
     let response = app
         .oneshot(
             Request::builder()
                 .uri("/config/effective?filter=providers.openai")
-                .header("X-Secret-Key", secret_key)
+                .header("X-Secret-Key", &secret_key)
                 .body(axum::body::Body::empty())
                 .unwrap(),
         )

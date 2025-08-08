@@ -27,8 +27,7 @@ pub async fn run() -> Result<()> {
         );
     }
 
-    let secret_key =
-        std::env::var("GOOSE_SERVER__SECRET_KEY").unwrap_or_else(|_| "test".to_string());
+    let secret_key = goose::config::unified::get_or("server.secret_key", "test".to_string());
 
     let new_agent = Agent::new();
     let agent_ref = Arc::new(new_agent);
