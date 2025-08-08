@@ -60,7 +60,7 @@ export default function MCPServersPage() {
       <div className="container mx-auto px-4 p-24">
         <div className="pb-16">
           <div className="flex items-center gap-3 mb-4">
-            <Link to="/docs" className="text-textSubtle hover:text-textProminent transition-colors no-underline">
+            <Link to="/docs/category/getting-started" className="text-textSubtle hover:text-textProminent transition-colors no-underline">
               <ArrowLeft className="h-5 w-5" />
             </Link>
             <h1 className="text-[64px] font-medium text-textProminent m-0">
