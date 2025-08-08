@@ -16,6 +16,7 @@ use serde_json::Value;
 use std::fs::{self, File};
 use std::future::Future;
 use std::io::{Read, Write};
+use std::net::{SocketAddr, TcpListener};
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::process::Stdio;
@@ -43,6 +44,7 @@ struct BuildState {
     start_time: Option<DateTime<Utc>>,
     logs: Vec<String>,
     last_read_index: usize,
+    port: Option<u16>,
 }
 
 impl Default for BuildRouter {
@@ -63,11 +65,15 @@ impl BuildRouter {
         if let Ok(cwd) = std::env::current_dir() {
             let pkg_json = cwd.join("package.json");
             if pkg_json.exists() {
+                // Set the port synchronously before spawning async work
+                let port = find_available_port(5173);
+                {
+                    let mut s = state.lock().unwrap();
+                    s.project_path = Some(cwd.clone());
+                    s.port = Some(port);
+                }
+
                 tokio::spawn(async move {
-                    {
-                        let mut s = state.lock().unwrap();
-                        s.project_path = Some(cwd.clone());
-                    }
                     let _ = install_deps_if_needed(&cwd).await;
                     let _ = start_dev_server(state.clone(), &cwd).await;
                 });
@@ -84,13 +90,24 @@ impl Router for BuildRouter {
     }
 
     fn instructions(&self) -> String {
-        let mut base = self.inner.instructions();
-        base.push_str(
-            indoc! {
-                "\n\nAdditional build tools available:\n- manage_server: {action: logs|restart|build|deploy, message?: string}\n"
-            },
-        );
-        base
+        indoc! {
+            r#"
+            When operating the build extension, your role is to help the user develop a web app.
+
+            You are the code author, and should not expect the user to understand programming. You
+            need to communicate as though the user is tech savvy but does not know anything about the
+            underlying code. You can however respond with more technical detail if the user leans in or
+            makes it clear they understand typescript.
+
+            The project itself will always be based off of a react-router template and use tailwind.
+            The project can be deployed to hosting infra with a reserved domain on block hosting.
+            The project is mostly maintained on localhost, the deployed version is just a frozen snapshot.
+            Expect the project to evolve over many sessions. You must maintain a PROJECT_SPEC.md file that
+            enumerates every page and describes what it does. You should guide the user into communicating the
+            details of that spec over time. You can fill in/extrapolate for them, but always follow the spec
+            and represent any preferences the user sends you in the spec.
+            "#
+        }.to_string()
     }
 
     fn capabilities(&self) -> ServerCapabilities {
@@ -114,6 +131,7 @@ impl Router for BuildRouter {
                 - restart: Install/update dependencies if needed and restart the dev server
                 - build: Run the production build (npm run build)
                 - deploy: Zip the build output and upload to the hosting endpoint
+                - port: Get the port number the dev server is running on
 
                 Notes:
                 - Autostarts the dev server on MCP startup when a package.json is present in the current directory
@@ -127,7 +145,7 @@ impl Router for BuildRouter {
                 "properties": {
                     "action": {
                         "type": "string",
-                        "enum": ["logs", "restart", "build", "deploy"]
+                        "enum": ["logs", "restart", "build", "deploy", "port"]
                     },
                     "message": {"type": "string", "description": "Optional deploy message"}
                 }
@@ -195,6 +213,16 @@ impl Router for BuildRouter {
 }
 
 impl BuildRouter {
+    async fn get_port(&self) -> Result<Vec<Content>, ToolError> {
+        // Return the port we determined when starting the server
+        let port = {
+            let s = self.state.lock().unwrap();
+            s.port.unwrap_or(5173) // Default to 5173 if not set
+        };
+
+        Ok(vec![Content::text(format!("{}", port))])
+    }
+
     async fn manage_server(
         &self,
         _notifier: mpsc::Sender<JsonRpcMessage>,
@@ -341,12 +369,52 @@ impl BuildRouter {
                 let report = deploy_from_project(&project, message).await?;
                 Ok(vec![Content::text(report).with_audience(vec![Role::User])])
             }
+            "port" => self.get_port().await,
             _ => Err(ToolError::InvalidParameters(format!(
                 "Unsupported action: {}",
                 action
             ))),
         }
     }
+}
+
+fn find_available_port(start_port: u16) -> u16 {
+    for port in start_port..=65535 {
+        // Check both IPv4 and IPv6 to ensure the port is truly available
+        // Try IPv4 first
+        let ipv4_available = match TcpListener::bind(SocketAddr::from(([127, 0, 0, 1], port))) {
+            Ok(listener) => {
+                drop(listener);
+                true
+            }
+            Err(_) => false,
+        };
+
+        // Try IPv6 - check ::1 (localhost)
+        let ipv6_available =
+            match TcpListener::bind(SocketAddr::from(([0, 0, 0, 0, 0, 0, 0, 1], port))) {
+                Ok(listener) => {
+                    drop(listener);
+                    true
+                }
+                Err(_) => false,
+            };
+
+        // Also check 0.0.0.0 which would catch any wildcard bindings
+        let wildcard_available = match TcpListener::bind(SocketAddr::from(([0, 0, 0, 0], port))) {
+            Ok(listener) => {
+                drop(listener);
+                true
+            }
+            Err(_) => false,
+        };
+
+        // Port is only available if all checks pass
+        if ipv4_available && ipv6_available && wildcard_available {
+            return port;
+        }
+    }
+    start_port // fallback to start_port if no port is available
 }
 
 fn pm_install_command() -> Vec<&'static str> {
@@ -362,50 +430,47 @@ fn pm_build_command() -> Vec<&'static str> {
 }
 
 async fn install_deps_if_needed(project_path: &Path) -> Result<()> {
-    // Heuristic: if node_modules missing or older than package.json, run install
-    let pkg_json = project_path.join("package.json");
-    let node_modules = project_path.join("node_modules");
-    let needs_install = if !node_modules.exists() {
-        true
-    } else {
-        let pkg_mtime = fs::metadata(&pkg_json).and_then(|m| m.modified()).ok();
-        let nm_mtime = fs::metadata(&node_modules).and_then(|m| m.modified()).ok();
-        match (pkg_mtime, nm_mtime) {
-            (Some(p), Some(n)) => p > n, // package.json newer than node_modules
-            (Some(_), None) => true,
-            _ => false,
-        }
-    };
-
-    if needs_install {
-        let _ = append_log(
-            project_path,
-            &format!("[{}] Installing dependencies with npm...\n", Utc::now()),
-        );
-        let out = run_pm_command(project_path, &pm_install_command()).await?;
-        let _ = append_log(project_path, &format!("{out}\n"));
-    }
+    let _ = append_log(
+        project_path,
+        &format!("[{}] Installing dependencies with npm...\n", Utc::now()),
+    );
+    let out = run_pm_command(project_path, &pm_install_command()).await?;
+    let _ = append_log(project_path, &format!("{out}\n"));
 
     Ok(())
 }
 
 async fn start_dev_server(state: Arc<Mutex<BuildState>>, project_path: &Path) -> Result<()> {
-    {
+    // Get the port that was already set synchronously, or find a new one if needed
+    let port = {
         let mut s = state.lock().unwrap();
         if s.child.is_some() {
             return Ok(()); // already running
         }
+
+        // Use existing port if set, otherwise find a new one
+        let port = s.port.unwrap_or_else(|| {
+            let new_port = find_available_port(5173);
+            s.port = Some(new_port);
+            new_port
+        });
+
         s.logs.push(format!(
-            "[{}] Starting dev server in {} using npm...\n",
+            "[{}] Starting dev server in {} using npm on port {}...\n",
             Utc::now(),
             project_path.display(),
+            port
         ));
-    }
+        port
+    };
 
     let mut cmd = Command::new(pm_dev_command()[0]);
     for arg in &pm_dev_command()[1..] {
         cmd.arg(arg);
     }
+    cmd.arg("--");
+    cmd.arg("--port");
+    cmd.arg(port.to_string());
     let mut child = cmd
         .current_dir(project_path)
         .stdout(Stdio::piped())
