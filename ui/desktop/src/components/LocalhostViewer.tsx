@@ -238,7 +238,7 @@ export function LocalhostViewer({
         {showEmptyState && (
           <div className="absolute inset-0 flex items-center justify-center bg-background-default">
             <div className="text-center">
-              <RefreshCw size={120} className="mx-auto mb-4 text-textSubtle opacity-40" strokeWidth={1} />
+              <RefreshCw size={60} className="mx-auto mb-4 text-textSubtle opacity-40" strokeWidth={1} />
               <h2 className="text-textSubtle text-xl font-medium mb-2 opacity-40">Localhost Viewer</h2>
               <p className="text-textSubtle text-sm opacity-40">Refresh your page to establish a connection</p>
             </div>
