@@ -2280,6 +2280,74 @@ ipcMain.handle('create-app', async (event, appName: string, subdomain?: string) 
     if (err && typeof err === 'object' && 'code' in err && err.code !== 'ENOENT') throw err;
   }
 
+  // Helper: emit progress to renderer
+  const emitProgress = (lastLine: string, type: 'stdout' | 'stderr' = 'stdout') => {
+    try {
+      event.sender.send('app-creation-progress', { appName, lastLine, type });
+    } catch (e) {
+      console.warn('[Main] Failed sending progress event:', e);
+    }
+  };
+
+  // Helper: post-scaffold patch to apply Goose coolio styling
+  const applyGooseTemplate = async (targetPath: string) => {
+    emitProgress('Applying Goose template styling…');
+
+    // Resolve template base directory (dev vs packaged)
+    const devTemplates = path.join(process.cwd(), 'src', 'templates', 'build');
+    const prodTemplates = path.join(process.resourcesPath, 'templates', 'build');
+
+    // Prefer dev path when present, else fallback to prod path, else fallback to __dirname-based
+    let templateBase = devTemplates;
+    try {
+      await fs.access(templateBase);
+    } catch {
+      templateBase = prodTemplates;
+      try {
+        await fs.access(templateBase);
+      } catch {
+        templateBase = path.join(__dirname, 'templates', 'build');
+      }
+    }
+
+    const writeFileSafe = async (rel: string, content: string) => {
+      const dest = path.join(targetPath, rel);
+      await fs.mkdir(path.dirname(dest), { recursive: true });
+      await fs.writeFile(dest, content, 'utf8');
+      console.log(`[Main] Wrote ${rel}`);
+    };
+
+    const copyFromTemplate = async (rel: string, interpolate = false) => {
+      const src = path.join(templateBase, rel);
+      let content = await fs.readFile(src, 'utf8');
+      if (interpolate) {
+        content = content.replace(/__APP_NAME__/g, appName);
+      }
+      await writeFileSafe(rel, content);
+    };
+
+    // Overwrite specific files
+    await copyFromTemplate(path.join('app', 'app.css'));
+    await copyFromTemplate(path.join('app', 'welcome', 'welcome.tsx'));
+    await copyFromTemplate(path.join('app', 'routes', 'home.tsx'), true);
+    await copyFromTemplate(path.join('app', 'routes.ts'));
+
+    // Remove unused logo assets
+    const unusedAssets = [
+      path.join(targetPath, 'app', 'welcome', 'logo-dark.svg'),
+      path.join(targetPath, 'app', 'welcome', 'logo-light.svg'),
+      path.join(targetPath, 'app', 'assets', 'react.svg'),
+    ];
+    for (const p of unusedAssets) {
+      try {
+        await fs.unlink(p);
+        console.log(`[Main] Removed unused asset: ${p}`);
+      } catch (e) {
+        // Ignore if missing
+      }
+    }
+  };
+
   return new Promise((resolve, reject) => {
     const command = 'npm';
     const args = [
@@ -2321,13 +2389,7 @@ ipcMain.handle('create-app', async (event, appName: string, subdomain?: string) 
         .filter((line: string) => line.trim());
       if (lines.length > 0) {
         lastOutputLine = lines[lines.length - 1].trim();
-
-        // Send progress update to renderer
-        event.sender.send('app-creation-progress', {
-          appName,
-          lastLine: lastOutputLine,
-          type: 'stdout',
-        });
+        emitProgress(lastOutputLine, 'stdout');
       }
     });
 
@@ -2342,13 +2404,7 @@ ipcMain.handle('create-app', async (event, appName: string, subdomain?: string) 
         .filter((line: string) => line.trim());
       if (lines.length > 0) {
         lastOutputLine = lines[lines.length - 1].trim();
-
-        // Send progress update to renderer (stderr might contain useful info, not just errors)
-        event.sender.send('app-creation-progress', {
-          appName,
-          lastLine: lastOutputLine,
-          type: 'stderr',
-        });
+        emitProgress(lastOutputLine, 'stderr');
       }
     });
 
@@ -2360,6 +2416,13 @@ ipcMain.handle('create-app', async (event, appName: string, subdomain?: string) 
     child.on('close', async (code) => {
       if (code === 0) {
         console.log(`[Main] App "${appName}" created successfully`);
+
+        try {
+          await applyGooseTemplate(appPath);
+        } catch (patchErr) {
+          console.error('[Main] Failed to apply Goose template styling:', patchErr);
+          // Continue even if template application fails to avoid blocking user
+        }
 
         // Save subdomain metadata if provided
         if (subdomain) {
