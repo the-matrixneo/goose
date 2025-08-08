@@ -133,65 +133,6 @@
         }
       }
     },
-    "/config/effective": {
-      "get": {
-        "tags": [
-          "Configuration Management"
-        ],
-        "summary": "Get the effective configuration with optional filtering and source information",
-        "operationId": "get_effective_config",
-        "parameters": [
-          {
-            "name": "filter",
-            "in": "query",
-            "description": "Optional filter to match against configuration keys",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "nullable": true
-            }
-          },
-          {
-            "name": "only_changed",
-            "in": "query",
-            "description": "Only return values that differ from defaults",
-            "required": false,
-            "schema": {
-              "type": "boolean",
-              "nullable": true
-            }
-          },
-          {
-            "name": "include_sources",
-            "in": "query",
-            "description": "Include source information for each configuration value",
-            "required": false,
-            "schema": {
-              "type": "boolean",
-              "nullable": true
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Effective configuration retrieved successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EffectiveConfigEntry"
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized - invalid secret key"
-          }
-        }
-      }
-    },
     "/config/extensions": {
       "get": {
         "tags": [
@@ -1217,9 +1158,18 @@
           "oauth_flow"
         ],
         "properties": {
+          "default": {
+            "type": "string",
+            "description": "Optional default value for the key",
+            "nullable": true
+          },
           "name": {
             "type": "string",
             "description": "The name of the configuration key (e.g., \"API_KEY\")"
+          },
+          "oauth_flow": {
+            "type": "boolean",
+            "description": "Whether this key should be configured using OAuth device code flow\nWhen true, the provider's configure_oauth() method will be called instead of prompting for manual input"
           },
           "required": {
             "type": "boolean",
@@ -1228,15 +1178,6 @@
           "secret": {
             "type": "boolean",
             "description": "Whether this key should be stored securely (e.g., in keychain)"
-          },
-          "default": {
-            "type": "string",
-            "description": "Optional default value for the key",
-            "nullable": true
-          },
-          "oauth_flow": {
-            "type": "boolean",
-            "description": "Whether this key should be configured using OAuth device code flow\nWhen true, the provider's configure_oauth() method will be called instead of prompting for manual input"
           }
         }
       },
@@ -1247,11 +1188,11 @@
           "is_secret"
         ],
         "properties": {
-          "key": {
-            "type": "string"
-          },
           "is_secret": {
             "type": "boolean"
+          },
+          "key": {
+            "type": "string"
           }
         }
       },
@@ -1318,16 +1259,16 @@
           "manageAction"
         ],
         "properties": {
+          "manageAction": {
+            "type": "string",
+            "description": "Operation to perform: \"truncation\" or \"summarize\""
+          },
           "messages": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/Message"
             },
             "description": "Collection of messages to be managed"
-          },
-          "manageAction": {
-            "type": "string",
-            "description": "Operation to perform: \"truncation\" or \"summarize\""
           }
         }
       },
@@ -1364,18 +1305,6 @@
           "description"
         ],
         "properties": {
-          "messages": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Message"
-            }
-          },
-          "title": {
-            "type": "string"
-          },
-          "description": {
-            "type": "string"
-          },
           "activities": {
             "type": "array",
             "items": {
@@ -1390,22 +1319,34 @@
               }
             ],
             "nullable": true
+          },
+          "description": {
+            "type": "string"
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Message"
+            }
+          },
+          "title": {
+            "type": "string"
           }
         }
       },
       "CreateRecipeResponse": {
         "type": "object",
         "properties": {
+          "error": {
+            "type": "string",
+            "nullable": true
+          },
           "recipe": {
             "allOf": [
               {
                 "$ref": "#/components/schemas/Recipe"
               }
             ],
-            "nullable": true
-          },
-          "error": {
-            "type": "string",
             "nullable": true
           }
         }
@@ -1418,18 +1359,18 @@
           "cron"
         ],
         "properties": {
-          "id": {
-            "type": "string"
-          },
-          "recipe_source": {
-            "type": "string"
-          },
           "cron": {
             "type": "string"
           },
           "execution_mode": {
             "type": "string",
             "nullable": true
+          },
+          "id": {
+            "type": "string"
+          },
+          "recipe_source": {
+            "type": "string"
           }
         }
       },
@@ -1455,61 +1396,12 @@
           }
         }
       },
-      "EffectiveConfigEntry": {
-        "type": "object",
-        "description": "Configuration entry with source information",
-        "required": [
-          "key",
-          "value",
-          "redacted",
-          "is_secret",
-          "source",
-          "has_default"
-        ],
-        "properties": {
-          "key": {
-            "type": "string",
-            "description": "The configuration key"
-          },
-          "value": {
-            "description": "The configuration value (may be redacted if secret)"
-          },
-          "redacted": {
-            "type": "boolean",
-            "description": "Whether this value has been redacted for security"
-          },
-          "is_secret": {
-            "type": "boolean",
-            "description": "Whether this is a secret configuration value"
-          },
-          "source": {
-            "$ref": "#/components/schemas/Source"
-          },
-          "env_name": {
-            "type": "string",
-            "description": "The environment variable name if sourced from environment",
-            "nullable": true
-          },
-          "alias_used": {
-            "type": "boolean",
-            "description": "Whether an alias was used for this configuration",
-            "nullable": true
-          },
-          "has_default": {
-            "type": "boolean",
-            "description": "Whether this configuration has a default value"
-          }
-        }
-      },
       "EmbeddedResource": {
         "type": "object",
         "required": [
           "resource"
         ],
         "properties": {
-          "resource": {
-            "$ref": "#/components/schemas/ResourceContents"
-          },
           "annotations": {
             "anyOf": [
               {
@@ -1519,6 +1411,9 @@
                 "type": "object"
               }
             ]
+          },
+          "resource": {
+            "$ref": "#/components/schemas/ResourceContents"
           }
         }
       },
@@ -1562,15 +1457,14 @@
               "type"
             ],
             "properties": {
-              "name": {
+              "bundled": {
+                "type": "boolean",
+                "description": "Whether this extension is bundled with Goose",
+                "nullable": true
+              },
+              "description": {
                 "type": "string",
-                "description": "The name used to identify this extension"
-              },
-              "uri": {
-                "type": "string"
-              },
-              "envs": {
-                "$ref": "#/components/schemas/Envs"
+                "nullable": true
               },
               "env_keys": {
                 "type": "array",
@@ -1578,9 +1472,12 @@
                   "type": "string"
                 }
               },
-              "description": {
+              "envs": {
+                "$ref": "#/components/schemas/Envs"
+              },
+              "name": {
                 "type": "string",
-                "nullable": true
+                "description": "The name used to identify this extension"
               },
               "timeout": {
                 "type": "integer",
@@ -1588,16 +1485,14 @@
                 "nullable": true,
                 "minimum": 0
               },
-              "bundled": {
-                "type": "boolean",
-                "description": "Whether this extension is bundled with Goose",
-                "nullable": true
-              },
               "type": {
                 "type": "string",
                 "enum": [
                   "sse"
                 ]
+              },
+              "uri": {
+                "type": "string"
               }
             }
           },
@@ -1611,14 +1506,25 @@
               "type"
             ],
             "properties": {
-              "name": {
-                "type": "string",
-                "description": "The name used to identify this extension"
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "bundled": {
+                "type": "boolean",
+                "description": "Whether this extension is bundled with Goose",
+                "nullable": true
               },
               "cmd": {
                 "type": "string"
               },
-              "args": {
+              "description": {
+                "type": "string",
+                "nullable": true
+              },
+              "env_keys": {
                 "type": "array",
                 "items": {
                   "type": "string"
@@ -1627,26 +1533,15 @@
               "envs": {
                 "$ref": "#/components/schemas/Envs"
               },
-              "env_keys": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
+              "name": {
+                "type": "string",
+                "description": "The name used to identify this extension"
               },
               "timeout": {
                 "type": "integer",
                 "format": "int64",
                 "nullable": true,
                 "minimum": 0
-              },
-              "description": {
-                "type": "string",
-                "nullable": true
-              },
-              "bundled": {
-                "type": "boolean",
-                "description": "Whether this extension is bundled with Goose",
-                "nullable": true
               },
               "type": {
                 "type": "string",
@@ -1664,28 +1559,28 @@
               "type"
             ],
             "properties": {
-              "name": {
-                "type": "string",
-                "description": "The name used to identify this extension"
-              },
-              "display_name": {
-                "type": "string",
+              "bundled": {
+                "type": "boolean",
+                "description": "Whether this extension is bundled with Goose",
                 "nullable": true
               },
               "description": {
                 "type": "string",
                 "nullable": true
               },
+              "display_name": {
+                "type": "string",
+                "nullable": true
+              },
+              "name": {
+                "type": "string",
+                "description": "The name used to identify this extension"
+              },
               "timeout": {
                 "type": "integer",
                 "format": "int64",
                 "nullable": true,
                 "minimum": 0
-              },
-              "bundled": {
-                "type": "boolean",
-                "description": "Whether this extension is bundled with Goose",
-                "nullable": true
               },
               "type": {
                 "type": "string",
@@ -1704,15 +1599,14 @@
               "type"
             ],
             "properties": {
-              "name": {
+              "bundled": {
+                "type": "boolean",
+                "description": "Whether this extension is bundled with Goose",
+                "nullable": true
+              },
+              "description": {
                 "type": "string",
-                "description": "The name used to identify this extension"
-              },
-              "uri": {
-                "type": "string"
-              },
-              "envs": {
-                "$ref": "#/components/schemas/Envs"
+                "nullable": true
               },
               "env_keys": {
                 "type": "array",
@@ -1720,15 +1614,18 @@
                   "type": "string"
                 }
               },
+              "envs": {
+                "$ref": "#/components/schemas/Envs"
+              },
               "headers": {
                 "type": "object",
                 "additionalProperties": {
                   "type": "string"
                 }
               },
-              "description": {
+              "name": {
                 "type": "string",
-                "nullable": true
+                "description": "The name used to identify this extension"
               },
               "timeout": {
                 "type": "integer",
@@ -1736,16 +1633,14 @@
                 "nullable": true,
                 "minimum": 0
               },
-              "bundled": {
-                "type": "boolean",
-                "description": "Whether this extension is bundled with Goose",
-                "nullable": true
-              },
               "type": {
                 "type": "string",
                 "enum": [
                   "streamable_http"
                 ]
+              },
+              "uri": {
+                "type": "string"
               }
             }
           },
@@ -1758,6 +1653,16 @@
               "type"
             ],
             "properties": {
+              "bundled": {
+                "type": "boolean",
+                "description": "Whether this extension is bundled with Goose",
+                "nullable": true
+              },
+              "instructions": {
+                "type": "string",
+                "description": "Instructions for how to use these tools",
+                "nullable": true
+              },
               "name": {
                 "type": "string",
                 "description": "The name used to identify this extension"
@@ -1768,16 +1673,6 @@
                   "$ref": "#/components/schemas/Tool"
                 },
                 "description": "The tools provided by the frontend"
-              },
-              "instructions": {
-                "type": "string",
-                "description": "Instructions for how to use these tools",
-                "nullable": true
-              },
-              "bundled": {
-                "type": "boolean",
-                "description": "Whether this extension is bundled with Goose",
-                "nullable": true
               },
               "type": {
                 "type": "string",
@@ -1796,25 +1691,9 @@
               "type"
             ],
             "properties": {
-              "name": {
-                "type": "string",
-                "description": "The name used to identify this extension"
-              },
               "code": {
                 "type": "string",
                 "description": "The Python code to execute"
-              },
-              "description": {
-                "type": "string",
-                "description": "Description of what the extension does",
-                "nullable": true
-              },
-              "timeout": {
-                "type": "integer",
-                "format": "int64",
-                "description": "Timeout in seconds",
-                "nullable": true,
-                "minimum": 0
               },
               "dependencies": {
                 "type": "array",
@@ -1823,6 +1702,22 @@
                 },
                 "description": "Python package dependencies required by this extension",
                 "nullable": true
+              },
+              "description": {
+                "type": "string",
+                "description": "Description of what the extension does",
+                "nullable": true
+              },
+              "name": {
+                "type": "string",
+                "description": "The name used to identify this extension"
+              },
+              "timeout": {
+                "type": "integer",
+                "format": "int64",
+                "description": "Timeout in seconds",
+                "nullable": true,
+                "minimum": 0
               },
               "type": {
                 "type": "string",
@@ -1864,14 +1759,14 @@
           "enabled"
         ],
         "properties": {
-          "name": {
-            "type": "string"
-          },
           "config": {
             "$ref": "#/components/schemas/ExtensionConfig"
           },
           "enabled": {
             "type": "boolean"
+          },
+          "name": {
+            "type": "string"
           }
         }
       },
@@ -1911,12 +1806,6 @@
           "mimeType"
         ],
         "properties": {
-          "data": {
-            "type": "string"
-          },
-          "mimeType": {
-            "type": "string"
-          },
           "annotations": {
             "anyOf": [
               {
@@ -1926,16 +1815,18 @@
                 "type": "object"
               }
             ]
+          },
+          "data": {
+            "type": "string"
+          },
+          "mimeType": {
+            "type": "string"
           }
         }
       },
       "InspectJobResponse": {
         "type": "object",
         "properties": {
-          "sessionId": {
-            "type": "string",
-            "nullable": true
-          },
           "processStartTime": {
             "type": "string",
             "nullable": true
@@ -1943,6 +1834,10 @@
           "runningDurationSeconds": {
             "type": "integer",
             "format": "int64",
+            "nullable": true
+          },
+          "sessionId": {
+            "type": "string",
             "nullable": true
           }
         }
@@ -1980,22 +1875,22 @@
           "content"
         ],
         "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MessageContent"
+            }
+          },
+          "created": {
+            "type": "integer",
+            "format": "int64"
+          },
           "id": {
             "type": "string",
             "nullable": true
           },
           "role": {
             "$ref": "#/components/schemas/Role"
-          },
-          "created": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "content": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/MessageContent"
-            }
           }
         }
       },
@@ -2225,14 +2120,15 @@
           "context_limit"
         ],
         "properties": {
-          "name": {
-            "type": "string",
-            "description": "The name of the model"
-          },
           "context_limit": {
             "type": "integer",
             "description": "The maximum context length this model supports",
             "minimum": 0
+          },
+          "currency": {
+            "type": "string",
+            "description": "Currency for the costs (default: \"$\")",
+            "nullable": true
           },
           "input_token_cost": {
             "type": "number",
@@ -2240,15 +2136,14 @@
             "description": "Cost per token for input (optional)",
             "nullable": true
           },
+          "name": {
+            "type": "string",
+            "description": "The name of the model"
+          },
           "output_token_cost": {
             "type": "number",
             "format": "double",
             "description": "Cost per token for output (optional)",
-            "nullable": true
-          },
-          "currency": {
-            "type": "string",
-            "description": "Currency for the costs (default: \"$\")",
             "nullable": true
           },
           "supports_cache_control": {
@@ -2265,14 +2160,14 @@
           "action"
         ],
         "properties": {
+          "action": {
+            "type": "string"
+          },
           "id": {
             "type": "string"
           },
           "principal_type": {
             "$ref": "#/components/schemas/PrincipalType"
-          },
-          "action": {
-            "type": "string"
           }
         }
       },
@@ -2300,14 +2195,14 @@
           "is_configured"
         ],
         "properties": {
-          "name": {
-            "type": "string"
+          "is_configured": {
+            "type": "boolean"
           },
           "metadata": {
             "$ref": "#/components/schemas/ProviderMetadata"
           },
-          "is_configured": {
-            "type": "boolean"
+          "name": {
+            "type": "string"
           }
         }
       },
@@ -2324,21 +2219,24 @@
           "config_keys"
         ],
         "properties": {
-          "name": {
-            "type": "string",
-            "description": "The unique identifier for this provider"
+          "config_keys": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConfigKey"
+            },
+            "description": "Required configuration keys"
           },
-          "display_name": {
+          "default_model": {
             "type": "string",
-            "description": "Display name for the provider in UIs"
+            "description": "The default/recommended model for this provider"
           },
           "description": {
             "type": "string",
             "description": "Description of the provider's capabilities"
           },
-          "default_model": {
+          "display_name": {
             "type": "string",
-            "description": "The default/recommended model for this provider"
+            "description": "Display name for the provider in UIs"
           },
           "known_models": {
             "type": "array",
@@ -2351,12 +2249,9 @@
             "type": "string",
             "description": "Link to the docs where models can be found"
           },
-          "config_keys": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ConfigKey"
-            },
-            "description": "Required configuration keys"
+          "name": {
+            "type": "string",
+            "description": "The unique identifier for this provider"
           }
         }
       },
@@ -2419,45 +2314,6 @@
           "description"
         ],
         "properties": {
-          "version": {
-            "type": "string"
-          },
-          "title": {
-            "type": "string"
-          },
-          "description": {
-            "type": "string"
-          },
-          "instructions": {
-            "type": "string",
-            "nullable": true
-          },
-          "prompt": {
-            "type": "string",
-            "nullable": true
-          },
-          "extensions": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ExtensionConfig"
-            },
-            "nullable": true
-          },
-          "context": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "nullable": true
-          },
-          "settings": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/Settings"
-              }
-            ],
-            "nullable": true
-          },
           "activities": {
             "type": "array",
             "items": {
@@ -2473,6 +2329,27 @@
             ],
             "nullable": true
           },
+          "context": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "description": {
+            "type": "string"
+          },
+          "extensions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExtensionConfig"
+            },
+            "nullable": true
+          },
+          "instructions": {
+            "type": "string",
+            "nullable": true
+          },
           "parameters": {
             "type": "array",
             "items": {
@@ -2480,10 +2357,30 @@
             },
             "nullable": true
           },
+          "prompt": {
+            "type": "string",
+            "nullable": true
+          },
           "response": {
             "allOf": [
               {
                 "$ref": "#/components/schemas/Response"
+              }
+            ],
+            "nullable": true
+          },
+          "retry": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RetryConfig"
+              }
+            ],
+            "nullable": true
+          },
+          "settings": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Settings"
               }
             ],
             "nullable": true
@@ -2495,13 +2392,11 @@
             },
             "nullable": true
           },
-          "retry": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/RetryConfig"
-              }
-            ],
-            "nullable": true
+          "title": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
           }
         }
       },
@@ -2514,21 +2409,18 @@
           "description"
         ],
         "properties": {
-          "key": {
+          "default": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
             "type": "string"
           },
           "input_type": {
             "$ref": "#/components/schemas/RecipeParameterInputType"
           },
-          "requirement": {
-            "$ref": "#/components/schemas/RecipeParameterRequirement"
-          },
-          "description": {
+          "key": {
             "type": "string"
-          },
-          "default": {
-            "type": "string",
-            "nullable": true
           },
           "options": {
             "type": "array",
@@ -2536,6 +2428,9 @@
               "type": "string"
             },
             "nullable": true
+          },
+          "requirement": {
+            "$ref": "#/components/schemas/RecipeParameterRequirement"
           }
         }
       },
@@ -2578,13 +2473,13 @@
               "text"
             ],
             "properties": {
-              "uri": {
-                "type": "string"
-              },
               "mimeType": {
                 "type": "string"
               },
               "text": {
+                "type": "string"
+              },
+              "uri": {
                 "type": "string"
               }
             }
@@ -2596,13 +2491,13 @@
               "blob"
             ],
             "properties": {
-              "uri": {
+              "blob": {
                 "type": "string"
               },
               "mimeType": {
                 "type": "string"
               },
-              "blob": {
+              "uri": {
                 "type": "string"
               }
             }
@@ -2625,12 +2520,6 @@
           "checks"
         ],
         "properties": {
-          "max_retries": {
-            "type": "integer",
-            "format": "int32",
-            "description": "Maximum number of retry attempts before giving up",
-            "minimum": 0
-          },
           "checks": {
             "type": "array",
             "items": {
@@ -2638,22 +2527,28 @@
             },
             "description": "List of success checks to validate recipe completion"
           },
+          "max_retries": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Maximum number of retry attempts before giving up",
+            "minimum": 0
+          },
           "on_failure": {
             "type": "string",
             "description": "Optional shell command to run on failure for cleanup",
             "nullable": true
           },
-          "timeout_seconds": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Timeout in seconds for individual shell commands (default: 300 seconds)",
-            "nullable": true,
-            "minimum": 0
-          },
           "on_failure_timeout_seconds": {
             "type": "integer",
             "format": "int64",
             "description": "Timeout in seconds for on_failure commands (default: 600 seconds)",
+            "nullable": true,
+            "minimum": 0
+          },
+          "timeout_seconds": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Timeout in seconds for individual shell commands (default: 300 seconds)",
             "nullable": true,
             "minimum": 0
           }
@@ -2688,13 +2583,21 @@
           "cron"
         ],
         "properties": {
-          "id": {
-            "type": "string"
-          },
-          "source": {
-            "type": "string"
-          },
           "cron": {
+            "type": "string"
+          },
+          "current_session_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "currently_running": {
+            "type": "boolean"
+          },
+          "execution_mode": {
+            "type": "string",
+            "nullable": true
+          },
+          "id": {
             "type": "string"
           },
           "last_run": {
@@ -2702,24 +2605,16 @@
             "format": "date-time",
             "nullable": true
           },
-          "currently_running": {
-            "type": "boolean"
-          },
           "paused": {
             "type": "boolean"
-          },
-          "current_session_id": {
-            "type": "string",
-            "nullable": true
           },
           "process_start_time": {
             "type": "string",
             "format": "date-time",
             "nullable": true
           },
-          "execution_mode": {
-            "type": "string",
-            "nullable": true
+          "source": {
+            "type": "string"
           }
         }
       },
@@ -2733,46 +2628,6 @@
           "messageCount"
         ],
         "properties": {
-          "id": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "createdAt": {
-            "type": "string"
-          },
-          "workingDir": {
-            "type": "string"
-          },
-          "scheduleId": {
-            "type": "string",
-            "nullable": true
-          },
-          "messageCount": {
-            "type": "integer",
-            "minimum": 0
-          },
-          "totalTokens": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          },
-          "inputTokens": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          },
-          "outputTokens": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          },
-          "accumulatedTotalTokens": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          },
           "accumulatedInputTokens": {
             "type": "integer",
             "format": "int32",
@@ -2782,6 +2637,46 @@
             "type": "integer",
             "format": "int32",
             "nullable": true
+          },
+          "accumulatedTotalTokens": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "inputTokens": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "messageCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "name": {
+            "type": "string"
+          },
+          "outputTokens": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "scheduleId": {
+            "type": "string",
+            "nullable": true
+          },
+          "totalTokens": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "workingDir": {
+            "type": "string"
           }
         }
       },
@@ -2793,19 +2688,19 @@
           "messages"
         ],
         "properties": {
-          "sessionId": {
-            "type": "string",
-            "description": "Unique identifier for the session"
-          },
-          "metadata": {
-            "$ref": "#/components/schemas/SessionMetadata"
-          },
           "messages": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/Message"
             },
             "description": "List of messages in the session conversation"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/SessionMetadata"
+          },
+          "sessionId": {
+            "type": "string",
+            "description": "Unique identifier for the session"
           }
         }
       },
@@ -2821,14 +2716,14 @@
           "id": {
             "type": "string"
           },
-          "path": {
-            "type": "string"
+          "metadata": {
+            "$ref": "#/components/schemas/SessionMetadata"
           },
           "modified": {
             "type": "string"
           },
-          "metadata": {
-            "$ref": "#/components/schemas/SessionMetadata"
+          "path": {
+            "type": "string"
           }
         }
       },
@@ -2856,54 +2751,6 @@
           "message_count"
         ],
         "properties": {
-          "working_dir": {
-            "type": "string",
-            "description": "Working directory for the session",
-            "example": "/home/user/sessions/session1"
-          },
-          "description": {
-            "type": "string",
-            "description": "A short description of the session, typically 3 words or less"
-          },
-          "schedule_id": {
-            "type": "string",
-            "description": "ID of the schedule that triggered this session, if any",
-            "nullable": true
-          },
-          "project_id": {
-            "type": "string",
-            "description": "ID of the project this session belongs to, if any",
-            "nullable": true
-          },
-          "message_count": {
-            "type": "integer",
-            "description": "Number of messages in the session",
-            "minimum": 0
-          },
-          "total_tokens": {
-            "type": "integer",
-            "format": "int32",
-            "description": "The total number of tokens used in the session. Retrieved from the provider's last usage.",
-            "nullable": true
-          },
-          "input_tokens": {
-            "type": "integer",
-            "format": "int32",
-            "description": "The number of input tokens used in the session. Retrieved from the provider's last usage.",
-            "nullable": true
-          },
-          "output_tokens": {
-            "type": "integer",
-            "format": "int32",
-            "description": "The number of output tokens used in the session. Retrieved from the provider's last usage.",
-            "nullable": true
-          },
-          "accumulated_total_tokens": {
-            "type": "integer",
-            "format": "int32",
-            "description": "The total number of tokens used in the session. Accumulated across all messages (useful for tracking cost over an entire session).",
-            "nullable": true
-          },
           "accumulated_input_tokens": {
             "type": "integer",
             "format": "int32",
@@ -2915,6 +2762,54 @@
             "format": "int32",
             "description": "The number of output tokens used in the session. Accumulated across all messages.",
             "nullable": true
+          },
+          "accumulated_total_tokens": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The total number of tokens used in the session. Accumulated across all messages (useful for tracking cost over an entire session).",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "description": "A short description of the session, typically 3 words or less"
+          },
+          "input_tokens": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The number of input tokens used in the session. Retrieved from the provider's last usage.",
+            "nullable": true
+          },
+          "message_count": {
+            "type": "integer",
+            "description": "Number of messages in the session",
+            "minimum": 0
+          },
+          "output_tokens": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The number of output tokens used in the session. Retrieved from the provider's last usage.",
+            "nullable": true
+          },
+          "project_id": {
+            "type": "string",
+            "description": "ID of the project this session belongs to, if any",
+            "nullable": true
+          },
+          "schedule_id": {
+            "type": "string",
+            "description": "ID of the schedule that triggered this session, if any",
+            "nullable": true
+          },
+          "total_tokens": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The total number of tokens used in the session. Retrieved from the provider's last usage.",
+            "nullable": true
+          },
+          "working_dir": {
+            "type": "string",
+            "description": "Working directory for the session",
+            "example": "/home/user/sessions/session1"
           }
         }
       },
@@ -2931,11 +2826,11 @@
       "Settings": {
         "type": "object",
         "properties": {
-          "goose_provider": {
+          "goose_model": {
             "type": "string",
             "nullable": true
           },
-          "goose_model": {
+          "goose_provider": {
             "type": "string",
             "nullable": true
           },
@@ -2946,77 +2841,6 @@
           }
         }
       },
-      "Source": {
-        "oneOf": [
-          {
-            "type": "object",
-            "required": [
-              "type"
-            ],
-            "properties": {
-              "type": {
-                "type": "string",
-                "enum": [
-                  "Cli"
-                ]
-              }
-            }
-          },
-          {
-            "type": "object",
-            "required": [
-              "name",
-              "alias_used",
-              "type"
-            ],
-            "properties": {
-              "name": {
-                "type": "string"
-              },
-              "alias_used": {
-                "type": "boolean"
-              },
-              "type": {
-                "type": "string",
-                "enum": [
-                  "Env"
-                ]
-              }
-            }
-          },
-          {
-            "type": "object",
-            "required": [
-              "type"
-            ],
-            "properties": {
-              "type": {
-                "type": "string",
-                "enum": [
-                  "File"
-                ]
-              }
-            }
-          },
-          {
-            "type": "object",
-            "required": [
-              "type"
-            ],
-            "properties": {
-              "type": {
-                "type": "string",
-                "enum": [
-                  "Default"
-                ]
-              }
-            }
-          }
-        ],
-        "discriminator": {
-          "propertyName": "type"
-        }
-      },
       "SubRecipe": {
         "type": "object",
         "required": [
@@ -3024,24 +2848,24 @@
           "path"
         ],
         "properties": {
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
           "name": {
             "type": "string"
           },
           "path": {
             "type": "string"
           },
+          "sequential_when_repeated": {
+            "type": "boolean"
+          },
           "values": {
             "type": "object",
             "additionalProperties": {
               "type": "string"
             },
-            "nullable": true
-          },
-          "sequential_when_repeated": {
-            "type": "boolean"
-          },
-          "description": {
-            "type": "string",
             "nullable": true
           }
         }
@@ -3091,9 +2915,6 @@
           "text"
         ],
         "properties": {
-          "text": {
-            "type": "string"
-          },
           "annotations": {
             "anyOf": [
               {
@@ -3103,6 +2924,9 @@
                 "type": "object"
               }
             ]
+          },
+          "text": {
+            "type": "string"
           }
         }
       },
@@ -3113,10 +2937,10 @@
           "signature"
         ],
         "properties": {
-          "thinking": {
+          "signature": {
             "type": "string"
           },
-          "signature": {
+          "thinking": {
             "type": "string"
           }
         }
@@ -3128,20 +2952,6 @@
           "inputSchema"
         ],
         "properties": {
-          "name": {
-            "type": "string"
-          },
-          "description": {
-            "type": "string"
-          },
-          "inputSchema": {
-            "type": "object",
-            "additionalProperties": true
-          },
-          "outputSchema": {
-            "type": "object",
-            "additionalProperties": true
-          },
           "annotations": {
             "anyOf": [
               {
@@ -3151,18 +2961,26 @@
                 "type": "object"
               }
             ]
+          },
+          "description": {
+            "type": "string"
+          },
+          "inputSchema": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "name": {
+            "type": "string"
+          },
+          "outputSchema": {
+            "type": "object",
+            "additionalProperties": true
           }
         }
       },
       "ToolAnnotations": {
         "type": "object",
         "properties": {
-          "title": {
-            "type": "string"
-          },
-          "readOnlyHint": {
-            "type": "boolean"
-          },
           "destructiveHint": {
             "type": "boolean"
           },
@@ -3171,6 +2989,12 @@
           },
           "openWorldHint": {
             "type": "boolean"
+          },
+          "readOnlyHint": {
+            "type": "boolean"
+          },
+          "title": {
+            "type": "string"
           }
         }
       },
@@ -3182,16 +3006,16 @@
           "arguments"
         ],
         "properties": {
+          "arguments": {},
           "id": {
             "type": "string"
           },
-          "toolName": {
-            "type": "string"
-          },
-          "arguments": {},
           "prompt": {
             "type": "string",
             "nullable": true
+          },
+          "toolName": {
+            "type": "string"
           }
         }
       },
@@ -3204,10 +3028,10 @@
           "parameters"
         ],
         "properties": {
-          "name": {
+          "description": {
             "type": "string"
           },
-          "description": {
+          "name": {
             "type": "string"
           },
           "parameters": {
@@ -3233,11 +3057,11 @@
           "permission"
         ],
         "properties": {
-          "tool_name": {
-            "type": "string"
-          },
           "permission": {
             "$ref": "#/components/schemas/PermissionLevel"
+          },
+          "tool_name": {
+            "type": "string"
           }
         }
       },
@@ -3290,13 +3114,13 @@
           "is_secret"
         ],
         "properties": {
+          "is_secret": {
+            "type": "boolean"
+          },
           "key": {
             "type": "string"
           },
-          "value": {},
-          "is_secret": {
-            "type": "boolean"
-          }
+          "value": {}
         }
       },
       "UpsertPermissionsQuery": {

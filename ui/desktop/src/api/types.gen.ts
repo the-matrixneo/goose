@@ -31,9 +31,18 @@ export type AuthorRequest = {
  */
 export type ConfigKey = {
     /**
+     * Optional default value for the key
+     */
+    default?: string | null;
+    /**
      * The name of the configuration key (e.g., "API_KEY")
      */
     name: string;
+    /**
+     * Whether this key should be configured using OAuth device code flow
+     * When true, the provider's configure_oauth() method will be called instead of prompting for manual input
+     */
+    oauth_flow: boolean;
     /**
      * Whether this key is required for the provider to function
      */
@@ -42,26 +51,15 @@ export type ConfigKey = {
      * Whether this key should be stored securely (e.g., in keychain)
      */
     secret: boolean;
-    /**
-     * Optional default value for the key
-     */
-    default?: string | null;
-    /**
-     * Whether this key should be configured using OAuth device code flow
-     * When true, the provider's configure_oauth() method will be called instead of prompting for manual input
-     */
-    oauth_flow: boolean;
 };
 
 export type ConfigKeyQuery = {
-    key: string;
     is_secret: boolean;
+    key: string;
 };
 
 export type ConfigResponse = {
-    config: {
-        [key: string]: unknown;
-    };
+    config: {};
 };
 
 export type Content = RawTextContent | RawImageContent | RawEmbeddedResource | Annotated;
@@ -75,13 +73,13 @@ export type ContextLengthExceeded = {
  */
 export type ContextManageRequest = {
     /**
-     * Collection of messages to be managed
-     */
-    messages: Array<Message>;
-    /**
      * Operation to perform: "truncation" or "summarize"
      */
     manageAction: string;
+    /**
+     * Collection of messages to be managed
+     */
+    messages: Array<Message>;
 };
 
 /**
@@ -99,23 +97,23 @@ export type ContextManageResponse = {
 };
 
 export type CreateRecipeRequest = {
-    messages: Array<Message>;
-    title: string;
-    description: string;
     activities?: Array<string> | null;
     author?: AuthorRequest | null;
+    description: string;
+    messages: Array<Message>;
+    title: string;
 };
 
 export type CreateRecipeResponse = {
-    recipe?: Recipe | null;
     error?: string | null;
+    recipe?: Recipe | null;
 };
 
 export type CreateScheduleRequest = {
-    id: string;
-    recipe_source: string;
     cron: string;
     execution_mode?: string | null;
+    id: string;
+    recipe_source: string;
 };
 
 export type DecodeRecipeRequest = {
@@ -126,46 +124,11 @@ export type DecodeRecipeResponse = {
     recipe: Recipe;
 };
 
-/**
- * Configuration entry with source information
- */
-export type EffectiveConfigEntry = {
-    /**
-     * The configuration key
-     */
-    key: string;
-    /**
-     * The configuration value (may be redacted if secret)
-     */
-    value: unknown;
-    /**
-     * Whether this value has been redacted for security
-     */
-    redacted: boolean;
-    /**
-     * Whether this is a secret configuration value
-     */
-    is_secret: boolean;
-    source: Source;
-    /**
-     * The environment variable name if sourced from environment
-     */
-    env_name?: string | null;
-    /**
-     * Whether an alias was used for this configuration
-     */
-    alias_used?: boolean | null;
-    /**
-     * Whether this configuration has a default value
-     */
-    has_default: boolean;
-};
-
 export type EmbeddedResource = {
-    resource: ResourceContents;
     annotations?: Annotations | {
         [key: string]: unknown;
     };
+    resource: ResourceContents;
 };
 
 export type EncodeRecipeRequest = {
@@ -185,67 +148,75 @@ export type Envs = {
  */
 export type ExtensionConfig = {
     /**
-     * The name used to identify this extension
-     */
-    name: string;
-    uri: string;
-    envs?: Envs;
-    env_keys?: Array<string>;
-    description?: string | null;
-    timeout?: number | null;
-    /**
      * Whether this extension is bundled with Goose
      */
     bundled?: boolean | null;
+    description?: string | null;
+    env_keys?: Array<string>;
+    envs?: Envs;
+    /**
+     * The name used to identify this extension
+     */
+    name: string;
+    timeout?: number | null;
     type: 'sse';
+    uri: string;
 } | {
-    /**
-     * The name used to identify this extension
-     */
-    name: string;
-    cmd: string;
     args: Array<string>;
-    envs?: Envs;
-    env_keys?: Array<string>;
-    timeout?: number | null;
-    description?: string | null;
     /**
      * Whether this extension is bundled with Goose
      */
     bundled?: boolean | null;
+    cmd: string;
+    description?: string | null;
+    env_keys?: Array<string>;
+    envs?: Envs;
+    /**
+     * The name used to identify this extension
+     */
+    name: string;
+    timeout?: number | null;
     type: 'stdio';
 } | {
     /**
-     * The name used to identify this extension
-     */
-    name: string;
-    display_name?: string | null;
-    description?: string | null;
-    timeout?: number | null;
-    /**
      * Whether this extension is bundled with Goose
      */
     bundled?: boolean | null;
+    description?: string | null;
+    display_name?: string | null;
+    /**
+     * The name used to identify this extension
+     */
+    name: string;
+    timeout?: number | null;
     type: 'builtin';
 } | {
     /**
-     * The name used to identify this extension
+     * Whether this extension is bundled with Goose
      */
-    name: string;
-    uri: string;
-    envs?: Envs;
+    bundled?: boolean | null;
+    description?: string | null;
     env_keys?: Array<string>;
+    envs?: Envs;
     headers?: {
         [key: string]: string;
     };
-    description?: string | null;
+    /**
+     * The name used to identify this extension
+     */
+    name: string;
     timeout?: number | null;
+    type: 'streamable_http';
+    uri: string;
+} | {
     /**
      * Whether this extension is bundled with Goose
      */
     bundled?: boolean | null;
-    type: 'streamable_http';
-} | {
+    /**
+     * Instructions for how to use these tools
+     */
+    instructions?: string | null;
     /**
      * The name used to identify this extension
      */
@@ -254,36 +225,28 @@ export type ExtensionConfig = {
      * The tools provided by the frontend
      */
     tools: Array<Tool>;
-    /**
-     * Instructions for how to use these tools
-     */
-    instructions?: string | null;
-    /**
-     * Whether this extension is bundled with Goose
-     */
-    bundled?: boolean | null;
     type: 'frontend';
 } | {
-    /**
-     * The name used to identify this extension
-     */
-    name: string;
     /**
      * The Python code to execute
      */
     code: string;
     /**
+     * Python package dependencies required by this extension
+     */
+    dependencies?: Array<string> | null;
+    /**
      * Description of what the extension does
      */
     description?: string | null;
     /**
+     * The name used to identify this extension
+     */
+    name: string;
+    /**
      * Timeout in seconds
      */
     timeout?: number | null;
-    /**
-     * Python package dependencies required by this extension
-     */
-    dependencies?: Array<string> | null;
     type: 'inline_python';
 };
 
@@ -294,9 +257,9 @@ export type ExtensionEntry = ExtensionConfig & {
 };
 
 export type ExtensionQuery = {
-    name: string;
     config: ExtensionConfig;
     enabled: boolean;
+    name: string;
 };
 
 export type ExtensionResponse = {
@@ -311,17 +274,17 @@ export type FrontendToolRequest = {
 };
 
 export type ImageContent = {
-    data: string;
-    mimeType: string;
     annotations?: Annotations | {
         [key: string]: unknown;
     };
+    data: string;
+    mimeType: string;
 };
 
 export type InspectJobResponse = {
-    sessionId?: string | null;
     processStartTime?: string | null;
     runningDurationSeconds?: number | null;
+    sessionId?: string | null;
 };
 
 export type KillJobResponse = {
@@ -336,10 +299,10 @@ export type ListSchedulesResponse = {
  * A message to or from an LLM
  */
 export type Message = {
+    content: Array<MessageContent>;
+    created?: number;
     id?: string | null;
     role: Role;
-    created?: number;
-    content: Array<MessageContent>;
 };
 
 /**
@@ -372,25 +335,25 @@ export type MessageContent = (TextContent & {
  */
 export type ModelInfo = {
     /**
-     * The name of the model
-     */
-    name: string;
-    /**
      * The maximum context length this model supports
      */
     context_limit: number;
+    /**
+     * Currency for the costs (default: "$")
+     */
+    currency?: string | null;
     /**
      * Cost per token for input (optional)
      */
     input_token_cost?: number | null;
     /**
+     * The name of the model
+     */
+    name: string;
+    /**
      * Cost per token for output (optional)
      */
     output_token_cost?: number | null;
-    /**
-     * Currency for the costs (default: "$")
-     */
-    currency?: string | null;
     /**
      * Whether this model supports cache control
      */
@@ -398,9 +361,9 @@ export type ModelInfo = {
 };
 
 export type PermissionConfirmationRequest = {
+    action: string;
     id: string;
     principal_type?: PrincipalType;
-    action: string;
 };
 
 /**
@@ -411,9 +374,9 @@ export type PermissionLevel = 'always_allow' | 'ask_before' | 'never_allow';
 export type PrincipalType = 'Extension' | 'Tool';
 
 export type ProviderDetails = {
-    name: string;
-    metadata: ProviderMetadata;
     is_configured: boolean;
+    metadata: ProviderMetadata;
+    name: string;
 };
 
 /**
@@ -421,21 +384,21 @@ export type ProviderDetails = {
  */
 export type ProviderMetadata = {
     /**
-     * The unique identifier for this provider
+     * Required configuration keys
      */
-    name: string;
+    config_keys: Array<ConfigKey>;
     /**
-     * Display name for the provider in UIs
+     * The default/recommended model for this provider
      */
-    display_name: string;
+    default_model: string;
     /**
      * Description of the provider's capabilities
      */
     description: string;
     /**
-     * The default/recommended model for this provider
+     * Display name for the provider in UIs
      */
-    default_model: string;
+    display_name: string;
     /**
      * A list of currently known models with their capabilities
      * TODO: eventually query the apis directly
@@ -446,9 +409,9 @@ export type ProviderMetadata = {
      */
     model_doc_link: string;
     /**
-     * Required configuration keys
+     * The unique identifier for this provider
      */
-    config_keys: Array<ConfigKey>;
+    name: string;
 };
 
 export type ProvidersResponse = {
@@ -522,29 +485,29 @@ export type RawTextContent = {
  *
  */
 export type Recipe = {
-    version?: string;
-    title: string;
-    description: string;
-    instructions?: string | null;
-    prompt?: string | null;
-    extensions?: Array<ExtensionConfig> | null;
-    context?: Array<string> | null;
-    settings?: Settings | null;
     activities?: Array<string> | null;
     author?: Author | null;
+    context?: Array<string> | null;
+    description: string;
+    extensions?: Array<ExtensionConfig> | null;
+    instructions?: string | null;
     parameters?: Array<RecipeParameter> | null;
+    prompt?: string | null;
     response?: Response | null;
-    sub_recipes?: Array<SubRecipe> | null;
     retry?: RetryConfig | null;
+    settings?: Settings | null;
+    sub_recipes?: Array<SubRecipe> | null;
+    title: string;
+    version?: string;
 };
 
 export type RecipeParameter = {
-    key: string;
-    input_type: RecipeParameterInputType;
-    requirement: RecipeParameterRequirement;
-    description: string;
     default?: string | null;
+    description: string;
+    input_type: RecipeParameterInputType;
+    key: string;
     options?: Array<string> | null;
+    requirement: RecipeParameterRequirement;
 };
 
 export type RecipeParameterInputType = 'string' | 'number' | 'boolean' | 'date' | 'file' | 'select';
@@ -556,13 +519,13 @@ export type RedactedThinkingContent = {
 };
 
 export type ResourceContents = {
-    uri: string;
     mimeType?: string;
     text: string;
-} | {
     uri: string;
-    mimeType?: string;
+} | {
     blob: string;
+    mimeType?: string;
+    uri: string;
 };
 
 export type Response = {
@@ -574,25 +537,25 @@ export type Response = {
  */
 export type RetryConfig = {
     /**
-     * Maximum number of retry attempts before giving up
-     */
-    max_retries: number;
-    /**
      * List of success checks to validate recipe completion
      */
     checks: Array<SuccessCheck>;
+    /**
+     * Maximum number of retry attempts before giving up
+     */
+    max_retries: number;
     /**
      * Optional shell command to run on failure for cleanup
      */
     on_failure?: string | null;
     /**
-     * Timeout in seconds for individual shell commands (default: 300 seconds)
-     */
-    timeout_seconds?: number | null;
-    /**
      * Timeout in seconds for on_failure commands (default: 600 seconds)
      */
     on_failure_timeout_seconds?: number | null;
+    /**
+     * Timeout in seconds for individual shell commands (default: 300 seconds)
+     */
+    timeout_seconds?: number | null;
 };
 
 export type Role = string;
@@ -602,49 +565,49 @@ export type RunNowResponse = {
 };
 
 export type ScheduledJob = {
-    id: string;
-    source: string;
     cron: string;
-    last_run?: string | null;
-    currently_running?: boolean;
-    paused?: boolean;
     current_session_id?: string | null;
-    process_start_time?: string | null;
+    currently_running?: boolean;
     execution_mode?: string | null;
+    id: string;
+    last_run?: string | null;
+    paused?: boolean;
+    process_start_time?: string | null;
+    source: string;
 };
 
 export type SessionDisplayInfo = {
-    id: string;
-    name: string;
-    createdAt: string;
-    workingDir: string;
-    scheduleId?: string | null;
-    messageCount: number;
-    totalTokens?: number | null;
-    inputTokens?: number | null;
-    outputTokens?: number | null;
-    accumulatedTotalTokens?: number | null;
     accumulatedInputTokens?: number | null;
     accumulatedOutputTokens?: number | null;
+    accumulatedTotalTokens?: number | null;
+    createdAt: string;
+    id: string;
+    inputTokens?: number | null;
+    messageCount: number;
+    name: string;
+    outputTokens?: number | null;
+    scheduleId?: string | null;
+    totalTokens?: number | null;
+    workingDir: string;
 };
 
 export type SessionHistoryResponse = {
     /**
-     * Unique identifier for the session
-     */
-    sessionId: string;
-    metadata: SessionMetadata;
-    /**
      * List of messages in the session conversation
      */
     messages: Array<Message>;
+    metadata: SessionMetadata;
+    /**
+     * Unique identifier for the session
+     */
+    sessionId: string;
 };
 
 export type SessionInfo = {
     id: string;
-    path: string;
-    modified: string;
     metadata: SessionMetadata;
+    modified: string;
+    path: string;
 };
 
 export type SessionListResponse = {
@@ -659,42 +622,6 @@ export type SessionListResponse = {
  */
 export type SessionMetadata = {
     /**
-     * Working directory for the session
-     */
-    working_dir: string;
-    /**
-     * A short description of the session, typically 3 words or less
-     */
-    description: string;
-    /**
-     * ID of the schedule that triggered this session, if any
-     */
-    schedule_id?: string | null;
-    /**
-     * ID of the project this session belongs to, if any
-     */
-    project_id?: string | null;
-    /**
-     * Number of messages in the session
-     */
-    message_count: number;
-    /**
-     * The total number of tokens used in the session. Retrieved from the provider's last usage.
-     */
-    total_tokens?: number | null;
-    /**
-     * The number of input tokens used in the session. Retrieved from the provider's last usage.
-     */
-    input_tokens?: number | null;
-    /**
-     * The number of output tokens used in the session. Retrieved from the provider's last usage.
-     */
-    output_tokens?: number | null;
-    /**
-     * The total number of tokens used in the session. Accumulated across all messages (useful for tracking cost over an entire session).
-     */
-    accumulated_total_tokens?: number | null;
-    /**
      * The number of input tokens used in the session. Accumulated across all messages.
      */
     accumulated_input_tokens?: number | null;
@@ -702,6 +629,42 @@ export type SessionMetadata = {
      * The number of output tokens used in the session. Accumulated across all messages.
      */
     accumulated_output_tokens?: number | null;
+    /**
+     * The total number of tokens used in the session. Accumulated across all messages (useful for tracking cost over an entire session).
+     */
+    accumulated_total_tokens?: number | null;
+    /**
+     * A short description of the session, typically 3 words or less
+     */
+    description: string;
+    /**
+     * The number of input tokens used in the session. Retrieved from the provider's last usage.
+     */
+    input_tokens?: number | null;
+    /**
+     * Number of messages in the session
+     */
+    message_count: number;
+    /**
+     * The number of output tokens used in the session. Retrieved from the provider's last usage.
+     */
+    output_tokens?: number | null;
+    /**
+     * ID of the project this session belongs to, if any
+     */
+    project_id?: string | null;
+    /**
+     * ID of the schedule that triggered this session, if any
+     */
+    schedule_id?: string | null;
+    /**
+     * The total number of tokens used in the session. Retrieved from the provider's last usage.
+     */
+    total_tokens?: number | null;
+    /**
+     * Working directory for the session
+     */
+    working_dir: string;
 };
 
 export type SessionsQuery = {
@@ -709,31 +672,19 @@ export type SessionsQuery = {
 };
 
 export type Settings = {
-    goose_provider?: string | null;
     goose_model?: string | null;
+    goose_provider?: string | null;
     temperature?: number | null;
 };
 
-export type Source = {
-    type: 'Cli';
-} | {
-    name: string;
-    alias_used: boolean;
-    type: 'Env';
-} | {
-    type: 'File';
-} | {
-    type: 'Default';
-};
-
 export type SubRecipe = {
+    description?: string | null;
     name: string;
     path: string;
+    sequential_when_repeated?: boolean;
     values?: {
         [key: string]: string;
     } | null;
-    sequential_when_repeated?: boolean;
-    description?: string | null;
 };
 
 /**
@@ -752,59 +703,59 @@ export type SummarizationRequested = {
 };
 
 export type TextContent = {
-    text: string;
     annotations?: Annotations | {
         [key: string]: unknown;
     };
+    text: string;
 };
 
 export type ThinkingContent = {
-    thinking: string;
     signature: string;
+    thinking: string;
 };
 
 export type Tool = {
-    name: string;
+    annotations?: ToolAnnotations | {
+        [key: string]: unknown;
+    };
     description?: string;
     inputSchema: {
         [key: string]: unknown;
     };
+    name: string;
     outputSchema?: {
-        [key: string]: unknown;
-    };
-    annotations?: ToolAnnotations | {
         [key: string]: unknown;
     };
 };
 
 export type ToolAnnotations = {
-    title?: string;
-    readOnlyHint?: boolean;
     destructiveHint?: boolean;
     idempotentHint?: boolean;
     openWorldHint?: boolean;
+    readOnlyHint?: boolean;
+    title?: string;
 };
 
 export type ToolConfirmationRequest = {
-    id: string;
-    toolName: string;
     arguments: unknown;
+    id: string;
     prompt?: string | null;
+    toolName: string;
 };
 
 /**
  * Information about the tool used for building prompts
  */
 export type ToolInfo = {
-    name: string;
     description: string;
+    name: string;
     parameters: Array<string>;
     permission?: PermissionLevel | null;
 };
 
 export type ToolPermission = {
-    tool_name: string;
     permission: PermissionLevel;
+    tool_name: string;
 };
 
 export type ToolRequest = {
@@ -826,9 +777,9 @@ export type UpdateScheduleRequest = {
 };
 
 export type UpsertConfigQuery = {
+    is_secret: boolean;
     key: string;
     value: unknown;
-    is_secret: boolean;
 };
 
 export type UpsertPermissionsQuery = {
@@ -932,42 +883,6 @@ export type BackupConfigResponses = {
 };
 
 export type BackupConfigResponse = BackupConfigResponses[keyof BackupConfigResponses];
-
-export type GetEffectiveConfigData = {
-    body?: never;
-    path?: never;
-    query?: {
-        /**
-         * Optional filter to match against configuration keys
-         */
-        filter?: string | null;
-        /**
-         * Only return values that differ from defaults
-         */
-        only_changed?: boolean | null;
-        /**
-         * Include source information for each configuration value
-         */
-        include_sources?: boolean | null;
-    };
-    url: '/config/effective';
-};
-
-export type GetEffectiveConfigErrors = {
-    /**
-     * Unauthorized - invalid secret key
-     */
-    401: unknown;
-};
-
-export type GetEffectiveConfigResponses = {
-    /**
-     * Effective configuration retrieved successfully
-     */
-    200: Array<EffectiveConfigEntry>;
-};
-
-export type GetEffectiveConfigResponse = GetEffectiveConfigResponses[keyof GetEffectiveConfigResponses];
 
 export type GetExtensionsData = {
     body?: never;
