@@ -11,7 +11,7 @@ Goose uses a YAML configuration file to manage settings and extensions. This fil
 * macOS/Linux: `~/.config/goose/config.yaml`
 * Windows: `%APPDATA%\Block\goose\config\config.yaml`
 
-The configuration file allows you to set default behaviors, configure language models, and manage extensions. While many settings can also be set using [environment variables](/docs/guides/environment-variables), the config file provides a persistent way to maintain your preferences.
+The configuration file allows you to set default behaviors, configure language models, and manage extensions. While many settings can also be set using [environment variables](/docs/guides/environment-variables), the unified configuration system lets you set most keys consistently across the config file, environment variables, and CLI flags. The config file provides a persistent way to maintain your preferences.
 
 ## Global Settings
 

@@ -307,7 +307,8 @@ ALPHA_FEATURES=true goose session
 
 ## Notes
 
-- Environment variables take precedence over configuration files.
+- Environment variables take precedence over configuration files and defaults, but can be overridden per-invocation by a global overlay flag.
+- Use canonical GOOSE_* variables when possible (e.g., GOOSE_LLM_MODEL). Legacy aliases (e.g., GOOSE_MODEL) are still accepted.
 - For security-sensitive variables (like API keys), consider using the system keyring instead of environment variables.
 - Some variables may require restarting Goose to take effect.
 - When using the planning mode, if planner-specific variables are not set, Goose will fall back to the main model configuration.

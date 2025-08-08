@@ -1,0 +1,255 @@
+# Unified configuration migration prompt (for Goose)
+
+You are the Goose developer assistant working inside this repository. Begin Phase 2 of the unified configuration migration.
+
+Checklist for the next commit series:
+
+- Registry expansion
+  - [ ] Add canonical keys and aliases for: goose mode, router strategy, context strategy, context limits (main/lead/worker/planner), editor API (host, api key, model), CLI theme and show-cost, scheduler type and temporal path, allowlist URL, server host/port (already present, review), planner/embeddings (already scaffolded), tracing OTLP all knobs (endpoint, timeout; already partially scaffolded)
+  - [ ] Add validators (enums: goose_mode, router strategy; url: hosts/endpoints; numeric ranges: timeouts, ports)
+- Code migration
+  - [ ] Grep for std::env::var("GOOSE_") and Config::get_param calls; replace reads with unified::get/get_or using canonical keys
+  - [ ] Where config is written, use unified::set or unified::set_secret
+  - [ ] Keep temporary fallback to legacy names if key not yet in registry
+- CLI
+  - [ ] Ensure any bespoke flags map to canonical keys behind the scenes; prefer docs to advertise configure --set
+- Server/Desktop
+  - [ ] Run `just generate-openapi` to expose /config/effective for the Desktop UI
+  - [ ] Add UI to display effective config with filters and sources (follow-up PR in ui/desktop)
+- Tests
+  - [ ] Unit tests for new keys and validators
+  - [ ] Integration tests for configure flows with env, overlay, file precedence
+  - [ ] Non-regression tests for server startup, sessions
+- Docs
+  - [ ] Keep docs/guides/unified-configuration.md in sync
+  - [ ] Update environment-variables.md and config-file.md to prefer canonical keys and note aliases/deprecation
+
+Exit criteria: most practical configuration in Goose is resolvable through unified::get/get_or with canonical keys; configure/show reflects the system comprehensively; Desktop view available.
+
+# Goose Unified Configuration — Brainstorm
+
+This document explores what a drop-in, unified configuration system for Goose should look like. It captures the problem framing, observations from the codebase, core design goals, and a proposed model that keeps things elegant, maintainable, reliable, and easy to reason about. It also outlines how this design lends itself to a future `goose configure` subcommand family (show/get/set/unset) and a `goose show-config`-style experience.
+
+This brainstorm is now partially implemented in Phase 1. See the implementation plan file for the shipped scope and next steps.
+
+---
+
+## How I arrived at this
+
+Inputs and steps I took to form this proposal:
+
+- Ran the provided discovery utility: `python3 config_discovery.py` from the repository root to extract configuration usages across the codebase.
+  - Results highlighted:
+    - 1045 total configuration usages
+    - 346 unique configuration keys
+    - 101 files with configuration
+    - By source: ~269 config-file keys, ~63 environment variables, ~21 secrets, ~11 CLI flags
+- Skimmed key areas of the codebase related to configuration:
+  - `crates/goose/src/config/base.rs` — an existing, robust config module supporting:
+    - YAML config file (atomic writes, backup/rotation, recovery)
+    - Environment variable overrides (case-mapped)
+    - Secrets stored in keyring or YAML file if keyring disabled
+    - Smart parsing of env strings (JSON, bools, numbers)
+  - `crates/goose-cli/src/cli.rs` — current CLI flags, subcommands, and the `configure` entry point
+- Correlated the discovery results with the code patterns to understand the current config surface and pain points: inconsistency of names, uneven coverage across env/config/CLI, and lack of a single-place mapping and observability.
+
+---
+
+## Problem summary
+
+- Configuration is consumed through three separate channels today: config file, environment variables, and command-line flags.
+- Keys and names are not consistently unified across those channels (e.g., GOOSE_MODEL vs model vs llm.model; provider-specific env vars like OPENAI_API_KEY, etc.).
+- Many config values are not available uniformly in all three channels.
+- Observability is limited: it’s hard to see the effective value of a config item and where it came from.
+
+---
+
+## Design goals
+
+- Elegance and consistency
+  - One canonical key for each config item, used across all channels.
+  - A clear, uniform precedence for merging values.
+- Maintainability
+  - A single registry of keys (types, defaults, docs, aliases, validation).
+  - Easy to add new keys, providers, and features.
+- Reliability
+  - Typed, validated values with clear errors.
+  - Keep existing atomic writes, backups, and secret storage guarantees.
+- Developer ergonomics
+  - One-liner lookups to replace existing patterns.
+  - Minimal changes required across the codebase.
+- Observability and UX
+  - Show effective values with their source (CLI/env/file/default).
+  - Redact secrets by default; reveal explicitly if needed.
+
+---
+
+## Proposed model
+
+### 1) Canonical keys and naming
+
+- Canonical format: snake_case with dot-separated namespaces.
+  - Examples: `llm.provider`, `llm.model`, `server.port`, `tracing.langfuse.url`, `providers.openai.host`.
+- Config file organization: YAML using nested structure or flat keys with dots (whichever fits current `base.rs` best).
+- Environment variables:
+  - Standardize on `GOOSE_` prefix and convert dots to underscores, uppercase: `llm.model` → `GOOSE_LLM_MODEL`.
+  - Keep compatibility aliases for existing env names (e.g., `OPENAI_API_KEY`, `GOOSE_MODEL`, `PROVIDER`) via a registry (with deprecation warnings).
+- CLI:
+  - Add a universal setter: `--set KEY=VALUE` (repeatable), so every key is settable via CLI without bespoke flags.
+  - Dedicated flags for popular items may still exist or be auto-generated later, but `--set` keeps scope tight and uniform.
+
+### 2) Central registry (the single source of truth)
+
+A static registry (Rust const/static, with macros for ergonomics) declaring for each key:
+
+- `key`: canonical key, e.g., `llm.model`
+- `type`: string | bool | u32 | f64 | map | list | any
+- `default`: optional default value
+- `help`: short and long help text
+- `secret`: bool — controls redaction and storage location
+- `env_aliases`: legacy env names to accept (e.g., `OPENAI_API_KEY`)
+- `cli_aliases`: legacy flags to accept (optional)
+- `deprecated_aliases`: and migration hints
+- `validator`: enum set, ranges, URL/path checks as needed
+- `tags/scopes`: to organize docs and show-config filtering (e.g., `providers/openai`)
+
+Benefits: one place to add keys, define types and defaults, deprecate legacy names, and generate help.
+
+### 3) Sources and precedence
+
+Uniform merge order (highest → lowest):
+
+1. CLI `--set KEY=VALUE` (universal setter)
+2. CLI dedicated flags mapped to keys (if present)
+3. Environment variables (prefer `GOOSE_*`; fall back to aliases)
+4. Config file values
+5. Registry defaults
+
+Secrets follow the same precedence but are redacted in displays.
+
+### 4) Overlays and scopes (optional, later)
+
+- Potential overlays in the future: project-local config files, etc.
+- Start simple with the existing global config path from `base.rs`.
+
+### 5) Unified API (drop-in)
+
+Module: `goose_config` (or `goose-config` crate) providing:
+
+- Reads:
+  - `get::<T>("llm.model") -> Result<T, Error>`
+  - `get_or::<T>("todo.max_chars", default: T) -> T`
+  - `resolve::<T>("server.port") -> Result<ValueWithSource<T>, Error>` where `ValueWithSource` includes `{ value, source, key, was_default, ... }`
+- Secrets:
+  - `get_secret::<T>("openai.api_key") -> Result<T, Error>`
+- Writes:
+  - `set("llm.model", json!("gpt-4o"))` → updates YAML config (non-secret)
+  - `set_secret("openai.api_key", json!("..."))` → updates keyring or secrets.yaml
+
+Example of drop-in replacement:
+
+```rust
+// Before (env + parse + default):
+std::env::var("GOOSE_TODO_MAX_CHARS")
+    .ok()
+    .and_then(|s| s.parse().ok())
+    .unwrap_or(DEFAULT_TODO_MAX_CHARS)
+
+// After (one-liner):
+let max = goose_config::get_or::<usize>("todo.max_chars", DEFAULT_TODO_MAX_CHARS);
+```
+
+### 6) CLI integration
+
+- Extend `goose configure` with:
+  - `goose configure show` — print effective config with source, redact secrets
+  - `goose configure get KEY` — print value (redacted if secret unless forced)
+  - `goose configure set KEY=VALUE` — persist to file or secrets store depending on key
+  - `goose configure unset KEY` — remove from file or secrets store
+- Global option: allow `--set KEY=VALUE` on the main CLI to apply ephemeral overrides for a single invocation/session.
+
+### 7) Observability ("show-config")
+
+- `show` supports:
+  - Formats: table, json, yaml
+  - Filters: `--filter llm.`, `--only-changed`, `--sources`
+  - Provenance per key (CLI/env/file/default), and alias usage/deprecation notes
+- Programmatic API to return the same data structure for server/desktop UI.
+
+### 8) Validation, typing, and reliability
+
+- Registry-driven validation: enums, ranges, URL/path checks
+- Typed parsing (strings, numbers, bools, JSON objects/arrays)
+- Clear error messages with origin
+
+### 9) Backward compatibility
+
+- Accept legacy env vars and flags via alias rules with deprecation warnings.
+- Encourage canonical names in docs and error messages.
+- Optionally provide a strict mode later that disallows aliases.
+
+### 10) Performance and caching
+
+- Cache resolved values after the first merge, with explicit invalidation on config changes or `--set`.
+- Optionally add a file watcher later.
+
+### 11) Secrets policy
+
+- Mark secrets in the registry; `set_secret` writes to keyring/file.
+- CLI/env allowed to set ephemeral secrets; UI redacts by default.
+
+### 12) Documentation and discovery
+
+- Use the registry to generate docs and CLI help for keys.
+- `goose configure show --describe KEY` (future) to print help, type, default, aliases.
+
+### 13) Extensibility
+
+- Adding a new provider or feature is a matter of adding canonical keys to the registry (with aliases and validation), and replacing reads with one-liners.
+
+---
+
+## Example canonical mappings
+
+- `llm.provider` ↔ `GOOSE_LLM_PROVIDER` (aliases: `GOOSE_PROVIDER`, `PROVIDER`)
+- `llm.model` ↔ `GOOSE_LLM_MODEL` (aliases: `GOOSE_MODEL`, `MODEL`)
+- `providers.openai.api_key` (secret) ↔ `GOOSE_PROVIDERS_OPENAI_API_KEY` (alias: `OPENAI_API_KEY`)
+- `server.port` ↔ `GOOSE_SERVER_PORT` (alias: `PORT`)
+- `tracing.langfuse.url` ↔ `GOOSE_TRACING_LANGFUSE_URL` (alias: `LANGFUSE_URL`)
+
+---
+
+## Why this fits Goose
+
+- Builds on the strengths already present in `base.rs` (atomic writes, recovery, secret storage) while adding:
+  - One canonical key per item
+  - A registry for types/defaults/aliases
+  - Uniform precedence
+  - One-liner fetches
+  - Strong observability and UX (show-config)
+- Scales to more providers and features without additional plumbing.
+
+---
+
+## Decisions (for v1)
+
+- Make `GOOSE_` prefix the standard for environment variables.
+- Start with a universal `--set KEY=VALUE` to keep CLI scope tight.
+- Implement the registry as a Rust const/static with macros for ergonomics.
+
+---
+
+## Migration & minimal-change replacement
+
+- Existing code that reads config values should become one-liners:
+  - `goose_config::get::<T>("key")?` or `goose_config::get_or::<T>("key", default)`
+- Legacy env vars and CLI flags still work (via aliases), but log deprecation notices and show canonical equivalents.
+- Incremental adoption is possible: start with high-value keys (provider/model/server), then expand.
+
+---
+
+## Open questions (intentionally deferred)
+
+- Project/workspace overlay files timing and scope
+- Auto-generating dedicated flags from the registry (beyond `--set`)
+- Strict mode rollout timing for removing legacy names
