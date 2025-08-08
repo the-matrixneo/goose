@@ -4,8 +4,9 @@ use super::errors::ProviderError;
 use super::retry::ProviderRetry;
 use super::utils::{get_model, handle_response_openai_compat};
 use crate::config::custom_providers::CustomProviderConfig;
+use crate::conversation::message::Message;
+use crate::conversation::Conversation;
 use crate::impl_provider_default;
-use crate::message::Message;
 use crate::model::ModelConfig;
 use crate::providers::formats::openai::{create_request, get_usage, response_to_message};
 use crate::utils::safe_truncate;
@@ -76,19 +77,21 @@ impl OllamaProvider {
 
     pub fn from_custom_config(model: ModelConfig, config: CustomProviderConfig) -> Result<Self> {
         let timeout = Duration::from_secs(config.timeout_seconds.unwrap_or(OLLAMA_TIMEOUT));
-        
+
         // Parse and normalize the custom URL
-        let base = if config.base_url.starts_with("http://") || config.base_url.starts_with("https://") {
-            config.base_url.clone()
-        } else {
-            format!("http://{}", config.base_url)
-        };
+        let base =
+            if config.base_url.starts_with("http://") || config.base_url.starts_with("https://") {
+                config.base_url.clone()
+            } else {
+                format!("http://{}", config.base_url)
+            };
 
         let mut base_url = Url::parse(&base)
             .map_err(|e| anyhow::anyhow!("Invalid base URL '{}': {}", config.base_url, e))?;
 
         // Set default port if missing and not using standard ports
-        let explicit_default_port = config.base_url.ends_with(":80") || config.base_url.ends_with(":443");
+        let explicit_default_port =
+            config.base_url.ends_with(":80") || config.base_url.ends_with(":443");
         let is_https = base_url.scheme() == "https";
 
         if base_url.port().is_none() && !explicit_default_port && !is_https {
@@ -190,7 +193,10 @@ impl Provider for OllamaProvider {
 
     /// Generate a session name based on the conversation history
     /// This override filters out reasoning tokens that some Ollama models produce
-    async fn generate_session_name(&self, messages: &[Message]) -> Result<String, ProviderError> {
+    async fn generate_session_name(
+        &self,
+        messages: &Conversation,
+    ) -> Result<String, ProviderError> {
         let context = self.get_initial_user_messages(messages);
         let message = Message::user().with_text(self.create_session_name_prompt(&context));
         let result = self

@@ -21,8 +21,8 @@ use super::utils::{
     ImageFormat,
 };
 use crate::config::custom_providers::CustomProviderConfig;
+use crate::conversation::message::Message;
 use crate::impl_provider_default;
-use crate::message::Message;
 use crate::model::ModelConfig;
 use crate::providers::base::MessageStream;
 use crate::providers::formats::openai::response_to_streaming_message;
@@ -107,7 +107,6 @@ impl OpenAiProvider {
         })
     }
 
-
     pub fn from_custom_config(model: ModelConfig, config: CustomProviderConfig) -> Result<Self> {
         let global_config = crate::config::Config::global();
         let api_key: String = global_config
@@ -127,11 +126,8 @@ impl OpenAiProvider {
 
         let timeout_secs = config.timeout_seconds.unwrap_or(600);
         let auth = AuthMethod::BearerToken(api_key);
-        let mut api_client = ApiClient::with_timeout(
-            host,
-            auth,
-            std::time::Duration::from_secs(timeout_secs),
-        )?;
+        let mut api_client =
+            ApiClient::with_timeout(host, auth, std::time::Duration::from_secs(timeout_secs))?;
 
         // Add custom headers if present
         if let Some(headers) = &config.headers {
