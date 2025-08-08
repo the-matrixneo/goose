@@ -57,13 +57,25 @@ export function LocalhostViewer({
   const [error, setError] = useState<string | null>(null);
   const [canGoBack, setCanGoBack] = useState(false);
   const [canGoForward, setCanGoForward] = useState(false);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (onUrlChange) {
       onUrlChange(url);
     }
   }, [url, onUrlChange]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleUrlSubmit = (newUrl: string) => {
     const formattedUrl = formatUrl(newUrl);
@@ -77,6 +89,7 @@ export function LocalhostViewer({
     setUrl(formattedUrl);
     setInputUrl(formattedUrl);
     setIsLoading(true);
+    setRetryCount(0); // Reset retry count for new URL
     
     // Save to localStorage
     if (typeof window !== 'undefined') {
@@ -93,6 +106,7 @@ export function LocalhostViewer({
   const handleRefresh = () => {
     if (iframeRef.current) {
       setIsLoading(true);
+      setError(null);
       iframeRef.current.src = iframeRef.current.src;
     }
   };
@@ -124,6 +138,14 @@ export function LocalhostViewer({
   const handleIframeLoad = () => {
     setIsLoading(false);
     setError(null);
+    setHasLoadedOnce(true);
+    setRetryCount(0); // Reset retry count on successful load
+
+    // Clear any pending retry timeout
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current);
+      retryTimeoutRef.current = null;
+    }
 
     // Try to update navigation state (may not work due to CORS)
     try {
@@ -138,7 +160,34 @@ export function LocalhostViewer({
 
   const handleIframeError = () => {
     setIsLoading(false);
-    setError(`Failed to load ${url}. Make sure the server is running.`);
+    
+    // If this is the first load attempt and we haven't loaded successfully before
+    // and we haven't exceeded our retry limit, automatically retry
+    const maxRetries = 3;
+    const retryDelay = 2000; // 2 seconds
+    
+    if (!hasLoadedOnce && retryCount < maxRetries) {
+      console.log(`LocalhostViewer: Auto-retrying connection (attempt ${retryCount + 1}/${maxRetries})`);
+      
+      setRetryCount(prev => prev + 1);
+      setError(`Connecting to ${url}... (attempt ${retryCount + 1}/${maxRetries})`);
+      
+      // Set a timeout to retry
+      retryTimeoutRef.current = setTimeout(() => {
+        if (iframeRef.current) {
+          setIsLoading(true);
+          // Force reload by updating the src
+          iframeRef.current.src = `${url}?retry=${Date.now()}`;
+        }
+      }, retryDelay);
+    } else {
+      // Show final error message
+      const errorMessage = retryCount >= maxRetries 
+        ? `Failed to connect to ${url} after ${maxRetries} attempts. Make sure the server is running.`
+        : `Failed to load ${url}. Make sure the server is running.`;
+      
+      setError(errorMessage);
+    }
   };
 
   return (
@@ -220,8 +269,23 @@ export function LocalhostViewer({
 
       {/* Error Display */}
       {error && (
-        <div className="p-3 bg-red-50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-800">
-          <p className="text-red-800 dark:text-red-200 text-sm">{error}</p>
+        <div className={`p-3 border-b ${
+          error.includes('attempt') || error.includes('Connecting')
+            ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800'
+            : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+        }`}>
+          <p className={`text-sm ${
+            error.includes('attempt') || error.includes('Connecting')
+              ? 'text-yellow-800 dark:text-yellow-200'
+              : 'text-red-800 dark:text-red-200'
+          }`}>
+            {error}
+            {error.includes('attempt') && (
+              <span className="ml-2">
+                <RefreshCw className="inline h-3 w-3 animate-spin" />
+              </span>
+            )}
+          </p>
         </div>
       )}
 
@@ -242,7 +306,14 @@ export function LocalhostViewer({
           <div className="absolute inset-0 bg-background-default/80 flex items-center justify-center">
             <div className="text-center">
               <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2 text-primary" />
-              <p className="text-textSubtle text-sm">Loading {url}...</p>
+              <p className="text-textSubtle text-sm">
+                Loading {url}...
+                {retryCount > 0 && (
+                  <span className="block text-xs mt-1">
+                    Attempt {retryCount + 1}/3
+                  </span>
+                )}
+              </p>
             </div>
           </div>
         )}
