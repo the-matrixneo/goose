@@ -236,145 +236,158 @@ impl BuildRouter {
         // No package manager override; we always use npm
 
         match action {
-            "logs" => {
-                let (text, meta) = {
-                    let mut s = self.state.lock().unwrap();
-                    let start = s.last_read_index;
-                    let end = s.logs.len();
-                    let new_logs = s.logs[start..end].join("");
-                    s.last_read_index = end;
-                    let running = s.child.as_ref().is_some();
-                    (
-                        new_logs.to_string(),
-                        format!("running: {running}, package_manager: {}", PM),
-                    )
-                };
-                Ok(vec![
-                    Content::text(meta).with_audience(vec![Role::Assistant]),
-                    Content::text(text)
-                        .with_audience(vec![Role::User])
-                        .with_priority(0.0),
-                ])
-            }
-            "restart" => {
-                let (project, child_opt) = {
-                    let mut s = self.state.lock().unwrap();
-                    let project = s
-                        .project_path
-                        .clone()
-                        .unwrap_or(std::env::current_dir().unwrap());
-
-                    // take existing process if any (drop lock before await)
-                    let child_opt = s.child.take();
-                    s.logs.push(format!(
-                        "[{}] Restart requested for project: {}\n",
-                        Utc::now(),
-                        project.display()
-                    ));
-                    (project, child_opt)
-                };
-                // kill outside lock
-                if let Some(mut child) = child_opt {
-                    // Try graceful shutdown first
-                    let pid_opt = child.id().map(|id| id as i32);
-                    {
-                        let mut s = self.state.lock().unwrap();
-                        if let Some(pid) = pid_opt {
-                            s.logs.push(format!(
-                                "[{}] Sending SIGTERM to pid {} for graceful shutdown...\n",
-                                Utc::now(),
-                                pid
-                            ));
-                        } else {
-                            s.logs.push(format!(
-                                "[{}] Child has no pid; attempting hard kill...\n",
-                                Utc::now()
-                            ));
-                        }
-                    }
-
-                    #[cfg(unix)]
-                    {
-                        use tokio::time::{timeout, Duration};
-                        if let Some(pid) = pid_opt {
-                            let _ = unix_kill(Pid::from_raw(pid), Signal::SIGTERM);
-                            match timeout(Duration::from_secs(3), child.wait()).await {
-                                Ok(_status) => {
-                                    let mut s = self.state.lock().unwrap();
-                                    s.logs.push(format!(
-                                        "[{}] Process {} exited cleanly after SIGTERM.\n",
-                                        Utc::now(),
-                                        pid
-                                    ));
-                                }
-                                Err(_elapsed) => {
-                                    {
-                                        let mut s = self.state.lock().unwrap();
-                                        s.logs.push(format!(
-                                            "[{}] Timeout waiting for pid {} to exit, sending SIGKILL...\n",
-                                            Utc::now(), pid
-                                        ));
-                                    }
-                                    let _ = child.kill().await; // SIGKILL
-                                    let _ = child.wait().await; // ensure it's fully terminated
-                                }
-                            }
-                        } else {
-                            let _ = child.kill().await;
-                            let _ = child.wait().await;
-                        }
-                    }
-
-                    #[cfg(not(unix))]
-                    {
-                        // On non-Unix, no SIGTERM; fall back to hard kill
-                        let _ = child.kill().await;
-                        let _ = child.wait().await;
-                    }
-                }
-
-                // install deps if needed and start
-                install_deps_if_needed(&project)
-                    .await
-                    .map_err(to_tool_err)?;
-                start_dev_server(self.state.clone(), &project)
-                    .await
-                    .map_err(to_tool_err)?;
-
-                Ok(vec![
-                    Content::text("Server restarted").with_audience(vec![Role::Assistant])
-                ])
-            }
-            "build" => {
-                let project = {
-                    let s = self.state.lock().unwrap();
-                    s.project_path
-                        .clone()
-                        .unwrap_or(std::env::current_dir().unwrap())
-                };
-                let out = run_pm_command(&project, &pm_build_command()).await?;
-                Ok(vec![Content::text(out).with_audience(vec![Role::User])])
-            }
-            "deploy" => {
-                let message = params
-                    .get("message")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("Deployment from Build MCP");
-                let project = {
-                    let s = self.state.lock().unwrap();
-                    s.project_path
-                        .clone()
-                        .unwrap_or(std::env::current_dir().unwrap())
-                };
-                let report = deploy_from_project(&project, message).await?;
-                Ok(vec![Content::text(report).with_audience(vec![Role::User])])
-            }
+            "logs" => self.handle_logs_action().await,
+            "restart" => self.handle_restart_action().await,
+            "build" => self.handle_build_action().await,
+            "deploy" => self.handle_deploy_action(&params).await,
             "port" => self.get_port().await,
             _ => Err(ToolError::InvalidParameters(format!(
                 "Unsupported action: {}",
                 action
             ))),
         }
+    }
+
+    async fn handle_logs_action(&self) -> Result<Vec<Content>, ToolError> {
+        let (text, meta) = {
+            let mut s = self.state.lock().unwrap();
+            let start = s.last_read_index;
+            let end = s.logs.len();
+            let new_logs = s.logs[start..end].join("");
+            s.last_read_index = end;
+            let running = s.child.as_ref().is_some();
+            (
+                new_logs.to_string(),
+                format!("running: {running}, package_manager: {}", PM),
+            )
+        };
+        Ok(vec![
+            Content::text(meta).with_audience(vec![Role::Assistant]),
+            Content::text(text)
+                .with_audience(vec![Role::User])
+                .with_priority(0.0),
+        ])
+    }
+
+    async fn handle_restart_action(&self) -> Result<Vec<Content>, ToolError> {
+        let (project, child_opt) = {
+            let mut s = self.state.lock().unwrap();
+            let project = s
+                .project_path
+                .clone()
+                .unwrap_or(std::env::current_dir().unwrap());
+
+            // take existing process if any (drop lock before await)
+            let child_opt = s.child.take();
+            s.logs.push(format!(
+                "[{}] Restart requested for project: {}\n",
+                Utc::now(),
+                project.display()
+            ));
+            (project, child_opt)
+        };
+        
+        // kill outside lock
+        if let Some(child) = child_opt {
+            self.terminate_child_process(child).await;
+        }
+
+        // install deps if needed and start
+        install_deps_if_needed(&project)
+            .await
+            .map_err(to_tool_err)?;
+        start_dev_server(self.state.clone(), &project)
+            .await
+            .map_err(to_tool_err)?;
+
+        Ok(vec![
+            Content::text("Server restarted").with_audience(vec![Role::Assistant])
+        ])
+    }
+
+    async fn terminate_child_process(&self, mut child: Child) {
+        // Try graceful shutdown first
+        let pid_opt = child.id().map(|id| id as i32);
+        {
+            let mut s = self.state.lock().unwrap();
+            if let Some(pid) = pid_opt {
+                s.logs.push(format!(
+                    "[{}] Sending SIGTERM to pid {} for graceful shutdown...\n",
+                    Utc::now(),
+                    pid
+                ));
+            } else {
+                s.logs.push(format!(
+                    "[{}] Child has no pid; attempting hard kill...\n",
+                    Utc::now()
+                ));
+            }
+        }
+
+        #[cfg(unix)]
+        {
+            use tokio::time::{timeout, Duration};
+            if let Some(pid) = pid_opt {
+                let _ = unix_kill(Pid::from_raw(pid), Signal::SIGTERM);
+                match timeout(Duration::from_secs(3), child.wait()).await {
+                    Ok(_status) => {
+                        let mut s = self.state.lock().unwrap();
+                        s.logs.push(format!(
+                            "[{}] Process {} exited cleanly after SIGTERM.\n",
+                            Utc::now(),
+                            pid
+                        ));
+                    }
+                    Err(_elapsed) => {
+                        {
+                            let mut s = self.state.lock().unwrap();
+                            s.logs.push(format!(
+                                "[{}] Timeout waiting for pid {} to exit, sending SIGKILL...\n",
+                                Utc::now(), pid
+                            ));
+                        }
+                        let _ = child.kill().await; // SIGKILL
+                        let _ = child.wait().await; // ensure it's fully terminated
+                    }
+                }
+            } else {
+                let _ = child.kill().await;
+                let _ = child.wait().await;
+            }
+        }
+
+        #[cfg(not(unix))]
+        {
+            // On non-Unix, no SIGTERM; fall back to hard kill
+            let _ = child.kill().await;
+            let _ = child.wait().await;
+        }
+    }
+
+    async fn handle_build_action(&self) -> Result<Vec<Content>, ToolError> {
+        let project = {
+            let s = self.state.lock().unwrap();
+            s.project_path
+                .clone()
+                .unwrap_or(std::env::current_dir().unwrap())
+        };
+        let out = run_pm_command(&project, &pm_build_command()).await?;
+        Ok(vec![Content::text(out).with_audience(vec![Role::User])])
+    }
+
+    async fn handle_deploy_action(&self, params: &Value) -> Result<Vec<Content>, ToolError> {
+        let message = params
+            .get("message")
+            .and_then(|v| v.as_str())
+            .unwrap_or("Deployment from Build MCP");
+        let project = {
+            let s = self.state.lock().unwrap();
+            s.project_path
+                .clone()
+                .unwrap_or(std::env::current_dir().unwrap())
+        };
+        let report = deploy_from_project(&project, message).await?;
+        Ok(vec![Content::text(report).with_audience(vec![Role::User])])
     }
 }
 
