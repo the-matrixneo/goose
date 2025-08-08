@@ -57,6 +57,7 @@ export function LocalhostViewer({
   const [error, setError] = useState<string | null>(null);
   const [canGoBack, setCanGoBack] = useState(false);
   const [canGoForward, setCanGoForward] = useState(false);
+  const [hasStarted, setHasStarted] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
@@ -77,6 +78,7 @@ export function LocalhostViewer({
     setUrl(formattedUrl);
     setInputUrl(formattedUrl);
     setIsLoading(true);
+    setHasStarted(true);
     
     // Save to localStorage
     if (typeof window !== 'undefined') {
@@ -94,6 +96,9 @@ export function LocalhostViewer({
     if (iframeRef.current) {
       setIsLoading(true);
       iframeRef.current.src = iframeRef.current.src;
+    } else {
+      // If no iframe yet, start with current URL
+      handleUrlSubmit(inputUrl);
     }
   };
 
@@ -140,6 +145,8 @@ export function LocalhostViewer({
     setIsLoading(false);
     setError(`Failed to load ${url}. Make sure the server is running.`);
   };
+
+  const showEmptyState = !hasStarted;
 
   return (
     <div className="h-full flex flex-col bg-background-default">
@@ -225,17 +232,31 @@ export function LocalhostViewer({
         </div>
       )}
 
-      {/* Iframe Content */}
+      {/* Content Area */}
       <div className="flex-1 relative overflow-hidden">
-        <iframe
-          ref={iframeRef}
-          src={url}
-          className="w-full h-full border-0"
-          title="Localhost Viewer"
-          onLoad={handleIframeLoad}
-          onError={handleIframeError}
-          sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation allow-top-navigation-by-user-activation"
-        />
+        {/* Empty State - Just refresh icon and text */}
+        {showEmptyState && (
+          <div className="absolute inset-0 flex items-center justify-center bg-background-default">
+            <div className="text-center">
+              <RefreshCw size={120} className="mx-auto mb-4 text-textSubtle opacity-40" strokeWidth={1} />
+              <h2 className="text-textSubtle text-xl font-medium mb-2 opacity-40">Localhost Viewer</h2>
+              <p className="text-textSubtle text-sm opacity-40">Develop your locally hosted apps with Goose</p>
+            </div>
+          </div>
+        )}
+
+        {/* Iframe Content */}
+        {hasStarted && (
+          <iframe
+            ref={iframeRef}
+            src={url}
+            className="w-full h-full border-0"
+            title="Localhost Viewer"
+            onLoad={handleIframeLoad}
+            onError={handleIframeError}
+            sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation allow-top-navigation-by-user-Activation"
+          />
+        )}
 
         {/* Loading overlay */}
         {isLoading && (
