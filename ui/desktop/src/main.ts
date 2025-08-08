@@ -2294,8 +2294,8 @@ ipcMain.handle('create-app', async (event, appName: string, subdomain?: string) 
     emitProgress('Applying Goose template styling…');
 
     // Resolve template base directory (dev vs packaged)
-    const devTemplates = path.join(process.cwd(), 'src', 'templates', 'build');
-    const prodTemplates = path.join(process.resourcesPath, 'templates', 'build');
+    const devTemplates = path.join(process.cwd(), 'src', 'templates');
+    const prodTemplates = path.join(process.resourcesPath, 'templates');
 
     // Prefer dev path when present, else fallback to prod path, else fallback to __dirname-based
     let templateBase = devTemplates;
@@ -2306,9 +2306,11 @@ ipcMain.handle('create-app', async (event, appName: string, subdomain?: string) 
       try {
         await fs.access(templateBase);
       } catch {
-        templateBase = path.join(__dirname, 'templates', 'build');
+        templateBase = path.join(__dirname, 'templates');
       }
     }
+
+    const buildTemplateBase = path.join(templateBase, 'build');
 
     const writeFileSafe = async (rel: string, content: string) => {
       const dest = path.join(targetPath, rel);
@@ -2318,7 +2320,7 @@ ipcMain.handle('create-app', async (event, appName: string, subdomain?: string) 
     };
 
     const copyFromTemplate = async (rel: string, interpolate = false) => {
-      const src = path.join(templateBase, rel);
+      const src = path.join(buildTemplateBase, rel);
       let content = await fs.readFile(src, 'utf8');
       if (interpolate) {
         content = content.replace(/__APP_NAME__/g, appName);
@@ -2326,11 +2328,65 @@ ipcMain.handle('create-app', async (event, appName: string, subdomain?: string) 
       await writeFileSafe(rel, content);
     };
 
+    const copyDirectory = async (srcDir: string, destDir: string, interpolate = false) => {
+      try {
+        // Create destination directory
+        await fs.mkdir(destDir, { recursive: true });
+        
+        // Read source directory
+        const entries = await fs.readdir(srcDir, { withFileTypes: true });
+        
+        for (const entry of entries) {
+          const srcPath = path.join(srcDir, entry.name);
+          const destPath = path.join(destDir, entry.name);
+          
+          if (entry.isDirectory()) {
+            // Recursively copy subdirectories
+            await copyDirectory(srcPath, destPath, interpolate);
+          } else if (entry.isFile()) {
+            // Copy file
+            let content = await fs.readFile(srcPath, 'utf8');
+            if (interpolate) {
+              content = content.replace(/__APP_NAME__/g, appName);
+            }
+            await fs.writeFile(destPath, content, 'utf8');
+            console.log(`[Main] Copied ${path.relative(targetPath, destPath)}`);
+          }
+        }
+      } catch (error) {
+        console.error(`[Main] Failed to copy directory ${srcDir}:`, error);
+      }
+    };
+
     // Overwrite specific files
     await copyFromTemplate(path.join('app', 'app.css'));
     await copyFromTemplate(path.join('app', 'welcome', 'welcome.tsx'));
     await copyFromTemplate(path.join('app', 'routes', 'home.tsx'), true);
     await copyFromTemplate(path.join('app', 'routes.ts'));
+
+    // Copy specs directory
+    const specsSourceDir = path.join(templateBase, 'specs');
+    const specsDestDir = path.join(targetPath, 'specs');
+    try {
+      await fs.access(specsSourceDir);
+      await copyDirectory(specsSourceDir, specsDestDir, true);
+      console.log(`[Main] Copied specs directory`);
+    } catch (error) {
+      console.warn(`[Main] Could not copy specs directory:`, error);
+    }
+
+    // Copy README.md to root
+    const readmeSource = path.join(templateBase, 'README.md');
+    try {
+      await fs.access(readmeSource);
+      let readmeContent = await fs.readFile(readmeSource, 'utf8');
+      readmeContent = readmeContent.replace(/\[Your Project Name\]/g, appName);
+      readmeContent = readmeContent.replace(/\[Date\]/g, new Date().toLocaleDateString());
+      await fs.writeFile(path.join(targetPath, 'README.md'), readmeContent, 'utf8');
+      console.log(`[Main] Copied README.md to root`);
+    } catch (error) {
+      console.warn(`[Main] Could not copy README.md:`, error);
+    }
 
     // Remove unused logo assets
     const unusedAssets = [
