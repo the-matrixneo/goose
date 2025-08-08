@@ -2,6 +2,7 @@ import { UIResourceRenderer, UIActionResult } from '@mcp-ui/client';
 import { ResourceContent } from '../types/message';
 import { useCallback } from 'react';
 import { toast } from 'react-toastify';
+import { gooseComponentLibrary } from './GooseComponentLibrary';
 
 interface MCPUIResourceRendererProps {
   content: ResourceContent;
@@ -58,18 +59,25 @@ export default function MCPUIResourceRenderer({ content }: MCPUIResourceRenderer
     }
   }, []);
 
+  // Determine rendering props based on MIME type
+  const isRemoteDOM = content.resource.mimeType === 'application/vnd.mcp-ui.remote-dom';
+  
   return (
     <div className="mt-3 p-4 border border-borderSubtle rounded-lg bg-background-muted">
       <div className="overflow-hidden rounded-sm">
         <UIResourceRenderer
           resource={content.resource}
           onUIAction={handleUIAction}
-          htmlProps={{
+          htmlProps={!isRemoteDOM ? {
             autoResizeIframe: {
               height: true,
               width: false, // set to false to allow for responsive design
             },
-          }}
+          } : undefined}
+          remoteDomProps={isRemoteDOM ? {
+            library: gooseComponentLibrary,
+            framework: 'react' as const
+          } : undefined}
         />
       </div>
     </div>
