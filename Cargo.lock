@@ -3452,6 +3452,7 @@ dependencies = [
  "lopdf",
  "mcp-core",
  "mcp-server",
+ "nix 0.29.0",
  "oauth2",
  "once_cell",
  "regex",
@@ -3472,9 +3473,11 @@ dependencies = [
  "umya-spreadsheet",
  "url",
  "utoipa",
+ "walkdir",
  "webbrowser 0.8.15",
  "which",
  "xcap",
+ "zip 0.6.6",
 ]
 
 [[package]]
@@ -6887,6 +6890,7 @@ dependencies = [
  "js-sys",
  "log",
  "mime",
+ "mime_guess",
  "once_cell",
  "percent-encoding",
  "pin-project-lite",
