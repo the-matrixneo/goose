@@ -8,6 +8,7 @@ import { Button } from '../ui/button';
 import { formatMessageTimestamp } from '../../utils/timeUtils';
 import { toastSuccess, toastError } from '../../toasts';
 import { Input } from '../ui/input';
+import { getApiUrl } from '../../config';
 
 interface AppTile {
   id: string;
@@ -302,12 +303,51 @@ const BuildView: React.FC = () => {
 
   const handleAppClick = async (app: AppTile) => {
     try {
-      await window.electron.openApp(app.path);
+      // Get the secret key for authentication
+      const secretKey = await window.electron.getSecretKey();
+
+      // Setup the pairing session with the build extension
+      const response = await fetch(getApiUrl('/extensions/setup-pairing'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Secret-Key': secretKey,
+        },
+        body: JSON.stringify({
+          project_dir: app.path
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to setup pairing session');
+      }
+
+      const result = await response.json();
+
+      // Check if there was an error in the response
+      if (result.error) {
+        throw new Error(result.message || 'Failed to setup pairing session');
+      }
+
+      // 1) Navigate to ChatView
+      window.location.hash = '#/pair';
+
+      // 2) Open sidecar browser immediately
+      // Use a small delay to let the router/layout mount
+      setTimeout(() => {
+        try {
+          const evt = new CustomEvent('open-sidecar-localhost', { detail: { url: 'http://localhost:3000' } });
+          window.dispatchEvent(evt);
+        } catch (e) {
+          console.warn('Failed to auto-open sidecar, user can click the globe button.', e);
+        }
+      }, 150);
     } catch (err) {
       console.error('Failed to open app:', err);
       toastError({
         title: 'Failed to open app',
-        msg: 'Could not open the app directory',
+        msg: err instanceof Error ? err.message : 'Could not open the app',
       });
     }
   };

@@ -114,6 +114,7 @@ pub async fn handle_configure() -> Result<(), Box<dyn Error>> {
                                 timeout: Some(goose::config::DEFAULT_EXTENSION_TIMEOUT),
                                 bundled: Some(true),
                                 description: None,
+                                working_dir: None,
                             },
                         })?;
                     }
@@ -643,6 +644,7 @@ pub fn configure_extensions_dialog() -> Result<(), Box<dyn Error>> {
                     timeout: Some(timeout),
                     bundled: Some(true),
                     description: None,
+                    working_dir: None,
                 },
             })?;
 
@@ -1621,6 +1623,7 @@ pub async fn handle_openrouter_auth() -> Result<(), Box<dyn Error>> {
                                         timeout: Some(goose::config::DEFAULT_EXTENSION_TIMEOUT),
                                         bundled: Some(true),
                                         description: None,
+                                        working_dir: None,
                                     },
                                 }) {
                                     Ok(_) => println!("✓ Developer extension enabled"),

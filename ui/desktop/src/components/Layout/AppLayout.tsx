@@ -5,7 +5,6 @@ import { View, ViewOptions } from '../../App';
 import { AppWindowMac, AppWindow, Globe } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Sidebar, SidebarInset, SidebarProvider, SidebarTrigger, useSidebar } from '../ui/sidebar';
-import LocalhostButton from '../LocalhostButton';
 import { SidecarProvider, useSidecar } from '../SidecarLayout';
 import { Tooltip, TooltipTrigger, TooltipContent } from '../ui/Tooltip';
 
@@ -96,6 +95,18 @@ const AppLayoutContent: React.FC<AppLayoutProps> = ({ setIsGoosehintsModalOpen }
       console.error('No sidecar available');
     }
   };
+
+  // Listen for programmatic request to show the sidecar localhost viewer
+  React.useEffect(() => {
+    const handler = (e: Event) => {
+      if (!sidecar) return;
+      const ce = e as CustomEvent<{ url?: string }>;
+      const url = ce.detail?.url || 'http://localhost:3000';
+      sidecar.showLocalhostViewer(url, 'Localhost Viewer');
+    };
+    window.addEventListener('open-sidecar-localhost', handler as EventListener);
+    return () => window.removeEventListener('open-sidecar-localhost', handler as EventListener);
+  }, [sidecar]);
 
   return (
     <div className="flex flex-1 w-full relative animate-fade-in">

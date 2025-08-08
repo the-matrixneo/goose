@@ -56,7 +56,7 @@ import {
   ChatContextManagerProvider,
   useChatContextManager,
 } from './context_management/ChatContextManager';
-import { SidecarProvider } from './SidecarLayout';
+// import { SidecarProvider } from './SidecarLayout';
 import { type View, ViewOptions } from '../App';
 import { MainPanelLayout } from './Layout/MainPanelLayout';
 import ChatInput from './ChatInput';
