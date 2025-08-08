@@ -62,6 +62,7 @@ export function LocalhostViewer({
   const [retryCount, setRetryCount] = useState(0);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const contentCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (onUrlChange) {
@@ -69,11 +70,14 @@ export function LocalhostViewer({
     }
   }, [url, onUrlChange]);
 
-  // Cleanup timeout on unmount
+  // Cleanup timeouts on unmount
   useEffect(() => {
     return () => {
       if (retryTimeoutRef.current) {
         clearTimeout(retryTimeoutRef.current);
+      }
+      if (contentCheckTimeoutRef.current) {
+        clearTimeout(contentCheckTimeoutRef.current);
       }
     };
   }, []);
@@ -139,12 +143,53 @@ export function LocalhostViewer({
     }
   };
 
+  const checkIframeContent = () => {
+    try {
+      const iframe = iframeRef.current;
+      if (!iframe || !iframe.contentDocument) {
+        return false;
+      }
+
+      const doc = iframe.contentDocument;
+      const title = doc.title;
+      const body = doc.body;
+      
+      // Check for common error page indicators
+      const isErrorPage = (
+        title.toLowerCase().includes('error') ||
+        title.toLowerCase().includes('not found') ||
+        title.toLowerCase().includes('404') ||
+        title.toLowerCase().includes('500') ||
+        title.toLowerCase().includes('connection') ||
+        title.toLowerCase().includes('refused') ||
+        title.toLowerCase().includes('unavailable')
+      );
+
+      // Check if body is essentially empty or contains error messages
+      const bodyText = body?.textContent?.trim().toLowerCase() || '';
+      const hasErrorContent = (
+        bodyText.includes('cannot get') ||
+        bodyText.includes('not found') ||
+        bodyText.includes('error') ||
+        bodyText.includes('connection refused') ||
+        bodyText.includes('econnrefused') ||
+        bodyText.includes('site can\'t be reached') ||
+        bodyText.includes('server is not responding')
+      );
+
+      // Check if the page is essentially empty (very little content)
+      const isEmpty = bodyText.length < 50 && !body?.querySelector('script, style, img, video, canvas');
+
+      return !isErrorPage && !hasErrorContent && !isEmpty;
+    } catch (e) {
+      // If we can't access the iframe content (CORS), assume it loaded successfully
+      // since the onLoad event fired
+      return true;
+    }
+  };
+
   const handleIframeLoad = () => {
     setIsLoading(false);
-    setError(null);
-    setConnectionStatus('connected');
-    setHasLoadedOnce(true);
-    setRetryCount(0); // Reset retry count on successful load
 
     // Clear any pending retry timeout
     if (retryTimeoutRef.current) {
@@ -152,15 +197,32 @@ export function LocalhostViewer({
       retryTimeoutRef.current = null;
     }
 
-    // Try to update navigation state (may not work due to CORS)
-    try {
-      if (iframeRef.current?.contentWindow) {
-        setCanGoBack(iframeRef.current.contentWindow.history.length > 1);
-        setCanGoForward(false); // Reset forward state
+    // Give the iframe a moment to fully load its content before checking
+    contentCheckTimeoutRef.current = setTimeout(() => {
+      const hasValidContent = checkIframeContent();
+      
+      if (hasValidContent) {
+        setError(null);
+        setConnectionStatus('connected');
+        setHasLoadedOnce(true);
+        setRetryCount(0); // Reset retry count on successful load
+      } else {
+        // Treat empty/error content as a connection failure
+        console.log('LocalhostViewer: Detected empty or error content, treating as connection failure');
+        handleIframeError();
+        return;
       }
-    } catch (e) {
-      // Ignore CORS errors when trying to access iframe history
-    }
+
+      // Try to update navigation state (may not work due to CORS)
+      try {
+        if (iframeRef.current?.contentWindow) {
+          setCanGoBack(iframeRef.current.contentWindow.history.length > 1);
+          setCanGoForward(false); // Reset forward state
+        }
+      } catch (e) {
+        // Ignore CORS errors when trying to access iframe history
+      }
+    }, 500); // Wait 500ms for content to fully load
   };
 
   const handleIframeError = () => {
@@ -191,7 +253,7 @@ export function LocalhostViewer({
       // Show final error message
       setConnectionStatus('failed');
       const errorMessage = retryCount >= maxRetries 
-        ? `Connection failed after ${maxRetries} attempts`
+        ? `No server running on port`
         : `Connection failed`;
       
       setError(errorMessage);
