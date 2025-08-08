@@ -551,22 +551,41 @@ Exit criteria for Phase 3:
 
 ---
 
-## Phase 6 Prompt (Realistic Consolidation)
+## Phase 6 Summary (Completed)
 
-You are Goose working inside this repository. Continue the unified configuration migration (Phase 6) to achieve realistic and sustainable progress.
+### Achievements
+- ✅ 90 configuration keys migrated to unified API (40.0% coverage)
+- ✅ Eliminated mixed access patterns for core configurations
+- ✅ Completed partial migrations for llm.model and llm.provider
+- ✅ Migrated all lead/worker configurations in factory.rs
+- ✅ Verified experiments and extensions already using unified API
+- ✅ All code compiles and passes quality checks
+
+### Keys Successfully Migrated in Phase 6
+- **Core Configurations**: Completed migration of partially-migrated keys
+- **Lead/Worker Settings**: Full migration in factory.rs
+- **Experiments/Extensions**: Verified already using unified API
+- **Mixed Access Patterns**: Eliminated redundant config access
+
+---
+
+## Phase 7 Prompt (Comprehensive Migration to 95%+ Coverage)
+
+You are Goose working inside this repository. Execute Phase 7 to achieve near-complete unified configuration coverage (95%+).
 
 ### Starting Context
-- **Current state:** 76 keys migrated to unified API (35.5% coverage)
-- **Remaining keys:** ~138 keys in legacy systems
+- **Current state:** 90 keys migrated to unified API (40.0% coverage)
+- **Remaining keys:** ~135 keys in legacy systems
 - **Discovery tool:** Use `python3 config_discovery.py` to track progress
 - **Working directory:** /Users/tlongwell/Development/goose6
 
 ### Primary Objectives
-1. **Expand unified API coverage to 100+ keys** (targeting 46-50% total coverage)
-2. **Focus on remaining provider configurations and API keys**
-3. **Complete experiments and extension configurations**
-4. **Migrate high-value config file parameters**
-5. **Ensure robust testing and documentation**
+1. **Achieve 95%+ unified API coverage** (target: 214+ keys)
+2. **Migrate ALL environment variables** (except system vars like HOME, PATH, USER)
+3. **Migrate ALL config file parameters** (except test-only configs)
+4. **Migrate ALL secret storage keys**
+5. **Eliminate all direct config_get/set_param calls**
+6. **Ensure zero compilation errors and maintain tests**
 
 ### Execution Strategy - What Works Best
 
