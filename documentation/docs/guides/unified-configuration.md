@@ -14,6 +14,19 @@ And lets you inspect the effective value with provenance (where it came from) wh
 
 Key benefits
 - One canonical key per setting (dot notation): llm.provider, llm.model, server.port, etc.
+
+> Callout: one‑liner drop‑in replacements
+>
+> Migrating existing config reads should be a one‑liner: replace manual env/config parsing with unified::get or unified::get_or. Example:
+>
+> ```rust
+> // Before
+> let model = std::env::var("GOOSE_MODEL").ok().unwrap_or_else(|| "gpt-4o".to_string());
+>
+> // After (one‑liner)
+> let model: String = goose::config::unified::get_or("llm.model", "gpt-4o".to_string());
+> ```
+
 - Automatic environment mapping with GOOSE_ prefix: llm.model → GOOSE_LLM_MODEL
 - Clear precedence and observability
 - CLI experience that works for all keys (show/get/set/unset) and a global non-persistent overlay
