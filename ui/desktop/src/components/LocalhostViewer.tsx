@@ -240,7 +240,7 @@ export function LocalhostViewer({
             <div className="text-center">
               <RefreshCw size={120} className="mx-auto mb-4 text-textSubtle opacity-40" strokeWidth={1} />
               <h2 className="text-textSubtle text-xl font-medium mb-2 opacity-40">Localhost Viewer</h2>
-              <p className="text-textSubtle text-sm opacity-40">Develop your locally hosted apps with Goose</p>
+              <p className="text-textSubtle text-sm opacity-40">Refresh your page to establish a connection</p>
             </div>
           </div>
         )}
