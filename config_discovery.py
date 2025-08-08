@@ -50,6 +50,23 @@ class ConfigDiscovery:
         
         # Comprehensive patterns for different configuration types
         self.config_patterns = {
+            # Unified configuration API
+            'unified_get': [
+                r'unified::get::<[^>]*>\s*\(\s*"([^"]+)"',
+                r'unified::get_or::<[^>]*>\s*\(\s*"([^"]+)"',
+                r'unified::get_or\s*\(\s*"([^"]+)"',
+                r'unified::resolve::<[^>]*>\s*\(\s*"([^"]+)"',
+                r'unified::get_secret::<[^>]*>\s*\(\s*"([^"]+)"',
+                r'goose::config::unified::get::<[^>]*>\s*\(\s*"([^"]+)"',
+                r'goose::config::unified::get_or::<[^>]*>\s*\(\s*"([^"]+)"',
+                r'goose::config::unified::get_or\s*\(\s*"([^"]+)"',
+                r'goose::config::unified::resolve::<[^>]*>\s*\(\s*"([^"]+)"',
+            ],
+            'unified_set': [
+                r'unified::set\s*\(\s*"([^"]+)"',
+                r'unified::set_secret\s*\(\s*"([^"]+)"',
+                r'unified::unset\s*\(\s*"([^"]+)"',
+            ],
             # Config file operations (narrowed to Config usage to avoid JSON .get false positives)
             'config_get': [
                 r'Config::global\(\)\.get_param\s*:?\s*<[^>]*>\s*\(\s*["\']([^"\']+)["\']',
@@ -189,7 +206,9 @@ class ConfigDiscovery:
     
     def categorize_usage(self, method: str) -> str:
         """Categorize usage by method type."""
-        if method.startswith('config_'):
+        if method.startswith('unified_'):
+            return 'unified_config'
+        elif method.startswith('config_'):
             return 'config_file'
         elif method.startswith('secret_'):
             return 'secrets'
@@ -198,10 +217,6 @@ class ConfigDiscovery:
         elif method.startswith('cli_'):
             return 'cli_flags'
         else:
-        # Pass 2: enrich with constant expansion for env/config keys declared via const/static
-        self._build_const_map()
-        self._expand_constant_usages()
-
             return 'other'
     
     def analyze_file(self, file_path: Path, include_context: bool = False):
@@ -360,6 +375,7 @@ class ConfigDiscovery:
         # Category breakdown
         report += "### By Category\n\n"
         category_names = {
+            'unified_config': 'Unified Configuration API',
             'config_file': 'Config File Parameters',
             'secrets': 'Secret Storage',
             'environment': 'Environment Variables',
@@ -372,7 +388,7 @@ class ConfigDiscovery:
         report += "\n"
         
         # Detailed sections
-        for category in ['config_file', 'secrets', 'environment', 'cli_flags']:
+        for category in ['unified_config', 'config_file', 'secrets', 'environment', 'cli_flags']:
             if category not in stats['by_category']:
                 continue
                 

@@ -94,7 +94,7 @@ impl ThinkingIndicator {
     pub fn show(&mut self) {
         let spinner = cliclack::spinner();
         if Config::global()
-            .get_param("RANDOM_THINKING_MESSAGES")
+            .get_param("cli.random_thinking_messages")
             .unwrap_or(true)
         {
             spinner.start(format!(
@@ -251,8 +251,6 @@ fn render_tool_request(req: &ToolRequest, theme: Theme, debug: bool) {
 }
 
 fn render_tool_response(resp: &ToolResponse, theme: Theme, debug: bool) {
-    let config = Config::global();
-
     match &resp.tool_result {
         Ok(contents) => {
             for content in contents {
@@ -262,10 +260,8 @@ fn render_tool_response(resp: &ToolResponse, theme: Theme, debug: bool) {
                     }
                 }
 
-                let min_priority = config
-                    .get_param::<f32>("GOOSE_CLI_MIN_PRIORITY")
-                    .ok()
-                    .unwrap_or(0.5);
+                use goose::config::unified;
+                let min_priority = unified::get::<f32>("cli.min_priority").unwrap_or(0.5);
 
                 if content
                     .priority()

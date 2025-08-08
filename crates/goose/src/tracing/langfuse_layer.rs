@@ -1,9 +1,9 @@
+use crate::config::unified;
 use crate::tracing::observation_layer::{BatchManager, ObservationLayer, SpanTracker};
 use chrono::Utc;
 use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::env;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
@@ -153,20 +153,15 @@ impl BatchManager for LangfuseBatchManager {
 }
 
 pub fn create_langfuse_observer() -> Option<ObservationLayer> {
-    let public_key = env::var("LANGFUSE_PUBLIC_KEY")
-        .or_else(|_| env::var("LANGFUSE_INIT_PROJECT_PUBLIC_KEY"))
-        .unwrap_or_default(); // Use empty string if not found
-
-    let secret_key = env::var("LANGFUSE_SECRET_KEY")
-        .or_else(|_| env::var("LANGFUSE_INIT_PROJECT_SECRET_KEY"))
-        .unwrap_or_default(); // Use empty string if not found
+    let public_key = unified::get::<String>("tracing.langfuse.public_key").unwrap_or_default();
+    let secret_key = unified::get::<String>("tracing.langfuse.secret_key").unwrap_or_default();
 
     // Return None if either key is empty
     if public_key.is_empty() || secret_key.is_empty() {
         return None;
     }
 
-    let base_url = env::var("LANGFUSE_URL").unwrap_or_else(|_| DEFAULT_LANGFUSE_URL.to_string());
+    let base_url = unified::get_or("tracing.langfuse.url", DEFAULT_LANGFUSE_URL.to_string());
 
     let batch_manager = Arc::new(Mutex::new(LangfuseBatchManager::new(
         public_key, secret_key, base_url,
@@ -187,6 +182,7 @@ mod tests {
     use super::*;
     use serde_json::json;
     use std::collections::HashMap;
+    use std::env;
     use tokio::sync::Mutex;
     use tracing::dispatcher;
     use wiremock::matchers::{method, path};

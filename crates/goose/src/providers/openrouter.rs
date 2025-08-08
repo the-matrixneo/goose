@@ -5,15 +5,16 @@ use serde_json::{json, Value};
 use super::api_client::{ApiClient, AuthMethod};
 use super::base::{ConfigKey, Provider, ProviderMetadata, ProviderUsage, Usage};
 use super::errors::ProviderError;
+use super::formats::openai::{create_request, get_usage, response_to_message};
 use super::retry::ProviderRetry;
 use super::utils::{
     emit_debug_trace, get_model, handle_response_google_compat, handle_response_openai_compat,
     is_google_model,
 };
+use crate::config::unified;
 use crate::conversation::message::Message;
 use crate::impl_provider_default;
 use crate::model::ModelConfig;
-use crate::providers::formats::openai::{create_request, get_usage, response_to_message};
 use rmcp::model::Tool;
 
 pub const OPENROUTER_DEFAULT_MODEL: &str = "anthropic/claude-3.5-sonnet";
@@ -42,11 +43,11 @@ impl_provider_default!(OpenRouterProvider);
 
 impl OpenRouterProvider {
     pub fn from_env(model: ModelConfig) -> Result<Self> {
-        let config = crate::config::Config::global();
-        let api_key: String = config.get_secret("OPENROUTER_API_KEY")?;
-        let host: String = config
-            .get_param("OPENROUTER_HOST")
-            .unwrap_or_else(|_| "https://openrouter.ai".to_string());
+        let api_key: String = unified::get_secret("providers.openrouter.api_key")?;
+        let host: String = unified::get_or(
+            "providers.openrouter.host",
+            "https://openrouter.ai".to_string(),
+        );
 
         let auth = AuthMethod::BearerToken(api_key);
         let api_client = ApiClient::new(host, auth)?

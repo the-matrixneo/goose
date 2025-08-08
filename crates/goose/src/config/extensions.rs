@@ -1,4 +1,4 @@
-use super::base::Config;
+use super::unified;
 use crate::agents::ExtensionConfig;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -30,12 +30,10 @@ pub struct ExtensionConfigManager;
 impl ExtensionConfigManager {
     /// Get the extension configuration if enabled -- uses key
     pub fn get_config(key: &str) -> Result<Option<ExtensionConfig>> {
-        let config = Config::global();
-
         // Try to get the extension entry
-        let extensions: HashMap<String, ExtensionEntry> = match config.get_param("extensions") {
+        let extensions: HashMap<String, ExtensionEntry> = match unified::get("extensions") {
             Ok(exts) => exts,
-            Err(super::ConfigError::NotFound(_)) => {
+            Err(_) => {
                 // Initialize with default developer extension
                 let defaults = HashMap::from([(
                     name_to_key(DEFAULT_EXTENSION), // Use key format for top-level key in config
@@ -50,10 +48,9 @@ impl ExtensionConfigManager {
                         },
                     },
                 )]);
-                config.set_param("extensions", serde_json::to_value(&defaults)?)?;
+                unified::set("extensions", serde_json::to_value(&defaults)?)?;
                 defaults
             }
-            Err(e) => return Err(e.into()),
         };
 
         Ok(extensions.get(key).and_then(|entry| {
@@ -66,14 +63,9 @@ impl ExtensionConfigManager {
     }
 
     pub fn get_config_by_name(name: &str) -> Result<Option<ExtensionConfig>> {
-        let config = Config::global();
-
         // Try to get the extension entry
-        let extensions: HashMap<String, ExtensionEntry> = match config.get_param("extensions") {
-            Ok(exts) => exts,
-            Err(super::ConfigError::NotFound(_)) => HashMap::new(),
-            Err(_) => HashMap::new(),
-        };
+        let extensions: HashMap<String, ExtensionEntry> =
+            unified::get_or("extensions", HashMap::new());
 
         Ok(extensions
             .values()
@@ -83,72 +75,56 @@ impl ExtensionConfigManager {
 
     /// Set or update an extension configuration
     pub fn set(entry: ExtensionEntry) -> Result<()> {
-        let config = Config::global();
-
-        let mut extensions: HashMap<String, ExtensionEntry> = config
-            .get_param("extensions")
-            .unwrap_or_else(|_| HashMap::new());
+        let mut extensions: HashMap<String, ExtensionEntry> =
+            unified::get_or("extensions", HashMap::new());
 
         let key = entry.config.key();
 
         extensions.insert(key, entry);
-        config.set_param("extensions", serde_json::to_value(extensions)?)?;
+        unified::set("extensions", serde_json::to_value(extensions)?)?;
         Ok(())
     }
 
     /// Remove an extension configuration -- uses the key
     pub fn remove(key: &str) -> Result<()> {
-        let config = Config::global();
-
-        let mut extensions: HashMap<String, ExtensionEntry> = config
-            .get_param("extensions")
-            .unwrap_or_else(|_| HashMap::new());
+        let mut extensions: HashMap<String, ExtensionEntry> =
+            unified::get_or("extensions", HashMap::new());
 
         extensions.remove(key);
-        config.set_param("extensions", serde_json::to_value(extensions)?)?;
+        unified::set("extensions", serde_json::to_value(extensions)?)?;
         Ok(())
     }
 
     /// Enable or disable an extension -- uses key
     pub fn set_enabled(key: &str, enabled: bool) -> Result<()> {
-        let config = Config::global();
-
-        let mut extensions: HashMap<String, ExtensionEntry> = config
-            .get_param("extensions")
-            .unwrap_or_else(|_| HashMap::new());
+        let mut extensions: HashMap<String, ExtensionEntry> =
+            unified::get_or("extensions", HashMap::new());
 
         if let Some(entry) = extensions.get_mut(key) {
             entry.enabled = enabled;
-            config.set_param("extensions", serde_json::to_value(extensions)?)?;
+            unified::set("extensions", serde_json::to_value(extensions)?)?;
         }
         Ok(())
     }
 
     /// Get all extensions and their configurations
     pub fn get_all() -> Result<Vec<ExtensionEntry>> {
-        let config = Config::global();
-        let extensions: HashMap<String, ExtensionEntry> = match config.get_param("extensions") {
-            Ok(exts) => exts,
-            Err(super::ConfigError::NotFound(_)) => HashMap::new(),
-            Err(e) => return Err(e.into()),
-        };
+        let extensions: HashMap<String, ExtensionEntry> =
+            unified::get_or("extensions", HashMap::new());
         Ok(Vec::from_iter(extensions.values().cloned()))
     }
 
     /// Get all extension names
     pub fn get_all_names() -> Result<Vec<String>> {
-        let config = Config::global();
-        Ok(config
-            .get_param("extensions")
-            .unwrap_or_else(|_| get_keys(Default::default())))
+        let extensions: HashMap<String, ExtensionEntry> =
+            unified::get_or("extensions", HashMap::new());
+        Ok(get_keys(extensions))
     }
 
     /// Check if an extension is enabled - FIXED to use key
     pub fn is_enabled(key: &str) -> Result<bool> {
-        let config = Config::global();
-        let extensions: HashMap<String, ExtensionEntry> = config
-            .get_param("extensions")
-            .unwrap_or_else(|_| HashMap::new());
+        let extensions: HashMap<String, ExtensionEntry> =
+            unified::get_or("extensions", HashMap::new());
 
         Ok(extensions.get(key).map(|e| e.enabled).unwrap_or(false))
     }

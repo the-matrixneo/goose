@@ -1122,22 +1122,22 @@ async fn run_scheduled_job_internal(
         agent_provider = provider;
     } else {
         let global_config = Config::global();
-        let provider_name: String = match global_config.get_param("GOOSE_PROVIDER") {
+        let provider_name: String = match global_config.get_param("llm.provider") {
             Ok(name) => name,
             Err(_) => return Err(JobExecutionError {
                 job_id: job.id.clone(),
                 error:
-                    "GOOSE_PROVIDER not configured globally. Run 'goose configure' or set env var."
+                    "llm.provider not configured globally. Run 'goose configure' or set GOOSE_PROVIDER env var."
                         .to_string(),
             }),
         };
         let model_name: String =
-            match global_config.get_param("GOOSE_MODEL") {
+            match global_config.get_param("llm.model") {
                 Ok(name) => name,
                 Err(_) => return Err(JobExecutionError {
                     job_id: job.id.clone(),
                     error:
-                        "GOOSE_MODEL not configured globally. Run 'goose configure' or set env var."
+                        "llm.model not configured globally. Run 'goose configure' or set GOOSE_MODEL env var."
                             .to_string(),
                 }),
             };

@@ -454,17 +454,15 @@ impl TemporalScheduler {
             }
         }
 
-        // Check environment variable override
-        if let Ok(binary_path) = std::env::var("GOOSE_TEMPORAL_BIN") {
+        // Check environment variable override or config
+        use crate::config::unified;
+        if let Ok(binary_path) = unified::get::<String>("scheduler.temporal.bin") {
             if std::path::Path::new(&binary_path).exists() {
-                tracing::info!(
-                    "Using temporal-service binary from GOOSE_TEMPORAL_BIN: {}",
-                    binary_path
-                );
+                tracing::info!("Using temporal-service binary from config: {}", binary_path);
                 return Ok(binary_path);
             } else {
                 tracing::warn!(
-                    "GOOSE_TEMPORAL_BIN points to non-existent file: {}",
+                    "Config scheduler.temporal.bin points to non-existent file: {}",
                     binary_path
                 );
             }

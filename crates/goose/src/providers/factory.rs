@@ -21,6 +21,7 @@ use super::{
     venice::VeniceProvider,
     xai::XaiProvider,
 };
+use crate::config::unified;
 use crate::model::ModelConfig;
 use anyhow::Result;
 
@@ -63,45 +64,36 @@ pub fn providers() -> Vec<ProviderMetadata> {
 }
 
 pub fn create(name: &str, model: ModelConfig) -> Result<Arc<dyn Provider>> {
-    let config = crate::config::Config::global();
-
-    // Check for lead model environment variables
-    if let Ok(lead_model_name) = config.get_param::<String>("GOOSE_LEAD_MODEL") {
-        tracing::info!("Creating lead/worker provider from environment variables");
+    // Check for lead model configuration using unified config
+    if let Ok(lead_model_name) = unified::get::<String>("lead.model") {
+        tracing::info!("Creating lead/worker provider from configuration");
 
         return create_lead_worker_from_env(name, &model, &lead_model_name);
     }
     create_provider(name, model)
 }
 
-/// Create a lead/worker provider from environment variables
+/// Create a lead/worker provider from configuration
 fn create_lead_worker_from_env(
     default_provider_name: &str,
     default_model: &ModelConfig,
     lead_model_name: &str,
 ) -> Result<Arc<dyn Provider>> {
-    let config = crate::config::Config::global();
-
     // Get lead provider (optional, defaults to main provider)
-    let lead_provider_name = config
-        .get_param::<String>("GOOSE_LEAD_PROVIDER")
-        .unwrap_or_else(|_| default_provider_name.to_string());
+    let lead_provider_name =
+        unified::get_or::<String>("lead.provider", default_provider_name.to_string());
 
     // Get configuration parameters with defaults
-    let lead_turns = config
-        .get_param::<usize>("GOOSE_LEAD_TURNS")
-        .unwrap_or(default_lead_turns());
-    let failure_threshold = config
-        .get_param::<usize>("GOOSE_LEAD_FAILURE_THRESHOLD")
-        .unwrap_or(default_failure_threshold());
-    let fallback_turns = config
-        .get_param::<usize>("GOOSE_LEAD_FALLBACK_TURNS")
-        .unwrap_or(default_fallback_turns());
+    let lead_turns = unified::get_or::<usize>("lead.turns", default_lead_turns());
+    let failure_threshold =
+        unified::get_or::<usize>("lead.failure_threshold", default_failure_threshold());
+    let fallback_turns = unified::get_or::<usize>("lead.fallback_turns", default_fallback_turns());
 
-    let lead_model_config = ModelConfig::new_with_context_env(
-        lead_model_name.to_string(),
-        Some("GOOSE_LEAD_CONTEXT_LIMIT"),
-    )?;
+    // Create lead model config with context limit from unified config
+    let mut lead_model_config = ModelConfig::new_or_fail(lead_model_name);
+    if let Ok(limit) = unified::get::<usize>("lead.context_limit") {
+        lead_model_config = lead_model_config.with_context_limit(Some(limit));
+    }
 
     // For worker model, preserve the original context_limit from config (highest precedence)
     // while still allowing environment variable overrides
@@ -115,18 +107,12 @@ fn create_lead_worker_from_env(
             .with_toolshim_model(default_model.toolshim_model.clone());
 
         // Apply environment variable overrides with proper precedence
-        let global_config = crate::config::Config::global();
-
         // Check for worker-specific context limit
-        if let Ok(limit_str) = global_config.get_param::<String>("GOOSE_WORKER_CONTEXT_LIMIT") {
-            if let Ok(limit) = limit_str.parse::<usize>() {
-                worker_config = worker_config.with_context_limit(Some(limit));
-            }
-        } else if let Ok(limit_str) = global_config.get_param::<String>("GOOSE_CONTEXT_LIMIT") {
+        if let Ok(limit) = unified::get::<usize>("worker.context_limit") {
+            worker_config = worker_config.with_context_limit(Some(limit));
+        } else if let Ok(limit) = unified::get::<usize>("model.context_limit") {
             // Check for general context limit if worker-specific is not set
-            if let Ok(limit) = limit_str.parse::<usize>() {
-                worker_config = worker_config.with_context_limit(Some(limit));
-            }
+            worker_config = worker_config.with_context_limit(Some(limit));
         }
 
         worker_config
@@ -253,7 +239,14 @@ mod tests {
             Err(error) => {
                 // If it fails, it should be due to missing API keys, confirming we tried to create providers
                 let error_msg = error.to_string();
-                assert!(error_msg.contains("OPENAI_API_KEY") || error_msg.contains("secret"));
+                println!("Error creating provider: {}", error_msg);
+                assert!(
+                    error_msg.contains("OPENAI_API_KEY")
+                        || error_msg.contains("secret")
+                        || error_msg.contains("api_key"),
+                    "Unexpected error: {}",
+                    error_msg
+                );
             }
         }
 
@@ -315,7 +308,13 @@ mod tests {
             Err(error) => {
                 // Should fail due to missing API keys, confirming we tried to create providers
                 let error_msg = error.to_string();
-                assert!(error_msg.contains("OPENAI_API_KEY") || error_msg.contains("secret"));
+                assert!(
+                    error_msg.contains("OPENAI_API_KEY")
+                        || error_msg.contains("secret")
+                        || error_msg.contains("api_key"),
+                    "Unexpected error: {}",
+                    error_msg
+                );
             }
         }
 
@@ -364,7 +363,13 @@ mod tests {
             Err(error) => {
                 // If it fails, it should be due to missing API keys
                 let error_msg = error.to_string();
-                assert!(error_msg.contains("OPENAI_API_KEY") || error_msg.contains("secret"));
+                assert!(
+                    error_msg.contains("OPENAI_API_KEY")
+                        || error_msg.contains("secret")
+                        || error_msg.contains("api_key"),
+                    "Unexpected error: {}",
+                    error_msg
+                );
             }
         }
 
@@ -396,7 +401,10 @@ mod tests {
                 "GOOSE_WORKER_CONTEXT_LIMIT",
                 env::var("GOOSE_WORKER_CONTEXT_LIMIT").ok(),
             ),
-            ("GOOSE_CONTEXT_LIMIT", env::var("GOOSE_CONTEXT_LIMIT").ok()),
+            (
+                "GOOSE_MODEL_CONTEXT_LIMIT",
+                env::var("GOOSE_MODEL_CONTEXT_LIMIT").ok(),
+            ),
         ];
 
         // Clear env vars to ensure clean test
@@ -419,10 +427,10 @@ mod tests {
         let _result = create_lead_worker_from_env("openai", &default_model, "gpt-4o");
         env::remove_var("GOOSE_WORKER_CONTEXT_LIMIT");
 
-        // Test case 3: With GOOSE_CONTEXT_LIMIT - should override original
-        env::set_var("GOOSE_CONTEXT_LIMIT", "64000");
+        // Test case 3: With GOOSE_MODEL_CONTEXT_LIMIT - should override original
+        env::set_var("GOOSE_MODEL_CONTEXT_LIMIT", "64000");
         let _result = create_lead_worker_from_env("openai", &default_model, "gpt-4o");
-        env::remove_var("GOOSE_CONTEXT_LIMIT");
+        env::remove_var("GOOSE_MODEL_CONTEXT_LIMIT");
 
         // Restore env vars
         for (key, value) in saved_vars {

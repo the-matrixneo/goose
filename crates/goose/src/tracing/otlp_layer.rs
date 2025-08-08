@@ -1,9 +1,9 @@
+use crate::config::unified;
 use opentelemetry::trace::TracerProvider;
 use opentelemetry::{global, KeyValue};
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_sdk::trace::{self, RandomIdGenerator, Sampler};
 use opentelemetry_sdk::{runtime, Resource};
-use std::env;
 use std::time::Duration;
 use tracing::{Level, Metadata};
 use tracing_opentelemetry::{MetricsLayer, OpenTelemetryLayer};
@@ -32,16 +32,14 @@ impl Default for OtlpConfig {
 
 impl OtlpConfig {
     pub fn from_env() -> Option<Self> {
-        if let Ok(endpoint) = env::var("OTEL_EXPORTER_OTLP_ENDPOINT") {
+        if let Ok(endpoint) = unified::get::<String>("tracing.otlp.endpoint") {
             let mut config = Self {
                 endpoint,
                 timeout: Duration::from_secs(10),
             };
 
-            if let Ok(timeout_str) = env::var("OTEL_EXPORTER_OTLP_TIMEOUT") {
-                if let Ok(timeout_ms) = timeout_str.parse::<u64>() {
-                    config.timeout = Duration::from_millis(timeout_ms);
-                }
+            if let Ok(timeout_ms) = unified::get::<u32>("tracing.otlp.timeout_ms") {
+                config.timeout = Duration::from_millis(timeout_ms as u64);
             }
 
             Some(config)
@@ -104,8 +102,7 @@ pub fn init_otlp_metrics(config: &OtlpConfig) -> OtlpResult<()> {
 }
 
 pub fn create_otlp_tracing_layer() -> OtlpResult<OtlpTracingLayer> {
-    let config =
-        OtlpConfig::from_env().ok_or("OTEL_EXPORTER_OTLP_ENDPOINT environment variable not set")?;
+    let config = OtlpConfig::from_env().ok_or("tracing.otlp.endpoint configuration not set")?;
 
     let resource = Resource::new(vec![
         KeyValue::new("service.name", "goose"),
@@ -134,8 +131,7 @@ pub fn create_otlp_tracing_layer() -> OtlpResult<OtlpTracingLayer> {
 }
 
 pub fn create_otlp_metrics_layer() -> OtlpResult<OtlpMetricsLayer> {
-    let config =
-        OtlpConfig::from_env().ok_or("OTEL_EXPORTER_OTLP_ENDPOINT environment variable not set")?;
+    let config = OtlpConfig::from_env().ok_or("tracing.otlp.endpoint configuration not set")?;
 
     let resource = Resource::new(vec![
         KeyValue::new("service.name", "goose"),

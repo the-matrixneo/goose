@@ -20,6 +20,7 @@ use super::utils::{
     emit_debug_trace, get_model, handle_response_openai_compat, handle_status_openai_compat,
     ImageFormat,
 };
+use crate::config::unified;
 use crate::conversation::message::Message;
 use crate::impl_provider_default;
 use crate::model::ModelConfig;
@@ -57,22 +58,23 @@ impl_provider_default!(OpenAiProvider);
 
 impl OpenAiProvider {
     pub fn from_env(model: ModelConfig) -> Result<Self> {
-        let config = crate::config::Config::global();
-        let api_key: String = config.get_secret("OPENAI_API_KEY")?;
-        let host: String = config
-            .get_param("OPENAI_HOST")
-            .unwrap_or_else(|_| "https://api.openai.com".to_string());
-        let base_path: String = config
-            .get_param("OPENAI_BASE_PATH")
-            .unwrap_or_else(|_| "v1/chat/completions".to_string());
-        let organization: Option<String> = config.get_param("OPENAI_ORGANIZATION").ok();
-        let project: Option<String> = config.get_param("OPENAI_PROJECT").ok();
-        let custom_headers: Option<HashMap<String, String>> = config
-            .get_secret("OPENAI_CUSTOM_HEADERS")
-            .or_else(|_| config.get_param("OPENAI_CUSTOM_HEADERS"))
-            .ok()
-            .map(parse_custom_headers);
-        let timeout_secs: u64 = config.get_param("OPENAI_TIMEOUT").unwrap_or(600);
+        let api_key: String = unified::get_secret("providers.openai.api_key")?;
+        let host: String = unified::get_or(
+            "providers.openai.host",
+            "https://api.openai.com".to_string(),
+        );
+        let base_path: String = unified::get_or(
+            "providers.openai.base_path",
+            "v1/chat/completions".to_string(),
+        );
+        let organization: Option<String> =
+            unified::get::<String>("providers.openai.organization").ok();
+        let project: Option<String> = unified::get::<String>("providers.openai.project").ok();
+        let custom_headers: Option<HashMap<String, String>> =
+            unified::get_secret("providers.openai.custom_headers")
+                .ok()
+                .map(parse_custom_headers);
+        let timeout_secs: u64 = unified::get_or("providers.openai.timeout", 600);
 
         let auth = AuthMethod::BearerToken(api_key);
         let mut api_client =
@@ -265,8 +267,9 @@ impl EmbeddingCapable for OpenAiProvider {
             return Ok(vec![]);
         }
 
-        let embedding_model = std::env::var("GOOSE_EMBEDDING_MODEL")
-            .unwrap_or_else(|_| "text-embedding-3-small".to_string());
+        // Use unified config API with canonical key
+        let embedding_model =
+            unified::get_or("embeddings.model", "text-embedding-3-small".to_string());
 
         let request = EmbeddingRequest {
             input: texts,

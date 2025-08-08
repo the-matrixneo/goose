@@ -1,4 +1,4 @@
-use super::base::Config;
+use super::unified;
 use anyhow::Result;
 use std::collections::HashMap;
 
@@ -18,9 +18,7 @@ impl ExperimentManager {
     /// - Adds missing experiments from `ALL_EXPERIMENTS` with the default value.
     /// - Removes experiments not in `ALL_EXPERIMENTS`.
     pub fn get_all() -> Result<Vec<(String, bool)>> {
-        let config = Config::global();
-        let mut experiments: HashMap<String, bool> =
-            config.get_param("experiments").unwrap_or_default();
+        let mut experiments: HashMap<String, bool> = unified::get_or("experiments", HashMap::new());
         Self::refresh_experiments(&mut experiments);
 
         Ok(experiments.into_iter().collect())
@@ -28,14 +26,11 @@ impl ExperimentManager {
 
     /// Enable or disable an experiment
     pub fn set_enabled(name: &str, enabled: bool) -> Result<()> {
-        let config = Config::global();
-        let mut experiments: HashMap<String, bool> = config
-            .get_param("experiments")
-            .unwrap_or_else(|_| HashMap::new());
+        let mut experiments: HashMap<String, bool> = unified::get_or("experiments", HashMap::new());
         Self::refresh_experiments(&mut experiments);
         experiments.insert(name.to_string(), enabled);
 
-        config.set_param("experiments", serde_json::to_value(experiments)?)?;
+        unified::set("experiments", serde_json::to_value(experiments)?)?;
         Ok(())
     }
 

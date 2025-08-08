@@ -10,6 +10,7 @@ use super::errors::ProviderError;
 use super::formats::openai::{create_request, get_usage, response_to_message};
 use super::retry::ProviderRetry;
 use super::utils::{emit_debug_trace, get_model, handle_response_openai_compat, ImageFormat};
+use crate::config::unified;
 use crate::conversation::message::Message;
 use crate::impl_provider_default;
 use crate::model::ModelConfig;
@@ -72,15 +73,14 @@ impl_provider_default!(AzureProvider);
 
 impl AzureProvider {
     pub fn from_env(model: ModelConfig) -> Result<Self> {
-        let config = crate::config::Config::global();
-        let endpoint: String = config.get_param("AZURE_OPENAI_ENDPOINT")?;
-        let deployment_name: String = config.get_param("AZURE_OPENAI_DEPLOYMENT_NAME")?;
-        let api_version: String = config
-            .get_param("AZURE_OPENAI_API_VERSION")
-            .unwrap_or_else(|_| AZURE_DEFAULT_API_VERSION.to_string());
+        let endpoint: String = unified::get::<String>("providers.azure.endpoint")?;
+        let deployment_name: String = unified::get::<String>("providers.azure.deployment_name")?;
+        let api_version: String = unified::get_or(
+            "providers.azure.api_version",
+            AZURE_DEFAULT_API_VERSION.to_string(),
+        );
 
-        let api_key = config
-            .get_secret("AZURE_OPENAI_API_KEY")
+        let api_key = unified::get_secret("providers.azure.api_key")
             .ok()
             .filter(|key: &String| !key.is_empty());
         let auth = AzureAuth::new(api_key).map_err(|e| match e {

@@ -12,7 +12,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-use crate::config::Config;
+use crate::config::unified;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolRecord {
@@ -56,16 +56,14 @@ impl ToolVectorDB {
     }
 
     pub fn get_db_path() -> Result<PathBuf> {
-        let config = Config::global();
-
         // Check for custom database path override
-        if let Ok(custom_path) = config.get_param::<String>("GOOSE_VECTOR_DB_PATH") {
+        if let Ok(custom_path) = unified::get::<String>("vector_db.path") {
             let path = PathBuf::from(custom_path);
 
             // Validate the path is absolute
             if !path.is_absolute() {
                 return Err(anyhow::anyhow!(
-                    "GOOSE_VECTOR_DB_PATH must be an absolute path, got: {}",
+                    "vector_db.path must be an absolute path, got: {}",
                     path.display()
                 ));
             }

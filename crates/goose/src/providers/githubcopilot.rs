@@ -228,7 +228,7 @@ impl GithubCopilotProvider {
 
     async fn refresh_api_info(&self) -> Result<CopilotTokenInfo> {
         let config = Config::global();
-        let token = match config.get_secret::<String>("GITHUB_COPILOT_TOKEN") {
+        let token = match config.get_secret::<String>("providers.githubcopilot.token") {
             Ok(token) => token,
             Err(err) => match err {
                 ConfigError::NotFound(_) => {
@@ -236,7 +236,10 @@ impl GithubCopilotProvider {
                         .get_access_token()
                         .await
                         .context("unable to login into github")?;
-                    config.set_secret("GITHUB_COPILOT_TOKEN", Value::String(token.clone()))?;
+                    config.set_secret(
+                        "providers.githubcopilot.token",
+                        Value::String(token.clone()),
+                    )?;
                     token
                 }
                 _ => return Err(err.into()),
@@ -388,7 +391,7 @@ impl Provider for GithubCopilotProvider {
             GITHUB_COPILOT_KNOWN_MODELS.to_vec(),
             GITHUB_COPILOT_DOC_URL,
             vec![ConfigKey::new_oauth(
-                "GITHUB_COPILOT_TOKEN",
+                "providers.githubcopilot.token",
                 true,
                 true,
                 None,
@@ -476,7 +479,10 @@ impl Provider for GithubCopilotProvider {
         let config = Config::global();
 
         // Check if token already exists and is valid
-        if config.get_secret::<String>("GITHUB_COPILOT_TOKEN").is_ok() {
+        if config
+            .get_secret::<String>("providers.githubcopilot.token")
+            .is_ok()
+        {
             // Try to refresh API info to validate the token
             match self.refresh_api_info().await {
                 Ok(_) => return Ok(()), // Token is valid
@@ -495,7 +501,7 @@ impl Provider for GithubCopilotProvider {
 
         // Save the token
         config
-            .set_secret("GITHUB_COPILOT_TOKEN", Value::String(token))
+            .set_secret("providers.githubcopilot.token", Value::String(token))
             .map_err(|e| ProviderError::ExecutionError(format!("Failed to save token: {}", e)))?;
 
         Ok(())

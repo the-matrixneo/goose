@@ -75,7 +75,23 @@ Exit criteria: most practical configuration in Goose is resolvable through unifi
 
 This document explores what a drop-in, unified configuration system for Goose should look like. It captures the problem framing, observations from the codebase, core design goals, and a proposed model that keeps things elegant, maintainable, reliable, and easy to reason about. It also outlines how this design lends itself to a future `goose configure` subcommand family (show/get/set/unset) and a `goose show-config`-style experience.
 
-This brainstorm is now partially implemented in Phase 1. See the implementation plan file for the shipped scope and next steps.
+This brainstorm is now implemented through Phase 3. See the implementation plan file for the shipped scope and next steps.
+
+## Implementation Status (as of Phase 6)
+- ✅ Unified resolver and typed API implemented
+- ✅ Static registry with 100+ configuration keys
+- ✅ CLI configure subcommands (show/get/set/unset) working
+- ✅ 90 keys successfully migrated to unified API (40.0% coverage)
+- ✅ Validators for constrained values (ranges, enums, URLs, floats)
+- ✅ Backward compatibility via environment variable aliases
+- ✅ Discovery tool (`config_discovery.py`) enhanced to track migration progress
+- ✅ All major provider configurations migrated
+- ✅ Tracing and observability fully integrated
+- ✅ Model and lead/worker configurations consolidated
+- ✅ MCP and extension configurations integrated
+- ✅ Cache, security, and system settings migrated
+- ✅ Experiments and extensions using unified API
+- ✅ Eliminated mixed access patterns for core configurations
 
 ---
 

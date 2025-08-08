@@ -13,6 +13,7 @@ use super::base::{ConfigKey, Provider, ProviderMetadata, ProviderUsage, Usage};
 use super::errors::ProviderError;
 use super::retry::ProviderRetry;
 use super::utils::emit_debug_trace;
+use crate::config::unified;
 use crate::conversation::message::{Message, MessageContent};
 use crate::impl_provider_default;
 use crate::model::ModelConfig;
@@ -34,14 +35,14 @@ pub struct SageMakerTgiProvider {
 
 impl SageMakerTgiProvider {
     pub fn from_env(model: ModelConfig) -> Result<Self> {
-        let config = crate::config::Config::global();
-
         // Get SageMaker endpoint name (just the name, not full URL)
-        let endpoint_name: String = config.get_param("SAGEMAKER_ENDPOINT_NAME").map_err(|_| {
-            anyhow::anyhow!("SAGEMAKER_ENDPOINT_NAME is required for SageMaker TGI provider")
-        })?;
+        let endpoint_name: String = unified::get::<String>("providers.sagemaker.endpoint_name")
+            .map_err(|_| {
+                anyhow::anyhow!("SAGEMAKER_ENDPOINT_NAME is required for SageMaker TGI provider")
+            })?;
 
         // Attempt to load config and secrets to get AWS_ prefixed keys
+        let config = crate::config::Config::global();
         let set_aws_env_vars = |res: Result<HashMap<String, Value>, _>| {
             if let Ok(map) = res {
                 map.into_iter()

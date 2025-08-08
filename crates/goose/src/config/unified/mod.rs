@@ -82,16 +82,21 @@
 
 pub mod registry;
 
-use once_cell::sync::OnceCell;
+#[cfg(test)]
+mod tests;
+
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::HashMap;
+use std::sync::Mutex;
+use utoipa::ToSchema;
 
 use super::base::{Config as FileConfig, ConfigError};
 use registry::{canonical_to_env, find_spec};
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(tag = "type")]
 pub enum Source {
     Cli,
     Env { name: String, alias_used: bool },
@@ -120,10 +125,16 @@ pub enum UnifiedConfigError {
 }
 
 // Runtime overlay passed from CLI --set KEY=VALUE
-static CLI_OVERLAY: OnceCell<HashMap<String, Value>> = OnceCell::new();
+// Using Mutex for test compatibility - allows resetting in tests
+static CLI_OVERLAY: Mutex<Option<HashMap<String, Value>>> = Mutex::new(None);
 
 pub fn set_cli_overlay(map: HashMap<String, Value>) {
-    let _ = CLI_OVERLAY.set(map);
+    *CLI_OVERLAY.lock().unwrap() = Some(map);
+}
+
+#[cfg(test)]
+pub(crate) fn reset_cli_overlay_for_tests() {
+    *CLI_OVERLAY.lock().unwrap() = None;
 }
 
 fn snapshot_env() -> HashMap<String, String> {
@@ -141,7 +152,7 @@ fn resolve_raw(key: &str) -> Result<(Value, Source, bool), UnifiedConfigError> {
     let spec = find_spec(key).ok_or_else(|| UnifiedConfigError::UnknownKey(key.to_string()))?;
 
     // 1) CLI overlay
-    if let Some(cli) = CLI_OVERLAY.get() {
+    if let Some(ref cli) = *CLI_OVERLAY.lock().unwrap() {
         if let Some(v) = cli.get(key) {
             return Ok((v.clone(), Source::Cli, spec.secret));
         }
@@ -348,20 +359,6 @@ pub fn effective_config(
         }
     }
     out
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn canonical_env_name() {
-        assert_eq!(canonical_to_env("llm.model"), "GOOSE_LLM_MODEL");
-        assert_eq!(
-            canonical_to_env("providers.openai.api_key"),
-            "GOOSE_PROVIDERS_OPENAI_API_KEY"
-        );
-    }
 }
 
 #[cfg(test)]

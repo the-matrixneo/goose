@@ -33,7 +33,7 @@ impl ClaudeCodeProvider {
     pub fn from_env(model: ModelConfig) -> Result<Self> {
         let config = crate::config::Config::global();
         let command: String = config
-            .get_param("CLAUDE_CODE_COMMAND")
+            .get_param("providers.claude_code.command")
             .unwrap_or_else(|_| "claude".to_string());
 
         let resolved_command = if !command.contains('/') {
@@ -50,7 +50,8 @@ impl ClaudeCodeProvider {
 
     /// Search for claude executable in common installation locations
     fn find_claude_executable(command_name: &str) -> Option<String> {
-        let home = std::env::var("HOME").ok()?;
+        // Use unified config for system.home
+        let home = crate::config::unified::get::<String>("system.home").ok()?;
 
         let search_paths = vec![
             format!("{}/.claude/local/{}", home, command_name),
@@ -83,7 +84,8 @@ impl ClaudeCodeProvider {
             }
         }
 
-        if let Ok(path_var) = std::env::var("PATH") {
+        // Use unified config for system.path
+        if let Ok(path_var) = crate::config::unified::get::<String>("system.path") {
             #[cfg(unix)]
             let path_separator = ':';
             #[cfg(windows)]
@@ -307,7 +309,8 @@ impl ClaudeCodeProvider {
         // Create a filtered system prompt without Extensions section
         let filtered_system = self.filter_extensions_from_system_prompt(system);
 
-        if std::env::var("GOOSE_CLAUDE_CODE_DEBUG").is_ok() {
+        // Use unified config for debug flag
+        if crate::config::unified::get_or("debug.claude_code", false) {
             println!("=== CLAUDE CODE PROVIDER DEBUG ===");
             println!("Command: {}", self.command);
             println!("Original system prompt length: {} chars", system.len());
@@ -337,9 +340,9 @@ impl ClaudeCodeProvider {
 
         cmd.arg("--verbose").arg("--output-format").arg("json");
 
-        // Add permission mode based on GOOSE_MODE setting
+        // Add permission mode based on agent.mode setting
         let config = Config::global();
-        if let Ok(goose_mode) = config.get_param::<String>("GOOSE_MODE") {
+        if let Ok(goose_mode) = config.get_param::<String>("agent.mode") {
             if goose_mode.as_str() == "auto" {
                 cmd.arg("--permission-mode").arg("acceptEdits");
             }
@@ -351,7 +354,7 @@ impl ClaudeCodeProvider {
             .spawn()
             .map_err(|e| ProviderError::RequestFailed(format!(
                 "Failed to spawn Claude CLI command '{}': {}. \
-                Make sure the Claude Code CLI is installed and in your PATH, or set CLAUDE_CODE_COMMAND in your config to the correct path.",
+                Make sure the Claude Code CLI is installed and in your PATH, or set providers.claude_code.command in your config to the correct path.",
                 self.command, e
             )))?;
 
@@ -426,7 +429,8 @@ impl ClaudeCodeProvider {
             })
             .unwrap_or_else(|| "Simple task".to_string());
 
-        if std::env::var("GOOSE_CLAUDE_CODE_DEBUG").is_ok() {
+        // Use unified config for debug flag
+        if crate::config::unified::get_or("debug.claude_code", false) {
             println!("=== CLAUDE CODE PROVIDER DEBUG ===");
             println!("Generated simple session description: {}", description);
             println!("Skipped subprocess call for session description");
@@ -460,7 +464,7 @@ impl Provider for ClaudeCodeProvider {
             CLAUDE_CODE_KNOWN_MODELS.to_vec(),
             CLAUDE_CODE_DOC_URL,
             vec![ConfigKey::new(
-                "CLAUDE_CODE_COMMAND",
+                "providers.claude_code.command",
                 false,
                 false,
                 Some("claude"),
@@ -535,7 +539,7 @@ mod tests {
         std::env::set_var("GOOSE_MODE", "auto");
 
         let config = Config::global();
-        let goose_mode: String = config.get_param("GOOSE_MODE").unwrap();
+        let goose_mode: String = config.get_param("agent.mode").unwrap();
         assert_eq!(goose_mode, "auto");
 
         std::env::remove_var("GOOSE_MODE");

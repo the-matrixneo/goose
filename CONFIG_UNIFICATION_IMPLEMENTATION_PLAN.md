@@ -461,3 +461,216 @@ Exit criteria for Phase 3:
 - Registry covers keys used by server/CLI/Desktop happy‑path flows including editor/toolshim/temperature
 - Docs reflect canonical keys with alias notes
 - All checks green (cargo check/fmt/clippy/test) and OpenAPI regenerated
+
+---
+
+## Phase 3 Summary (Completed)
+
+### Achievements
+- ✅ Registry expanded with 8 new keys and validators
+- ✅ 18 configuration keys successfully migrated to unified API
+- ✅ F64 type added for floating-point configuration
+- ✅ Temperature and OTLP protocol validators implemented
+- ✅ Discovery tool (`config_discovery.py`) enhanced to track unified configuration usage
+- ✅ All code compiles and tests pass
+
+### Migration Statistics (via config_discovery.py)
+- **Total configuration usages:** 619
+- **Unique keys:** 166
+- **Unified API migrations:** 18 keys
+- **Remaining legacy env vars:** 57 keys
+- **Remaining config file params:** 70 keys
+
+### Keys Successfully Migrated
+- **CLI:** `cli.show_cost`, `cli.show_thinking`, `cli.theme`
+- **Editor:** `editor.api_key`, `editor.host`, `editor.model`
+- **Model:** `model.context_limit`, `model.temperature`
+- **Toolshim:** `toolshim.enabled`, `toolshim.model`
+- **Security:** `security.allowlist.bypass`, `security.allowlist.url`
+- **Server:** `server.port`
+- **Session:** `session.max_turns`, `session.max_tool_repetitions`
+- **Scheduler:** `scheduler.type`
+- **Embeddings:** `embeddings.provider`, `embeddings.model`
+- **Other:** `ollama.host`
+
+### Lessons Learned
+1. **Subagent coordination:** Parallel execution can timeout; use sequential for complex migrations
+2. **Discovery tool importance:** Essential for tracking progress and validating work
+3. **Incremental approach:** Small, focused migrations are more successful than large batches
+4. **Testing strategy:** Run `cargo check` frequently; use discovery tool to validate migrations
+
+---
+
+## Phase 4 Summary (Completed)
+
+### Achievements
+- ✅ 69 new configuration keys migrated (216% of target)
+- ✅ Total of 87 unified configuration keys (174% of target)
+- ✅ 41.4% of all configuration now using unified API
+- ✅ All major provider configurations migrated
+- ✅ Tracing and observability fully integrated
+- ✅ Model and lead/worker configurations consolidated
+- ✅ F64 type added for floating-point configuration
+- ✅ All code compiles and passes quality checks
+
+### Keys Successfully Migrated in Phase 4
+- **Provider API Keys & Tokens**: 22 keys across all major providers
+- **Provider Hosts & Endpoints**: 15 keys with URL validation
+- **Provider Timeouts & Retries**: 12 keys with appropriate validators
+- **Tracing Configuration**: 5 keys for Langfuse and OTLP
+- **System Configuration**: 15 keys including security, scheduler, and agent settings
+- **Model Configuration**: 8 keys for editor, embeddings, and toolshim
+
+---
+
+## Phase 5 Summary (Completed)
+
+### Achievements
+- ✅ 18 new configuration keys migrated
+- ✅ Total of 76 unified configuration keys (35.5% coverage)
+- ✅ Lead/worker configurations fully migrated
+- ✅ MCP and extension configurations integrated
+- ✅ Provider command configurations completed
+- ✅ Cache, security, and system settings migrated
+- ✅ All code compiles and passes quality checks
+
+### Keys Successfully Migrated in Phase 5
+- **Lead/Worker Settings**: Complete migration in factory.rs
+- **Provider Commands**: claude_code.command, gemini_cli.command
+- **MCP Configuration**: context_file_names, google_drive settings, working_dir
+- **System Settings**: cache.dir, security.disable_keyring, vector_db.path
+- **Recipe Configuration**: github_repo_config_key, timeouts, path
+- **Display Settings**: no_color, random_thinking_messages
+- **Debug Flags**: claude_code_debug, gemini_cli_debug
+
+### Lessons Learned
+- Discovery tool needs refinement for accurate unified API tracking
+- Many configurations were duplicates across providers
+- Some system variables (HOME, PATH, USER) should remain as environment variables
+- Realistic targets are better than ambitious ones
+
+---
+
+## Phase 6 Prompt (Realistic Consolidation)
+
+You are Goose working inside this repository. Continue the unified configuration migration (Phase 6) to achieve realistic and sustainable progress.
+
+### Starting Context
+- **Current state:** 76 keys migrated to unified API (35.5% coverage)
+- **Remaining keys:** ~138 keys in legacy systems
+- **Discovery tool:** Use `python3 config_discovery.py` to track progress
+- **Working directory:** /Users/tlongwell/Development/goose6
+
+### Primary Objectives
+1. **Expand unified API coverage to 100+ keys** (targeting 46-50% total coverage)
+2. **Focus on remaining provider configurations and API keys**
+3. **Complete experiments and extension configurations**
+4. **Migrate high-value config file parameters**
+5. **Ensure robust testing and documentation**
+
+### Execution Strategy - What Works Best
+
+#### Subagent Best Practices (Proven Successful)
+- **Use 15-minute timeouts** - Most tasks complete within this window
+- **Parallel execution for independent tasks** - 3-4 subagents maximum
+- **Sequential for complex interdependent migrations**
+- **Always create summary files** in `/tmp/gooseconfigoverhaul/phase6/`
+- **Run discovery tool first and last** to measure progress
+
+#### Effective Task Patterns
+1. **Discovery First**: Always start with a discovery subagent to establish baseline
+2. **Batch by Category**: Group similar configurations (e.g., all provider settings)
+3. **Test Frequently**: Include compilation checks in each subagent task
+4. **Document Changes**: Have subagents write detailed summaries
+
+### Phase 6 Task Breakdown
+
+#### 1. **phase6_discovery** (Run First, Alone - 5 min timeout)
+```
+- Run `python3 config_discovery.py --output /tmp/gooseconfigoverhaul/phase6/baseline.md`
+- Analyze current 76 unified keys vs 214 total
+- Identify quick wins (simple 1:1 mappings)
+- Create prioritized list in `/tmp/gooseconfigoverhaul/phase6/targets.md`
+- Focus on configs with 3+ usages for maximum impact
+```
+
+#### 2. **experiments_extensions_batch** (15 min timeout)
+```
+- Migrate `experiments` config structure to `experiments.*` namespace
+- Migrate `extensions` config structure to `extensions.*` namespace
+- These are in config/experiments.rs and config/extensions.rs
+- Update all get_param/set_param calls
+- Test with `cargo check -p goose`
+- Summary: `/tmp/gooseconfigoverhaul/phase6/experiments_extensions.md`
+```
+
+#### 3. **remaining_secrets_batch** (15 min timeout)
+```
+- Complete migration of remaining API keys in secret storage
+- Focus on provider keys not yet migrated
+- Ensure proper secret flag in registry
+- Update all secret_get/secret_set calls
+- Summary: `/tmp/gooseconfigoverhaul/phase6/secrets_migration.md`
+```
+
+#### 4. **config_file_params_batch** (15 min timeout)
+```
+- Migrate high-frequency config file parameters
+- Focus on test configurations (test_key, complex_key, etc.)
+- Update base.rs test configurations
+- Ensure backward compatibility
+- Summary: `/tmp/gooseconfigoverhaul/phase6/config_params.md`
+```
+
+#### 5. **validation_and_cleanup** (10 min timeout)
+```
+- Run final discovery tool
+- Compile all crates: `cargo check --workspace`
+- Run formatter: `cargo fmt --all`
+- Run clippy: `./scripts/clippy-lint.sh`
+- Create final report with metrics
+- Summary: `/tmp/gooseconfigoverhaul/phase6/final_report.md`
+```
+
+### Success Metrics for Phase 6
+- [ ] 100+ total keys using unified API (46%+ coverage)
+- [ ] All experiments and extensions migrated
+- [ ] Remaining provider secrets consolidated
+- [ ] Test configurations cleaned up
+- [ ] Zero compilation errors
+- [ ] All existing tests passing
+
+### Common Pitfalls to Avoid
+1. **Don't migrate system env vars** (HOME, PATH, USER) - keep as-is
+2. **Skip test-only configs** unless they're widely used
+3. **Avoid breaking changes** - always maintain aliases
+4. **Don't over-parallelize** - 3-4 subagents maximum
+5. **Check for duplicates** - many providers share similar configs
+
+### Migration Checklist for Subagents
+```rust
+// For each configuration migration:
+1. Add to registry with proper type and validator
+2. Add env_aliases for backward compatibility
+3. Replace usage sites with unified::get_or()
+4. Test compilation with cargo check
+5. Document in summary file
+```
+
+### Tips from Successful Phases
+1. **Discovery tool limitations**: It undercounts unified API usage - verify manually
+2. **Duplicate configs**: Check if similar keys exist before adding new ones
+3. **Provider patterns**: Most providers follow similar configuration patterns
+4. **Test incrementally**: Compile after each file change
+5. **Summary files are crucial**: They help track progress across subagents
+
+### Expected Outcomes
+- Reach 100+ unified configuration keys
+- Achieve 46-50% total coverage
+- Establish patterns for Phase 7
+- Maintain full backward compatibility
+- Improve configuration consistency
+
+Begin with the discovery analyst to establish your baseline, then proceed with parallel migrations. Focus on quality over quantity - well-migrated configurations are better than many partial migrations.
+
+Begin by running the discovery analyst to establish your baseline, then proceed with migrations in priority order. Good luck!

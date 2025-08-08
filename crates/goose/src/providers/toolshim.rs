@@ -33,6 +33,7 @@
 use super::errors::ProviderError;
 use super::ollama::OLLAMA_DEFAULT_PORT;
 use super::ollama::OLLAMA_HOST;
+use crate::config::unified;
 use crate::conversation::message::{Message, MessageContent};
 use crate::conversation::Conversation;
 use crate::model::ModelConfig;
@@ -49,9 +50,9 @@ use uuid::Uuid;
 /// Default model to use for tool interpretation
 pub const DEFAULT_INTERPRETER_MODEL_OLLAMA: &str = "mistral-nemo";
 
-/// Environment variables that affect behavior:
-/// - GOOSE_TOOLSHIM: When set to "true" or "1", enables using the tool shim in the standard OllamaProvider (default: false)
-/// - GOOSE_TOOLSHIM_OLLAMA_MODEL: Ollama model to use as the tool interpreter (default: DEFAULT_INTERPRETER_MODEL)
+/// Configuration keys used:
+/// - toolshim.enabled: When set to true, enables using the tool shim (default: false)
+/// - toolshim.model: Model to use as the tool interpreter (default: DEFAULT_INTERPRETER_MODEL)
 /// A trait for models that can interpret text into structured tool call JSON format
 #[async_trait::async_trait]
 pub trait ToolInterpreter {
@@ -83,10 +84,8 @@ impl OllamaInterpreter {
 
     /// Get the Ollama base URL from existing config or use default values
     fn get_ollama_base_url() -> Result<String, ProviderError> {
-        let config = crate::config::Config::global();
-        let host: String = config
-            .get_param("OLLAMA_HOST")
-            .unwrap_or_else(|_| OLLAMA_HOST.to_string());
+        // Use unified config API with canonical key, fallback to default
+        let host: String = unified::get_or("ollama.host", OLLAMA_HOST.to_string());
 
         // Format the URL correctly with http:// prefix if needed
         let base = if host.starts_with("http://") || host.starts_with("https://") {
@@ -278,9 +277,11 @@ Otherwise, if no JSON tool requests are provided, use the no-op tool:
         // Define the JSON schema for tool call format
         let format_schema = OllamaInterpreter::tool_structured_ouput_format_schema();
 
-        // Determine which model to use for interpretation (from env var or default)
-        let interpreter_model = std::env::var("GOOSE_TOOLSHIM_OLLAMA_MODEL")
-            .unwrap_or_else(|_| DEFAULT_INTERPRETER_MODEL_OLLAMA.to_string());
+        // Determine which model to use for interpretation (use unified config API)
+        let interpreter_model = unified::get_or(
+            "toolshim.model",
+            DEFAULT_INTERPRETER_MODEL_OLLAMA.to_string(),
+        );
 
         // Make a call to ollama with structured output
         let interpreter_response = self

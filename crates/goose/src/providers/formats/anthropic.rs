@@ -1,3 +1,4 @@
+use crate::config::unified;
 use crate::conversation::message::{Message, MessageContent};
 use crate::model::ModelConfig;
 use crate::providers::base::Usage;
@@ -413,18 +414,16 @@ pub fn create_request(
     }
 
     // Add thinking parameters for claude-3-7-sonnet model
-    let is_thinking_enabled = std::env::var("CLAUDE_THINKING_ENABLED").is_ok();
+    let is_thinking_enabled =
+        unified::get_or::<bool>("providers.anthropic.thinking_enabled", false);
     if model_config.model_name.starts_with("claude-3-7-sonnet-") && is_thinking_enabled {
         // Minimum budget_tokens is 1024
-        let budget_tokens = std::env::var("CLAUDE_THINKING_BUDGET")
-            .unwrap_or_else(|_| "16000".to_string())
-            .parse()
-            .unwrap_or(16000);
+        let budget_tokens = unified::get_or::<u32>("providers.anthropic.thinking_budget", 16000);
 
-        payload
-            .as_object_mut()
-            .unwrap()
-            .insert("max_tokens".to_string(), json!(max_tokens + budget_tokens));
+        payload.as_object_mut().unwrap().insert(
+            "max_tokens".to_string(),
+            json!(max_tokens + budget_tokens as i32),
+        );
 
         payload.as_object_mut().unwrap().insert(
             "thinking".to_string(),
@@ -679,6 +678,7 @@ mod tests {
     use crate::conversation::message::Message;
     use rmcp::object;
     use serde_json::json;
+    use std::env;
 
     #[test]
     fn test_parse_text_response() -> Result<()> {

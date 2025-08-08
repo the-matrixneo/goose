@@ -85,18 +85,15 @@ pub async fn handle_web(port: u16, host: String, open: bool) -> Result<()> {
     let _config = goose::config::Config::global();
 
     let provider_name: String = goose::config::unified::get::<String>("llm.provider")
-        .or_else(|_| goose::config::Config::global().get_param("GOOSE_PROVIDER"))
         .unwrap_or_else(|_| {
             eprintln!("No provider configured. Run 'goose configure' first");
             std::process::exit(1);
         });
 
-    let model: String = goose::config::unified::get::<String>("llm.model")
-        .or_else(|_| goose::config::Config::global().get_param("GOOSE_MODEL"))
-        .unwrap_or_else(|_| {
-            eprintln!("No model configured. Run 'goose configure' first");
-            std::process::exit(1);
-        });
+    let model: String = goose::config::unified::get::<String>("llm.model").unwrap_or_else(|_| {
+        eprintln!("No model configured. Run 'goose configure' first");
+        std::process::exit(1);
+    });
 
     let model_config = goose::model::ModelConfig::new(&model)?;
 

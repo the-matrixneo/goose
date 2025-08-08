@@ -403,9 +403,24 @@ impl DeveloperRouter {
             },
         };
 
-        let hints_filenames: Vec<String> = std::env::var("CONTEXT_FILE_NAMES")
+        // Use unified config to get context file names
+        let hints_filenames: Vec<String> = goose::config::unified::get("mcp.context_file_names")
             .ok()
-            .and_then(|s| serde_json::from_str(&s).ok())
+            .and_then(|v: serde_json::Value| {
+                // Handle both array and string formats
+                match v {
+                    serde_json::Value::Array(arr) => Some(
+                        arr.into_iter()
+                            .filter_map(|v| v.as_str().map(String::from))
+                            .collect(),
+                    ),
+                    serde_json::Value::String(s) => {
+                        // Try to parse as JSON array
+                        serde_json::from_str(&s).ok()
+                    }
+                    _ => None,
+                }
+            })
             .unwrap_or_else(|| vec![".goosehints".to_string()]);
 
         let mut global_hints_contents = Vec::with_capacity(hints_filenames.len());

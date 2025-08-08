@@ -95,19 +95,15 @@ async fn transcribe_handler(
     };
 
     // Get the OpenAI API key from config (after input validation)
-    let config = goose::config::Config::global();
-    let api_key: String = config
-        .get_secret("OPENAI_API_KEY")
+    use goose::config::unified;
+    let api_key: String = unified::get_secret("providers.openai.api_key")
         .map_err(|_| StatusCode::PRECONDITION_FAILED)?;
 
     // Get the OpenAI host from config (with default)
-    let openai_host = match config.get("OPENAI_HOST", false) {
-        Ok(value) => value
-            .as_str()
-            .map(|s| s.to_string())
-            .unwrap_or_else(|| "https://api.openai.com".to_string()),
-        Err(_) => "https://api.openai.com".to_string(),
-    };
+    let openai_host: String = unified::get_or(
+        "providers.openai.host",
+        "https://api.openai.com".to_string(),
+    );
 
     tracing::debug!("Using OpenAI host: {}", openai_host);
 
@@ -206,42 +202,14 @@ async fn transcribe_elevenlabs_handler(
     };
 
     // Get the ElevenLabs API key from config (after input validation)
-    let config = goose::config::Config::global();
+    use goose::config::unified;
 
-    // First try to get it as a secret
-    let api_key: String = match config.get_secret("ELEVENLABS_API_KEY") {
+    // Get it as a secret
+    let api_key: String = match unified::get_secret("audio.elevenlabs.api_key") {
         Ok(key) => key,
-        Err(_) => {
-            // Try to get it as non-secret (for backward compatibility)
-            match config.get("ELEVENLABS_API_KEY", false) {
-                Ok(value) => {
-                    match value.as_str() {
-                        Some(key_str) => {
-                            tracing::info!("Migrating ElevenLabs API key to secret storage");
-                            let key = key_str.to_string();
-                            // Migrate to secret storage
-                            if let Err(e) = config.set(
-                                "ELEVENLABS_API_KEY",
-                                serde_json::Value::String(key.clone()),
-                                true,
-                            ) {
-                                tracing::error!("Failed to migrate ElevenLabs API key: {:?}", e);
-                            }
-                            // Delete the non-secret version
-                            let _ = config.delete("ELEVENLABS_API_KEY");
-                            key
-                        }
-                        None => {
-                            tracing::error!("ElevenLabs API key is not a string");
-                            return Err(StatusCode::PRECONDITION_FAILED);
-                        }
-                    }
-                }
-                Err(e) => {
-                    tracing::error!("Failed to get ElevenLabs API key from config: {:?}", e);
-                    return Err(StatusCode::PRECONDITION_FAILED);
-                }
-            }
+        Err(e) => {
+            tracing::error!("Failed to get ElevenLabs API key from config: {:?}", e);
+            return Err(StatusCode::PRECONDITION_FAILED);
         }
     };
 
@@ -327,19 +295,12 @@ async fn check_dictation_config(
 ) -> Result<Json<serde_json::Value>, StatusCode> {
     verify_secret_key(&headers, &state)?;
 
-    let config = goose::config::Config::global();
+    use goose::config::unified;
 
     // Check if ElevenLabs API key is configured
-    let has_elevenlabs = config
-        .get_secret::<String>("ELEVENLABS_API_KEY")
+    let has_elevenlabs = unified::get_secret::<String>("audio.elevenlabs.api_key")
         .map(|_| true)
-        .unwrap_or_else(|_| {
-            // Check non-secret for backward compatibility
-            config
-                .get("ELEVENLABS_API_KEY", false)
-                .map(|_| true)
-                .unwrap_or(false)
-        });
+        .unwrap_or(false);
 
     Ok(Json(serde_json::json!({
         "elevenlabs": has_elevenlabs

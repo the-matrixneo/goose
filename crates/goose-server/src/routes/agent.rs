@@ -181,7 +181,7 @@ async fn get_tools(
     verify_secret_key(&headers, &state)?;
 
     let config = Config::global();
-    let goose_mode = config.get_param("GOOSE_MODE").unwrap_or("auto".to_string());
+    let goose_mode = config.get_param("agent.mode").unwrap_or("auto".to_string());
     let agent = state
         .get_agent()
         .await
@@ -244,10 +244,7 @@ async fn update_agent_provider(
         .map_err(|_| StatusCode::PRECONDITION_FAILED)?;
 
     let config = Config::global();
-    let model = match payload
-        .model
-        .or_else(|| config.get_param("GOOSE_MODEL").ok())
-    {
+    let model = match payload.model.or_else(|| config.get_param("llm.model").ok()) {
         Some(m) => m,
         None => return Err(StatusCode::BAD_REQUEST),
     };

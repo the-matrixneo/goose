@@ -5,34 +5,60 @@ use axum::{
     routing::get,
     Json, Router,
 };
+use goose::config::unified::Source;
 use http::{HeaderMap, StatusCode};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use utoipa::{IntoParams, ToSchema};
 
-#[derive(Deserialize)]
+/// Query parameters for the effective config endpoint
+#[derive(Deserialize, IntoParams)]
 pub struct EffectiveConfigQuery {
+    /// Optional filter to match against configuration keys
     pub filter: Option<String>,
+    /// Only return values that differ from defaults
     pub only_changed: Option<bool>,
+    /// Include source information for each configuration value
     pub include_sources: Option<bool>,
 }
 
-#[derive(Serialize)]
-pub struct Output {
+/// Configuration entry with source information
+#[derive(Serialize, ToSchema)]
+pub struct EffectiveConfigEntry {
+    /// The configuration key
     pub key: String,
+    /// The configuration value (may be redacted if secret)
     pub value: serde_json::Value,
+    /// Whether this value has been redacted for security
     pub redacted: bool,
+    /// Whether this is a secret configuration value
     pub is_secret: bool,
-    pub source: goose::config::unified::Source,
+    /// The source of this configuration value
+    pub source: Source,
+    /// The environment variable name if sourced from environment
     pub env_name: Option<String>,
+    /// Whether an alias was used for this configuration
     pub alias_used: Option<bool>,
+    /// Whether this configuration has a default value
     pub has_default: bool,
 }
 
+/// Get the effective configuration with optional filtering and source information
+#[utoipa::path(
+    get,
+    path = "/config/effective",
+    params(EffectiveConfigQuery),
+    responses(
+        (status = 200, description = "Effective configuration retrieved successfully", body = Vec<EffectiveConfigEntry>),
+        (status = 401, description = "Unauthorized - invalid secret key")
+    ),
+    tag = "Configuration Management"
+)]
 pub async fn get_effective_config(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Query(q): Query<EffectiveConfigQuery>,
-) -> Result<Json<Vec<Output>>, StatusCode> {
+) -> Result<Json<Vec<EffectiveConfigEntry>>, StatusCode> {
     verify_secret_key(&headers, &state)?;
 
     let entries = goose::config::unified::effective_config(
@@ -41,9 +67,9 @@ pub async fn get_effective_config(
         q.include_sources.unwrap_or(false),
     );
 
-    let out: Vec<Output> = entries
+    let out: Vec<EffectiveConfigEntry> = entries
         .into_iter()
-        .map(|e| Output {
+        .map(|e| EffectiveConfigEntry {
             key: e.key,
             value: e.value,
             redacted: e.redacted,

@@ -8,6 +8,7 @@ use serde_json::Value;
 use tokio::time::sleep;
 use url::Url;
 
+use crate::config::unified;
 use crate::conversation::message::Message;
 use crate::model::ModelConfig;
 use crate::providers::base::{ConfigKey, Provider, ProviderMetadata, ProviderUsage};
@@ -104,9 +105,8 @@ impl GcpVertexAIProvider {
     /// # Arguments
     /// * `model` - Configuration for the model to be used
     async fn new_async(model: ModelConfig) -> Result<Self> {
-        let config = crate::config::Config::global();
-        let project_id = config.get_param("GCP_PROJECT_ID")?;
-        let location = Self::determine_location(config)?;
+        let project_id = unified::get::<String>("providers.gcp.project_id")?;
+        let location = Self::determine_location()?;
         let host = format!("https://{}-aiplatform.googleapis.com", location);
 
         let client = Client::builder()
@@ -116,7 +116,7 @@ impl GcpVertexAIProvider {
         let auth = GcpAuth::new().await?;
 
         // Load optional retry configuration from environment
-        let retry_config = Self::load_retry_config(config);
+        let retry_config = Self::load_retry_config();
 
         Ok(Self {
             client,
@@ -130,31 +130,27 @@ impl GcpVertexAIProvider {
     }
 
     /// Loads retry configuration from environment variables or uses defaults.
-    fn load_retry_config(config: &crate::config::Config) -> RetryConfig {
+    fn load_retry_config() -> RetryConfig {
         // Load max retries for 429 rate limit errors
-        let max_retries = config
-            .get_param("GCP_MAX_RETRIES")
+        let max_retries = unified::get::<u32>("providers.gcp.max_retries")
             .ok()
-            .and_then(|v: String| v.parse::<usize>().ok())
+            .map(|v| v as usize)
             .unwrap_or(DEFAULT_MAX_RETRIES);
 
-        let initial_interval_ms = config
-            .get_param("GCP_INITIAL_RETRY_INTERVAL_MS")
-            .ok()
-            .and_then(|v: String| v.parse::<u64>().ok())
-            .unwrap_or(DEFAULT_INITIAL_RETRY_INTERVAL_MS);
+        let initial_interval_ms = unified::get_or(
+            "providers.gcp.initial_retry_interval_ms",
+            DEFAULT_INITIAL_RETRY_INTERVAL_MS,
+        );
 
-        let backoff_multiplier = config
-            .get_param("GCP_BACKOFF_MULTIPLIER")
-            .ok()
-            .and_then(|v: String| v.parse::<f64>().ok())
-            .unwrap_or(DEFAULT_BACKOFF_MULTIPLIER);
+        let backoff_multiplier = unified::get_or(
+            "providers.gcp.backoff_multiplier",
+            DEFAULT_BACKOFF_MULTIPLIER,
+        );
 
-        let max_interval_ms = config
-            .get_param("GCP_MAX_RETRY_INTERVAL_MS")
-            .ok()
-            .and_then(|v: String| v.parse::<u64>().ok())
-            .unwrap_or(DEFAULT_MAX_RETRY_INTERVAL_MS);
+        let max_interval_ms = unified::get_or(
+            "providers.gcp.max_retry_interval_ms",
+            DEFAULT_MAX_RETRY_INTERVAL_MS,
+        );
 
         RetryConfig::new(
             max_retries,
@@ -169,9 +165,8 @@ impl GcpVertexAIProvider {
     /// Location is determined in the following order:
     /// 1. Custom location from GCP_LOCATION environment variable
     /// 2. Global default location (Iowa)
-    fn determine_location(config: &crate::config::Config) -> Result<String> {
-        Ok(config
-            .get_param("GCP_LOCATION")
+    fn determine_location() -> Result<String> {
+        Ok(unified::get::<String>("providers.gcp.location")
             .ok()
             .filter(|location: &String| !location.trim().is_empty())
             .unwrap_or_else(|| Iowa.to_string()))

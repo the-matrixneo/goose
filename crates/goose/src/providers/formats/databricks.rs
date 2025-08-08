@@ -1,3 +1,4 @@
+use crate::config::unified;
 use crate::conversation::message::{Message, MessageContent};
 use crate::model::ModelConfig;
 use crate::providers::utils::{
@@ -557,20 +558,17 @@ pub fn create_request(
     }
 
     // Add thinking parameters for Claude 3.7 Sonnet model when requested
-    let is_thinking_enabled = std::env::var("CLAUDE_THINKING_ENABLED").is_ok();
+    let is_thinking_enabled = unified::get_or("providers.anthropic.thinking_enabled", false);
     if is_claude_sonnet && is_thinking_enabled {
         // Minimum budget_tokens is 1024
-        let budget_tokens = std::env::var("CLAUDE_THINKING_BUDGET")
-            .unwrap_or_else(|_| "16000".to_string())
-            .parse()
-            .unwrap_or(16000);
+        let budget_tokens = unified::get_or("providers.anthropic.thinking_budget", 16000u32);
 
         // For Claude models with thinking enabled, we need to add max_tokens + budget_tokens
         // Default to 8192 (Claude max output) + budget if not specified
         let max_completion_tokens = model_config.max_tokens.unwrap_or(8192);
         payload.as_object_mut().unwrap().insert(
             "max_tokens".to_string(),
-            json!(max_completion_tokens + budget_tokens),
+            json!(max_completion_tokens + budget_tokens as i32),
         );
 
         payload.as_object_mut().unwrap().insert(

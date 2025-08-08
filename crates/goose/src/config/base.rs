@@ -11,6 +11,8 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 
+use crate::config::unified;
+
 pub static APP_STRATEGY: Lazy<AppStrategyArgs> = Lazy::new(|| AppStrategyArgs {
     top_level_domain: "Block".to_string(),
     author: "Block".to_string(),
@@ -73,7 +75,7 @@ impl From<keyring::Error> for ConfigError {
 ///
 /// Secrets are loaded with the following precedence:
 /// 1. Environment variables (exact key match)
-/// 2. System keyring (which can be disabled with GOOSE_DISABLE_KEYRING)
+/// 2. System keyring (which can be disabled with security.disable_keyring)
 /// 3. If the keyring is disabled, secrets are stored in a secrets file
 ///    (~/.config/goose/secrets.yaml by default)
 ///
@@ -129,13 +131,17 @@ impl Default for Config {
 
         let config_path = config_dir.join("config.yaml");
 
-        let secrets = match env::var("GOOSE_DISABLE_KEYRING") {
-            Ok(_) => SecretStorage::File {
+        // Use unified config to check if keyring is disabled
+        let disable_keyring = unified::get_or("security.disable_keyring", false);
+
+        let secrets = if disable_keyring {
+            SecretStorage::File {
                 path: config_dir.join("secrets.yaml"),
-            },
-            Err(_) => SecretStorage::Keyring {
+            }
+        } else {
+            SecretStorage::Keyring {
                 service: KEYRING_SERVICE.to_string(),
-            },
+            }
         };
         Config {
             config_path,

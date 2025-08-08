@@ -74,10 +74,10 @@ pub fn create_editor_model() -> Option<EditorModel> {
         return None;
     }
 
-    // Check if basic editor API variables are set
-    let api_key = std::env::var("GOOSE_EDITOR_API_KEY").ok()?;
-    let host = std::env::var("GOOSE_EDITOR_HOST").ok()?;
-    let model = std::env::var("GOOSE_EDITOR_MODEL").ok()?;
+    // Use unified config API with canonical keys
+    let api_key = goose::config::unified::get::<String>("editor.api_key").ok()?;
+    let host = goose::config::unified::get::<String>("editor.host").ok()?;
+    let model = goose::config::unified::get::<String>("editor.model").ok()?;
 
     if api_key.is_empty() || host.is_empty() || model.is_empty() {
         return None;

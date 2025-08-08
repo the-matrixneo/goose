@@ -32,7 +32,7 @@ impl GeminiCliProvider {
     pub fn from_env(model: ModelConfig) -> Result<Self> {
         let config = crate::config::Config::global();
         let command: String = config
-            .get_param("GEMINI_CLI_COMMAND")
+            .get_param("providers.gemini_cli.command")
             .unwrap_or_else(|_| "gemini".to_string());
 
         let resolved_command = if !command.contains('/') {
@@ -49,7 +49,8 @@ impl GeminiCliProvider {
 
     /// Search for gemini executable in common installation locations
     fn find_gemini_executable(command_name: &str) -> Option<String> {
-        let home = std::env::var("HOME").ok()?;
+        // Use unified config for system.home
+        let home = crate::config::unified::get::<String>("system.home").ok()?;
 
         // Common locations where gemini might be installed
         let search_paths = vec![
@@ -87,7 +88,8 @@ impl GeminiCliProvider {
         }
 
         // If not found in common locations, check if it's in PATH
-        if let Ok(path_var) = std::env::var("PATH") {
+        // Use unified config for system.path
+        if let Ok(path_var) = crate::config::unified::get::<String>("system.path") {
             for dir in path_var.split(':') {
                 let full_path = format!("{}/{}", dir, command_name);
                 let path_buf = PathBuf::from(&full_path);
@@ -158,7 +160,8 @@ impl GeminiCliProvider {
 
         full_prompt.push_str("Assistant: ");
 
-        if std::env::var("GOOSE_GEMINI_CLI_DEBUG").is_ok() {
+        // Use unified config for debug flag
+        if crate::config::unified::get_or("debug.gemini_cli", false) {
             println!("=== GEMINI CLI PROVIDER DEBUG ===");
             println!("Command: {}", self.command);
             println!("Full prompt: {}", full_prompt);
@@ -277,7 +280,8 @@ impl GeminiCliProvider {
             })
             .unwrap_or_else(|| "Simple task".to_string());
 
-        if std::env::var("GOOSE_GEMINI_CLI_DEBUG").is_ok() {
+        // Use unified config for debug flag
+        if crate::config::unified::get_or("debug.gemini_cli", false) {
             println!("=== GEMINI CLI PROVIDER DEBUG ===");
             println!("Generated simple session description: {}", description);
             println!("Skipped subprocess call for session description");

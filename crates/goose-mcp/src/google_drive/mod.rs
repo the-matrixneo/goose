@@ -99,10 +99,15 @@ impl GoogleDriveRouter {
         Docs<HttpsConnector<HttpConnector>>,
         Arc<CredentialsManager>,
     ) {
-        let keyfile_path_str = env::var("GOOGLE_DRIVE_OAUTH_PATH")
-            .unwrap_or_else(|_| "./gcp-oauth.keys.json".to_string());
-        let credentials_path_str = env::var("GOOGLE_DRIVE_CREDENTIALS_PATH")
-            .unwrap_or_else(|_| "./gdrive-server-credentials.json".to_string());
+        // Use unified config for paths
+        let keyfile_path_str = goose::config::unified::get_or(
+            "mcp.google_drive.oauth_path",
+            "./gcp-oauth.keys.json".to_string(),
+        );
+        let credentials_path_str = goose::config::unified::get_or(
+            "mcp.google_drive.credentials_path",
+            "./gdrive-server-credentials.json".to_string(),
+        );
 
         let expanded_keyfile = shellexpand::tilde(keyfile_path_str.as_str());
         let keyfile_path = Path::new(expanded_keyfile.as_ref());
@@ -116,7 +121,10 @@ impl GoogleDriveRouter {
             "Google Drive MCP server authentication config paths"
         );
 
-        if let Ok(oauth_config) = env::var("GOOGLE_DRIVE_OAUTH_CONFIG") {
+        // Use unified config for oauth_config
+        if let Ok(oauth_config) =
+            goose::config::unified::get::<String>("mcp.google_drive.oauth_config")
+        {
             // Ensure the parent directory exists (create_dir_all is idempotent)
             if let Some(parent) = keyfile_path.parent() {
                 if let Err(e) = fs::create_dir_all(parent) {

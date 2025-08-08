@@ -49,7 +49,8 @@ pub async fn run_scenario<F>(
 where
     F: Fn(&ScenarioResult) -> Result<()> + Send + Sync + 'static,
 {
-    if let Ok(only_provider) = std::env::var("GOOSE_TEST_PROVIDER") {
+    // Use unified config for test provider
+    if let Ok(only_provider) = goose::config::unified::get::<String>("test.provider") {
         let active_providers = get_provider_configs();
         let config = active_providers
             .iter()

@@ -1,6 +1,7 @@
 use anyhow::Result;
 use clap::ValueEnum;
 use cliclack::spinner;
+use goose::config::unified;
 use goose::config::unified as unified_config;
 use goose::config::unified::registry;
 use goose::config::unified::{effective_config, Source, UnifiedConfigError};
@@ -253,8 +254,6 @@ use rmcp::object;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::error::Error;
-
-use crate::recipes::github_recipe::GOOSE_RECIPE_GITHUB_REPO_CONFIG_KEY;
 
 // useful for light themes where there is no dicernible colour contrast between
 // cursor-selected and cursor-unselected items.
@@ -527,7 +526,7 @@ pub async fn configure_provider_dialog() -> Result<bool, Box<dyn Error>> {
         .collect();
 
     // Get current default provider if it exists
-    let current_provider: Option<String> = config.get_param("GOOSE_PROVIDER").ok();
+    let current_provider: Option<String> = unified::get::<String>("llm.provider").ok();
     let default_provider = current_provider.unwrap_or_default();
 
     // Select provider
@@ -683,15 +682,13 @@ pub async fn configure_provider_dialog() -> Result<bool, Box<dyn Error>> {
     let spin = spinner();
     spin.start("Checking your configuration...");
 
-    // Create model config with env var settings
-    let toolshim_enabled = std::env::var("GOOSE_TOOLSHIM")
-        .map(|val| val == "1" || val.to_lowercase() == "true")
-        .unwrap_or(false);
+    // Create model config with unified config settings
+    let toolshim_enabled = unified::get_or("toolshim.enabled", false);
 
     let model_config = goose::model::ModelConfig::new(&model)?
         .with_max_tokens(Some(50))
         .with_toolshim(toolshim_enabled)
-        .with_toolshim_model(std::env::var("GOOSE_TOOLSHIM_OLLAMA_MODEL").ok());
+        .with_toolshim_model(unified::get::<String>("toolshim.model").ok());
 
     let provider = create(provider_name, model_config)?;
 
@@ -1424,7 +1421,7 @@ pub fn configure_goose_router_strategy_dialog() -> Result<(), Box<dyn Error>> {
     match strategy {
         "vector" => {
             config.set_param(
-                "GOOSE_ROUTER_TOOL_SELECTION_STRATEGY",
+                "router.tool_selection_strategy",
                 Value::String("vector".to_string()),
             )?;
             cliclack::outro(
@@ -1433,7 +1430,7 @@ pub fn configure_goose_router_strategy_dialog() -> Result<(), Box<dyn Error>> {
         }
         "default" => {
             config.set_param(
-                "GOOSE_ROUTER_TOOL_SELECTION_STRATEGY",
+                "router.tool_selection_strategy",
                 Value::String("default".to_string()),
             )?;
             cliclack::outro("Set to Default Strategy - using default tool selection")?;
@@ -1444,7 +1441,6 @@ pub fn configure_goose_router_strategy_dialog() -> Result<(), Box<dyn Error>> {
 }
 
 pub fn configure_tool_output_dialog() -> Result<(), Box<dyn Error>> {
-    let config = Config::global();
     // Check if GOOSE_CLI_MIN_PRIORITY is set as an environment variable
     if std::env::var("GOOSE_CLI_MIN_PRIORITY").is_ok() {
         let _ = cliclack::log::info("Notice: GOOSE_CLI_MIN_PRIORITY environment variable is set and will override the configuration here.");
@@ -1455,17 +1451,18 @@ pub fn configure_tool_output_dialog() -> Result<(), Box<dyn Error>> {
         .item("all", "All (default)", "Ex. shell command output")
         .interact()?;
 
+    use goose::config::unified;
     match tool_log_level {
         "high" => {
-            config.set_param("GOOSE_CLI_MIN_PRIORITY", Value::from(0.8))?;
+            unified::set("cli.min_priority", Value::from(0.8))?;
             cliclack::outro("Showing tool output of high importance only.")?;
         }
         "medium" => {
-            config.set_param("GOOSE_CLI_MIN_PRIORITY", Value::from(0.2))?;
+            unified::set("cli.min_priority", Value::from(0.2))?;
             cliclack::outro("Showing tool output of medium importance.")?;
         }
         "all" => {
-            config.set_param("GOOSE_CLI_MIN_PRIORITY", Value::from(0.0))?;
+            unified::set("cli.min_priority", Value::from(0.0))?;
             cliclack::outro("Showing all tool output.")?;
         }
         _ => unreachable!(),
@@ -1537,15 +1534,12 @@ pub async fn configure_tool_permissions_dialog() -> Result<(), Box<dyn Error>> {
 
     // Fetch tools for the selected extension
     // Load config and get provider/model
-    let config = Config::global();
 
-    let provider_name: String = config
-        .get_param("GOOSE_PROVIDER")
+    let provider_name: String = unified::get::<String>("llm.provider")
         .expect("No provider configured. Please set model provider first");
 
-    let model: String = config
-        .get_param("GOOSE_MODEL")
-        .expect("No model configured. Please set model first");
+    let model: String =
+        unified::get::<String>("llm.model").expect("No model configured. Please set model first");
     let model_config = goose::model::ModelConfig::new(&model)?;
 
     // Create the agent
@@ -1673,11 +1667,9 @@ pub async fn configure_tool_permissions_dialog() -> Result<(), Box<dyn Error>> {
 }
 
 fn configure_recipe_dialog() -> Result<(), Box<dyn Error>> {
-    let key_name = GOOSE_RECIPE_GITHUB_REPO_CONFIG_KEY;
-    let config = Config::global();
-    let default_recipe_repo = std::env::var(key_name)
-        .ok()
-        .or_else(|| config.get_param(key_name).unwrap_or(None));
+    let key_name = "recipes.github_repo_config_key";
+    let default_recipe_repo = unified::get::<String>(key_name).ok();
+
     let mut recipe_repo_input = cliclack::input(
         "Enter your Goose Recipe Github repo (owner/repo): eg: my_org/goose-recipes",
     )
@@ -1688,9 +1680,9 @@ fn configure_recipe_dialog() -> Result<(), Box<dyn Error>> {
     let input_value: String = recipe_repo_input.interact()?;
     // if input is blank, it clears the recipe github repo settings in the config file
     if input_value.clone().trim().is_empty() {
-        config.delete(key_name)?;
+        unified::unset(key_name)?;
     } else {
-        config.set_param(key_name, Value::String(input_value))?;
+        unified::set(key_name, Value::String(input_value))?;
     }
     Ok(())
 }
@@ -1752,7 +1744,7 @@ fn configure_scheduler_dialog() -> Result<(), Box<dyn Error>> {
 pub fn configure_max_turns_dialog() -> Result<(), Box<dyn Error>> {
     let config = Config::global();
 
-    let current_max_turns: u32 = config.get_param("GOOSE_MAX_TURNS").unwrap_or(1000);
+    let current_max_turns: u32 = config.get_param("session.max_turns").unwrap_or(1000);
 
     let max_turns_input: String =
         cliclack::input("Set maximum number of agent turns without user input:")
@@ -1808,7 +1800,7 @@ pub async fn handle_openrouter_auth() -> Result<(), Box<dyn Error>> {
 
             // Test configuration - get the model that was configured
             println!("\nTesting configuration...");
-            let configured_model: String = config.get_param("GOOSE_MODEL")?;
+            let configured_model: String = unified::get::<String>("llm.model")?;
             let model_config = match goose::model::ModelConfig::new(&configured_model) {
                 Ok(config) => config,
                 Err(e) => {

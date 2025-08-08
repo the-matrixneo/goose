@@ -185,7 +185,6 @@ pub async fn build_session(session_config: SessionBuilderConfig) -> Session {
                 .and_then(|s| s.goose_provider.clone())
         })
         .or_else(|| goose::config::unified::get::<String>("llm.provider").ok())
-        .or_else(|| Config::global().get_param("GOOSE_PROVIDER").ok())
         .expect("No provider configured. Run 'goose configure' first");
 
     let model_name = session_config
@@ -197,7 +196,6 @@ pub async fn build_session(session_config: SessionBuilderConfig) -> Session {
                 .and_then(|s| s.goose_model.clone())
         })
         .or_else(|| goose::config::unified::get::<String>("llm.model").ok())
-        .or_else(|| Config::global().get_param("GOOSE_MODEL").ok())
         .expect("No model configured. Run 'goose configure' first");
 
     let temperature = session_config.settings.as_ref().and_then(|s| s.temperature);
@@ -562,7 +560,8 @@ pub async fn build_session(session_config: SessionBuilderConfig) -> Session {
     }
 
     // Only override system prompt if a system override exists
-    let system_prompt_file: Option<String> = config.get_param("GOOSE_SYSTEM_PROMPT_FILE_PATH").ok();
+    use goose::config::unified;
+    let system_prompt_file: Option<String> = unified::get("system.prompt_file_path").ok();
     if let Some(ref path) = system_prompt_file {
         let override_prompt =
             std::fs::read_to_string(path).expect("Failed to read system prompt file");

@@ -1,13 +1,14 @@
 use super::api_client::{ApiClient, AuthMethod};
 use super::base::{ConfigKey, Provider, ProviderMetadata, ProviderUsage, Usage};
 use super::errors::ProviderError;
+use super::formats::openai::{create_request, get_usage, response_to_message};
 use super::retry::ProviderRetry;
 use super::utils::{get_model, handle_response_openai_compat};
+use crate::config::unified;
 use crate::conversation::message::Message;
 use crate::conversation::Conversation;
 use crate::impl_provider_default;
 use crate::model::ModelConfig;
-use crate::providers::formats::openai::{create_request, get_usage, response_to_message};
 use crate::utils::safe_truncate;
 use anyhow::Result;
 use async_trait::async_trait;
@@ -36,13 +37,9 @@ impl_provider_default!(OllamaProvider);
 
 impl OllamaProvider {
     pub fn from_env(model: ModelConfig) -> Result<Self> {
-        let config = crate::config::Config::global();
-        let host: String = config
-            .get_param("OLLAMA_HOST")
-            .unwrap_or_else(|_| OLLAMA_HOST.to_string());
-
+        let host: String = unified::get_or("providers.ollama.host", OLLAMA_HOST.to_string());
         let timeout: Duration =
-            Duration::from_secs(config.get_param("OLLAMA_TIMEOUT").unwrap_or(OLLAMA_TIMEOUT));
+            Duration::from_secs(unified::get_or("providers.ollama.timeout", OLLAMA_TIMEOUT));
 
         // OLLAMA_HOST is sometimes just the 'host' or 'host:port' without a scheme
         let base = if host.starts_with("http://") || host.starts_with("https://") {
@@ -130,8 +127,7 @@ impl Provider for OllamaProvider {
         messages: &[Message],
         tools: &[Tool],
     ) -> Result<(Message, ProviderUsage), ProviderError> {
-        let config = crate::config::Config::global();
-        let goose_mode = config.get_param("GOOSE_MODE").unwrap_or("auto".to_string());
+        let goose_mode = unified::get_or("agent.mode", "auto".to_string());
         let filtered_tools = if goose_mode == "chat" { &[] } else { tools };
 
         let payload = create_request(

@@ -138,7 +138,7 @@ impl PromptManager {
 
         let mut system_prompt_extras = self.system_prompt_extras.clone();
         let config = Config::global();
-        let goose_mode = config.get_param("GOOSE_MODE").unwrap_or("auto".to_string());
+        let goose_mode = config.get_param("agent.mode").unwrap_or("auto".to_string());
         if goose_mode == "chat" {
             system_prompt_extras.push(
                 "Right now you are in the chat only mode, no access to any tool use and system."

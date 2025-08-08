@@ -30,7 +30,7 @@ use etcetera::{choose_app_strategy, AppStrategy};
 use goose::agents::extension::{Envs, ExtensionConfig};
 use goose::agents::types::RetryConfig;
 use goose::agents::{Agent, SessionConfig};
-use goose::config::Config;
+use goose::config::{unified, Config};
 use goose::providers::pricing::initialize_pricing_cache;
 use goose::session;
 use input::InputResult;
@@ -605,7 +605,6 @@ impl Session {
                 input::InputResult::GooseMode(mode) => {
                     save_history(&mut editor);
 
-                    let config = Config::global();
                     let mode = mode.to_lowercase();
 
                     // Check if mode is valid
@@ -617,9 +616,7 @@ impl Session {
                         continue;
                     }
 
-                    config
-                        .set_param("GOOSE_MODE", Value::String(mode.to_string()))
-                        .unwrap();
+                    unified::set("agent.mode", Value::String(mode.to_string())).unwrap();
                     output::goose_mode_message(&format!("Goose mode set to '{}'", mode));
                     continue;
                 }
@@ -809,13 +806,10 @@ impl Session {
                     output::render_act_on_plan();
                     self.run_mode = RunMode::Normal;
                     // set goose mode: auto if that isn't already the case
-                    let config = Config::global();
                     let curr_goose_mode =
-                        config.get_param("GOOSE_MODE").unwrap_or("auto".to_string());
+                        unified::get_or::<String>("agent.mode", "auto".to_string());
                     if curr_goose_mode != "auto" {
-                        config
-                            .set_param("GOOSE_MODE", Value::String("auto".to_string()))
-                            .unwrap();
+                        unified::set("agent.mode", Value::String("auto".to_string())).unwrap();
                     }
 
                     // clear the messages before acting on the plan
@@ -831,8 +825,7 @@ impl Session {
 
                     // Reset run & goose mode
                     if curr_goose_mode != "auto" {
-                        config
-                            .set_param("GOOSE_MODE", Value::String(curr_goose_mode.to_string()))
+                        unified::set("agent.mode", Value::String(curr_goose_mode.to_string()))
                             .unwrap();
                     }
                 } else {
@@ -1120,10 +1113,8 @@ impl Session {
                                                     }
                                                     Some("response_generated") => {
                                                         // Check verbosity setting for subagent response content
-                                                        let config = Config::global();
-                                                        let min_priority = config
-                                                            .get_param::<f32>("GOOSE_CLI_MIN_PRIORITY")
-                                                            .ok()
+                                                        use goose::config::unified;
+                                                        let min_priority = unified::get::<f32>("cli.min_priority")
                                                             .unwrap_or(0.5);
 
                                                         if min_priority > 0.1 && !self.debug {
@@ -1471,12 +1462,10 @@ impl Session {
         let model_config = provider.get_model_config();
         let context_limit = model_config.context_limit();
 
-        let config = Config::global();
         let show_cost = goose::config::unified::get_or::<bool>("cli.show_cost", false);
 
-        let provider_name = config
-            .get_param::<String>("GOOSE_PROVIDER")
-            .unwrap_or_else(|_| "unknown".to_string());
+        let provider_name =
+            unified::get::<String>("llm.provider").unwrap_or_else(|_| "unknown".to_string());
 
         // Initialize pricing cache on startup
         tracing::info!("Initializing pricing cache...");
@@ -1633,8 +1622,7 @@ fn get_reasoner() -> Result<Arc<dyn Provider>, anyhow::Error> {
         provider
     } else {
         println!("WARNING: GOOSE_PLANNER_PROVIDER not found. Using default provider...");
-        config
-            .get_param::<String>("GOOSE_PROVIDER")
+        unified::get::<String>("llm.provider")
             .expect("No provider configured. Run 'goose configure' first")
     };
 
@@ -1643,8 +1631,7 @@ fn get_reasoner() -> Result<Arc<dyn Provider>, anyhow::Error> {
         model
     } else {
         println!("WARNING: GOOSE_PLANNER_MODEL not found. Using default model...");
-        config
-            .get_param::<String>("GOOSE_MODEL")
+        unified::get::<String>("llm.model")
             .expect("No model configured. Run 'goose configure' first")
     };
 

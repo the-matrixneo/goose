@@ -45,18 +45,27 @@ impl_provider_default!(SnowflakeProvider);
 impl SnowflakeProvider {
     pub fn from_env(model: ModelConfig) -> Result<Self> {
         let config = crate::config::Config::global();
-        let mut host: Result<String, ConfigError> = config.get_param("SNOWFLAKE_HOST");
-        if host.is_err() {
-            host = config.get_secret("SNOWFLAKE_HOST")
-        }
-        if host.is_err() {
-            return Err(ConfigError::NotFound(
-                "Did not find SNOWFLAKE_HOST in either config file or keyring".to_string(),
-            )
-            .into());
-        }
 
-        let mut host = host?;
+        // Try unified config first, then fall back to old method for compatibility
+        let mut host: String =
+            match crate::config::unified::get::<String>("providers.snowflake.host") {
+                Ok(h) => h,
+                Err(_) => {
+                    // Fall back to old method: try param, then secret
+                    let mut host: Result<String, ConfigError> = config.get_param("SNOWFLAKE_HOST");
+                    if host.is_err() {
+                        host = config.get_secret("SNOWFLAKE_HOST")
+                    }
+                    if host.is_err() {
+                        return Err(ConfigError::NotFound(
+                            "Did not find SNOWFLAKE_HOST in either config file or keyring"
+                                .to_string(),
+                        )
+                        .into());
+                    }
+                    host?
+                }
+            };
 
         // Convert host to lowercase
         host = host.to_lowercase();

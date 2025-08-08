@@ -7,13 +7,15 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::sync::RwLock;
 
+use crate::config::unified;
+
 /// Disk cache configuration
 const CACHE_FILE_NAME: &str = "pricing_cache.json";
 const CACHE_TTL_DAYS: u64 = 7; // Cache for 7 days
 
 /// Get the cache directory path
 fn get_cache_dir() -> Result<PathBuf> {
-    let cache_dir = if let Ok(goose_dir) = std::env::var("GOOSE_CACHE_DIR") {
+    let cache_dir = if let Ok(goose_dir) = unified::get::<String>("cache.dir") {
         PathBuf::from(goose_dir)
     } else {
         dirs::cache_dir()

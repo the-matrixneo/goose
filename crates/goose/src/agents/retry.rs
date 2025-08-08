@@ -10,7 +10,7 @@ use crate::agents::types::SessionConfig;
 use crate::agents::types::{
     RetryConfig, SuccessCheck, DEFAULT_ON_FAILURE_TIMEOUT_SECONDS, DEFAULT_RETRY_TIMEOUT_SECONDS,
 };
-use crate::config::Config;
+use crate::config::unified;
 use crate::conversation::message::Message;
 use crate::conversation::Conversation;
 use crate::tool_monitor::ToolMonitor;
@@ -27,12 +27,6 @@ pub enum RetryResult {
     /// Retry is needed and will be performed
     Retried,
 }
-
-/// Environment variable for configuring retry timeout globally
-const GOOSE_RECIPE_RETRY_TIMEOUT_SECONDS: &str = "GOOSE_RECIPE_RETRY_TIMEOUT_SECONDS";
-
-/// Environment variable for configuring on_failure timeout globally
-const GOOSE_RECIPE_ON_FAILURE_TIMEOUT_SECONDS: &str = "GOOSE_RECIPE_ON_FAILURE_TIMEOUT_SECONDS";
 
 /// Manages retry state and operations for agent execution
 #[derive(Debug)]
@@ -162,10 +156,7 @@ impl RetryManager {
 fn get_retry_timeout(retry_config: &RetryConfig) -> Duration {
     let timeout_seconds = retry_config
         .timeout_seconds
-        .or_else(|| {
-            let config = Config::global();
-            config.get_param(GOOSE_RECIPE_RETRY_TIMEOUT_SECONDS).ok()
-        })
+        .or_else(|| unified::get::<u64>("recipes.retry_timeout_seconds").ok())
         .unwrap_or(DEFAULT_RETRY_TIMEOUT_SECONDS);
 
     Duration::from_secs(timeout_seconds)
@@ -176,12 +167,7 @@ fn get_retry_timeout(retry_config: &RetryConfig) -> Duration {
 fn get_on_failure_timeout(retry_config: &RetryConfig) -> Duration {
     let timeout_seconds = retry_config
         .on_failure_timeout_seconds
-        .or_else(|| {
-            let config = Config::global();
-            config
-                .get_param(GOOSE_RECIPE_ON_FAILURE_TIMEOUT_SECONDS)
-                .ok()
-        })
+        .or_else(|| unified::get::<u64>("recipes.on_failure_timeout_seconds").ok())
         .unwrap_or(DEFAULT_ON_FAILURE_TIMEOUT_SECONDS);
 
     Duration::from_secs(timeout_seconds)

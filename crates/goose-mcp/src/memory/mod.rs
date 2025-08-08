@@ -225,9 +225,11 @@ impl MemoryRouter {
             "#};
 
         // Check for .goose/memory in current directory
-        let local_memory_dir = std::env::var("GOOSE_WORKING_DIR")
+        // Use unified config for working directory
+        let local_memory_dir = goose::config::unified::get::<String>("mcp.working_dir")
+            .ok()
             .map(PathBuf::from)
-            .unwrap_or_else(|_| std::env::current_dir().unwrap())
+            .unwrap_or_else(|| std::env::current_dir().unwrap())
             .join(".goose")
             .join("memory");
 

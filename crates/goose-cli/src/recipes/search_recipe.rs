@@ -1,8 +1,7 @@
 use anyhow::{anyhow, Result};
-use goose::config::Config;
+use goose::config::unified;
 use goose::recipe::read_recipe_file_content::{read_recipe_file, RecipeFile};
 use goose::recipe::template_recipe::parse_recipe_content;
-use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -10,10 +9,7 @@ use crate::recipes::recipe::RECIPE_FILE_EXTENSIONS;
 
 use super::github_recipe::{
     list_github_recipes, retrieve_recipe_from_github, RecipeInfo, RecipeSource,
-    GOOSE_RECIPE_GITHUB_REPO_CONFIG_KEY,
 };
-
-const GOOSE_RECIPE_PATH_ENV_VAR: &str = "GOOSE_RECIPE_PATH";
 
 pub fn retrieve_recipe_file(recipe_name: &str) -> Result<RecipeFile> {
     if RECIPE_FILE_EXTENSIONS
@@ -66,7 +62,7 @@ fn read_recipe_in_dir(dir: &Path, recipe_name: &str) -> Result<RecipeFile> {
 
 fn retrieve_recipe_from_local_path(recipe_name: &str) -> Result<RecipeFile> {
     let mut search_dirs = vec![PathBuf::from(".")];
-    if let Ok(recipe_path_env) = env::var(GOOSE_RECIPE_PATH_ENV_VAR) {
+    if let Ok(recipe_path_env) = unified::get::<String>("recipes.path") {
         let path_separator = if cfg!(windows) { ';' } else { ':' };
         let recipe_path_env_dirs: Vec<PathBuf> = recipe_path_env
             .split(path_separator)
@@ -93,11 +89,7 @@ fn retrieve_recipe_from_local_path(recipe_name: &str) -> Result<RecipeFile> {
 }
 
 fn configured_github_recipe_repo() -> Option<String> {
-    let config = Config::global();
-    match config.get_param(GOOSE_RECIPE_GITHUB_REPO_CONFIG_KEY) {
-        Ok(Some(recipe_repo_full_name)) => Some(recipe_repo_full_name),
-        _ => None,
-    }
+    unified::get::<String>("recipes.github_repo_config_key").ok()
 }
 
 /// Lists all available recipes from local paths and GitHub repositories
@@ -123,8 +115,8 @@ fn discover_local_recipes() -> Result<Vec<RecipeInfo>> {
     let mut recipes = Vec::new();
     let mut search_dirs = vec![PathBuf::from(".")];
 
-    // Add GOOSE_RECIPE_PATH directories
-    if let Ok(recipe_path_env) = env::var(GOOSE_RECIPE_PATH_ENV_VAR) {
+    // Add recipes.path directories
+    if let Ok(recipe_path_env) = unified::get::<String>("recipes.path") {
         let path_separator = if cfg!(windows) { ';' } else { ':' };
         let recipe_path_env_dirs: Vec<PathBuf> = recipe_path_env
             .split(path_separator)

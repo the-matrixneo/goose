@@ -1,11 +1,12 @@
 use super::api_client::{ApiClient, AuthMethod};
+use super::base::{ConfigKey, Provider, ProviderMetadata, ProviderUsage, Usage};
 use super::errors::ProviderError;
 use super::retry::ProviderRetry;
 use super::utils::{get_model, handle_response_openai_compat};
+use crate::config::unified;
 use crate::conversation::message::Message;
 use crate::impl_provider_default;
 use crate::model::ModelConfig;
-use crate::providers::base::{ConfigKey, Provider, ProviderMetadata, ProviderUsage, Usage};
 use crate::providers::formats::openai::{create_request, get_usage, response_to_message};
 use anyhow::Result;
 use async_trait::async_trait;
@@ -47,11 +48,8 @@ impl_provider_default!(XaiProvider);
 
 impl XaiProvider {
     pub fn from_env(model: ModelConfig) -> Result<Self> {
-        let config = crate::config::Config::global();
-        let api_key: String = config.get_secret("XAI_API_KEY")?;
-        let host: String = config
-            .get_param("XAI_HOST")
-            .unwrap_or_else(|_| XAI_API_HOST.to_string());
+        let api_key: String = unified::get_secret("providers.xai.api_key")?;
+        let host: String = unified::get_or("providers.xai.host", XAI_API_HOST.to_string());
 
         let auth = AuthMethod::BearerToken(api_key);
         let api_client = ApiClient::new(host, auth)?;

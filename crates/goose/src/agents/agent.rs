@@ -881,7 +881,7 @@ impl Agent {
                 .as_ref()
                 .and_then(|s| s.max_turns)
                 .unwrap_or_else(|| {
-                    config.get_param("GOOSE_MAX_TURNS").unwrap_or(DEFAULT_MAX_TURNS)
+                    config.get_param("session.max_turns").unwrap_or(DEFAULT_MAX_TURNS)
                 });
 
             loop {
@@ -1147,7 +1147,7 @@ impl Agent {
             Some("foreground") => "chat".to_string(),
             Some("background") => "auto".to_string(),
             _ => config
-                .get_param("GOOSE_MODE")
+                .get_param("agent.mode")
                 .unwrap_or_else(|_| "auto".to_string()),
         }
     }
@@ -1357,7 +1357,8 @@ impl Agent {
             .collect();
 
         let author = Author {
-            contact: std::env::var("USER")
+            // Use unified config for system.user
+            contact: crate::config::unified::get::<String>("system.user")
                 .or_else(|_| std::env::var("USERNAME"))
                 .ok(),
             metadata: None,
@@ -1367,7 +1368,7 @@ impl Agent {
         // but it doesn't know and the plumbing looks complicated.
         let config = Config::global();
         let provider_name: String = config
-            .get_param("GOOSE_PROVIDER")
+            .get_param("llm.provider")
             .expect("No provider configured. Run 'goose configure' first");
 
         let settings = Settings {

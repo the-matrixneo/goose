@@ -17,6 +17,7 @@ use super::formats::databricks::{create_request, response_to_message};
 use super::oauth;
 use super::retry::ProviderRetry;
 use super::utils::{get_model, handle_response_openai_compat, ImageFormat};
+use crate::config::unified;
 use crate::config::ConfigError;
 use crate::conversation::message::Message;
 use crate::impl_provider_default;
@@ -110,22 +111,30 @@ impl DatabricksProvider {
     pub fn from_env(model: ModelConfig) -> Result<Self> {
         let config = crate::config::Config::global();
 
-        let mut host: Result<String, ConfigError> = config.get_param("DATABRICKS_HOST");
-        if host.is_err() {
-            host = config.get_secret("DATABRICKS_HOST")
-        }
+        // Try unified config first, then fall back to old method for compatibility
+        let host: String = match crate::config::unified::get::<String>("providers.databricks.host")
+        {
+            Ok(h) => h,
+            Err(_) => {
+                // Fall back to old method: try param, then secret
+                let mut host: Result<String, ConfigError> = config.get_param("DATABRICKS_HOST");
+                if host.is_err() {
+                    host = config.get_secret("DATABRICKS_HOST")
+                }
 
-        if host.is_err() {
-            return Err(ConfigError::NotFound(
-                "Did not find DATABRICKS_HOST in either config file or keyring".to_string(),
-            )
-            .into());
-        }
+                if host.is_err() {
+                    return Err(ConfigError::NotFound(
+                        "Did not find DATABRICKS_HOST in either config file or keyring".to_string(),
+                    )
+                    .into());
+                }
+                host?
+            }
+        };
+        let retry_config = Self::load_retry_config();
 
-        let host = host?;
-        let retry_config = Self::load_retry_config(config);
-
-        let auth = if let Ok(api_key) = config.get_secret("DATABRICKS_TOKEN") {
+        let auth = if let Ok(api_key) = unified::get_secret::<String>("providers.databricks.token")
+        {
             DatabricksAuth::token(api_key)
         } else {
             DatabricksAuth::oauth(host.clone())
@@ -146,27 +155,27 @@ impl DatabricksProvider {
         })
     }
 
-    fn load_retry_config(config: &crate::config::Config) -> RetryConfig {
-        let max_retries = config
-            .get_param("DATABRICKS_MAX_RETRIES")
+    fn load_retry_config() -> RetryConfig {
+        let max_retries = unified::get::<u32>("providers.databricks.max_retries")
             .ok()
-            .and_then(|v: String| v.parse::<usize>().ok())
+            .map(|v| v as usize)
             .unwrap_or(DEFAULT_MAX_RETRIES);
 
-        let initial_interval_ms = config
-            .get_param("DATABRICKS_INITIAL_RETRY_INTERVAL_MS")
-            .ok()
-            .and_then(|v: String| v.parse::<u64>().ok())
-            .unwrap_or(DEFAULT_INITIAL_RETRY_INTERVAL_MS);
+        let initial_interval_ms =
+            unified::get::<u32>("providers.databricks.initial_retry_interval_ms")
+                .ok()
+                .map(|v| v as u64)
+                .unwrap_or(DEFAULT_INITIAL_RETRY_INTERVAL_MS);
 
+        let config = crate::config::Config::global();
         let backoff_multiplier = config
-            .get_param("DATABRICKS_BACKOFF_MULTIPLIER")
+            .get_param("providers.databricks.backoff_multiplier")
             .ok()
             .and_then(|v: String| v.parse::<f64>().ok())
             .unwrap_or(DEFAULT_BACKOFF_MULTIPLIER);
 
         let max_interval_ms = config
-            .get_param("DATABRICKS_MAX_RETRY_INTERVAL_MS")
+            .get_param("providers.databricks.max_retry_interval_ms")
             .ok()
             .and_then(|v: String| v.parse::<u64>().ok())
             .unwrap_or(DEFAULT_MAX_RETRY_INTERVAL_MS);

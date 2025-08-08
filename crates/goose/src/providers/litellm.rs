@@ -9,6 +9,7 @@ use super::embedding::EmbeddingCapable;
 use super::errors::ProviderError;
 use super::retry::ProviderRetry;
 use super::utils::{emit_debug_trace, get_model, handle_response_openai_compat, ImageFormat};
+use crate::config::unified;
 use crate::conversation::message::Message;
 use crate::impl_provider_default;
 use crate::model::ModelConfig;
@@ -29,22 +30,21 @@ impl_provider_default!(LiteLLMProvider);
 
 impl LiteLLMProvider {
     pub fn from_env(model: ModelConfig) -> Result<Self> {
-        let config = crate::config::Config::global();
-        let api_key: String = config
-            .get_secret("LITELLM_API_KEY")
-            .unwrap_or_else(|_| String::new());
-        let host: String = config
-            .get_param("LITELLM_HOST")
-            .unwrap_or_else(|_| "https://api.litellm.ai".to_string());
-        let base_path: String = config
-            .get_param("LITELLM_BASE_PATH")
-            .unwrap_or_else(|_| "v1/chat/completions".to_string());
-        let custom_headers: Option<HashMap<String, String>> = config
-            .get_secret("LITELLM_CUSTOM_HEADERS")
-            .or_else(|_| config.get_param("LITELLM_CUSTOM_HEADERS"))
-            .ok()
-            .map(parse_custom_headers);
-        let timeout_secs: u64 = config.get_param("LITELLM_TIMEOUT").unwrap_or(600);
+        let api_key: String =
+            unified::get_secret("providers.litellm.api_key").unwrap_or_else(|_| String::new());
+        let host: String = unified::get_or(
+            "providers.litellm.host",
+            "http://localhost:4000".to_string(),
+        );
+        let base_path: String = unified::get_or(
+            "providers.litellm.base_path",
+            "v1/chat/completions".to_string(),
+        );
+        let custom_headers: Option<HashMap<String, String>> =
+            unified::get_secret("providers.litellm.custom_headers")
+                .ok()
+                .map(parse_custom_headers);
+        let timeout_secs: u64 = unified::get_or("providers.litellm.timeout", 600u64);
 
         let auth = if api_key.is_empty() {
             AuthMethod::Custom(Box::new(NoAuth))

@@ -15,6 +15,7 @@ use super::formats::anthropic::{
     create_request, get_usage, response_to_message, response_to_streaming_message,
 };
 use super::utils::{emit_debug_trace, get_model, map_http_error_to_provider_error};
+use crate::config::unified;
 use crate::conversation::message::Message;
 use crate::impl_provider_default;
 use crate::model::ModelConfig;
@@ -48,11 +49,11 @@ impl_provider_default!(AnthropicProvider);
 
 impl AnthropicProvider {
     pub fn from_env(model: ModelConfig) -> Result<Self> {
-        let config = crate::config::Config::global();
-        let api_key: String = config.get_secret("ANTHROPIC_API_KEY")?;
-        let host: String = config
-            .get_param("ANTHROPIC_HOST")
-            .unwrap_or_else(|_| "https://api.anthropic.com".to_string());
+        let api_key: String = unified::get_secret("providers.anthropic.api_key")?;
+        let host: String = unified::get_or(
+            "providers.anthropic.host",
+            "https://api.anthropic.com".to_string(),
+        );
 
         let auth = AuthMethod::ApiKey {
             header_name: "x-api-key".to_string(),
@@ -68,7 +69,7 @@ impl AnthropicProvider {
     fn get_conditional_headers(&self) -> Vec<(&str, &str)> {
         let mut headers = Vec::new();
 
-        let is_thinking_enabled = std::env::var("CLAUDE_THINKING_ENABLED").is_ok();
+        let is_thinking_enabled = unified::get_or("providers.anthropic.thinking_enabled", false);
         if self.model.model_name.starts_with("claude-3-7-sonnet-") {
             if is_thinking_enabled {
                 headers.push(("anthropic-beta", "output-128k-2025-02-19"));
