@@ -330,14 +330,43 @@ const BuildView: React.FC = () => {
         throw new Error(result.message || 'Failed to setup pairing session');
       }
 
+      // Get the port from the manage_server tool
+      let port = 3000; // default
+      try {
+        const portResponse = await fetch(getApiUrl('/agent/call_tool'), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Secret-Key': secretKey,
+          },
+          body: JSON.stringify({
+            tool_name: 'build__manage_server',
+            arguments: { action: 'port' }
+          })
+        });
+
+        if (portResponse.ok) {
+          const portResult = await portResponse.json();
+          if (portResult.success && portResult.result && portResult.result.length > 0) {
+            const portText = portResult.result[0].text;
+            const parsedPort = parseInt(portText, 10);
+            if (!isNaN(parsedPort)) {
+              port = parsedPort;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to get port from manage_server, using default 3000', err);
+      }
+
       // 1) Navigate to ChatView
       window.location.hash = '#/pair';
 
-      // 2) Open sidecar browser immediately
+      // 2) Open sidecar browser immediately with the correct port
       // Use a small delay to let the router/layout mount
       setTimeout(() => {
         try {
-          const evt = new CustomEvent('open-sidecar-localhost', { detail: { url: 'http://localhost:3000' } });
+          const evt = new CustomEvent('open-sidecar-localhost', { detail: { url: `http://localhost:${port}` } });
           window.dispatchEvent(evt);
         } catch (e) {
           console.warn('Failed to auto-open sidecar, user can click the globe button.', e);
