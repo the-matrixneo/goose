@@ -30,54 +30,60 @@ import React from 'react';
 import { cn } from '../utils';
 
 /**
- * RemoteDOMText - Adapts Label component styling for text content
+ * Text - Adapts Label component styling for text content
+ * Extracts patterns from Label component with semantic tokens
  */
-interface RemoteDOMTextProps {
+interface TextProps {
   children: React.ReactNode;
   variant?: 'body' | 'caption' | 'small' | 'large';
   className?: string;
 }
 
-const RemoteDOMText: React.FC<RemoteDOMTextProps> = ({ 
+const Text: React.FC<TextProps> = ({ 
   children, 
   variant = 'body', 
   className 
 }) => {
   const variantClasses = {
-    body: 'text-sm',
-    caption: 'text-xs text-text-muted',
-    small: 'text-xs',
-    large: 'text-base'
+    body: 'text-sm leading-none', // Matches Label component
+    caption: 'text-xs text-text-muted leading-none',
+    small: 'text-xs leading-none',
+    large: 'text-base leading-none'
   };
 
   return (
-    <span className={cn(variantClasses[variant], className)}>
+    <span className={cn(
+      'select-none', // Matches Label component behavior
+      variantClasses[variant], 
+      className
+    )}>
       {children}
     </span>
   );
 };
 
 /**
- * RemoteDOMHeading - Heading component with Cash Sans typography
+ * Heading - Heading component with Cash Sans typography
+ * Extracts patterns from Greeting component with proper hierarchy
  */
-interface RemoteDOMHeadingProps {
+interface HeadingProps {
   children: React.ReactNode;
   level?: 1 | 2 | 3 | 4 | 5 | 6;
   className?: string;
 }
 
-const RemoteDOMHeading: React.FC<RemoteDOMHeadingProps> = ({ 
+const Heading: React.FC<HeadingProps> = ({ 
   children, 
   level = 1, 
   className 
 }) => {
   const levelClasses = {
-    1: 'text-2xl font-bold',
-    2: 'text-xl font-semibold',
-    3: 'text-lg font-semibold',
-    4: 'text-base font-semibold',
-    5: 'text-sm font-semibold',
-    6: 'text-xs font-semibold'
+    1: 'text-4xl font-light', // Matches Greeting component
+    2: 'text-3xl font-light',
+    3: 'text-2xl font-normal',
+    4: 'text-xl font-normal',
+    5: 'text-lg font-medium',
+    6: 'text-base font-medium'
   };
 
   const Tag = `h${level}` as keyof JSX.IntrinsicElements;
@@ -90,15 +96,15 @@ const RemoteDOMHeading: React.FC<RemoteDOMHeadingProps> = ({
 };
 
 /**
- * RemoteDOMContainer - Layout container without Card borders
+ * Container - Layout container without Card borders
  */
-interface RemoteDOMContainerProps {
+interface ContainerProps {
   children: React.ReactNode;
   padding?: 'none' | 'sm' | 'md' | 'lg';
   className?: string;
 }
 
-const RemoteDOMContainer: React.FC<RemoteDOMContainerProps> = ({ 
+const Container: React.FC<ContainerProps> = ({ 
   children, 
   padding = 'md', 
   className 
@@ -118,9 +124,9 @@ const RemoteDOMContainer: React.FC<RemoteDOMContainerProps> = ({
 };
 
 /**
- * RemoteDOMStack - Flexbox stack layout
+ * Stack - Flexbox stack layout
  */
-interface RemoteDOMStackProps {
+interface StackProps {
   children: React.ReactNode;
   direction?: 'vertical' | 'horizontal';
   gap?: 'none' | 'sm' | 'md' | 'lg';
@@ -129,7 +135,7 @@ interface RemoteDOMStackProps {
   className?: string;
 }
 
-const RemoteDOMStack: React.FC<RemoteDOMStackProps> = ({ 
+const Stack: React.FC<StackProps> = ({ 
   children, 
   direction = 'vertical', 
   gap = 'md',
@@ -179,9 +185,9 @@ const RemoteDOMStack: React.FC<RemoteDOMStackProps> = ({
 };
 
 /**
- * RemoteDOMGrid - CSS Grid layout wrapper
+ * Grid - CSS Grid layout wrapper
  */
-interface RemoteDOMGridProps {
+interface GridProps {
   children: React.ReactNode;
   columns?: number | string;
   rows?: number | string;
@@ -189,7 +195,7 @@ interface RemoteDOMGridProps {
   className?: string;
 }
 
-const RemoteDOMGrid: React.FC<RemoteDOMGridProps> = ({ 
+const Grid: React.FC<GridProps> = ({ 
   children, 
   columns = 'auto',
   rows = 'auto',
@@ -280,11 +286,11 @@ export const gooseComponentLibrary = {
   'ui-separator': Separator,
   
   // Missing Primitives (🔧 Newly created)
-  'ui-text': RemoteDOMText,
-  'ui-heading': RemoteDOMHeading,
-  'ui-container': RemoteDOMContainer,
-  'ui-stack': RemoteDOMStack,
-  'ui-grid': RemoteDOMGrid,
+  'ui-text': Text,
+  'ui-heading': Heading,
+  'ui-container': Container,
+  'ui-stack': Stack,
+  'ui-grid': Grid,
 };
 
 export type GooseComponentLibrary = typeof gooseComponentLibrary;
