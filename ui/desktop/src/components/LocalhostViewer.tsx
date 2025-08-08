@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect } from 'react';
-import { RefreshCw, ExternalLink, ChevronLeft, ChevronRight } from 'lucide-react';
+import { RefreshCw, ExternalLink, ChevronLeft, ChevronRight, AlertCircle, CheckCircle } from 'lucide-react';
 import { Button } from './ui/button';
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/Tooltip';
 
@@ -55,6 +55,7 @@ export function LocalhostViewer({
   
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<'idle' | 'connecting' | 'retrying' | 'connected' | 'failed'>('idle');
   const [canGoBack, setCanGoBack] = useState(false);
   const [canGoForward, setCanGoForward] = useState(false);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
@@ -82,6 +83,7 @@ export function LocalhostViewer({
 
     if (!isValidLocalhostUrl(formattedUrl)) {
       setError('Only localhost URLs are allowed (e.g., http://localhost:3000)');
+      setConnectionStatus('failed');
       return;
     }
 
@@ -89,6 +91,7 @@ export function LocalhostViewer({
     setUrl(formattedUrl);
     setInputUrl(formattedUrl);
     setIsLoading(true);
+    setConnectionStatus('connecting');
     setRetryCount(0); // Reset retry count for new URL
     
     // Save to localStorage
@@ -106,6 +109,7 @@ export function LocalhostViewer({
   const handleRefresh = () => {
     if (iframeRef.current) {
       setIsLoading(true);
+      setConnectionStatus('connecting');
       setError(null);
       iframeRef.current.src = iframeRef.current.src;
     }
@@ -138,6 +142,7 @@ export function LocalhostViewer({
   const handleIframeLoad = () => {
     setIsLoading(false);
     setError(null);
+    setConnectionStatus('connected');
     setHasLoadedOnce(true);
     setRetryCount(0); // Reset retry count on successful load
 
@@ -170,23 +175,62 @@ export function LocalhostViewer({
       console.log(`LocalhostViewer: Auto-retrying connection (attempt ${retryCount + 1}/${maxRetries})`);
       
       setRetryCount(prev => prev + 1);
-      setError(`Connecting to ${url}... (attempt ${retryCount + 1}/${maxRetries})`);
+      setConnectionStatus('retrying');
+      setError(`Retrying... (${retryCount + 1}/${maxRetries})`);
       
       // Set a timeout to retry
       retryTimeoutRef.current = setTimeout(() => {
         if (iframeRef.current) {
           setIsLoading(true);
+          setConnectionStatus('connecting');
           // Force reload by updating the src
           iframeRef.current.src = `${url}?retry=${Date.now()}`;
         }
       }, retryDelay);
     } else {
       // Show final error message
+      setConnectionStatus('failed');
       const errorMessage = retryCount >= maxRetries 
-        ? `Failed to connect to ${url} after ${maxRetries} attempts. Make sure the server is running.`
-        : `Failed to load ${url}. Make sure the server is running.`;
+        ? `Connection failed after ${maxRetries} attempts`
+        : `Connection failed`;
       
       setError(errorMessage);
+    }
+  };
+
+  // Helper function to render connection status indicator
+  const renderConnectionStatus = () => {
+    switch (connectionStatus) {
+      case 'connecting':
+        return (
+          <div className="flex items-center text-blue-600 text-xs">
+            <RefreshCw className="h-3 w-3 animate-spin mr-1" />
+            <span>Connecting...</span>
+          </div>
+        );
+      case 'retrying':
+        return (
+          <div className="flex items-center text-yellow-600 text-xs">
+            <RefreshCw className="h-3 w-3 animate-spin mr-1" />
+            <span>{error}</span>
+          </div>
+        );
+      case 'connected':
+        return (
+          <div className="flex items-center text-green-600 text-xs">
+            <CheckCircle className="h-3 w-3 mr-1" />
+            <span>Connected</span>
+          </div>
+        );
+      case 'failed':
+        return (
+          <div className="flex items-center text-red-600 text-xs">
+            <AlertCircle className="h-3 w-3 mr-1" />
+            <span>{error}</span>
+          </div>
+        );
+      default:
+        return null;
     }
   };
 
@@ -236,24 +280,32 @@ export function LocalhostViewer({
           </Tooltip>
         </div>
 
-        {/* URL Input */}
-        <div className="flex-1 flex items-center">
-          <input
-            type="text"
-            value={inputUrl}
-            onChange={(e) => setInputUrl(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder="http://localhost:3000"
-            className="flex-1 px-3 py-1 text-sm border border-borderSubtle rounded-md bg-background-default text-textStandard focus:outline-none focus:ring-2 focus:ring-borderProminent focus:border-transparent"
-          />
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => handleUrlSubmit(inputUrl)}
-            className="ml-2 px-3 py-1 text-xs"
-          >
-            Go
-          </Button>
+        {/* URL Input with Status */}
+        <div className="flex-1 flex items-center gap-2">
+          <div className="flex-1 flex flex-col">
+            <div className="flex items-center">
+              <input
+                type="text"
+                value={inputUrl}
+                onChange={(e) => setInputUrl(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="http://localhost:3000"
+                className="flex-1 px-3 py-1 text-sm border border-borderSubtle rounded-md bg-background-default text-textStandard focus:outline-none focus:ring-2 focus:ring-borderProminent focus:border-transparent"
+              />
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleUrlSubmit(inputUrl)}
+                className="ml-2 px-3 py-1 text-xs"
+              >
+                Go
+              </Button>
+            </div>
+            {/* Connection Status - appears below the input */}
+            <div className="mt-1 min-h-[16px]">
+              {renderConnectionStatus()}
+            </div>
+          </div>
         </div>
 
         {/* External link button */}
@@ -266,28 +318,6 @@ export function LocalhostViewer({
           <TooltipContent>Open in Browser</TooltipContent>
         </Tooltip>
       </div>
-
-      {/* Error Display */}
-      {error && (
-        <div className={`p-3 border-b ${
-          error.includes('attempt') || error.includes('Connecting')
-            ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800'
-            : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
-        }`}>
-          <p className={`text-sm ${
-            error.includes('attempt') || error.includes('Connecting')
-              ? 'text-yellow-800 dark:text-yellow-200'
-              : 'text-red-800 dark:text-red-200'
-          }`}>
-            {error}
-            {error.includes('attempt') && (
-              <span className="ml-2">
-                <RefreshCw className="inline h-3 w-3 animate-spin" />
-              </span>
-            )}
-          </p>
-        </div>
-      )}
 
       {/* Iframe Content */}
       <div className="flex-1 relative overflow-hidden">
