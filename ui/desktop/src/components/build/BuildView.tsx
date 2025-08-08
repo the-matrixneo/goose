@@ -9,6 +9,7 @@ import { formatMessageTimestamp } from '../../utils/timeUtils';
 import { toastSuccess, toastError } from '../../toasts';
 import { Input } from '../ui/input';
 import { getApiUrl } from '../../config';
+import { ChatSmart } from '../icons';
 
 interface AppTile {
   id: string;
@@ -413,23 +414,25 @@ const BuildView: React.FC = () => {
         </div>
 
         {/* Main content area with card-based layout - matching home page structure */}
-        <div className="flex flex-col flex-1 space-y-0.5">
-          {isLoading ? (
-            /* Loading state - single container */
-            <div className="bg-background-default rounded-2xl flex-1 py-6 px-6">
-              <div className="flex items-center justify-center h-full text-text-muted">
-                <div className="flex items-center gap-2">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-text-muted"></div>
-                  <span>Loading apps...</span>
+        <div className="flex-1 overflow-hidden">
+          <div className="h-full overflow-y-auto scroll-smooth" style={{ scrollSnapType: 'y mandatory' }}>
+            <div className="flex flex-col space-y-0.5 p-0.5">
+              {isLoading ? (
+                /* Loading state - single container */
+                <div className="bg-background-default rounded-2xl py-6 px-6 min-h-[400px]" style={{ scrollSnapAlign: 'start' }}>
+                  <div className="flex items-center justify-center h-full text-text-muted">
+                    <div className="flex items-center gap-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-text-muted"></div>
+                      <span>Loading apps...</span>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-          ) : (apps.length > 0 || creatingApps.length > 0) ? (
-            /* Apps exist or creating - individual containers for each app */
-            <>
-              {/* Render creating apps first (skeleton placeholders) */}
-              {creatingApps.map((creatingApp) => (
-                <div key={creatingApp.id} className="bg-background-default rounded-2xl py-6 px-6 shadow-inner animate-pulse-slow">
+              ) : (apps.length > 0 || creatingApps.length > 0) ? (
+                /* Apps exist or creating - individual containers for each app */
+                <>
+                  {/* Render creating apps first (skeleton placeholders) */}
+                  {creatingApps.map((creatingApp) => (
+                <div key={creatingApp.id} className="bg-background-default rounded-2xl py-6 px-6 shadow-inner animate-pulse-slow" style={{ scrollSnapAlign: 'start' }}>
                   <div className="flex flex-col h-full text-text-muted page-transition">
                     <div className="flex flex-col items-start">
                       {/* App image placeholder - animated skeleton */}
@@ -481,7 +484,7 @@ const BuildView: React.FC = () => {
 
               {/* Render existing apps */}
               {apps.map((app) => (
-                <div key={app.id} className="bg-background-default rounded-2xl py-6 px-6 shadow-lg transition-shadow duration-700 ease-out">
+                <div key={app.id} className="bg-background-default rounded-2xl py-6 px-6 shadow-lg transition-shadow duration-700 ease-out" style={{ scrollSnapAlign: 'start' }}>
                   <div className="flex flex-col h-full text-text-muted page-transition">
                     <div className="flex flex-col items-start">
                       {/* App image placeholder - 32x32 rounded square */}
@@ -517,7 +520,14 @@ const BuildView: React.FC = () => {
                       </div>
 
                       {/* Path */}
-                      <div className="flex items-center text-text-muted text-xs mb-4">
+                      <div 
+                        className="flex items-center text-text-muted text-xs mb-4 cursor-pointer hover:text-text-standard transition-colors duration-200"
+                        onClick={(e) => {
+                          e.stopPropagation(); // Prevent triggering the app click
+                          window.electron.openDirectoryInExplorer(app.path);
+                        }}
+                        title="Open in Finder"
+                      >
                         <FolderOpen className="w-3 h-3 mr-1 flex-shrink-0" />
                         <span className="truncate">{app.path}</span>
                       </div>
@@ -529,46 +539,43 @@ const BuildView: React.FC = () => {
                         variant="secondary"
                         className="flex items-center gap-2"
                       >
-                        <FolderOpen className="w-4 h-4" />
-                        Open App
+                        <ChatSmart className="w-4 h-4" />
+                        Open in chat
                       </Button>
                     </div>
                   </div>
                 </div>
               ))}
 
-              {/* Filler container - extends to fill remaining space */}
-              <div className="bg-background-default rounded-2xl flex-1"></div>
-            </>
-          ) : (
-            /* Empty state - two separate containers */
-            <>
-              {/* Empty state content container */}
-              <div className="bg-background-default rounded-2xl py-6 px-6">
-                <div className="flex flex-col h-full text-text-muted page-transition">
-                  <div className="flex flex-col items-start">
-                    <Hammer className="h-4 w-4 mb-4 text-inverse" />
-                    <p className="text-sm">
-                      Your web apps will show up here. Create a new web app to get started in build.
-                    </p>
+                </>
+              ) : (
+                /* Empty state - two separate containers */
+                <>
+                  {/* Empty state content container */}
+                  <div className="bg-background-default rounded-2xl py-6 px-6" style={{ scrollSnapAlign: 'start' }}>
+                    <div className="flex flex-col h-full text-text-muted page-transition">
+                      <div className="flex flex-col items-start">
+                        <Hammer className="h-4 w-4 mb-4 text-inverse" />
+                        <p className="text-sm">
+                          Your web apps will show up here. Create a new web app to get started in build.
+                        </p>
+                      </div>
+                      <div className="flex justify-end mt-auto pt-6">
+                        <Button
+                          onClick={handleCreateAppClick}
+                          variant="default"
+                          className="flex items-center gap-2"
+                        >
+                          <Plus className="w-4 h-4" />
+                          Create your first web app
+                        </Button>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex justify-end mt-auto pt-6">
-                    <Button
-                      onClick={handleCreateAppClick}
-                      variant="default"
-                      className="flex items-center gap-2"
-                    >
-                      <Plus className="w-4 h-4" />
-                      Create your first web app
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Empty container stretching the full height */}
-              <div className="bg-background-default rounded-2xl flex-1"></div>
-            </>
-          )}
+                </>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
