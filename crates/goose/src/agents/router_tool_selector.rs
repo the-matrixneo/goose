@@ -12,10 +12,8 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use crate::conversation::message::Message;
-use crate::providers::base::Provider;
-use crate::model::ModelConfig;
 use crate::prompt_template::render_global_file;
-use crate::providers::{self, base::Provider};
+use crate::providers::base::Provider;
 
 #[derive(Serialize)]
 struct ToolSelectorContext {
