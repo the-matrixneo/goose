@@ -11,8 +11,6 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 
-use crate::config::unified;
-
 pub static APP_STRATEGY: Lazy<AppStrategyArgs> = Lazy::new(|| AppStrategyArgs {
     top_level_domain: "Block".to_string(),
     author: "Block".to_string(),
@@ -21,6 +19,42 @@ pub static APP_STRATEGY: Lazy<AppStrategyArgs> = Lazy::new(|| AppStrategyArgs {
 
 const KEYRING_SERVICE: &str = "goose";
 const KEYRING_USERNAME: &str = "secrets";
+
+/// Bootstrap configuration module for reading critical config values during initialization.
+/// This module provides a way to read configuration values without using the full unified
+/// configuration system, avoiding circular dependencies during Config initialization.
+mod bootstrap {
+    use crate::config::unified::registry;
+
+    /// Check if keyring is disabled by reading environment variables directly.
+    /// This uses the registry to maintain consistency with canonical names and aliases,
+    /// but doesn't use the full unified configuration system to avoid circular dependencies.
+    pub fn is_keyring_disabled() -> bool {
+        // Use the registry to get the canonical env var name and aliases
+        registry::find_spec("security.disable_keyring")
+            .and_then(|spec| {
+                // First check the canonical GOOSE_* environment variable
+                let canonical_env = registry::canonical_to_env("security.disable_keyring");
+                std::env::var(&canonical_env).ok().or_else(|| {
+                    // Fall back to checking any registered aliases
+                    spec.env_aliases
+                        .iter()
+                        .find_map(|alias| std::env::var(alias).ok())
+                })
+            })
+            .and_then(|value| {
+                // Parse the value as a boolean
+                // This matches the parsing logic in Config::parse_env_value
+                let trimmed = value.trim();
+                match trimmed.to_lowercase().as_str() {
+                    "true" | "1" | "yes" | "on" => Some(true),
+                    "false" | "0" | "no" | "off" => Some(false),
+                    _ => None,
+                }
+            })
+            .unwrap_or(false)
+    }
+}
 
 #[cfg(test)]
 const TEST_KEYRING_SERVICE: &str = "goose-test";
@@ -131,8 +165,10 @@ impl Default for Config {
 
         let config_path = config_dir.join("config.yaml");
 
-        // Use unified config to check if keyring is disabled
-        let disable_keyring = unified::get_or("security.disable_keyring", false);
+        // Use the bootstrap module to check if keyring is disabled.
+        // This avoids circular dependency during initialization while still
+        // using the registry to maintain consistency with canonical names and aliases.
+        let disable_keyring = bootstrap::is_keyring_disabled();
 
         let secrets = if disable_keyring {
             SecretStorage::File {

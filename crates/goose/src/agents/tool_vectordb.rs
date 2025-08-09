@@ -548,7 +548,11 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let custom_path = temp_dir.path().join("custom_vector_db");
 
-        unified::set("vector_db.path", serde_json::json!(custom_path.to_str().unwrap())).unwrap();
+        unified::set(
+            "vector_db.path",
+            serde_json::json!(custom_path.to_str().unwrap()),
+        )
+        .unwrap();
 
         let db_path = ToolVectorDB::get_db_path()?;
         assert_eq!(db_path, custom_path);

@@ -10,11 +10,11 @@ use goose::config::PermissionManager;
 use goose::model::ModelConfig;
 use goose::providers::create;
 use goose::recipe::Response;
+use goose::recipe::SubRecipe;
 use goose::{
     agents::{extension::ToolInfo, extension_manager::get_parameter_names},
     config::permission::PermissionLevel,
 };
-use goose::recipe::SubRecipe;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;

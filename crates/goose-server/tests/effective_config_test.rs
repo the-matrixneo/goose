@@ -10,7 +10,7 @@ use tower::ServiceExt;
 async fn test_effective_config_endpoint() {
     // Create a mock agent
     let agent = Arc::new(Agent::new());
-    
+
     // Create app state with mock values
     let secret_key = "test-secret-key".to_string();
     let state = AppState::new(agent, secret_key.clone()).await;
@@ -74,7 +74,7 @@ async fn test_effective_config_secret_redaction() {
 
     // Create a mock agent
     let agent = Arc::new(Agent::new());
-    
+
     // Create app state with mock values
     let secret_key = "test-secret-key".to_string();
     let state = AppState::new(agent, secret_key.clone()).await;
