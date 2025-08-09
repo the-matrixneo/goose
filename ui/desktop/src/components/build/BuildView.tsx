@@ -548,7 +548,7 @@ const BuildView: React.FC = () => {
               ))}
 
                   {/* Filler container - extends to fill remaining space */}
-                  <div className="bg-background-default rounded-2xl flex-1"></div>
+                  <div className="bg-background-default rounded-2xl min-h-[200px]"></div>
                 </>
               ) : (
                 /* Empty state - two separate containers */
@@ -576,7 +576,7 @@ const BuildView: React.FC = () => {
                   </div>
 
                   {/* Filler container - extends to fill remaining space */}
-                  <div className="bg-background-default rounded-2xl flex-1"></div>                </>
+                  <div className="bg-background-default rounded-2xl min-h-[200px]"></div>                </>
               )}
             </div>
           </div>
