@@ -395,7 +395,7 @@ const BuildView: React.FC = () => {
               <div className="flex justify-between items-center mb-1">
                 <h1 className="text-4xl font-light">Build</h1>
                 {/* Create App button on the right - show when not loading */}
-                {!isLoading && (
+                {!isLoading && (apps.length > 0 || creatingApps.length > 0) && (
                   <Button
                     onClick={handleCreateAppClick}
                     variant="default"
