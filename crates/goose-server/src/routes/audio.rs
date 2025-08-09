@@ -95,9 +95,13 @@ async fn transcribe_handler(
     };
 
     // Get the OpenAI API key from config (after input validation)
+    // Note: Audio transcription currently requires OpenAI's Whisper API
     use goose::config::unified;
     let api_key: String = unified::get_secret("providers.openai.api_key")
-        .map_err(|_| StatusCode::PRECONDITION_FAILED)?;
+        .map_err(|_| {
+            tracing::warn!("Audio transcription requires OpenAI API key (providers.openai.api_key) to be configured for Whisper API access");
+            StatusCode::PRECONDITION_FAILED
+        })?;
 
     // Get the OpenAI host from config (with default)
     let openai_host: String = unified::get_or(

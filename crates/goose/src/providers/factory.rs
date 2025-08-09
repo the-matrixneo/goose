@@ -79,7 +79,8 @@ fn create_lead_worker_from_env(
     default_model: &ModelConfig,
     lead_model_name: &str,
 ) -> Result<Arc<dyn Provider>> {
-    // Get lead provider (optional, defaults to main provider)
+    // Get lead provider (optional, defaults to main provider NOT openai)
+    // This ensures we don't require OpenAI API key when using a different provider
     let lead_provider_name =
         unified::get_or::<String>("lead.provider", default_provider_name.to_string());
 
@@ -118,9 +119,17 @@ fn create_lead_worker_from_env(
         worker_config
     };
 
-    // Create the providers
-    let lead_provider = create_provider(&lead_provider_name, lead_model_config)?;
-    let worker_provider = create_provider(default_provider_name, worker_model_config)?;
+    // Create the providers with better error messages
+    let lead_provider = create_provider(&lead_provider_name, lead_model_config)
+        .map_err(|e| anyhow::anyhow!(
+            "Failed to create lead provider '{}': {}. Make sure the required API key is configured (e.g., providers.{}.api_key)",
+            lead_provider_name, e, lead_provider_name
+        ))?;
+    let worker_provider = create_provider(default_provider_name, worker_model_config)
+        .map_err(|e| anyhow::anyhow!(
+            "Failed to create worker provider '{}': {}. Make sure the required API key is configured (e.g., providers.{}.api_key)",
+            default_provider_name, e, default_provider_name
+        ))?;
 
     // Create the lead/worker provider with configured settings
     Ok(Arc::new(LeadWorkerProvider::new_with_settings(
@@ -216,6 +225,64 @@ mod tests {
     }
 
     #[test]
+    fn test_lead_worker_uses_main_provider_by_default() {
+        // Save current config state
+        let saved_lead = unified::get::<String>("lead.model").ok();
+        let saved_provider = unified::get::<String>("lead.provider").ok();
+        let saved_llm_provider = unified::get::<String>("llm.provider").ok();
+
+        // Clear lead.provider to ensure it uses default
+        let _ = unified::unset("lead.provider");
+
+        // Set a non-OpenAI main provider
+        unified::set("llm.provider", serde_json::json!("anthropic")).unwrap();
+
+        // Set lead model to trigger lead/worker mode
+        unified::set("lead.model", serde_json::json!("claude-3-haiku")).unwrap();
+
+        // This should try to create lead/worker with anthropic as both lead and worker
+        let result = create("anthropic", ModelConfig::new_or_fail("claude-3-sonnet"));
+
+        // Should fail due to missing Anthropic API key, NOT OpenAI API key
+        match result {
+            Ok(_) => {
+                // Success means API keys are available
+            }
+            Err(error) => {
+                let error_msg = error.to_string();
+                // Should mention anthropic, not openai
+                assert!(
+                    error_msg.contains("anthropic") || error_msg.contains("ANTHROPIC"),
+                    "Error should mention anthropic provider, not OpenAI. Got: {}",
+                    error_msg
+                );
+                assert!(
+                    !error_msg.contains("OPENAI_API_KEY"),
+                    "Should not require OpenAI API key when using anthropic. Got: {}",
+                    error_msg
+                );
+            }
+        }
+
+        // Restore config state
+        if let Some(val) = saved_lead {
+            unified::set("lead.model", serde_json::json!(val)).unwrap();
+        } else {
+            let _ = unified::unset("lead.model");
+        }
+        if let Some(val) = saved_provider {
+            unified::set("lead.provider", serde_json::json!(val)).unwrap();
+        } else {
+            let _ = unified::unset("lead.provider");
+        }
+        if let Some(val) = saved_llm_provider {
+            unified::set("llm.provider", serde_json::json!(val)).unwrap();
+        } else {
+            let _ = unified::unset("llm.provider");
+        }
+    }
+
+    #[test]
     fn test_create_lead_worker_provider() {
         // Save current config state
         let saved_lead = unified::get::<String>("lead.model").ok();
@@ -240,9 +307,7 @@ mod tests {
                 let error_msg = error.to_string();
                 println!("Error creating provider: {}", error_msg);
                 assert!(
-                    error_msg.contains("OPENAI_API_KEY")
-                        || error_msg.contains("secret")
-                        || error_msg.contains("api_key"),
+                    error_msg.contains("api_key") || error_msg.contains("API"),
                     "Unexpected error: {}",
                     error_msg
                 );
@@ -305,9 +370,7 @@ mod tests {
                 // Should fail due to missing API keys, confirming we tried to create providers
                 let error_msg = error.to_string();
                 assert!(
-                    error_msg.contains("OPENAI_API_KEY")
-                        || error_msg.contains("secret")
-                        || error_msg.contains("api_key"),
+                    error_msg.contains("api_key") || error_msg.contains("API"),
                     "Unexpected error: {}",
                     error_msg
                 );
@@ -379,9 +442,7 @@ mod tests {
                 // If it fails, it should be due to missing API keys
                 let error_msg = error.to_string();
                 assert!(
-                    error_msg.contains("OPENAI_API_KEY")
-                        || error_msg.contains("secret")
-                        || error_msg.contains("api_key"),
+                    error_msg.contains("api_key") || error_msg.contains("API"),
                     "Unexpected error: {}",
                     error_msg
                 );

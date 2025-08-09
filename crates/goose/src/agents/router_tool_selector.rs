@@ -46,17 +46,71 @@ impl VectorToolSelector {
         let embedding_provider = if let Ok(embedding_provider_name) =
             uconfig::get::<String>("embeddings.provider")
         {
+            // Only try to create an embedding provider if explicitly configured
+            // Get the embedding model, with provider-specific defaults
+            let default_model = match embedding_provider_name.as_str() {
+                "openai" => "text-embedding-3-small",
+                "databricks" => "databricks-bge-large-en",
+                "litellm" => "text-embedding-3-small", // LiteLLM can proxy various models
+                "ollama" => "nomic-embed-text",        // Ollama default embedding model
+                _ => {
+                    // For providers that don't support embeddings, return an error
+                    return Err(anyhow::anyhow!(
+                        "Provider '{}' does not support embeddings. Please configure a different embeddings.provider (e.g., openai, databricks, litellm, ollama) or disable vector-based tool selection.",
+                        embedding_provider_name
+                    ));
+                }
+            };
+
             let embedding_model =
-                uconfig::get_or::<String>("embeddings.model", "text-embedding-3-small".to_string());
+                uconfig::get_or::<String>("embeddings.model", default_model.to_string());
+
             // Create the provider using the factory
             let model_config = ModelConfig::new(embedding_model.as_str())
                 .context("Failed to create model config for embedding provider")?;
-            providers::create(&embedding_provider_name, model_config).context(format!(
-                "Failed to create {} provider for embeddings. If using OpenAI, make sure OPENAI_API_KEY is set or configure the provider via goose configure.",
-                embedding_provider_name
-            ))?
+
+            // Try to create the provider, but provide a helpful error if it fails
+            match providers::create(&embedding_provider_name, model_config) {
+                Ok(provider) => provider,
+                Err(e) => {
+                    // Check if the error is about missing API key
+                    let error_str = e.to_string();
+                    if error_str.contains("api_key") || error_str.contains("API") {
+                        return Err(anyhow::anyhow!(
+                            "Failed to create {} provider for embeddings. The provider requires an API key to be configured.\n\
+                            Either:\n\
+                            1. Configure the API key: goose configure set providers.{}.api_key <key>\n\
+                            2. Use LLM-based tool selection instead: goose configure set router.tool_selection_strategy llm\n\
+                            3. Disable the router extension if not needed\n\
+                            Original error: {}",
+                            embedding_provider_name, embedding_provider_name, e
+                        ));
+                    } else {
+                        return Err(e).context(format!(
+                            "Failed to create {} provider for embeddings",
+                            embedding_provider_name
+                        ));
+                    }
+                }
+            }
         } else {
             // Otherwise fall back to using the same provider instance as used for base goose model
+            // Check if it supports embeddings first
+            if !provider.supports_embeddings() {
+                // Get the provider name for a better error message
+                let provider_name = provider.get_model_config().model_name.clone();
+                return Err(anyhow::anyhow!(
+                    "Vector-based tool selection requires a provider with embedding support, but the current provider does not support embeddings.\n\
+                    Either:\n\
+                    1. Configure an embedding provider that you have API access to:\n\
+                       goose configure set embeddings.provider openai  # (requires OpenAI API key)\n\
+                       goose configure set embeddings.provider ollama  # (for local embeddings)\n\
+                    2. Use LLM-based tool selection instead: goose configure set router.tool_selection_strategy llm\n\
+                    3. Disable the router extension if vector search is not needed\n\
+                    Current provider model: {}",
+                    provider_name
+                ));
+            }
             provider.clone()
         };
 
