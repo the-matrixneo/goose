@@ -395,7 +395,7 @@ const BuildView: React.FC = () => {
               <div className="flex justify-between items-center mb-1">
                 <h1 className="text-4xl font-light">Build</h1>
                 {/* Create App button on the right - show when not loading */}
-                {!isLoading && (apps.length > 0 || creatingApps.length > 0) && (
+                {!isLoading && (
                   <Button
                     onClick={handleCreateAppClick}
                     variant="default"
@@ -547,8 +547,6 @@ const BuildView: React.FC = () => {
                 </div>
               ))}
 
-                  {/* Filler container - extends to fill remaining space */}
-                  <div className="bg-background-default rounded-2xl" style={{ minHeight: "calc(100vh - 300px)" }}></div>
                 </>
               ) : (
                 /* Empty state - two separate containers */
@@ -574,9 +572,7 @@ const BuildView: React.FC = () => {
                       </div>
                     </div>
                   </div>
-
-                  {/* Filler container - extends to fill remaining space */}
-                  <div className="bg-background-default rounded-2xl" style={{ minHeight: "calc(100vh - 300px)" }}></div>                </>
+                </>
               )}
             </div>
           </div>
