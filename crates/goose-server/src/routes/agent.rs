@@ -88,6 +88,21 @@ struct ErrorResponse {
     error: String,
 }
 
+#[derive(Deserialize, utoipa::ToSchema)]
+pub struct ExecuteToolRequest {
+    tool_name: String,
+    arguments: serde_json::Value,
+    #[allow(dead_code)] // Reserved for future session-specific tool execution
+    session_id: Option<String>,
+}
+
+#[derive(Serialize, utoipa::ToSchema)]
+pub struct ExecuteToolResponse {
+    success: bool,
+    result: Option<serde_json::Value>,
+    error: Option<String>,
+}
+
 async fn get_versions() -> Json<VersionsResponse> {
     let versions = ["goose".to_string()];
     let default_version = "goose".to_string();
@@ -342,6 +357,179 @@ async fn update_session_config(
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/agent/execute_tool",
+    request_body = ExecuteToolRequest,
+    responses(
+        (status = 200, description = "Tool executed successfully", body = ExecuteToolResponse),
+        (status = 401, description = "Unauthorized - invalid secret key"),
+        (status = 424, description = "Agent not initialized"),
+        (status = 500, description = "Internal server error")
+    ),
+    tag = "Agent Tools"
+)]
+async fn execute_tool(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(payload): Json<ExecuteToolRequest>,
+) -> Result<Json<ExecuteToolResponse>, StatusCode> {
+    verify_secret_key(&headers, &state)?;
+
+    let agent = state
+        .get_agent()
+        .await
+        .map_err(|_| StatusCode::PRECONDITION_FAILED)?;
+
+    // 🔍 Debug: Log available tools
+    let available_tools = agent.list_tools(None).await;
+    tracing::info!("🔍 Available tools in agent: {:?}", available_tools.iter().map(|t| &t.name).collect::<Vec<_>>());
+    tracing::info!("🔍 Total tools available: {}", available_tools.len());
+    
+    // 🔧 Debug: Log registered extensions
+    {
+        let extension_manager = agent.extension_manager.read().await;
+        let extensions = extension_manager.list_extensions().await;
+        match extensions {
+            Ok(ext_list) => tracing::info!("🔧 Registered extensions: {:?}", ext_list),
+            Err(e) => tracing::error!("🔧 Failed to list extensions: {:?}", e),
+        }
+    }
+    
+    tracing::info!("🎯 Requested tool: {}", payload.tool_name);
+    
+    // 🔎 Debug: Check if requested tool exists
+    let tool_exists = available_tools.iter().any(|t| t.name == payload.tool_name);
+    tracing::info!("🔎 Tool exists in available tools: {}", tool_exists);
+
+    // 🧭 Resolve tool name to a registered extension prefix if needed
+    let mut resolved_tool_name = payload.tool_name.clone();
+    if !tool_exists {
+        // Helper: normalize similar to backend extension normalization
+        fn normalize_like_backend(input: &str) -> String {
+            let mut result = String::with_capacity(input.len());
+            for c in input.chars() {
+                match c {
+                    c if c.is_ascii_alphanumeric() || c == '_' || c == '-' => result.push(c),
+                    c if c.is_whitespace() => { /* skip */ }
+                    _ => result.push('_'),
+                }
+            }
+            result.to_lowercase()
+        }
+
+        // Split incoming tool name into prefix and tool part if provided
+        let (incoming_prefix_opt, incoming_tool_part) = match resolved_tool_name.split_once("__") {
+            Some((p, t)) => (Some(p.to_string()), t.to_string()),
+            None => (None, resolved_tool_name.clone()),
+        };
+
+        // Fetch registered extensions
+        let registered_extensions: Vec<String> = {
+            let extension_manager = agent.extension_manager.read().await;
+            match extension_manager.list_extensions().await {
+                Ok(exts) => exts,
+                Err(_) => Vec::new(),
+            }
+        };
+
+        // Try to map by prefix if provided
+        let mut remapped = false;
+        if let Some(incoming_prefix) = incoming_prefix_opt.as_ref() {
+            let norm = normalize_like_backend(incoming_prefix);
+            let norm_trim = norm.trim_matches('_');
+            for ext in &registered_extensions {
+                let ext_trim = ext.trim_matches('_');
+                if norm_trim == ext_trim || norm_trim == ext.as_str() {
+                    let candidate = format!("{}__{}", ext, incoming_tool_part);
+                    if available_tools.iter().any(|t| t.name == candidate) {
+                        tracing::info!("🧭 Remapped tool prefix: '{}' -> '{}'", incoming_prefix, ext);
+                        resolved_tool_name = candidate;
+                        remapped = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // If still not found, try suffix match (any tool ending with __<name>)
+        if !remapped {
+            let suffix = format!("__{}", resolved_tool_name);
+            if let Some(candidate) = available_tools
+                .iter()
+                .find(|t| t.name.ends_with(&suffix))
+                .map(|t| t.name.clone().to_string())
+            {
+                tracing::info!("🧭 Suffix-mapped tool: '{}' -> '{}'", resolved_tool_name, candidate);
+                resolved_tool_name = candidate;
+            }
+        }
+    }
+
+    // Create a tool call with the resolved name
+    let tool_call = mcp_core::tool::ToolCall::new(
+        resolved_tool_name,
+        payload.arguments,
+    );
+
+    // Generate a unique request ID using timestamp
+    let request_id = format!("tool_{}", chrono::Utc::now().timestamp_millis());
+
+    // Create a cancellation token for the tool execution
+    let cancellation_token = tokio_util::sync::CancellationToken::new();
+
+    // 🚀 Debug: Log before dispatching tool
+    tracing::info!("🚀 Dispatching tool call: {:?}", tool_call);
+
+    // Execute the tool
+    let (_returned_id, result) = agent
+        .dispatch_tool_call(tool_call, request_id, Some(cancellation_token))
+        .await;
+
+    // 📋 Debug: Log dispatch result
+    tracing::info!("📋 Tool dispatch result: {:?}", result.is_ok());
+
+    match result {
+        Ok(tool_call_result) => {
+            // Execute the future to get the actual result
+            let actual_result = tool_call_result.result.await;
+            
+            match actual_result {
+                Ok(content) => {
+                    // Convert content to JSON
+                    let result_json = serde_json::to_value(content)
+                        .ok()
+                        .or_else(|| Some(serde_json::json!({ "message": "Tool executed successfully" })));
+
+                    Ok(Json(ExecuteToolResponse {
+                        success: true,
+                        result: result_json,
+                        error: None,
+                    }))
+                }
+                        Err(e) => {
+            tracing::error!("❌ Tool execution failed: {}", e);
+            tracing::error!("❌ Error details: {:?}", e);
+            Ok(Json(ExecuteToolResponse {
+                success: false,
+                result: None,
+                error: Some(e.to_string()),
+            }))
+        }
+            }
+        }
+        Err(e) => {
+            tracing::error!("❌ Tool dispatch failed: {}", e);
+            tracing::error!("❌ Dispatch error details: {:?}", e);
+            Ok(Json(ExecuteToolResponse {
+                success: false,
+                result: None,
+                error: Some(e.to_string()),
+            }))
+        }
+    }
+}
+
 pub fn routes(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/agent/versions", get(get_versions))
@@ -355,5 +543,6 @@ pub fn routes(state: Arc<AppState>) -> Router {
         )
         .route("/agent/session_config", post(update_session_config))
         .route("/agent/add_sub_recipes", post(add_sub_recipes))
+        .route("/agent/execute_tool", post(execute_tool))
         .with_state(state)
 }
