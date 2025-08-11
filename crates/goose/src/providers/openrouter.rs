@@ -122,7 +122,6 @@ fn update_request_for_anthropic(original_payload: &Value) -> Value {
         .and_then(|obj| obj.get_mut("messages"))
         .and_then(|messages| messages.as_array_mut())
     {
-
         // Add "cache_control" to the last and second-to-last "user" messages.
         // During each turn, we mark the final message with cache_control so the conversation can be
         // incrementally cached. The second-to-last user message is also marked for caching with the

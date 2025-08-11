@@ -38,12 +38,12 @@ impl Agent {
 
         // Get tools from extension manager
         let mut tools = self.list_tools_for_router().await;
-        
+
         // If router is disabled and no tools were returned, fall back to regular tools
         if !router_enabled && tools.is_empty() {
             tools = self.list_tools(None).await;
         }
-        
+
         // Add frontend tools
         let frontend_tools = self.frontend_tools.lock().await;
         for frontend_tool in frontend_tools.values() {

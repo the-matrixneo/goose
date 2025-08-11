@@ -1190,19 +1190,11 @@ pub fn configure_goose_router_strategy_dialog() -> Result<(), Box<dyn Error>> {
 
     match enable_router {
         "true" => {
-            config.set_param(
-                "GOOSE_ENABLE_ROUTER",
-                Value::String("true".to_string()),
-            )?;
-            cliclack::outro(
-                "Router enabled - using LLM-based intelligence for tool selection",
-            )?;
+            config.set_param("GOOSE_ENABLE_ROUTER", Value::String("true".to_string()))?;
+            cliclack::outro("Router enabled - using LLM-based intelligence for tool selection")?;
         }
         "false" => {
-            config.set_param(
-                "GOOSE_ENABLE_ROUTER",
-                Value::String("false".to_string()),
-            )?;
+            config.set_param("GOOSE_ENABLE_ROUTER", Value::String("false".to_string()))?;
             cliclack::outro("Router disabled - using default tool selection")?;
         }
         _ => unreachable!(),

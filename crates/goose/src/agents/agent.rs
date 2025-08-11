@@ -702,9 +702,7 @@ impl Agent {
         prefixed_tools
     }
 
-    pub async fn list_tools_for_router(
-        &self,
-    ) -> Vec<Tool> {
+    pub async fn list_tools_for_router(&self) -> Vec<Tool> {
         self.tool_route_manager
             .list_tools_for_router(&self.extension_manager)
             .await
