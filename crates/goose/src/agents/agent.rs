@@ -97,6 +97,7 @@ pub struct Agent {
     pub(super) tool_route_manager: ToolRouteManager,
     pub(super) scheduler_service: Mutex<Option<Arc<dyn SchedulerTrait>>>,
     pub(super) retry_manager: RetryManager,
+    pub(super) active_session: Arc<Mutex<Option<crate::agents::types::SessionConfig>>>,
 }
 
 #[derive(Clone, Debug)]
@@ -173,6 +174,7 @@ impl Agent {
             tool_route_manager: ToolRouteManager::new(),
             scheduler_service: Mutex::new(None),
             retry_manager,
+            active_session: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -431,7 +433,9 @@ impl Agent {
         } else if tool_call.name == SUBAGENT_EXECUTE_TASK_TOOL_NAME {
             let provider = self.provider().await.ok();
 
-            let task_config = TaskConfig::new(provider);
+            let mut task_config = TaskConfig::new(provider);
+            // Attach active session if present
+            task_config.session = self.active_session.lock().await.clone();
             subagent_execute_task_tool::run_tasks(
                 tool_call.arguments.clone(),
                 task_config,
@@ -865,6 +869,12 @@ impl Agent {
         } = context;
         let reply_span = tracing::Span::current();
         self.reset_retry_attempts().await;
+
+        // Set active session for tool calls (e.g., subagents)
+        {
+            let mut active = self.active_session.lock().await;
+            *active = session.clone();
+        }
 
         if let Some(content) = messages
             .last()

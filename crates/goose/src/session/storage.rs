@@ -65,6 +65,12 @@ pub struct SessionMetadata {
     pub accumulated_input_tokens: Option<i32>,
     /// The number of output tokens used in the session. Accumulated across all messages.
     pub accumulated_output_tokens: Option<i32>,
+    /// The total number of tokens used by subagents in the session. Accumulated across all subagent runs.
+    pub accumulated_subagent_total_tokens: Option<i32>,
+    /// The number of input tokens used by subagents in the session. Accumulated across all subagent runs.
+    pub accumulated_subagent_input_tokens: Option<i32>,
+    /// The number of output tokens used by subagents in the session. Accumulated across all subagent runs.
+    pub accumulated_subagent_output_tokens: Option<i32>,
 }
 
 // Custom deserializer to handle old sessions without working_dir
@@ -85,6 +91,9 @@ impl<'de> Deserialize<'de> for SessionMetadata {
             accumulated_total_tokens: Option<i32>,
             accumulated_input_tokens: Option<i32>,
             accumulated_output_tokens: Option<i32>,
+            accumulated_subagent_total_tokens: Option<i32>,
+            accumulated_subagent_input_tokens: Option<i32>,
+            accumulated_subagent_output_tokens: Option<i32>,
             working_dir: Option<PathBuf>,
         }
 
@@ -107,6 +116,9 @@ impl<'de> Deserialize<'de> for SessionMetadata {
             accumulated_total_tokens: helper.accumulated_total_tokens,
             accumulated_input_tokens: helper.accumulated_input_tokens,
             accumulated_output_tokens: helper.accumulated_output_tokens,
+            accumulated_subagent_total_tokens: helper.accumulated_subagent_total_tokens,
+            accumulated_subagent_input_tokens: helper.accumulated_subagent_input_tokens,
+            accumulated_subagent_output_tokens: helper.accumulated_subagent_output_tokens,
             working_dir,
         })
     }
@@ -133,6 +145,9 @@ impl SessionMetadata {
             accumulated_total_tokens: None,
             accumulated_input_tokens: None,
             accumulated_output_tokens: None,
+            accumulated_subagent_total_tokens: None,
+            accumulated_subagent_input_tokens: None,
+            accumulated_subagent_output_tokens: None,
         }
     }
 }

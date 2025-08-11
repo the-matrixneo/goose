@@ -95,8 +95,13 @@ async fn handle_text_instruction_task(
         }
     };
     match result {
-        Ok(result_text) => Ok(serde_json::json!({
-            "result": result_text
+        Ok((result_text, usage)) => Ok(serde_json::json!({
+            "result": result_text,
+            "usage": {
+                "input_tokens": usage.input_tokens,
+                "output_tokens": usage.output_tokens,
+                "total_tokens": usage.total_tokens,
+            }
         })),
         Err(e) => {
             let error_msg = format!("Subagent execution failed: {}", e);

@@ -18,6 +18,8 @@ use std::{collections::HashMap, sync::Arc};
 use tokio::sync::{Mutex, RwLock};
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, instrument};
+use crate::providers::base::Usage;
+use crate::agents::reply_parts::update_session_subagent_metrics;
 
 /// Status of a subagent
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -48,6 +50,7 @@ pub struct SubAgent {
     pub turn_count: Arc<Mutex<usize>>,
     pub created_at: DateTime<Utc>,
     pub extension_manager: Arc<RwLock<ExtensionManager>>,
+    pub accumulated_usage: Arc<Mutex<Usage>>,
 }
 
 impl SubAgent {
@@ -87,6 +90,7 @@ impl SubAgent {
             turn_count: Arc::new(Mutex::new(0)),
             created_at: Utc::now(),
             extension_manager: Arc::new(RwLock::new(extension_manager)),
+            accumulated_usage: Arc::new(Mutex::new(Usage::default())),
         });
 
         debug!("Subagent {} created successfully", subagent.id);
@@ -166,7 +170,20 @@ impl SubAgent {
             )
             .await
             {
-                Ok((response, _usage)) => {
+                Ok((response, usage)) => {
+                    // Accumulate provider usage
+                    {
+                        let mut acc = self.accumulated_usage.lock().await;
+                        *acc += usage.usage;
+                    }
+
+                    // Update session subagent accumulators if session is available
+                    if let Some(session_cfg) = &self.config.session {
+                        if let Err(e) = update_session_subagent_metrics(session_cfg, &usage.usage).await {
+                            debug!("Failed to update subagent session metrics: {}", e);
+                        }
+                    }
+
                     // Process any tool calls in the response
                     let tool_requests: Vec<ToolRequest> = response
                         .content
@@ -319,5 +336,10 @@ impl SubAgent {
             .map_err(|e| anyhow!("Failed to render subagent system prompt: {}", e))?;
 
         Ok(system_prompt)
+    }
+
+    /// Get the accumulated token usage for this subagent
+    pub async fn get_usage(&self) -> Usage {
+        *self.accumulated_usage.lock().await
     }
 }

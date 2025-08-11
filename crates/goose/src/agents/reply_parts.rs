@@ -4,6 +4,9 @@ use std::sync::Arc;
 
 use async_stream::try_stream;
 use futures::stream::StreamExt;
+use futures::TryStreamExt;
+use tokio_stream::StreamExt;
+use tracing::debug;
 
 use super::super::agents::Agent;
 use crate::agents::router_tool_selector::RouterToolSelectionStrategy;
@@ -314,4 +317,36 @@ impl Agent {
 
         Ok(())
     }
+}
+
+/// Update only subagent token accumulators on the session metadata
+pub(crate) async fn update_session_subagent_metrics(
+    session_config: &crate::agents::types::SessionConfig,
+    usage: &ProviderUsage,
+) -> Result<()> {
+    let session_file_path = match session::storage::get_path(session_config.id.clone()) {
+        Ok(path) => path,
+        Err(e) => {
+            return Err(anyhow::anyhow!("Failed to get session file path: {}", e));
+        }
+    };
+    let mut metadata = session::storage::read_metadata(&session_file_path)?;
+
+    let accumulate = |a: Option<i32>, b: Option<i32>| -> Option<i32> {
+        match (a, b) {
+            (Some(x), Some(y)) => Some(x + y),
+            _ => a.or(b),
+        }
+    };
+
+    metadata.accumulated_subagent_total_tokens =
+        accumulate(metadata.accumulated_subagent_total_tokens, usage.total_tokens);
+    metadata.accumulated_subagent_input_tokens =
+        accumulate(metadata.accumulated_subagent_input_tokens, usage.input_tokens);
+    metadata.accumulated_subagent_output_tokens =
+        accumulate(metadata.accumulated_subagent_output_tokens, usage.output_tokens);
+
+    session::storage::update_metadata(&session_file_path, &metadata).await?;
+
+    Ok(())
 }

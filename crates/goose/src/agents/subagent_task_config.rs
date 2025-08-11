@@ -3,6 +3,7 @@ use std::env;
 use std::fmt;
 use std::sync::Arc;
 use uuid::Uuid;
+use crate::agents::types::SessionConfig;
 
 /// Default maximum number of turns for task execution
 pub const DEFAULT_SUBAGENT_MAX_TURNS: usize = 5;
@@ -16,6 +17,7 @@ pub struct TaskConfig {
     pub id: String,
     pub provider: Option<Arc<dyn Provider>>,
     pub max_turns: Option<usize>,
+    pub session: Option<SessionConfig>,
 }
 
 impl fmt::Debug for TaskConfig {
@@ -40,6 +42,7 @@ impl TaskConfig {
                     .and_then(|val| val.parse::<usize>().ok())
                     .unwrap_or(DEFAULT_SUBAGENT_MAX_TURNS),
             ),
+            session: None,
         }
     }
 
