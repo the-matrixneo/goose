@@ -70,18 +70,19 @@ impl ToolRouteManager {
             return false;
         }
 
-        // Check environment variable first (takes precedence)
+        // Check config first (takes precedence)
+        let config = Config::global();
+        if let Ok(config_value) = config.get_param::<String>("GOOSE_ENABLE_ROUTER") {
+            return config_value.to_lowercase() == "true";
+        }
+
+        // Fall back to environment variable
         if let Ok(env_value) = std::env::var("GOOSE_ENABLE_ROUTER") {
             return env_value.to_lowercase() == "true";
         }
 
-        // Fall back to config
-        let config = Config::global();
-        let router_tool_selection_strategy = config
-            .get_param("GOOSE_ENABLE_ROUTER")
-            .unwrap_or_else(|_| "false".to_string());
-
-        router_tool_selection_strategy.to_lowercase() == "true"
+        // Default to false if neither is set
+        false
     }
 
     pub async fn update_router_tool_selector(

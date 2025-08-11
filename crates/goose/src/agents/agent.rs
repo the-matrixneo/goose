@@ -1250,14 +1250,13 @@ impl Agent {
         let model_config = provider.get_model_config();
         let model_name = &model_config.model_name;
 
-        let router_enabled = self.tool_route_manager.is_router_enabled().await;
         let prompt_manager = self.prompt_manager.lock().await;
         let system_prompt = prompt_manager.build_system_prompt(
             extensions_info,
             self.frontend_instructions.lock().await.clone(),
             extension_manager.suggest_disable_extensions_prompt().await,
             Some(model_name),
-            router_enabled,
+            false,
         );
 
         let recipe_prompt = prompt_manager.get_recipe_prompt().await;
