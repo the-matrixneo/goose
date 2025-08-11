@@ -21,7 +21,6 @@ use crate::agents::recipe_tools::dynamic_task_tools::{
     create_dynamic_task, create_dynamic_task_tool, DYNAMIC_TASK_TOOL_NAME_PREFIX,
 };
 use crate::agents::retry::{RetryManager, RetryResult};
-use crate::agents::router_tool_selector::RouterToolSelector;
 use crate::agents::router_tools::ROUTER_LLM_SEARCH_TOOL_NAME;
 use crate::agents::sub_recipe_manager::SubRecipeManager;
 use crate::agents::subagent_execution_tool::subagent_execute_task_tool::{
@@ -505,26 +504,28 @@ impl Agent {
         extension_name: String,
         request_id: String,
     ) -> (String, Result<Vec<Content>, ToolError>) {
-        let selector = self.tool_route_manager.get_router_tool_selector().await;
-        if let Some(selector) = selector {
-            let selector_action = if action == "disable" { "remove" } else { "add" };
-            let extension_manager = self.extension_manager.read().await;
-            let selector = Arc::new(selector);
-            if let Err(e) = ToolRouterIndexManager::update_extension_tools(
-                &selector,
-                &extension_manager,
-                &extension_name,
-                selector_action,
-            )
-            .await
-            {
-                return (
-                    request_id,
-                    Err(ToolError::ExecutionError(format!(
-                        "Failed to update LLM index: {}",
-                        e
-                    ))),
-                );
+        if self.tool_route_manager.is_router_functional().await {
+            let selector = self.tool_route_manager.get_router_tool_selector().await;
+            if let Some(selector) = selector {
+                let selector_action = if action == "disable" { "remove" } else { "add" };
+                let extension_manager = self.extension_manager.read().await;
+                let selector = Arc::new(selector);
+                if let Err(e) = ToolRouterIndexManager::update_extension_tools(
+                    &selector,
+                    &extension_manager,
+                    &extension_name,
+                    selector_action,
+                )
+                .await
+                {
+                    return (
+                        request_id,
+                        Err(ToolError::ExecutionError(format!(
+                            "Failed to update LLM index: {}",
+                            e
+                        ))),
+                    );
+                }
             }
         }
         let mut extension_manager = self.extension_manager.write().await;
@@ -575,8 +576,8 @@ impl Agent {
             .map_err(|e| ToolError::ExecutionError(e.to_string()));
 
         drop(extension_manager);
-        // Update LLM index if operation was successful and LLM routing is enabled
-        if result.is_ok() {
+        // Update LLM index if operation was successful and LLM routing is functional
+        if result.is_ok() && self.tool_route_manager.is_router_functional().await {
             let selector = self.tool_route_manager.get_router_tool_selector().await;
             if let Some(selector) = selector {
                 let llm_action = if action == "disable" { "remove" } else { "add" };
@@ -637,25 +638,26 @@ impl Agent {
             }
         }
 
-        // If LLM tool selection is enabled, index the tools
-        let selector: Option<Arc<Box<dyn RouterToolSelector>>> =
-            self.tool_route_manager.get_router_tool_selector().await;
-        if let Some(selector) = selector {
-            let extension_manager = self.extension_manager.read().await;
-            let selector = Arc::new(selector);
-            if let Err(e) = ToolRouterIndexManager::update_extension_tools(
-                &selector,
-                &extension_manager,
-                &extension.name(),
-                "add",
-            )
-            .await
-            {
-                return Err(ExtensionError::SetupError(format!(
-                    "Failed to index tools for extension {}: {}",
-                    extension.name(),
-                    e
-                )));
+        // If LLM tool selection is functional, index the tools
+        if self.tool_route_manager.is_router_functional().await {
+            let selector = self.tool_route_manager.get_router_tool_selector().await;
+            if let Some(selector) = selector {
+                let extension_manager = self.extension_manager.read().await;
+                let selector = Arc::new(selector);
+                if let Err(e) = ToolRouterIndexManager::update_extension_tools(
+                    &selector,
+                    &extension_manager,
+                    &extension.name(),
+                    "add",
+                )
+                .await
+                {
+                    return Err(ExtensionError::SetupError(format!(
+                        "Failed to index tools for extension {}: {}",
+                        extension.name(),
+                        e
+                    )));
+                }
             }
         }
 
@@ -713,17 +715,19 @@ impl Agent {
         extension_manager.remove_extension(name).await?;
         drop(extension_manager);
 
-        // If LLM tool selection is enabled, remove tools from the index
-        let selector = self.tool_route_manager.get_router_tool_selector().await;
-        if let Some(selector) = selector {
-            let extension_manager = self.extension_manager.read().await;
-            ToolRouterIndexManager::update_extension_tools(
-                &selector,
-                &extension_manager,
-                name,
-                "remove",
-            )
-            .await?;
+        // If LLM tool selection is functional, remove tools from the index
+        if self.tool_route_manager.is_router_functional().await {
+            let selector = self.tool_route_manager.get_router_tool_selector().await;
+            if let Some(selector) = selector {
+                let extension_manager = self.extension_manager.read().await;
+                ToolRouterIndexManager::update_extension_tools(
+                    &selector,
+                    &extension_manager,
+                    name,
+                    "remove",
+                )
+                .await?;
+            }
         }
 
         Ok(())

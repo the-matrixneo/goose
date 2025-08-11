@@ -70,6 +70,12 @@ impl ToolRouteManager {
             return false;
         }
 
+        // Check environment variable first (takes precedence)
+        if let Ok(env_value) = std::env::var("GOOSE_ENABLE_ROUTER") {
+            return env_value.to_lowercase() == "true";
+        }
+
+        // Fall back to config
         let config = Config::global();
         let router_tool_selection_strategy = config
             .get_param("GOOSE_ENABLE_ROUTER")
@@ -129,6 +135,16 @@ impl ToolRouteManager {
         self.router_tool_selector.lock().await.clone()
     }
 
+    /// Check if the router is actually functional (enabled in config AND initialized)
+    pub async fn is_router_functional(&self) -> bool {
+        if !self.is_router_enabled().await {
+            return false;
+        }
+
+        // Check if the selector actually exists (meaning it was successfully initialized)
+        self.router_tool_selector.lock().await.is_some()
+    }
+
     pub async fn list_tools_for_router(
         &self,
         extension_manager: &Arc<RwLock<ExtensionManager>>,
@@ -146,8 +162,8 @@ impl ToolRouteManager {
         let mut prefixed_tools = vec![];
         prefixed_tools.push(router_tools::llm_search_tool());
 
-        // If router is enabled but not initialized (no provider), just return the search tool
-        if self.router_tool_selector.lock().await.is_none() {
+        // If router is enabled but not functional (no provider), just return the search tool
+        if !self.is_router_functional().await {
             return prefixed_tools;
         }
 
