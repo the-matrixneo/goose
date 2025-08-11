@@ -21,11 +21,6 @@ struct ToolSelectorContext {
     query: String,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum RouterToolSelectionStrategy {
-    Llm,
-}
-
 #[async_trait]
 pub trait RouterToolSelector: Send + Sync {
     async fn select_tools(&self, params: Value) -> Result<Vec<Content>, ToolError>;
@@ -33,7 +28,6 @@ pub trait RouterToolSelector: Send + Sync {
     async fn remove_tool(&self, tool_name: &str) -> Result<(), ToolError>;
     async fn record_tool_call(&self, tool_name: &str) -> Result<(), ToolError>;
     async fn get_recent_tool_calls(&self, limit: usize) -> Result<Vec<String>, ToolError>;
-    fn selector_type(&self) -> RouterToolSelectionStrategy;
 }
 
 pub struct LLMToolSelector {
@@ -166,25 +160,12 @@ impl RouterToolSelector for LLMToolSelector {
         let recent_calls = self.recent_tool_calls.read().await;
         Ok(recent_calls.iter().rev().take(limit).cloned().collect())
     }
-
-    fn selector_type(&self) -> RouterToolSelectionStrategy {
-        RouterToolSelectionStrategy::Llm
-    }
 }
 
 // Helper function to create a boxed tool selector
 pub async fn create_tool_selector(
-    strategy: Option<RouterToolSelectionStrategy>,
     provider: Arc<dyn Provider>,
 ) -> Result<Box<dyn RouterToolSelector>> {
-    match strategy {
-        Some(RouterToolSelectionStrategy::Llm) => {
-            let selector = LLMToolSelector::new(provider).await?;
-            Ok(Box::new(selector))
-        }
-        None => {
-            let selector = LLMToolSelector::new(provider).await?;
-            Ok(Box::new(selector))
-        }
-    }
+    let selector = LLMToolSelector::new(provider).await?;
+    Ok(Box::new(selector))
 }

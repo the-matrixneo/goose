@@ -21,7 +21,7 @@ use crate::agents::recipe_tools::dynamic_task_tools::{
     create_dynamic_task, create_dynamic_task_tool, DYNAMIC_TASK_TOOL_NAME_PREFIX,
 };
 use crate::agents::retry::{RetryManager, RetryResult};
-use crate::agents::router_tool_selector::{RouterToolSelectionStrategy, RouterToolSelector};
+use crate::agents::router_tool_selector::RouterToolSelector;
 use crate::agents::router_tools::ROUTER_LLM_SEARCH_TOOL_NAME;
 use crate::agents::sub_recipe_manager::SubRecipeManager;
 use crate::agents::subagent_execution_tool::subagent_execute_task_tool::{
@@ -506,27 +506,25 @@ impl Agent {
         request_id: String,
     ) -> (String, Result<Vec<Content>, ToolError>) {
         let selector = self.tool_route_manager.get_router_tool_selector().await;
-        if ToolRouterIndexManager::is_tool_router_enabled(&selector) {
-            if let Some(selector) = selector {
-                let selector_action = if action == "disable" { "remove" } else { "add" };
-                let extension_manager = self.extension_manager.read().await;
-                let selector = Arc::new(selector);
-                if let Err(e) = ToolRouterIndexManager::update_extension_tools(
-                    &selector,
-                    &extension_manager,
-                    &extension_name,
-                    selector_action,
-                )
-                .await
-                {
-                    return (
-                        request_id,
-                        Err(ToolError::ExecutionError(format!(
-                            "Failed to update LLM index: {}",
-                            e
-                        ))),
-                    );
-                }
+        if let Some(selector) = selector {
+            let selector_action = if action == "disable" { "remove" } else { "add" };
+            let extension_manager = self.extension_manager.read().await;
+            let selector = Arc::new(selector);
+            if let Err(e) = ToolRouterIndexManager::update_extension_tools(
+                &selector,
+                &extension_manager,
+                &extension_name,
+                selector_action,
+            )
+            .await
+            {
+                return (
+                    request_id,
+                    Err(ToolError::ExecutionError(format!(
+                        "Failed to update LLM index: {}",
+                        e
+                    ))),
+                );
             }
         }
         let mut extension_manager = self.extension_manager.write().await;
@@ -580,27 +578,25 @@ impl Agent {
         // Update LLM index if operation was successful and LLM routing is enabled
         if result.is_ok() {
             let selector = self.tool_route_manager.get_router_tool_selector().await;
-            if ToolRouterIndexManager::is_tool_router_enabled(&selector) {
-                if let Some(selector) = selector {
-                    let llm_action = if action == "disable" { "remove" } else { "add" };
-                    let extension_manager = self.extension_manager.read().await;
-                    let selector = Arc::new(selector);
-                    if let Err(e) = ToolRouterIndexManager::update_extension_tools(
-                        &selector,
-                        &extension_manager,
-                        &extension_name,
-                        llm_action,
-                    )
-                    .await
-                    {
-                        return (
-                            request_id,
-                            Err(ToolError::ExecutionError(format!(
-                                "Failed to update LLM index: {}",
-                                e
-                            ))),
-                        );
-                    }
+            if let Some(selector) = selector {
+                let llm_action = if action == "disable" { "remove" } else { "add" };
+                let extension_manager = self.extension_manager.read().await;
+                let selector = Arc::new(selector);
+                if let Err(e) = ToolRouterIndexManager::update_extension_tools(
+                    &selector,
+                    &extension_manager,
+                    &extension_name,
+                    llm_action,
+                )
+                .await
+                {
+                    return (
+                        request_id,
+                        Err(ToolError::ExecutionError(format!(
+                            "Failed to update LLM index: {}",
+                            e
+                        ))),
+                    );
                 }
             }
         }
@@ -644,24 +640,22 @@ impl Agent {
         // If LLM tool selection is enabled, index the tools
         let selector: Option<Arc<Box<dyn RouterToolSelector>>> =
             self.tool_route_manager.get_router_tool_selector().await;
-        if ToolRouterIndexManager::is_tool_router_enabled(&selector) {
-            if let Some(selector) = selector {
-                let extension_manager = self.extension_manager.read().await;
-                let selector = Arc::new(selector);
-                if let Err(e) = ToolRouterIndexManager::update_extension_tools(
-                    &selector,
-                    &extension_manager,
-                    &extension.name(),
-                    "add",
-                )
-                .await
-                {
-                    return Err(ExtensionError::SetupError(format!(
-                        "Failed to index tools for extension {}: {}",
-                        extension.name(),
-                        e
-                    )));
-                }
+        if let Some(selector) = selector {
+            let extension_manager = self.extension_manager.read().await;
+            let selector = Arc::new(selector);
+            if let Err(e) = ToolRouterIndexManager::update_extension_tools(
+                &selector,
+                &extension_manager,
+                &extension.name(),
+                "add",
+            )
+            .await
+            {
+                return Err(ExtensionError::SetupError(format!(
+                    "Failed to index tools for extension {}: {}",
+                    extension.name(),
+                    e
+                )));
             }
         }
 
@@ -710,10 +704,9 @@ impl Agent {
 
     pub async fn list_tools_for_router(
         &self,
-        strategy: Option<RouterToolSelectionStrategy>,
     ) -> Vec<Tool> {
         self.tool_route_manager
-            .list_tools_for_router(strategy, &self.extension_manager)
+            .list_tools_for_router(&self.extension_manager)
             .await
     }
 
@@ -724,17 +717,15 @@ impl Agent {
 
         // If LLM tool selection is enabled, remove tools from the index
         let selector = self.tool_route_manager.get_router_tool_selector().await;
-        if ToolRouterIndexManager::is_tool_router_enabled(&selector) {
-            if let Some(selector) = selector {
-                let extension_manager = self.extension_manager.read().await;
-                ToolRouterIndexManager::update_extension_tools(
-                    &selector,
-                    &extension_manager,
-                    name,
-                    "remove",
-                )
-                .await?;
-            }
+        if let Some(selector) = selector {
+            let extension_manager = self.extension_manager.read().await;
+            ToolRouterIndexManager::update_extension_tools(
+                &selector,
+                &extension_manager,
+                name,
+                "remove",
+            )
+            .await?;
         }
 
         Ok(())
@@ -1257,13 +1248,14 @@ impl Agent {
         let model_config = provider.get_model_config();
         let model_name = &model_config.model_name;
 
+        let router_enabled = self.tool_route_manager.is_router_enabled().await;
         let prompt_manager = self.prompt_manager.lock().await;
         let system_prompt = prompt_manager.build_system_prompt(
             extensions_info,
             self.frontend_instructions.lock().await.clone(),
             extension_manager.suggest_disable_extensions_prompt().await,
             Some(model_name),
-            None,
+            router_enabled,
         );
 
         let recipe_prompt = prompt_manager.get_recipe_prompt().await;
@@ -1422,7 +1414,7 @@ mod tests {
 
         let prompt_manager = agent.prompt_manager.lock().await;
         let system_prompt =
-            prompt_manager.build_system_prompt(vec![], None, Value::Null, None, None);
+            prompt_manager.build_system_prompt(vec![], None, Value::Null, None, false);
 
         let final_output_tool_ref = agent.final_output_tool.lock().await;
         let final_output_tool_system_prompt =

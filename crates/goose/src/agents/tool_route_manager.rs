@@ -1,6 +1,6 @@
 use crate::agents::extension_manager::ExtensionManager;
 use crate::agents::router_tool_selector::{
-    create_tool_selector, RouterToolSelectionStrategy, RouterToolSelector,
+    create_tool_selector, RouterToolSelector,
 };
 use crate::agents::router_tools::{self};
 use crate::agents::tool_execution::ToolCallResult;
@@ -67,20 +67,17 @@ impl ToolRouteManager {
         }
     }
 
-    pub async fn get_router_tool_selection_strategy(&self) -> Option<RouterToolSelectionStrategy> {
+    pub async fn is_router_enabled(&self) -> bool {
         if *self.router_disabled_override.lock().await {
-            return None;
+            return false;
         }
 
         let config = Config::global();
         let router_tool_selection_strategy = config
-            .get_param("GOOSE_ROUTER_TOOL_SELECTION_STRATEGY")
-            .unwrap_or_else(|_| "default".to_string());
+            .get_param("GOOSE_ENABLE_ROUTER")
+            .unwrap_or_else(|_| "false".to_string());
 
-        match router_tool_selection_strategy.to_lowercase().as_str() {
-            "llm" => Some(RouterToolSelectionStrategy::Llm),
-            _ => None,
-        }
+        router_tool_selection_strategy.to_lowercase() == "true"
     }
 
     pub async fn update_router_tool_selector(
@@ -89,26 +86,27 @@ impl ToolRouteManager {
         reindex_all: Option<bool>,
         extension_manager: &Arc<RwLock<ExtensionManager>>,
     ) -> Result<()> {
-        let strategy = self.get_router_tool_selection_strategy().await;
-        let selector = match strategy {
-            Some(RouterToolSelectionStrategy::Llm) => {
-                let selector = create_tool_selector(strategy, provider.clone())
-                    .await
-                    .map_err(|e| anyhow!("Failed to create tool selector: {}", e))?;
-                Arc::new(selector)
-            }
-            None => return Ok(()),
-        };
+        let enabled = self.is_router_enabled().await;
+        if !enabled {
+            return Ok(());
+        }
+
+        let selector = create_tool_selector(provider.clone())
+            .await
+            .map_err(|e| anyhow!("Failed to create tool selector: {}", e))?;
+
+        // Wrap selector in Arc for the index manager methods
+        let selector_arc = Arc::new(selector);
 
         // First index platform tools
         let extension_manager = extension_manager.read().await;
-        ToolRouterIndexManager::index_platform_tools(&selector, &extension_manager).await?;
+        ToolRouterIndexManager::index_platform_tools(&selector_arc, &extension_manager).await?;
 
         if reindex_all.unwrap_or(false) {
             let enabled_extensions = extension_manager.list_extensions().await?;
             for extension_name in enabled_extensions {
                 if let Err(e) = ToolRouterIndexManager::update_extension_tools(
-                    &selector,
+                    &selector_arc,
                     &extension_manager,
                     &extension_name,
                     "add",
@@ -124,7 +122,7 @@ impl ToolRouteManager {
         }
 
         // Update the selector
-        *self.router_tool_selector.lock().await = Some(selector.clone());
+        *self.router_tool_selector.lock().await = Some(selector_arc);
 
         Ok(())
     }
@@ -135,22 +133,27 @@ impl ToolRouteManager {
 
     pub async fn list_tools_for_router(
         &self,
-        strategy: Option<RouterToolSelectionStrategy>,
         extension_manager: &Arc<RwLock<ExtensionManager>>,
     ) -> Vec<Tool> {
+        // If router is disabled or overridden, return empty
         if *self.router_disabled_override.lock().await {
             return vec![];
         }
 
-        let mut prefixed_tools = vec![];
-        match strategy {
-            Some(RouterToolSelectionStrategy::Llm) => {
-                prefixed_tools.push(router_tools::llm_search_tool());
-            }
-            None => {}
+        // If router is not enabled, return empty (will fall back to regular tools)
+        if !self.is_router_enabled().await {
+            return vec![];
         }
 
-        // Get recent tool calls from router tool selector if available
+        let mut prefixed_tools = vec![];
+        prefixed_tools.push(router_tools::llm_search_tool());
+
+        // If router is enabled but not initialized (no provider), just return the search tool
+        if self.router_tool_selector.lock().await.is_none() {
+            return prefixed_tools;
+        }
+
+        // Get recent tool calls from router tool selector
         let selector = self.router_tool_selector.lock().await.clone();
         if let Some(selector) = selector {
             if let Ok(recent_calls) = selector.get_recent_tool_calls(20).await {
