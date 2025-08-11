@@ -4,7 +4,7 @@ use tracing;
 
 use crate::agents::extension_manager::ExtensionManager;
 use crate::agents::platform_tools;
-use crate::agents::router_tool_selector::{RouterToolSelectionStrategy, RouterToolSelector};
+use crate::agents::router_tool_selector::RouterToolSelector;
 
 /// Manages tool indexing operations for the router when LLM routing is enabled
 pub struct ToolRouterIndexManager;
@@ -100,11 +100,5 @@ impl ToolRouterIndexManager {
 
         tracing::info!("Indexed platform tools for LLM search");
         Ok(())
-    }
-
-    /// Helper to check if LLM tool router is enabled
-    pub fn is_tool_router_enabled(selector: &Option<Arc<Box<dyn RouterToolSelector>>>) -> bool {
-        selector.is_some()
-            && selector.as_ref().unwrap().selector_type() == RouterToolSelectionStrategy::Llm
     }
 }

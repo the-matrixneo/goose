@@ -1170,40 +1170,32 @@ pub fn configure_goose_mode_dialog() -> Result<(), Box<dyn Error>> {
 pub fn configure_goose_router_strategy_dialog() -> Result<(), Box<dyn Error>> {
     let config = Config::global();
 
-    // Check if GOOSE_ROUTER_STRATEGY is set as an environment variable
-    if std::env::var("GOOSE_ROUTER_TOOL_SELECTION_STRATEGY").is_ok() {
-        let _ = cliclack::log::info("Notice: GOOSE_ROUTER_TOOL_SELECTION_STRATEGY environment variable is set. Configuration will override this.");
+    // Check if GOOSE_ENABLE_ROUTER is set as an environment variable
+    if std::env::var("GOOSE_ENABLE_ROUTER").is_ok() {
+        let _ = cliclack::log::info("Notice: GOOSE_ENABLE_ROUTER environment variable is set. Configuration will override this.");
     }
 
-    let strategy = cliclack::select("Which router strategy would you like to use?")
+    let enable_router = cliclack::select("Would you like to enable LLM-based tool routing?")
         .item(
-            "llm",
-            "LLM Strategy",
+            "true",
+            "Enable Router",
             "Use LLM-based intelligence to select tools",
         )
         .item(
-            "default",
-            "Default Strategy",
+            "false",
+            "Disable Router",
             "Use the default tool selection strategy",
         )
         .interact()?;
 
-    match strategy {
-        "llm" => {
-            config.set_param(
-                "GOOSE_ROUTER_TOOL_SELECTION_STRATEGY",
-                Value::String("llm".to_string()),
-            )?;
-            cliclack::outro(
-                "Set to LLM Strategy - using LLM-based intelligence for tool selection",
-            )?;
+    match enable_router {
+        "true" => {
+            config.set_param("GOOSE_ENABLE_ROUTER", Value::String("true".to_string()))?;
+            cliclack::outro("Router enabled - using LLM-based intelligence for tool selection")?;
         }
-        "default" => {
-            config.set_param(
-                "GOOSE_ROUTER_TOOL_SELECTION_STRATEGY",
-                Value::String("default".to_string()),
-            )?;
-            cliclack::outro("Set to Default Strategy - using default tool selection")?;
+        "false" => {
+            config.set_param("GOOSE_ENABLE_ROUTER", Value::String("false".to_string()))?;
+            cliclack::outro("Router disabled - using default tool selection")?;
         }
         _ => unreachable!(),
     };

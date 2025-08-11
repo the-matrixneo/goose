@@ -10,20 +10,20 @@ interface ToolSelectionStrategy {
 
 export const all_tool_selection_strategies: ToolSelectionStrategy[] = [
   {
-    key: 'default',
-    label: 'Default',
-    description: 'Loads all tools from enabled extensions',
+    key: 'false',
+    label: 'Disabled',
+    description: 'Use the default tool selection strategy',
   },
   {
-    key: 'llm',
-    label: 'LLM-based',
+    key: 'true',
+    label: 'Enabled',
     description:
-      'Uses LLM to intelligently select the most relevant tools based on the user query context.',
+      'Use LLM-based intelligence to select the most relevant tools based on the user query context.',
   },
 ];
 
 export const ToolSelectionStrategySection = () => {
-  const [currentStrategy, setCurrentStrategy] = useState('default');
+  const [currentStrategy, setCurrentStrategy] = useState('false');
   const [_error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { read, upsert } = useConfig();
@@ -37,7 +37,7 @@ export const ToolSelectionStrategySection = () => {
     try {
       // First update the configuration
       try {
-        await upsert('GOOSE_ROUTER_TOOL_SELECTION_STRATEGY', newStrategy, false);
+        await upsert('GOOSE_ENABLE_ROUTER', newStrategy, false);
       } catch (error) {
         console.error('Error updating configuration:', error);
         setError(`Failed to update configuration: ${error}`);
@@ -88,13 +88,13 @@ export const ToolSelectionStrategySection = () => {
 
   const fetchCurrentStrategy = useCallback(async () => {
     try {
-      const strategy = (await read('GOOSE_ROUTER_TOOL_SELECTION_STRATEGY', false)) as string;
+      const strategy = (await read('GOOSE_ENABLE_ROUTER', false)) as string;
       if (strategy) {
         setCurrentStrategy(strategy);
       }
     } catch (error) {
-      console.error('Error fetching current tool selection strategy:', error);
-      setError(`Failed to fetch current strategy: ${error}`);
+      console.error('Error fetching current router setting:', error);
+      setError(`Failed to fetch current router setting: ${error}`);
     }
   }, [read]);
 
