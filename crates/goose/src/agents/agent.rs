@@ -1156,11 +1156,66 @@ impl Agent {
                                 messages_to_add.push(final_message_tool_resp);
                             }
                         }
-                        Err(ProviderError::ContextLengthExceeded(_)) => {
-                            yield AgentEvent::Message(Message::assistant().with_context_length_exceeded(
-                                    "The context length of the model has been exceeded. Please start a new session and try again.",
-                                ));
-                            break;
+                        Err(ProviderError::ContextLengthExceeded(err_msg)) => {
+                            // Attempt auto-recovery by compacting the conversation
+                            info!("Context length exceeded, attempting auto-compaction: {}", err_msg);
+
+                            // Send status update to client
+                            yield AgentEvent::Message(Message::assistant().with_text(
+                                "Context limit reached. Compacting conversation to continue..."
+                            ));
+
+                            // Get session metadata if available
+                            let session_metadata = if let Some(ref session_config) = session {
+                                match session::storage::get_path(session_config.id.clone()) {
+                                    Ok(session_file_path) => session::storage::read_metadata(&session_file_path).ok(),
+                                    Err(_) => None,
+                                }
+                            } else {
+                                None
+                            };
+
+                            // Run auto-compact on current messages
+                            match auto_compact::check_and_compact_messages(
+                                self,
+                                messages.messages(),
+                                Some(true), // Force compaction
+                                session_metadata.as_ref(),
+                            ).await {
+                                Ok(compact_result) if compact_result.compacted => {
+                                    // Successfully compacted
+                                    messages = compact_result.messages;
+
+                                    // Send success message
+                                    yield AgentEvent::Message(Message::assistant().with_text(
+                                        "Successfully compacted conversation. Continuing..."
+                                    ));
+
+                                    // Send history replaced event to update client
+                                    yield AgentEvent::HistoryReplaced(messages.messages().clone());
+
+                                    // Update tools and system prompt with new context
+                                    (tools, toolshim_tools, system_prompt) = self.prepare_tools_and_prompt().await?;
+
+                                    // Continue the loop to retry with compacted context
+                                    continue;
+                                }
+                                Ok(_) => {
+                                    // Compaction didn't help or wasn't possible
+                                    yield AgentEvent::Message(Message::assistant().with_context_length_exceeded(
+                                        "Unable to reduce context size. Please start a new session and try again.",
+                                    ));
+                                    break;
+                                }
+                                Err(e) => {
+                                    // Compaction failed
+                                    error!("Auto-compaction failed: {}", e);
+                                    yield AgentEvent::Message(Message::assistant().with_context_length_exceeded(
+                                        format!("Context limit exceeded and auto-compaction failed: {}. Please start a new session.", e),
+                                    ));
+                                    break;
+                                }
+                            }
                         }
                         Err(e) => {
                             error!("Error: {}", e);

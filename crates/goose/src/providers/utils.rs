@@ -45,23 +45,53 @@ pub fn convert_image(image: &ImageContent, image_format: &ImageFormat) -> Value 
 }
 
 fn check_context_length_exceeded(text: &str) -> bool {
-    let check_phrases = [
-        "too long",
-        "context length",
-        "context_length_exceeded",
-        "reduce the length",
-        "token count",
-        "exceeds",
-        "exceed context limit",
-        "input length",
-        "max_tokens",
-        "decrease input length",
-        "context limit",
-    ];
     let text_lower = text.to_lowercase();
-    check_phrases
-        .iter()
-        .any(|phrase| text_lower.contains(phrase))
+
+    // More specific patterns that indicate context length issues
+    // These patterns are designed to reduce false positives
+    let specific_patterns = [
+        // Exact error codes/types
+        "context_length_exceeded",
+        "string_above_max_length",
+        "max_tokens_exceeded",
+        "maximum_context_length",
+        // Common provider-specific messages
+        "context window",
+        "token limit",
+        "maximum number of tokens",
+        "reduce the length of the messages",
+        "decrease the length of the messages",
+        // Combined patterns (must have both)
+        ("context", "exceeds"),
+        ("context", "too long"),
+        ("token", "exceeds"),
+        ("token", "limit"),
+        ("input", "too long"),
+        ("message", "too long"),
+    ];
+
+    // Check exact patterns
+    for pattern in &specific_patterns[0..10] {
+        if text_lower.contains(pattern) {
+            return true;
+        }
+    }
+
+    // Check combined patterns - both words must be present
+    for (word1, word2) in &[
+        ("context", "exceeds"),
+        ("context", "too long"),
+        ("token", "exceeds"),
+        ("token", "limit"),
+        ("input", "too long"),
+        ("message", "too long"),
+    ] {
+        if text_lower.contains(word1) && text_lower.contains(word2) {
+            return true;
+        }
+    }
+
+    false
 }
 
 pub fn map_http_error_to_provider_error(
