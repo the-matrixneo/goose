@@ -3349,6 +3349,7 @@ dependencies = [
  "utoipa",
  "uuid",
  "webbrowser 0.8.15",
+ "which",
  "winapi",
  "wiremock",
 ]

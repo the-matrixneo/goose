@@ -50,51 +50,82 @@ impl ClaudeCodeProvider {
 
     /// Search for claude executable in common installation locations
     fn find_claude_executable(command_name: &str) -> Option<String> {
-        let home = std::env::var("HOME").ok()?;
+        // On Windows, use the `which` crate to properly resolve executables
+        #[cfg(windows)]
+        {
+            if let Ok(path) = which::which(command_name) {
+                let full_path = path.to_string_lossy().to_string();
+                tracing::info!("Found claude executable using which at: {}", full_path);
+                return Some(full_path);
+            }
 
-        let search_paths = vec![
-            format!("{}/.claude/local/{}", home, command_name),
-            format!("{}/.local/bin/{}", home, command_name),
-            format!("{}/bin/{}", home, command_name),
-            format!("/usr/local/bin/{}", command_name),
-            format!("/usr/bin/{}", command_name),
-            format!("/opt/claude/{}", command_name),
-        ];
+            // If `which` fails, try some common Windows locations
+            if let Ok(userprofile) = std::env::var("USERPROFILE") {
+                let search_paths = vec![
+                    format!(
+                        "{}\\AppData\\Local\\Claude\\{}.exe",
+                        userprofile, command_name
+                    ),
+                    format!(
+                        "{}\\AppData\\Local\\Programs\\Claude\\{}.exe",
+                        userprofile, command_name
+                    ),
+                    format!("{}\\claude\\{}.exe", userprofile, command_name),
+                    format!("C:\\Program Files\\Claude\\{}.exe", command_name),
+                    format!("C:\\Program Files (x86)\\Claude\\{}.exe", command_name),
+                ];
 
-        for path in search_paths {
-            let path_buf = PathBuf::from(&path);
-            if path_buf.exists() && path_buf.is_file() {
-                #[cfg(unix)]
-                {
-                    use std::os::unix::fs::PermissionsExt;
-                    if let Ok(metadata) = std::fs::metadata(&path_buf) {
-                        let permissions = metadata.permissions();
-                        if permissions.mode() & 0o111 != 0 {
-                            tracing::info!("Found claude executable at: {}", path);
-                            return Some(path);
-                        }
+                for path in search_paths {
+                    let path_buf = PathBuf::from(&path);
+                    if path_buf.exists() && path_buf.is_file() {
+                        tracing::info!("Found claude executable at: {}", path);
+                        return Some(path);
                     }
-                }
-                #[cfg(not(unix))]
-                {
-                    tracing::info!("Found claude executable at: {}", path);
-                    return Some(path);
                 }
             }
         }
 
-        if let Ok(path_var) = std::env::var("PATH") {
-            #[cfg(unix)]
-            let path_separator = ':';
-            #[cfg(windows)]
-            let path_separator = ';';
+        // On Unix/macOS, use the existing logic
+        #[cfg(not(windows))]
+        {
+            if let Ok(home) = std::env::var("HOME") {
+                let search_paths = vec![
+                    format!("{}/.claude/local/{}", home, command_name),
+                    format!("{}/.local/bin/{}", home, command_name),
+                    format!("{}/bin/{}", home, command_name),
+                    format!("/usr/local/bin/{}", command_name),
+                    format!("/usr/bin/{}", command_name),
+                    format!("/opt/claude/{}", command_name),
+                ];
 
-            for dir in path_var.split(path_separator) {
-                let path_buf = PathBuf::from(dir).join(command_name);
-                if path_buf.exists() && path_buf.is_file() {
-                    let full_path = path_buf.to_string_lossy().to_string();
-                    tracing::info!("Found claude executable in PATH at: {}", full_path);
-                    return Some(full_path);
+                for path in search_paths {
+                    let path_buf = PathBuf::from(&path);
+                    if path_buf.exists() && path_buf.is_file() {
+                        #[cfg(unix)]
+                        {
+                            use std::os::unix::fs::PermissionsExt;
+                            if let Ok(metadata) = std::fs::metadata(&path_buf) {
+                                let permissions = metadata.permissions();
+                                if permissions.mode() & 0o111 != 0 {
+                                    tracing::info!("Found claude executable at: {}", path);
+                                    return Some(path);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if let Ok(path_var) = std::env::var("PATH") {
+                let path_separator = ':';
+
+                for dir in path_var.split(path_separator) {
+                    let path_buf = PathBuf::from(dir).join(command_name);
+                    if path_buf.exists() && path_buf.is_file() {
+                        let full_path = path_buf.to_string_lossy().to_string();
+                        tracing::info!("Found claude executable in PATH at: {}", full_path);
+                        return Some(full_path);
+                    }
                 }
             }
         }
