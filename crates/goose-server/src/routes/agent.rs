@@ -348,7 +348,7 @@ async fn update_session_config(
     if let Some(response) = payload.response {
         agent.add_final_output_tool(response).await;
 
-        tracing::info!("Added final output tool with response config");
+        // final output tool added
         Ok(Json(
             "Session config updated with final output tool".to_string(),
         ))
@@ -381,26 +381,10 @@ async fn execute_tool(
         .await
         .map_err(|_| StatusCode::PRECONDITION_FAILED)?;
 
-    // 🔍 Debug: Log available tools
     let available_tools = agent.list_tools(None).await;
-    tracing::info!("🔍 Available tools in agent: {:?}", available_tools.iter().map(|t| &t.name).collect::<Vec<_>>());
-    tracing::info!("🔍 Total tools available: {}", available_tools.len());
-    
-    // 🔧 Debug: Log registered extensions
-    {
-        let extension_manager = agent.extension_manager.read().await;
-        let extensions = extension_manager.list_extensions().await;
-        match extensions {
-            Ok(ext_list) => tracing::info!("🔧 Registered extensions: {:?}", ext_list),
-            Err(e) => tracing::error!("🔧 Failed to list extensions: {:?}", e),
-        }
-    }
-    
-    tracing::info!("🎯 Requested tool: {}", payload.tool_name);
-    
-    // 🔎 Debug: Check if requested tool exists
+
+    // Check if requested tool exists
     let tool_exists = available_tools.iter().any(|t| t.name == payload.tool_name);
-    tracing::info!("🔎 Tool exists in available tools: {}", tool_exists);
 
     // 🧭 Resolve tool name to a registered extension prefix if needed
     let mut resolved_tool_name = payload.tool_name.clone();
@@ -443,7 +427,6 @@ async fn execute_tool(
                 if norm_trim == ext_trim || norm_trim == ext.as_str() {
                     let candidate = format!("{}__{}", ext, incoming_tool_part);
                     if available_tools.iter().any(|t| t.name == candidate) {
-                        tracing::info!("🧭 Remapped tool prefix: '{}' -> '{}'", incoming_prefix, ext);
                         resolved_tool_name = candidate;
                         remapped = true;
                         break;
@@ -460,17 +443,13 @@ async fn execute_tool(
                 .find(|t| t.name.ends_with(&suffix))
                 .map(|t| t.name.clone().to_string())
             {
-                tracing::info!("🧭 Suffix-mapped tool: '{}' -> '{}'", resolved_tool_name, candidate);
                 resolved_tool_name = candidate;
             }
         }
     }
 
     // Create a tool call with the resolved name
-    let tool_call = mcp_core::tool::ToolCall::new(
-        resolved_tool_name,
-        payload.arguments,
-    );
+    let tool_call = mcp_core::tool::ToolCall::new(resolved_tool_name, payload.arguments);
 
     // Generate a unique request ID using timestamp
     let request_id = format!("tool_{}", chrono::Utc::now().timestamp_millis());
@@ -478,28 +457,24 @@ async fn execute_tool(
     // Create a cancellation token for the tool execution
     let cancellation_token = tokio_util::sync::CancellationToken::new();
 
-    // 🚀 Debug: Log before dispatching tool
-    tracing::info!("🚀 Dispatching tool call: {:?}", tool_call);
+    // Dispatch tool call
 
     // Execute the tool
     let (_returned_id, result) = agent
         .dispatch_tool_call(tool_call, request_id, Some(cancellation_token))
         .await;
 
-    // 📋 Debug: Log dispatch result
-    tracing::info!("📋 Tool dispatch result: {:?}", result.is_ok());
-
     match result {
         Ok(tool_call_result) => {
             // Execute the future to get the actual result
             let actual_result = tool_call_result.result.await;
-            
+
             match actual_result {
                 Ok(content) => {
                     // Convert content to JSON
-                    let result_json = serde_json::to_value(content)
-                        .ok()
-                        .or_else(|| Some(serde_json::json!({ "message": "Tool executed successfully" })));
+                    let result_json = serde_json::to_value(content).ok().or_else(|| {
+                        Some(serde_json::json!({ "message": "Tool executed successfully" }))
+                    });
 
                     Ok(Json(ExecuteToolResponse {
                         success: true,
@@ -507,26 +482,18 @@ async fn execute_tool(
                         error: None,
                     }))
                 }
-                        Err(e) => {
-            tracing::error!("❌ Tool execution failed: {}", e);
-            tracing::error!("❌ Error details: {:?}", e);
-            Ok(Json(ExecuteToolResponse {
-                success: false,
-                result: None,
-                error: Some(e.to_string()),
-            }))
-        }
+                Err(e) => Ok(Json(ExecuteToolResponse {
+                    success: false,
+                    result: None,
+                    error: Some(e.to_string()),
+                })),
             }
         }
-        Err(e) => {
-            tracing::error!("❌ Tool dispatch failed: {}", e);
-            tracing::error!("❌ Dispatch error details: {:?}", e);
-            Ok(Json(ExecuteToolResponse {
-                success: false,
-                result: None,
-                error: Some(e.to_string()),
-            }))
-        }
+        Err(e) => Ok(Json(ExecuteToolResponse {
+            success: false,
+            result: None,
+            error: Some(e.to_string()),
+        })),
     }
 }
 

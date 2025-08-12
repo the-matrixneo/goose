@@ -33,10 +33,7 @@ export default function MCPUIResourceRenderer({ content }: MCPUIResourceRenderer
   );
 
   const handleAction = (action: UIActionResult) => {
-    console.log(
-      `MCP UI message received (but only handled with a toast notification for now):`,
-      action
-    );
+    // Actions are currently surfaced as toasts only
     toast.info(`${action.type} message sent from MCP UI, refer to console for more info`, {
       data: action,
     });
@@ -73,14 +70,9 @@ export default function MCPUIResourceRenderer({ content }: MCPUIResourceRenderer
         case 'tool': {
           // Execute the tool directly via the backend
           try {
-            // Log the result to understand its structure
-            console.log('Tool action result:', result);
-
             // Extract tool information from the result
             // The MCP UI sends payload with toolName and params
             const toolData = getProp(result, 'payload') ?? getProp(result, 'data') ?? result;
-
-            console.log('🔥 Tool data:', { toolData });
 
             const toolName =
               getString(toolData, 'toolName') ||
@@ -97,15 +89,11 @@ export default function MCPUIResourceRenderer({ content }: MCPUIResourceRenderer
               throw new Error('Tool name not found in action result');
             }
 
-            console.log('🎯 Executing tool:', toolName, 'with arguments:', toolArguments);
-
             const requestBody = {
               tool_name: toolName,
               arguments: toolArguments,
               session_id: null, // You may want to pass the current session ID if available
             };
-
-            console.log('📦 Tool call request body:', JSON.stringify(requestBody, null, 2));
 
             const response = await fetch(getApiUrl('/agent/execute_tool'), {
               method: 'POST',
@@ -134,17 +122,15 @@ export default function MCPUIResourceRenderer({ content }: MCPUIResourceRenderer
                 // Request chat to scroll to bottom to reveal new messages
                 window.dispatchEvent(new CustomEvent('scroll-chat-to-bottom'));
               } catch (e) {
-                console.warn('Failed to dispatch external-tool-executed event', e);
+                // ignore event dispatch errors
               }
               toast.success(`Tool "${toolName}" executed successfully`, {
                 data: data.result,
               });
-              console.log('✅ Tool execution result:', data.result);
             } else {
               throw new Error(data.error || 'Tool execution failed');
             }
           } catch (error) {
-            console.error('❌ Error executing tool:', error);
             toast.error(
               `Failed to execute tool: ${error instanceof Error ? error.message : String(error)}`
             );
