@@ -32,14 +32,16 @@ export default function MCPUIResourceRenderer({ content }: MCPUIResourceRenderer
     [getProp]
   );
 
-  const handleAction = (action: UIActionResult) => {
+  const handleAction = (action: UIActionResult, showToast: boolean = true) => {
     console.log(
       `MCP UI message received (but only handled with a toast notification for now):`,
       action
     );
-    toast.info(`${action.type} message sent from MCP UI, refer to console for more info`, {
-      data: action,
-    });
+    if (showToast) {
+      toast.info(`${action.type} message sent from MCP UI, refer to console for more info`, {
+        data: action,
+      });
+    }
     return { status: 'handled', message: `${action.type} action logged` };
   };
 
@@ -127,9 +129,7 @@ export default function MCPUIResourceRenderer({ content }: MCPUIResourceRenderer
               } catch (e) {
                 // ignore event dispatch errors
               }
-              toast.success(`Tool "${toolName}" executed successfully`, {
-                data: data.result,
-              });
+              handleAction(result, false);
             } else {
               throw new Error(data.error || 'Tool execution failed');
             }
@@ -137,6 +137,7 @@ export default function MCPUIResourceRenderer({ content }: MCPUIResourceRenderer
             toast.error(
               `Failed to execute tool: ${error instanceof Error ? error.message : String(error)}`
             );
+            console.error(error);
           }
           break;
         }
