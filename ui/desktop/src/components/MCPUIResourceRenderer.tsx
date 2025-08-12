@@ -33,7 +33,10 @@ export default function MCPUIResourceRenderer({ content }: MCPUIResourceRenderer
   );
 
   const handleAction = (action: UIActionResult) => {
-    // Actions are currently surfaced as toasts only
+    console.log(
+      `MCP UI message received (but only handled with a toast notification for now):`,
+      action
+    );
     toast.info(`${action.type} message sent from MCP UI, refer to console for more info`, {
       data: action,
     });
