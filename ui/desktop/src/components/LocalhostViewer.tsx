@@ -57,14 +57,95 @@ export function LocalhostViewer({
   const [error, setError] = useState<string | null>(null);
   const [canGoBack, setCanGoBack] = useState(false);
   const [canGoForward, setCanGoForward] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const [iframeReady, setIframeReady] = useState(false);
   // eslint-disable-next-line no-undef
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (onUrlChange) {
       onUrlChange(url);
     }
   }, [url, onUrlChange]);
+
+  // Poll the server until it's ready before showing iframe
+  useEffect(() => {
+    if (iframeReady) return; // Don't run if already ready
+    
+    setIsLoading(true);
+    let mounted = true;
+    let pollInterval: NodeJS.Timeout | null = null;
+    let attemptCount = 0;
+    const maxAttempts = 10;
+    
+    const checkServerReady = async () => {
+      attemptCount++;
+      
+      try {
+        // Try to fetch from the URL to see if server is responding
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 second timeout
+        
+        const response = await fetch(url, { 
+          method: 'HEAD',
+          signal: controller.signal,
+          mode: 'no-cors' // Use no-cors to avoid CORS issues during check
+        });
+        
+        clearTimeout(timeoutId);
+        
+        // If we get here without throwing, server is likely ready
+        // Note: with mode: 'no-cors', we can't read the response but no error means connection succeeded
+        console.log(`Server at ${url} is ready`);
+        
+        if (mounted) {
+          setIframeReady(true);
+          if (pollInterval) {
+            clearInterval(pollInterval);
+            pollInterval = null;
+          }
+        }
+      } catch (error) {
+        console.log(`Server not ready yet (attempt ${attemptCount}/${maxAttempts}):`, error);
+        
+        if (attemptCount >= maxAttempts) {
+          // Give up and show the iframe anyway - let the user manually refresh if needed
+          console.log('Max attempts reached, showing iframe anyway');
+          if (mounted) {
+            setIframeReady(true);
+            if (pollInterval) {
+              clearInterval(pollInterval);
+              pollInterval = null;
+            }
+          }
+        }
+      }
+    };
+    
+    // Initial delay to let server start
+    const initialTimer = setTimeout(() => {
+      if (!mounted) return;
+      
+      // First check
+      checkServerReady();
+      
+      // Set up polling
+      pollInterval = setInterval(() => {
+        if (mounted && !iframeReady) {
+          checkServerReady();
+        }
+      }, 1000); // Poll every second
+    }, 800); // Wait 800ms before first check
+    
+    return () => {
+      mounted = false;
+      clearTimeout(initialTimer);
+      if (pollInterval) {
+        clearInterval(pollInterval);
+      }
+    };
+  }, [url, iframeReady]); // Re-run when URL changes or iframeReady resets
 
   const handleUrlSubmit = (newUrl: string) => {
     const formattedUrl = formatUrl(newUrl);
@@ -78,6 +159,8 @@ export function LocalhostViewer({
     setUrl(formattedUrl);
     setInputUrl(formattedUrl);
     setIsLoading(true);
+    setRetryCount(0); // Reset retry count when changing URL
+    setIframeReady(false); // Reset iframe ready state to trigger re-check
 
     // Save to localStorage
     if (typeof window !== 'undefined') {
@@ -128,6 +211,13 @@ export function LocalhostViewer({
   const handleIframeLoad = () => {
     setIsLoading(false);
     setError(null);
+    setRetryCount(0); // Reset retry count on successful load
+    
+    // Clear any pending retry timeout
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current);
+      retryTimeoutRef.current = null;
+    }
 
     // Try to update navigation state (may not work due to CORS)
     try {
@@ -141,9 +231,42 @@ export function LocalhostViewer({
   };
 
   const handleIframeError = () => {
-    setIsLoading(false);
-    setError(`Failed to load ${url}. Make sure the server is running.`);
+    // Implement retry logic with exponential backoff
+    const maxRetries = 3;
+    
+    if (retryCount < maxRetries) {
+      const retryDelay = Math.min(1000 * Math.pow(2, retryCount), 5000); // Exponential backoff: 1s, 2s, 4s (max 5s)
+      
+      console.log(`Retrying to load ${url} (attempt ${retryCount + 1}/${maxRetries}) in ${retryDelay}ms...`);
+      
+      // Clear any existing retry timeout
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+      }
+      
+      retryTimeoutRef.current = setTimeout(() => {
+        setRetryCount(prev => prev + 1);
+        if (iframeRef.current) {
+          // Force reload by setting src
+          const currentSrc = iframeRef.current.src;
+          iframeRef.current.src = '';
+          iframeRef.current.src = currentSrc;
+        }
+      }, retryDelay);
+    } else {
+      setIsLoading(false);
+      setError(`Failed to load ${url} after ${maxRetries} attempts. Make sure the server is running.`);
+    }
   };
+
+  // Clean up retry timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+      }
+    };
+  }, []);
 
   return (
     <div className="h-full flex flex-col bg-background-default">
@@ -231,22 +354,27 @@ export function LocalhostViewer({
 
       {/* Iframe Content */}
       <div className="flex-1 relative overflow-hidden">
-        <iframe
-          ref={iframeRef}
-          src={url}
-          className="w-full h-full border-0"
-          title="Localhost Viewer"
-          onLoad={handleIframeLoad}
-          onError={handleIframeError}
-          sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation allow-top-navigation-by-user-activation"
-        />
+        {iframeReady && (
+          <iframe
+            ref={iframeRef}
+            src={url}
+            className="w-full h-full border-0"
+            title="Localhost Viewer"
+            onLoad={handleIframeLoad}
+            onError={handleIframeError}
+            sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation allow-top-navigation-by-user-activation"
+          />
+        )}
 
-        {/* Loading overlay */}
-        {isLoading && (
+        {/* Loading overlay - show while waiting for iframe to be ready or while loading */}
+        {(!iframeReady || isLoading) && (
           <div className="absolute inset-0 bg-background-default/80 flex items-center justify-center">
             <div className="text-center">
               <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2 text-primary" />
-              <p className="text-textSubtle text-sm">Loading {url}...</p>
+              <p className="text-textSubtle text-sm">
+                {!iframeReady ? 'Initializing...' : `Loading ${url}...`}
+                {retryCount > 0 && ` (retry ${retryCount}/3)`}
+              </p>
             </div>
           </div>
         )}

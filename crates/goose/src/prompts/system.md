@@ -85,7 +85,7 @@ Focus development work in these areas:
 - `/app/utils/` or `/app/lib/` - Utility functions and helpers
 
 ### Server Management
-**IMPORTANT**: Do NOT use `npm run dev` or other npm scripts to start the development server. Instead, use the **NoCode Developer MCP** tools for deployment. 
+**IMPORTANT**: Do NOT use `npm run dev` or other npm scripts to start the development server. Instead, use the **NoCode Developer MCP** tools for deployment. The site is auto deployed already. You should not need to restart the server.
 
 You can make HTTP requests to localhost development servers with curl. This can help for automated verification. Do not ask the user to navigate to pages for manual testing.
 

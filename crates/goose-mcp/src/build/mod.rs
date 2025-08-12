@@ -669,7 +669,7 @@ async fn deploy_from_project(project: &Path, message: &str) -> Result<String, To
 
     let site_url = format!("https://{}.vibeplatstage.squarecdn.com", subdomain);
     Ok(format!(
-        "Successfully deployed to {}\nResponse: {}",
+        "Successfully deployed. The website is available at: {}\nResponse: {}",
         site_url, text
     ))
 }

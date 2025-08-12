@@ -65,6 +65,10 @@ pub struct PromptArgumentTemplate {
 static PROMPTS_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/src/developer/prompts");
 const LINE_READ_LIMIT: usize = 2000;
 
+// TODO: add back the spec stuff; put another sidecar with the spec somewhere 
+// prompting; need to add spec template files somewhere when new react router project created
+// update prompting so not like talking to a developer. can just add to system prompt.
+
 /// Loads prompt files from the embedded PROMPTS_DIR and returns a HashMap of prompts.
 /// Ensures that each prompt name is unique.
 pub fn load_prompt_files() -> HashMap<String, Prompt> {
