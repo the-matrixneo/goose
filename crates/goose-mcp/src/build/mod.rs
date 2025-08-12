@@ -23,6 +23,8 @@ use std::process::Stdio;
 use std::sync::{Arc, Mutex};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::{Child, Command};
+#[cfg(unix)]
+use std::os::unix::process::CommandExt;
 use tokio::sync::mpsc;
 use walkdir::WalkDir;
 use zip::write::FileOptions;
@@ -50,6 +52,48 @@ struct BuildState {
 impl Default for BuildRouter {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl Drop for BuildRouter {
+    fn drop(&mut self) {
+        // Clean up the dev server process when the router is dropped
+        if let Ok(mut state) = self.state.lock() {
+            if let Some(mut child) = state.child.take() {
+                // Log that we're terminating the process
+                let pid = child.id().map(|id| id.to_string()).unwrap_or_else(|| "unknown".to_string());
+                eprintln!("[BuildRouter] Terminating dev server process (pid: {})", pid);
+                
+                // Try to kill the child process
+                // Note: kill_on_drop is already set, but we're being explicit here
+                let _ = child.start_kill();
+                
+                // For good measure, also try platform-specific termination
+                #[cfg(unix)]
+                {
+                    if let Some(id) = child.id() {
+                        // npm/node often spawns child processes, we need to kill the entire process group
+                        // The process group ID is typically the negative of the process ID
+                        let pgid = -(id as i32);
+                        
+                        // Send SIGTERM to the entire process group for graceful shutdown
+                        let _ = unix_kill(Pid::from_raw(pgid), Signal::SIGTERM);
+                        
+                        // Give it a moment to exit gracefully
+                        std::thread::sleep(std::time::Duration::from_millis(500));
+                        
+                        // Force kill the process group if still running
+                        let _ = unix_kill(Pid::from_raw(pgid), Signal::SIGKILL);
+                        
+                        // Also try to kill the specific process in case it's not in a group
+                        let _ = unix_kill(Pid::from_raw(id as i32), Signal::SIGKILL);
+                    }
+                }
+                
+                // Block briefly to ensure the process is terminated
+                std::thread::sleep(std::time::Duration::from_millis(200));
+            }
+        }
     }
 }
 
@@ -312,7 +356,7 @@ impl BuildRouter {
             let mut s = self.state.lock().unwrap();
             if let Some(pid) = pid_opt {
                 s.logs.push(format!(
-                    "[{}] Sending SIGTERM to pid {} for graceful shutdown...\n",
+                    "[{}] Sending SIGTERM to pid {} and its process group for graceful shutdown...\n",
                     Utc::now(),
                     pid
                 ));
@@ -328,12 +372,18 @@ impl BuildRouter {
         {
             use tokio::time::{timeout, Duration};
             if let Some(pid) = pid_opt {
+                // Try to kill the entire process group first
+                let pgid = -(pid);
+                let _ = unix_kill(Pid::from_raw(pgid), Signal::SIGTERM);
+                
+                // Also send SIGTERM to the specific process
                 let _ = unix_kill(Pid::from_raw(pid), Signal::SIGTERM);
+                
                 match timeout(Duration::from_secs(3), child.wait()).await {
                     Ok(_status) => {
                         let mut s = self.state.lock().unwrap();
                         s.logs.push(format!(
-                            "[{}] Process {} exited cleanly after SIGTERM.\n",
+                            "[{}] Process {} and its group exited cleanly after SIGTERM.\n",
                             Utc::now(),
                             pid
                         ));
@@ -342,11 +392,15 @@ impl BuildRouter {
                         {
                             let mut s = self.state.lock().unwrap();
                             s.logs.push(format!(
-                                "[{}] Timeout waiting for pid {} to exit, sending SIGKILL...\n",
+                                "[{}] Timeout waiting for pid {} to exit, sending SIGKILL to process group...\n",
                                 Utc::now(),
                                 pid
                             ));
                         }
+                        // Kill the process group
+                        let _ = unix_kill(Pid::from_raw(pgid), Signal::SIGKILL);
+                        
+                        // Also kill the specific process
                         let _ = child.kill().await; // SIGKILL
                         let _ = child.wait().await; // ensure it's fully terminated
                     }
@@ -485,6 +539,11 @@ async fn start_dev_server(state: Arc<Mutex<BuildState>>, project_path: &Path) ->
     cmd.arg("--");
     cmd.arg("--port");
     cmd.arg(port.to_string());
+    
+    // On Unix, create a new process group so we can kill all child processes
+    #[cfg(unix)]
+    cmd.process_group(0);
+    
     let mut child = cmd
         .current_dir(project_path)
         .stdout(Stdio::piped())
