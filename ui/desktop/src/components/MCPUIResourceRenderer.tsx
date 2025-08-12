@@ -131,6 +131,8 @@ export default function MCPUIResourceRenderer({ content }: MCPUIResourceRenderer
                     detail: { toolName, toolArguments, result: data.result },
                   })
                 );
+                // Request chat to scroll to bottom to reveal new messages
+                window.dispatchEvent(new CustomEvent('scroll-chat-to-bottom'));
               } catch (e) {
                 console.warn('Failed to dispatch external-tool-executed event', e);
               }
@@ -160,7 +162,7 @@ export default function MCPUIResourceRenderer({ content }: MCPUIResourceRenderer
   );
 
   return (
-    <div className="mt-3 p-4 border border-borderSubtle rounded-lg bg-background-muted">
+    <div className="mt-3 p-1 border border-borderSubtle rounded-lg bg-background-muted">
       <div className="overflow-hidden rounded-sm">
         <UIResourceRenderer
           resource={content.resource}
