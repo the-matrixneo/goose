@@ -411,10 +411,10 @@ async fn execute_tool(
         // Fetch registered extensions
         let registered_extensions: Vec<String> = {
             let extension_manager = agent.extension_manager.read().await;
-            match extension_manager.list_extensions().await {
-                Ok(exts) => exts,
-                Err(_) => Vec::new(),
-            }
+            extension_manager
+                .list_extensions()
+                .await
+                .unwrap_or_default()
         };
 
         // Try to map by prefix if provided
