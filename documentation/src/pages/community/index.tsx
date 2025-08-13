@@ -259,7 +259,6 @@ export default function Community(): ReactNode {
       description="Join the Goose community - connect with developers, contribute to the project, and help shape the future of AI-powered development tools."
     >
       <main className="container">
-        <UpcomingEventsSection />
         <CommunityAllStarsSection />
       </main>
     </Layout>
