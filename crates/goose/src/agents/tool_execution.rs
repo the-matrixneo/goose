@@ -60,8 +60,8 @@ impl Agent {
                 if let Ok(tool_call) = request.tool_call.clone() {
                     let confirmation = Message::user().with_tool_confirmation_request(
                         request.id.clone(),
-                        tool_call.name.clone(),
-                        tool_call.arguments.clone(),
+                        goose::call_tool::name(&tool_call).clone(),
+                        goose::call_tool::args_value(&tool_call).clone(),
                         Some("Goose would like to call the above tool. Allow? (y/n):".to_string()),
                     );
                     yield confirmation;
@@ -85,7 +85,7 @@ impl Agent {
                                 }));
 
                                 if confirmation.permission == Permission::AlwaysAllow {
-                                    permission_manager.update_user_permission(&tool_call.name, PermissionLevel::AlwaysAllow);
+                                    permission_manager.update_user_permission(&goose::call_tool::name(&tool_call), PermissionLevel::AlwaysAllow);
                                 }
                             } else {
                                 // User declined - add declined response
@@ -111,7 +111,7 @@ impl Agent {
         try_stream! {
             for request in tool_requests {
                 if let Ok(tool_call) = request.tool_call.clone() {
-                    if self.is_frontend_tool(&tool_call.name).await {
+                    if self.is_frontend_tool(&goose::call_tool::name(&tool_call)).await {
                         // Send frontend tool request and wait for response
                         yield Message::assistant().with_frontend_tool_request(
                             request.id.clone(),

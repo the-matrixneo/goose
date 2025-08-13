@@ -40,7 +40,7 @@ impl ToolRouteManager {
         if let Some(selector) = selector {
             for request in requests {
                 if let Ok(tool_call) = &request.tool_call {
-                    if let Err(e) = selector.record_tool_call(&tool_call.name).await {
+                    if let Err(e) = selector.record_tool_call(&goose::call_tool::name(&tool_call)).await {
                         error!("Failed to record tool call: {}", e);
                     }
                 }
@@ -173,9 +173,9 @@ impl ToolRouteManager {
                 for tool_name in recent_calls {
                     // Find the tool in the extension manager's tools
                     if let Ok(extension_tools) = extension_manager.get_prefixed_tools(None).await {
-                        if let Some(tool) = extension_tools.iter().find(|t| t.name == tool_name) {
+                        if let Some(tool) = extension_tools.iter().find(|t| goose::call_tool::name(&t) == tool_name) {
                             // Only add if not already in prefixed_tools
-                            if !prefixed_tools.iter().any(|t| t.name == tool.name) {
+                            if !prefixed_tools.iter().any(|t| goose::call_tool::name(&t) == goose::call_tool::name(&tool)) {
                                 prefixed_tools.push(tool.clone());
                             }
                         }

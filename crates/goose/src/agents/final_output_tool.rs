@@ -1,7 +1,7 @@
 use crate::agents::tool_execution::ToolCallResult;
 use crate::recipe::Response;
 use indoc::formatdoc;
-use mcp_core::ToolCall;
+use rmcp::model::CallToolRequest; use rmcp::model::CallToolRequestParam;
 use rmcp::model::{Content, ErrorCode, ErrorData, Tool, ToolAnnotations};
 use serde_json::Value;
 use std::borrow::Cow;
@@ -117,10 +117,10 @@ impl FinalOutputTool {
         }
     }
 
-    pub async fn execute_tool_call(&mut self, tool_call: ToolCall) -> ToolCallResult {
-        match tool_call.name.as_str() {
+    pub async fn execute_tool_call(&mut self, tool_call: CallToolRequest) -> ToolCallResult {
+        match goose::call_tool::name(&tool_call).as_str() {
             FINAL_OUTPUT_TOOL_NAME => {
-                let result = self.validate_json_output(&tool_call.arguments).await;
+                let result = self.validate_json_output(&goose::call_tool::args_value(&tool_call)).await;
                 match result {
                     Ok(parsed_value) => {
                         self.final_output = Some(Self::parsed_final_output_string(parsed_value));
@@ -137,7 +137,7 @@ impl FinalOutputTool {
             }
             _ => ToolCallResult::from(Err(ErrorData {
                 code: ErrorCode::INVALID_REQUEST,
-                message: Cow::from(format!("Unknown tool: {}", tool_call.name)),
+                message: Cow::from(format!("Unknown tool: {}", goose::call_tool::name(&tool_call))),
                 data: None,
             })),
         }
@@ -226,12 +226,9 @@ mod tests {
         };
 
         let mut tool = FinalOutputTool::new(response);
-        let tool_call = ToolCall {
-            name: FINAL_OUTPUT_TOOL_NAME.to_string(),
-            arguments: json!({
+        let tool_call = CallToolRequest { params: rmcp::model::CallToolRequestParam { name: (FINAL_OUTPUT_TOOL_NAME.to_string()).to_string().into(), arguments: match json!({
                 "message": "Hello"  // Missing required "count" field
-            }),
-        };
+            }) { serde_json::Value::Object(map) => Some(map), _ => None }, method: Default::default(), extensions: Default::default() }};
 
         let result = tool.execute_tool_call(tool_call).await;
         let tool_result = result.result.await;
@@ -248,16 +245,13 @@ mod tests {
         };
 
         let mut tool = FinalOutputTool::new(response);
-        let tool_call = ToolCall {
-            name: FINAL_OUTPUT_TOOL_NAME.to_string(),
-            arguments: json!({
+        let tool_call = CallToolRequest { params: rmcp::model::CallToolRequestParam { name: (FINAL_OUTPUT_TOOL_NAME.to_string()).to_string().into(), arguments: match json!({
                 "user": {
                     "name": "John",
                     "age": 30
                 },
-                "tags": ["developer", "rust"]
-            }),
-        };
+                "tags":  ["developer", "rust"]
+            }) { serde_json::Value::Object(map) => Some(map), _ => None }, method: Default::default(), extensions: Default::default() }};
 
         let result = tool.execute_tool_call(tool_call).await;
         let tool_result = result.result.await;

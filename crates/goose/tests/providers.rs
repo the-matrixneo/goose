@@ -142,7 +142,7 @@ impl ProviderTester {
             )
             .await?;
 
-        println!("=== {}::reponse1 ===", self.name);
+        println!("=== {}::reponse1 ===", goose::call_tool::name(&self));
         dbg!(&response1);
         println!("===================");
 
@@ -187,7 +187,7 @@ impl ProviderTester {
             )
             .await?;
 
-        println!("=== {}::reponse2 ===", self.name);
+        println!("=== {}::reponse2 ===", goose::call_tool::name(&self));
         dbg!(&response2);
         println!("===================");
 
@@ -204,7 +204,7 @@ impl ProviderTester {
 
     async fn test_context_length_exceeded_error(&self) -> Result<()> {
         // Google Gemini has a really long context window
-        let large_message_content = if self.name.to_lowercase() == "google" {
+        let large_message_content = if goose::call_tool::name(&self).to_lowercase() == "google" {
             "hello ".repeat(1_300_000)
         } else {
             "hello ".repeat(300_000)
@@ -230,12 +230,12 @@ impl ProviderTester {
             .await;
 
         // Print some debug info
-        println!("=== {}::context_length_exceeded_error ===", self.name);
+        println!("=== {}::context_length_exceeded_error ===", goose::call_tool::name(&self));
         dbg!(&result);
         println!("===================");
 
         // Ollama truncates by default even when the context window is exceeded
-        if self.name.to_lowercase() == "ollama" {
+        if goose::call_tool::name(&self).to_lowercase() == "ollama" {
             assert!(
                 result.is_ok(),
                 "Expected to succeed because of default truncation"
@@ -293,7 +293,7 @@ impl ProviderTester {
             )
             .await;
 
-        println!("=== {}::image_content_support ===", self.name);
+        println!("=== {}::image_content_support ===", goose::call_tool::name(&self));
         let (response, _) = result?;
         println!("Image response: {:?}", response);
         // Verify we got a text response
@@ -319,7 +319,7 @@ impl ProviderTester {
         let user_message = Message::user().with_text("Take a screenshot please");
         let tool_request = Message::assistant().with_tool_request(
             "test_id",
-            Ok(mcp_core::tool::ToolCall::new(
+            Ok(rmcp::model::CallToolRequest::new(
                 "get_screenshot",
                 serde_json::json!({}),
             )),
@@ -341,7 +341,7 @@ impl ProviderTester {
             )
             .await;
 
-        println!("=== {}::tool_image_response ===", self.name);
+        println!("=== {}::tool_image_response ===", goose::call_tool::name(&self));
         let (response, _) = result2?;
         println!("Tool image response: {:?}", response);
         println!("===================");

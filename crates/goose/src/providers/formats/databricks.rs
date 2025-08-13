@@ -5,7 +5,7 @@ use crate::providers::utils::{
     sanitize_function_name, ImageFormat,
 };
 use anyhow::{anyhow, Error};
-use mcp_core::ToolCall;
+use rmcp::model::CallToolRequest; use rmcp::model::CallToolRequestParam;
 use rmcp::model::{
     AnnotateAble, Content, ErrorCode, ErrorData, RawContent, ResourceContents, Role, Tool,
 };
@@ -101,7 +101,7 @@ fn format_messages(messages: &[Message], image_format: &ImageFormat) -> Vec<Data
                     has_tool_calls = true;
                     match &request.tool_call {
                         Ok(tool_call) => {
-                            let sanitized_name = sanitize_function_name(&tool_call.name);
+                            let sanitized_name = sanitize_function_name(&goose::call_tool::name(&tool_call));
 
                             let tool_calls = converted.tool_calls.get_or_insert_default();
                             tool_calls.push(json!({
@@ -109,7 +109,7 @@ fn format_messages(messages: &[Message], image_format: &ImageFormat) -> Vec<Data
                                 "type": "function",
                                 "function": {
                                     "name": sanitized_name,
-                                    "arguments": tool_call.arguments.to_string(),
+                                    "arguments": goose::call_tool::args_value(&tool_call).to_string(),
                                 }
                             }));
                         }
@@ -223,8 +223,8 @@ fn format_messages(messages: &[Message], image_format: &ImageFormat) -> Vec<Data
                             "type": "text",
                             "text": format!(
                                 "Frontend tool request: {} ({})",
-                                tool_call.name,
-                                serde_json::to_string_pretty(&tool_call.arguments).unwrap()
+                                goose::call_tool::name(&tool_call),
+                                serde_json::to_string_pretty(&goose::call_tool::args_value(&tool_call)).unwrap()
                             )
                         }));
                     } else {
@@ -267,14 +267,14 @@ pub fn format_tools(tools: &[Tool]) -> anyhow::Result<Vec<Value>> {
     let mut result = Vec::new();
 
     for tool in tools {
-        if !tool_names.insert(&tool.name) {
-            return Err(anyhow!("Duplicate tool name: {}", tool.name));
+        if !tool_names.insert(&goose::call_tool::name(&tool)) {
+            return Err(anyhow!("Duplicate tool name: {}", goose::call_tool::name(&tool)));
         }
 
         result.push(json!({
             "type": "function",
             "function": {
-                "name": tool.name,
+                "name": goose::call_tool::name(&tool),
                 // do not silently truncate description
                 "description": tool.description,
                 "parameters": tool.input_schema,
@@ -373,7 +373,7 @@ pub fn response_to_message(response: &Value) -> anyhow::Result<Message> {
                         Ok(params) => {
                             content.push(MessageContent::tool_request(
                                 id,
-                                Ok(ToolCall::new(&function_name, params)),
+                                Ok(CallToolRequest { params: rmcp::model::CallToolRequestParam { name: (&function_name).to_string().into(), arguments: match (params) { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }),
                             ));
                         }
                         Err(e) => {
@@ -771,7 +771,7 @@ mod tests {
             Message::user().with_text("How are you?"),
             Message::assistant().with_tool_request(
                 "tool1",
-                Ok(ToolCall::new("example", json!({"param1": "value1"}))),
+                Ok(CallToolRequest { params: rmcp::model::CallToolRequestParam { name: "example".to_string().into(), arguments: match json!({"param1": "value1"}) { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() })),
             ),
         ];
 
@@ -807,7 +807,7 @@ mod tests {
     fn test_format_messages_multiple_content() -> anyhow::Result<()> {
         let mut messages = vec![Message::assistant().with_tool_request(
             "tool1",
-            Ok(ToolCall::new("example", json!({"param1": "value1"}))),
+            Ok(CallToolRequest { params: rmcp::model::CallToolRequestParam { name: "example".to_string().into(), arguments: match json!({"param1": "value1"}) { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() })),
         )];
 
         // Get the ID from the tool request to use in the response
@@ -955,8 +955,8 @@ mod tests {
         assert_eq!(message.content.len(), 1);
         if let MessageContent::ToolRequest(request) = &message.content[0] {
             let tool_call = request.tool_call.as_ref().unwrap();
-            assert_eq!(tool_call.name, "example_fn");
-            assert_eq!(tool_call.arguments, json!({"param": "value"}));
+            assert_eq!(goose::call_tool::name(&tool_call), "example_fn");
+            assert_eq!(goose::call_tool::args_value(&tool_call), json!({"param": "value"}));
         } else {
             panic!("Expected ToolRequest content");
         }
@@ -1026,8 +1026,8 @@ mod tests {
 
         if let MessageContent::ToolRequest(request) = &message.content[0] {
             let tool_call = request.tool_call.as_ref().unwrap();
-            assert_eq!(tool_call.name, "example_fn");
-            assert_eq!(tool_call.arguments, json!({}));
+            assert_eq!(goose::call_tool::name(&tool_call), "example_fn");
+            assert_eq!(goose::call_tool::args_value(&tool_call), json!({}));
         } else {
             panic!("Expected ToolRequest content");
         }

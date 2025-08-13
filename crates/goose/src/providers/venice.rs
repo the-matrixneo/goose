@@ -12,7 +12,7 @@ use super::utils::map_http_error_to_provider_error;
 use crate::conversation::message::{Message, MessageContent};
 use crate::impl_provider_default;
 use crate::model::ModelConfig;
-use mcp_core::{ToolCall, ToolResult};
+use mcp_core::{CallToolRequest, ToolResult};
 use rmcp::model::{Role, Tool};
 
 // ---------- Capability Flags ----------
@@ -342,8 +342,8 @@ impl Provider for VeniceProvider {
                                 tracing::debug!(
                                     "Tool call conversion: id={}, name={}, args_len={}",
                                     tr.id,
-                                    tool_call.name,
-                                    tool_call.arguments.to_string().len()
+                                    goose::call_tool::name(&tool_call),
+                                    goose::call_tool::args_value(&tool_call).to_string().len()
                                 );
 
                                 // Convert to Venice format
@@ -351,8 +351,8 @@ impl Provider for VeniceProvider {
                                     "id": tr.id,
                                     "type": "function",
                                     "function": {
-                                        "name": tool_call.name,
-                                        "arguments": tool_call.arguments.to_string()
+                                        "name": goose::call_tool::name(&tool_call),
+                                        "arguments": goose::call_tool::args_value(&tool_call).to_string()
                                     }
                                 }))
                             } else {
@@ -407,7 +407,7 @@ impl Provider for VeniceProvider {
                     json!({
                         "type": "function",
                         "function": {
-                            "name": tool.name,
+                            "name": goose::call_tool::name(&tool),
                             "description": tool.description,
                             "parameters": tool.input_schema
                         }
@@ -452,8 +452,8 @@ impl Provider for VeniceProvider {
                         function["arguments"].clone()
                     };
 
-                    // Create a ToolCall using the function name and arguments
-                    let tool_call = ToolCall { name, arguments };
+                    // Create a CallToolRequest using the function name and arguments
+                    let tool_call = CallToolRequest { name, arguments };
 
                     // Create a ToolRequest MessageContent
                     let tool_request = MessageContent::tool_request(id, ToolResult::Ok(tool_call));

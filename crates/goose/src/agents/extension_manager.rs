@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 use futures::stream::{FuturesUnordered, StreamExt};
 use futures::{future, FutureExt};
 use mcp_core::handler::require_str_parameter;
-use mcp_core::ToolCall;
+use rmcp::model::CallToolRequest; use rmcp::model::CallToolRequestParam;
 use rmcp::service::ClientInitializeError;
 use rmcp::transport::streamable_http_client::StreamableHttpClientTransportConfig;
 use rmcp::transport::{
@@ -475,7 +475,7 @@ impl ExtensionManager {
                 loop {
                     for tool in client_tools.tools {
                         tools.push(Tool {
-                            name: format!("{}__{}", name, tool.name).into(),
+                            name: format!("{}__{}", name, goose::call_tool::name(&tool)).into(),
                             description: tool.description,
                             input_schema: tool.input_schema,
                             annotations: tool.annotations,
@@ -658,7 +658,7 @@ impl ExtensionManager {
                 let resource_list = lr
                     .resources
                     .into_iter()
-                    .map(|r| format!("{} - {}, uri: ({})", extension_name, r.name, r.uri))
+                    .map(|r| format!("{} - {}, uri: ({})", extension_name, goose::call_tool::name(&r), r.uri))
                     .collect::<Vec<String>>()
                     .join("\n");
 
@@ -725,12 +725,12 @@ impl ExtensionManager {
 
     pub async fn dispatch_tool_call(
         &self,
-        tool_call: ToolCall,
+        tool_call: CallToolRequest,
         cancellation_token: CancellationToken,
     ) -> Result<ToolCallResult> {
         // Dispatch tool call based on the prefix naming convention
-        let (client_name, client) = self.get_client_for_tool(&tool_call.name).ok_or_else(|| {
-            ErrorData::new(ErrorCode::RESOURCE_NOT_FOUND, tool_call.name.clone(), None)
+        let (client_name, client) = self.get_client_for_tool(&goose::call_tool::name(&tool_call)).ok_or_else(|| {
+            ErrorData::new(ErrorCode::RESOURCE_NOT_FOUND, goose::call_tool::name(&tool_call).clone(), None)
         })?;
 
         // rsplit returns the iterator in reverse, tool_name is then at 0
@@ -739,11 +739,11 @@ impl ExtensionManager {
             .strip_prefix(client_name)
             .and_then(|s| s.strip_prefix("__"))
             .ok_or_else(|| {
-                ErrorData::new(ErrorCode::RESOURCE_NOT_FOUND, tool_call.name.clone(), None)
+                ErrorData::new(ErrorCode::RESOURCE_NOT_FOUND, goose::call_tool::name(&tool_call).clone(), None)
             })?
             .to_string();
 
-        let arguments = tool_call.arguments.clone();
+        let arguments = goose::call_tool::args_value(&tool_call).clone();
         let client = client.clone();
         let notifications_receiver = client.lock().await.subscribe().await;
 
@@ -895,7 +895,7 @@ impl ExtensionManager {
                         format!("Frontend extension '{}'", name)
                     }
                 };
-                disabled_extensions.push(format!("- {} - {}", config.name(), description));
+                disabled_extensions.push(format!("- {} - {}", goose::call_tool::name(&config)(), description));
             }
         }
 
@@ -1084,20 +1084,30 @@ mod tests {
         );
 
         // verify a normal tool call
-        let tool_call = ToolCall {
-            name: "test_client__tool".to_string(),
-            arguments: json!({}),
+        let tool_call = CallToolRequest {
+            params: rmcp::model::CallToolRequestParam {
+                name: "test_client__tool".to_string().into(),
+                arguments: match json!({}) { serde_json::Value::Object(map) => Some(map), _ => None },
+            },
+            method: Default::default(),
+            extensions: Default::default(),
         };
+
 
         let result = extension_manager
             .dispatch_tool_call(tool_call, CancellationToken::default())
             .await;
         assert!(result.is_ok());
 
-        let tool_call = ToolCall {
-            name: "test_client__test__tool".to_string(),
-            arguments: json!({}),
+        let tool_call = CallToolRequest {
+            params: rmcp::model::CallToolRequestParam {
+                name: "test_client__test__tool".to_string().into(),
+                arguments: match json!({}) { serde_json::Value::Object(map) => Some(map), _ => None },
+            },
+            method: Default::default(),
+            extensions: Default::default(),
         };
+
 
         let result = extension_manager
             .dispatch_tool_call(tool_call, CancellationToken::default())
@@ -1105,10 +1115,15 @@ mod tests {
         assert!(result.is_ok());
 
         // verify a multiple underscores dispatch
-        let tool_call = ToolCall {
-            name: "__cli__ent____tool".to_string(),
-            arguments: json!({}),
+        let tool_call = CallToolRequest {
+            params: rmcp::model::CallToolRequestParam {
+                name: "__cli__ent____tool".to_string().into(),
+                arguments: match json!({}) { serde_json::Value::Object(map) => Some(map), _ => None },
+            },
+            method: Default::default(),
+            extensions: Default::default(),
         };
+
 
         let result = extension_manager
             .dispatch_tool_call(tool_call, CancellationToken::default())
@@ -1116,20 +1131,30 @@ mod tests {
         assert!(result.is_ok());
 
         // Test unicode in tool name, "client 🚀" should become "client_"
-        let tool_call = ToolCall {
-            name: "client___tool".to_string(),
-            arguments: json!({}),
+        let tool_call = CallToolRequest {
+            params: rmcp::model::CallToolRequestParam {
+                name: "client___tool".to_string().into(),
+                arguments: match json!({}) { serde_json::Value::Object(map) => Some(map), _ => None },
+            },
+            method: Default::default(),
+            extensions: Default::default(),
         };
+
 
         let result = extension_manager
             .dispatch_tool_call(tool_call, CancellationToken::default())
             .await;
         assert!(result.is_ok());
 
-        let tool_call = ToolCall {
-            name: "client___test__tool".to_string(),
-            arguments: json!({}),
+        let tool_call = CallToolRequest {
+            params: rmcp::model::CallToolRequestParam {
+                name: "client___test__tool".to_string().into(),
+                arguments: match json!({}) { serde_json::Value::Object(map) => Some(map), _ => None },
+            },
+            method: Default::default(),
+            extensions: Default::default(),
         };
+
 
         let result = extension_manager
             .dispatch_tool_call(tool_call, CancellationToken::default())
@@ -1137,10 +1162,15 @@ mod tests {
         assert!(result.is_ok());
 
         // this should error out, specifically for an ToolError::ExecutionError
-        let invalid_tool_call = ToolCall {
-            name: "client___tools".to_string(),
-            arguments: json!({}),
+        let invalid_tool_call = CallToolRequest {
+            params: rmcp::model::CallToolRequestParam {
+                name: "client___tools".to_string().into(),
+                arguments: match json!({}) { serde_json::Value::Object(map) => Some(map), _ => None },
+            },
+            method: Default::default(),
+            extensions: Default::default(),
         };
+
 
         let result = extension_manager
             .dispatch_tool_call(invalid_tool_call, CancellationToken::default())
@@ -1158,10 +1188,15 @@ mod tests {
 
         // this should error out, specifically with an ToolError::NotFound
         // this client doesn't exist
-        let invalid_tool_call = ToolCall {
-            name: "_client__tools".to_string(),
-            arguments: json!({}),
+        let invalid_tool_call = CallToolRequest {
+            params: rmcp::model::CallToolRequestParam {
+                name: "_client__tools".to_string().into(),
+                arguments: match json!({}) { serde_json::Value::Object(map) => Some(map), _ => None },
+            },
+            method: Default::default(),
+            extensions: Default::default(),
         };
+
 
         let result = extension_manager
             .dispatch_tool_call(invalid_tool_call, CancellationToken::default())

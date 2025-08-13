@@ -3,7 +3,7 @@ use crate::providers::base::Usage;
 use crate::providers::errors::ProviderError;
 use crate::providers::utils::{is_valid_function_name, sanitize_function_name};
 use anyhow::Result;
-use mcp_core::ToolCall;
+use rmcp::model::CallToolRequest; use rmcp::model::CallToolRequestParam;
 use rand::{distributions::Alphanumeric, Rng};
 use rmcp::model::{AnnotateAble, ErrorCode, ErrorData, RawContent, Role, Tool};
 use std::borrow::Cow;
@@ -41,13 +41,13 @@ pub fn format_messages(messages: &[Message]) -> Vec<Value> {
                             let mut function_call_part = Map::new();
                             function_call_part.insert(
                                 "name".to_string(),
-                                json!(sanitize_function_name(&tool_call.name)),
+                                json!(sanitize_function_name(&goose::call_tool::name(&tool_call))),
                             );
-                            if tool_call.arguments.is_object()
-                                && !tool_call.arguments.as_object().unwrap().is_empty()
+                            if goose::call_tool::args_value(&tool_call).is_object()
+                                && !goose::call_tool::args_value(&tool_call).as_object().unwrap().is_empty()
                             {
                                 function_call_part
-                                    .insert("args".to_string(), tool_call.arguments.clone());
+                                    .insert("args".to_string(), goose::call_tool::args_value(&tool_call).clone());
                             }
                             parts.push(json!({
                                 "functionCall": function_call_part
@@ -132,7 +132,7 @@ pub fn format_tools(tools: &[Tool]) -> Vec<Value> {
         .iter()
         .map(|tool| {
             let mut parameters = Map::new();
-            parameters.insert("name".to_string(), json!(tool.name));
+            parameters.insert("name".to_string(), json!(goose::call_tool::name(&tool)));
             parameters.insert("description".to_string(), json!(tool.description));
             let tool_input_schema = &tool.input_schema;
             // Only add the parameters key if the tool schema has non-empty properties.
@@ -269,7 +269,7 @@ pub fn response_to_message(response: Value) -> Result<Message> {
                 if let Some(params) = parameters {
                     content.push(MessageContent::tool_request(
                         id,
-                        Ok(ToolCall::new(&name, params.clone())),
+                        Ok(CallToolRequest { params: rmcp::model::CallToolRequestParam { name: (&name).to_string().into(), arguments: match (params.clone() { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() })),
                     ));
                 }
             }
@@ -348,7 +348,7 @@ mod tests {
         Message::new(role, 0, vec![MessageContent::text(text.to_string())])
     }
 
-    fn set_up_tool_request_message(id: &str, tool_call: ToolCall) -> Message {
+    fn set_up_tool_request_message(id: &str, tool_call: CallToolRequest) -> Message {
         Message::new(
             Role::User,
             0,
@@ -356,14 +356,14 @@ mod tests {
         )
     }
 
-    fn set_up_tool_confirmation_message(id: &str, tool_call: ToolCall) -> Message {
+    fn set_up_tool_confirmation_message(id: &str, tool_call: CallToolRequest) -> Message {
         Message::new(
             Role::User,
             0,
             vec![MessageContent::tool_confirmation_request(
                 id.to_string(),
-                tool_call.name.clone(),
-                tool_call.arguments.clone(),
+                goose::call_tool::name(&tool_call).clone(),
+                goose::call_tool::args_value(&tool_call).clone(),
                 Some("Goose would like to call the above tool. Allow? (y/n):".to_string()),
             )],
         )
@@ -415,10 +415,10 @@ mod tests {
             "param1": "value1"
         });
         let messages = vec![
-            set_up_tool_request_message("id", ToolCall::new("tool_name", arguments.clone())),
+            set_up_tool_request_message("id", CallToolRequest { params: rmcp::model::CallToolRequestParam { name: "tool_name".to_string().into(), arguments: match (arguments.clone() { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() })),
             set_up_tool_confirmation_message(
                 "id2",
-                ToolCall::new("tool_name_2", arguments.clone()),
+                CallToolRequest { params: rmcp::model::CallToolRequestParam { name: "tool_name_2".to_string().into(), arguments: match (arguments.clone() { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }),
             ),
         ];
         let payload = format_messages(&messages);
@@ -779,8 +779,8 @@ mod tests {
         assert_eq!(message.role, Role::Assistant);
         assert_eq!(message.content.len(), 1);
         if let Ok(tool_call) = &message.content[0].as_tool_request().unwrap().tool_call {
-            assert_eq!(tool_call.name, "valid_name");
-            assert_eq!(tool_call.arguments["param"], "value");
+            assert_eq!(goose::call_tool::name(&tool_call), "valid_name");
+            assert_eq!(goose::call_tool::args_value(&tool_call)["param"], "value");
         } else {
             panic!("Expected valid tool request");
         }

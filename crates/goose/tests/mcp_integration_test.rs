@@ -9,7 +9,7 @@ use tokio_util::sync::CancellationToken;
 
 use goose::agents::extension::{Envs, ExtensionConfig};
 use goose::agents::extension_manager::ExtensionManager;
-use mcp_core::ToolCall;
+use rmcp::model::CallToolRequest; use rmcp::model::CallToolRequestParam;
 
 use test_case::test_case;
 
@@ -21,38 +21,38 @@ enum TestMode {
 #[test_case(
     vec!["npx", "-y", "@modelcontextprotocol/server-everything"],
     vec![
-        ToolCall::new("echo", json!({"message": "Hello, world!"})),
-        ToolCall::new("add", json!({"a": 1, "b": 2})),
-        ToolCall::new("longRunningOperation", json!({"duration": 1, "steps": 5})),
-        ToolCall::new("structuredContent", json!({"location": "11238"})),
+        CallToolRequest { params: rmcp::model::CallToolRequestParam { name: "echo".to_string().into(), arguments: match json!({"message": "Hello, world!"}) { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }),
+        CallToolRequest { params: rmcp::model::CallToolRequestParam { name: "add".to_string().into(), arguments: match json!({"a": 1, "b": 2}) { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }),
+        CallToolRequest { params: rmcp::model::CallToolRequestParam { name: "longRunningOperation".to_string().into(), arguments: match json!({"duration": 1, "steps": 5}) { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }),
+        CallToolRequest { params: rmcp::model::CallToolRequestParam { name: "structuredContent".to_string().into(), arguments: match json!({"location": "11238"}) { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }),
     ],
     vec![]
 )]
 #[test_case(
     vec!["github-mcp-server", "stdio"],
     vec![
-        ToolCall::new("get_file_contents", json!({
+        CallToolRequest { params: rmcp::model::CallToolRequestParam { name: "get_file_contents".to_string().into(), arguments: match json!({
             "owner": "block",
             "repo": "goose",
             "path": "README.md",
             "sha": "48c1ec8afdb7d4d5b4f6e67e623926c884034776"
-        })),
+        }) { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }),
     ],
     vec!["GITHUB_PERSONAL_ACCESS_TOKEN"]
 )]
 #[test_case(
     vec!["uvx", "mcp-server-fetch"],
     vec![
-        ToolCall::new("fetch", json!({
+        CallToolRequest { params: rmcp::model::CallToolRequestParam { name: "fetch".to_string().into(), arguments: match json!({
             "url": "https://example.com",
-        })),
+        }) { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }),
     ],
     vec![]
 )]
 #[tokio::test]
 async fn test_replayed_session(
     command: Vec<&str>,
-    tool_calls: Vec<ToolCall>,
+    tool_calls: Vec<CallToolRequest>,
     required_envs: Vec<&str>,
 ) {
     let replay_file_name = command
@@ -133,7 +133,7 @@ async fn test_replayed_session(
     let result = (async || -> Result<(), Box<dyn std::error::Error>> {
         let mut results = Vec::new();
         for tool_call in tool_calls {
-            let tool_call = ToolCall::new(format!("test__{}", tool_call.name), tool_call.arguments);
+            let tool_call = CallToolRequest { params: rmcp::model::CallToolRequestParam { name: (format!("test__{}".to_string().into(), arguments: match (goose::call_tool::name(&tool_call) { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }), goose::call_tool::args_value(&tool_call));
             let result = extension_manager
                 .dispatch_tool_call(tool_call, CancellationToken::default())
                 .await;

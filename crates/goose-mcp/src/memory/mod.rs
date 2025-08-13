@@ -4,8 +4,8 @@ use indoc::formatdoc;
 use mcp_core::{
     handler::{PromptError, ResourceError},
     protocol::ServerCapabilities,
-    tool::ToolCall,
 };
+use rmcp::model::{CallToolRequest, CallToolRequestParam};
 use mcp_server::router::CapabilitiesBuilder;
 use mcp_server::Router;
 use rmcp::model::{
@@ -453,10 +453,11 @@ impl MemoryRouter {
         Ok(())
     }
 
-    async fn execute_tool_call(&self, tool_call: ToolCall) -> Result<String, io::Error> {
-        match tool_call.name.as_str() {
+    async fn execute_tool_call(&self, tool_call: CallToolRequest) -> Result<String, io::Error> {
+        match &*tool_call.params.name {
             "remember_memory" => {
-                let args = MemoryArgs::from_value(&tool_call.arguments)?;
+                let arg_obj = serde_json::Value::Object(tool_call.params.arguments.clone().unwrap_or_default());
+                let args = MemoryArgs::from_value(&arg_obj)?;
                 let data = args.data.filter(|d| !d.is_empty()).ok_or_else(|| {
                     io::Error::new(
                         io::ErrorKind::InvalidInput,
@@ -467,7 +468,8 @@ impl MemoryRouter {
                 Ok(format!("Stored memory in category: {}", args.category))
             }
             "retrieve_memories" => {
-                let args = MemoryArgs::from_value(&tool_call.arguments)?;
+                let arg_obj = serde_json::Value::Object(tool_call.params.arguments.clone().unwrap_or_default());
+                let args = MemoryArgs::from_value(&arg_obj)?;
                 let memories = if args.category == "*" {
                     self.retrieve_all(args.is_global)?
                 } else {
@@ -476,7 +478,8 @@ impl MemoryRouter {
                 Ok(format!("Retrieved memories: {:?}", memories))
             }
             "remove_memory_category" => {
-                let args = MemoryArgs::from_value(&tool_call.arguments)?;
+                let arg_obj = serde_json::Value::Object(tool_call.params.arguments.clone().unwrap_or_default());
+                let args = MemoryArgs::from_value(&arg_obj)?;
                 if args.category == "*" {
                     self.clear_all_global_or_local_memories(args.is_global)?;
                     Ok(format!(
@@ -489,8 +492,10 @@ impl MemoryRouter {
                 }
             }
             "remove_specific_memory" => {
-                let args = MemoryArgs::from_value(&tool_call.arguments)?;
-                let memory_content = tool_call.arguments["memory_content"].as_str().unwrap();
+                let arg_obj = serde_json::Value::Object(tool_call.params.arguments.clone().unwrap_or_default());
+                let args = MemoryArgs::from_value(&arg_obj)?;
+                let arg_obj = serde_json::Value::Object(tool_call.params.arguments.clone().unwrap_or_default());
+                let memory_content = arg_obj["memory_content"].as_str().unwrap();
                 self.remove_specific_memory(args.category, memory_content, args.is_global)?;
                 Ok(format!(
                     "Removed specific memory from category: {}",
@@ -530,9 +535,13 @@ impl Router for MemoryRouter {
         let tool_name = tool_name.to_string();
 
         Box::pin(async move {
-            let tool_call = ToolCall {
-                name: tool_name,
-                arguments,
+            let tool_call = CallToolRequest {
+                params: CallToolRequestParam {
+                    name: tool_name.into(),
+                    arguments: match arguments { Value::Object(m) => Some(m), _ => None },
+                },
+                method: Default::default(),
+                extensions: Default::default(),
             };
             match this.execute_tool_call(tool_call).await {
                 Ok(result) => Ok(vec![Content::text(result)]),

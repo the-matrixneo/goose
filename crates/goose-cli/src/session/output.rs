@@ -6,7 +6,7 @@ use goose::conversation::message::{Message, MessageContent, ToolRequest, ToolRes
 use goose::providers::pricing::get_model_pricing;
 use goose::providers::pricing::parse_model_id;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
-use mcp_core::tool::ToolCall;
+use rmcp::model::CallToolRequest; use rmcp::model::CallToolRequestParam;
 use regex::Regex;
 use rmcp::model::PromptArgument;
 use serde_json::Value;
@@ -244,7 +244,7 @@ pub fn goose_mode_message(text: &str) {
 
 fn render_tool_request(req: &ToolRequest, theme: Theme, debug: bool) {
     match &req.tool_call {
-        Ok(call) => match call.name.as_str() {
+        Ok(call) => match goose::call_tool::name(&call).as_str() {
             "developer__text_editor" => render_text_editor_request(call, debug),
             "developer__shell" => render_shell_request(call, debug),
             "dynamic_task__create_task" => render_dynamic_task_request(call, debug),
@@ -311,7 +311,7 @@ pub fn render_prompt_info(info: &PromptInfo) {
     if let Some(ext) = &info.extension {
         println!(" {}: {}", style("Extension").green(), ext);
     }
-    println!(" Prompt: {}", style(&info.name).cyan().bold());
+    println!(" Prompt: {}", style(&goose::call_tool::name(&info)).cyan().bold());
     if let Some(desc) = &info.description {
         println!("\n {}", desc);
     }
@@ -320,7 +320,7 @@ pub fn render_prompt_info(info: &PromptInfo) {
 }
 
 fn render_arguments(info: &PromptInfo) {
-    if let Some(args) = &info.arguments {
+    if let Some(args) = &goose::call_tool::args_value(&info) {
         println!("\n Arguments:");
         for arg in args {
             let required = arg.required.unwrap_or(false);
@@ -332,7 +332,7 @@ fn render_arguments(info: &PromptInfo) {
 
             println!(
                 "  {} {} {}",
-                style(&arg.name).yellow(),
+                style(&goose::call_tool::name(&arg)).yellow(),
                 req_str,
                 arg.description.as_deref().unwrap_or("")
             );
@@ -386,7 +386,7 @@ pub fn render_builtin_error(names: &str, error: &str) {
     println!();
 }
 
-fn render_text_editor_request(call: &ToolCall, debug: bool) {
+fn render_text_editor_request(call: &CallToolRequest, debug: bool) {
     print_tool_header(call);
 
     // Print path first with special formatting
@@ -411,7 +411,7 @@ fn render_text_editor_request(call: &ToolCall, debug: bool) {
     println!();
 }
 
-fn render_shell_request(call: &ToolCall, debug: bool) {
+fn render_shell_request(call: &CallToolRequest, debug: bool) {
     print_tool_header(call);
 
     match call.arguments.get("command") {
@@ -422,7 +422,7 @@ fn render_shell_request(call: &ToolCall, debug: bool) {
     }
 }
 
-fn render_dynamic_task_request(call: &ToolCall, debug: bool) {
+fn render_dynamic_task_request(call: &CallToolRequest, debug: bool) {
     print_tool_header(call);
 
     // Print task_parameters array
@@ -453,7 +453,7 @@ fn render_dynamic_task_request(call: &ToolCall, debug: bool) {
     println!();
 }
 
-fn render_todo_request(call: &ToolCall, _debug: bool) {
+fn render_todo_request(call: &CallToolRequest, _debug: bool) {
     print_tool_header(call);
 
     // For todo tools, always show the full content without redaction
@@ -466,7 +466,7 @@ fn render_todo_request(call: &ToolCall, _debug: bool) {
     println!();
 }
 
-fn render_default_request(call: &ToolCall, debug: bool) {
+fn render_default_request(call: &CallToolRequest, debug: bool) {
     print_tool_header(call);
     print_params(&call.arguments, 0, debug);
     println!();
@@ -474,8 +474,8 @@ fn render_default_request(call: &ToolCall, debug: bool) {
 
 // Helper functions
 
-fn print_tool_header(call: &ToolCall) {
-    let parts: Vec<_> = call.name.rsplit("__").collect();
+fn print_tool_header(call: &CallToolRequest) {
+    let parts: Vec<_> = goose::call_tool::name(&call).rsplit("__").collect();
     let tool_header = format!(
         "─── {} | {} ──────────────────────────",
         style(parts.first().unwrap_or(&"unknown")),

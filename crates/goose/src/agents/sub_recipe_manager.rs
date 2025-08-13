@@ -40,7 +40,7 @@ impl SubRecipeManager {
             let sub_recipe_key = format!(
                 "{}_{}",
                 SUB_RECIPE_TASK_TOOL_NAME_PREFIX,
-                sub_recipe.name.clone()
+                goose::call_tool::name(&sub_recipe).clone()
             );
             let tool = create_sub_recipe_task_tool(&sub_recipe);
             self.sub_recipe_tools.insert(sub_recipe_key.clone(), tool);

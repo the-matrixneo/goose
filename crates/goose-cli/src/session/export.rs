@@ -114,7 +114,7 @@ pub fn tool_request_to_markdown(req: &ToolRequest, export_all_content: bool) -> 
     let mut md = String::new();
     match &req.tool_call {
         Ok(call) => {
-            let parts: Vec<_> = call.name.rsplitn(2, "__").collect();
+            let parts: Vec<_> = goose::call_tool::name(&call).rsplitn(2, "__").collect();
             let (namespace, tool_name_only) = if parts.len() == 2 {
                 (parts[1], parts[0])
             } else {
@@ -127,7 +127,7 @@ pub fn tool_request_to_markdown(req: &ToolRequest, export_all_content: bool) -> 
             ));
             md.push_str("**Arguments:**\n");
 
-            match call.name.as_str() {
+            match goose::call_tool::name(&call).as_str() {
                 "developer__shell" => {
                     if let Some(Value::String(command)) = call.arguments.get("command") {
                         md.push_str(&format!(
@@ -361,7 +361,7 @@ pub fn message_to_markdown(message: &Message, export_all_content: bool) -> Strin
 mod tests {
     use super::*;
     use goose::conversation::message::{Message, ToolRequest, ToolResponse};
-    use mcp_core::tool::ToolCall;
+    use rmcp::model::CallToolRequest; use rmcp::model::CallToolRequestParam;
     use rmcp::model::{Content, RawTextContent, TextContent};
     use serde_json::json;
 
@@ -477,12 +477,9 @@ mod tests {
 
     #[test]
     fn test_tool_request_to_markdown_shell() {
-        let tool_call = ToolCall {
-            name: "developer__shell".to_string(),
-            arguments: json!({
+        let tool_call = CallToolRequest { params: rmcp::model::CallToolRequestParam { name: "developer__shell".to_string()).to_string().into(), arguments: match json!({
                 "command": "ls -la",
-                "working_dir": "/home/user"
-            }),
+                "working_dir": "/home/user") { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }),
         };
         let tool_request = ToolRequest {
             id: "test-id".to_string(),
@@ -500,12 +497,9 @@ mod tests {
 
     #[test]
     fn test_tool_request_to_markdown_text_editor() {
-        let tool_call = ToolCall {
-            name: "developer__text_editor".to_string(),
-            arguments: json!({
+        let tool_call = CallToolRequest { params: rmcp::model::CallToolRequestParam { name: "developer__text_editor".to_string()).to_string().into(), arguments: match json!({
                 "path": "/path/to/file.txt",
-                "code_edit": "print('Hello World')"
-            }),
+                "code_edit": "print('Hello World') { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }")),
         };
         let tool_request = ToolRequest {
             id: "test-id".to_string(),
@@ -567,9 +561,7 @@ mod tests {
 
     #[test]
     fn test_message_to_markdown_with_tool_request() {
-        let tool_call = ToolCall {
-            name: "test_tool".to_string(),
-            arguments: json!({"param": "value"}),
+        let tool_call = CallToolRequest { params: rmcp::model::CallToolRequestParam { name: "test_tool".to_string()).to_string().into(), arguments: match json!({"param": "value") { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }),
         };
 
         let message = Message::assistant().with_tool_request("test-id", Ok(tool_call));
@@ -626,11 +618,8 @@ mod tests {
 
     #[test]
     fn test_shell_tool_with_code_output() {
-        let tool_call = ToolCall {
-            name: "developer__shell".to_string(),
-            arguments: json!({
-                "command": "cat main.py"
-            }),
+        let tool_call = CallToolRequest { params: rmcp::model::CallToolRequestParam { name: "developer__shell".to_string()).to_string().into(), arguments: match json!({
+                "command": "cat main.py") { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }),
         };
         let tool_request = ToolRequest {
             id: "shell-cat".to_string(),
@@ -671,11 +660,8 @@ if __name__ == "__main__":
 
     #[test]
     fn test_shell_tool_with_git_commands() {
-        let git_status_call = ToolCall {
-            name: "developer__shell".to_string(),
-            arguments: json!({
-                "command": "git status --porcelain"
-            }),
+        let git_status_call = CallToolRequest { params: rmcp::model::CallToolRequestParam { name: "developer__shell".to_string()).to_string().into(), arguments: match json!({
+                "command": "git status --porcelain") { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }),
         };
         let tool_request = ToolRequest {
             id: "git-status".to_string(),
@@ -708,11 +694,8 @@ if __name__ == "__main__":
 
     #[test]
     fn test_shell_tool_with_build_output() {
-        let cargo_build_call = ToolCall {
-            name: "developer__shell".to_string(),
-            arguments: json!({
-                "command": "cargo build"
-            }),
+        let cargo_build_call = CallToolRequest { params: rmcp::model::CallToolRequestParam { name: "developer__shell".to_string()).to_string().into(), arguments: match json!({
+                "command": "cargo build") { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }),
         };
         let _tool_request = ToolRequest {
             id: "cargo-build".to_string(),
@@ -751,11 +734,8 @@ warning: unused variable `x`
 
     #[test]
     fn test_shell_tool_with_json_api_response() {
-        let curl_call = ToolCall {
-            name: "developer__shell".to_string(),
-            arguments: json!({
-                "command": "curl -s https://api.github.com/repos/microsoft/vscode/releases/latest"
-            }),
+        let curl_call = CallToolRequest { params: rmcp::model::CallToolRequestParam { name: "developer__shell".to_string()).to_string().into(), arguments: match json!({
+                "command": "curl -s https://api.github.com/repos/microsoft/vscode/releases/latest") { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }),
         };
         let _tool_request = ToolRequest {
             id: "curl-api".to_string(),
@@ -796,12 +776,10 @@ warning: unused variable `x`
 
     #[test]
     fn test_text_editor_tool_with_code_creation() {
-        let editor_call = ToolCall {
-            name: "developer__text_editor".to_string(),
-            arguments: json!({
+        let editor_call = CallToolRequest { params: rmcp::model::CallToolRequestParam { name: "developer__text_editor".to_string()).to_string().into(), arguments: match json!({
                 "command": "write",
                 "path": "/tmp/fibonacci.js",
-                "file_text": "function fibonacci(n) {\n  if (n <= 1) return n;\n  return fibonacci(n - 1) + fibonacci(n - 2);\n}\n\nconsole.log(fibonacci(10));"
+                "file_text": "function fibonacci(n) { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() } {\n  if (n <= 1) return n;\n  return fibonacci(n - 1) + fibonacci(n - 2);\n)\n\nconsole.log(fibonacci(10));"
             }),
         };
         let tool_request = ToolRequest {
@@ -836,12 +814,9 @@ warning: unused variable `x`
 
     #[test]
     fn test_text_editor_tool_view_code() {
-        let editor_call = ToolCall {
-            name: "developer__text_editor".to_string(),
-            arguments: json!({
+        let editor_call = CallToolRequest { params: rmcp::model::CallToolRequestParam { name: "developer__text_editor".to_string()).to_string().into(), arguments: match json!({
                 "command": "view",
-                "path": "/src/utils.py"
-            }),
+                "path": "/src/utils.py") { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }),
         };
         let _tool_request = ToolRequest {
             id: "editor-view".to_string(),
@@ -885,11 +860,8 @@ def process_data(data: List[Dict]) -> List[Dict]:
 
     #[test]
     fn test_shell_tool_with_error_output() {
-        let error_call = ToolCall {
-            name: "developer__shell".to_string(),
-            arguments: json!({
-                "command": "python nonexistent_script.py"
-            }),
+        let error_call = CallToolRequest { params: rmcp::model::CallToolRequestParam { name: "developer__shell".to_string()).to_string().into(), arguments: match json!({
+                "command": "python nonexistent_script.py") { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }),
         };
         let _tool_request = ToolRequest {
             id: "shell-error".to_string(),
@@ -919,10 +891,8 @@ Command failed with exit code 2"#;
 
     #[test]
     fn test_shell_tool_complex_script_execution() {
-        let script_call = ToolCall {
-            name: "developer__shell".to_string(),
-            arguments: json!({
-                "command": "python -c \"import sys; print(f'Python {sys.version}'); [print(f'{i}^2 = {i**2}') for i in range(1, 6)]\""
+        let script_call = CallToolRequest { params: rmcp::model::CallToolRequestParam { name: "developer__shell".to_string()).to_string().into(), arguments: match json!({
+                "command": "python -c \"import sys; print(f'Python {sys.version) { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }'); [print(f'{i}^2 = {i**2}') for i in range(1, 6)]\""
             }),
         };
         let tool_request = ToolRequest {
@@ -964,11 +934,8 @@ Command failed with exit code 2"#;
 
     #[test]
     fn test_shell_tool_with_multi_command() {
-        let multi_call = ToolCall {
-            name: "developer__shell".to_string(),
-            arguments: json!({
-                "command": "cd /tmp && ls -la | head -5 && pwd"
-            }),
+        let multi_call = CallToolRequest { params: rmcp::model::CallToolRequestParam { name: "developer__shell".to_string()).to_string().into(), arguments: match json!({
+                "command": "cd /tmp && ls -la | head -5 && pwd") { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }),
         };
         let _tool_request = ToolRequest {
             id: "multi-cmd".to_string(),
@@ -1007,11 +974,8 @@ drwx------   3 user  staff    96 Dec  6 16:20 com.apple.launchd.abc
 
     #[test]
     fn test_developer_tool_grep_code_search() {
-        let grep_call = ToolCall {
-            name: "developer__shell".to_string(),
-            arguments: json!({
-                "command": "rg 'async fn' --type rust -n"
-            }),
+        let grep_call = CallToolRequest { params: rmcp::model::CallToolRequestParam { name: "developer__shell".to_string()).to_string().into(), arguments: match json!({
+                "command": "rg 'async fn' --type rust -n") { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }),
         };
         let tool_request = ToolRequest {
             id: "grep-search".to_string(),
@@ -1049,10 +1013,8 @@ src/middleware.rs:12:async fn auth_middleware(req: Request, next: Next) -> Resul
     #[test]
     fn test_shell_tool_json_detection_works() {
         // This test shows that JSON detection in tool responses DOES work
-        let tool_call = ToolCall {
-            name: "developer__shell".to_string(),
-            arguments: json!({
-                "command": "echo '{\"test\": \"json\"}'"
+        let tool_call = CallToolRequest { params: rmcp::model::CallToolRequestParam { name: "developer__shell".to_string()).to_string().into(), arguments: match json!({
+                "command": "echo '{\"test\": \"json\") { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }'"
             }),
         };
         let _tool_request = ToolRequest {
@@ -1082,11 +1044,8 @@ src/middleware.rs:12:async fn auth_middleware(req: Request, next: Next) -> Resul
 
     #[test]
     fn test_shell_tool_with_package_management() {
-        let npm_call = ToolCall {
-            name: "developer__shell".to_string(),
-            arguments: json!({
-                "command": "npm install express typescript @types/node --save-dev"
-            }),
+        let npm_call = CallToolRequest { params: rmcp::model::CallToolRequestParam { name: "developer__shell".to_string()).to_string().into(), arguments: match json!({
+                "command": "npm install express typescript @types/node --save-dev") { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }),
         };
         let tool_request = ToolRequest {
             id: "npm-install".to_string(),

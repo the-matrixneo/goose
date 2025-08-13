@@ -42,7 +42,7 @@ use crate::providers::errors::ProviderError;
 use crate::recipe::{Author, Recipe, Response, Settings, SubRecipe};
 use crate::scheduler_trait::SchedulerTrait;
 use crate::session;
-use crate::tool_monitor::{ToolCall, ToolMonitor};
+use crate::tool_monitor::{CallToolRequest, ToolMonitor};
 use crate::utils::is_token_cancelled;
 use mcp_core::ToolResult;
 use regex::Regex;
@@ -375,13 +375,24 @@ impl Agent {
     #[instrument(skip(self, tool_call, request_id), fields(input, output))]
     pub async fn dispatch_tool_call(
         &self,
-        tool_call: mcp_core::tool::ToolCall,
+        tool_call: rmcp::model::CallToolRequest,
         request_id: String,
         cancellation_token: Option<CancellationToken>,
     ) -> (String, Result<ToolCallResult, ErrorData>) {
         // Check if this tool call should be allowed based on repetition monitoring
         if let Some(monitor) = self.tool_monitor.lock().await.as_mut() {
-            let tool_call_info = ToolCall::new(tool_call.name.clone(), tool_call.arguments.clone());
+            let tool_call_info = CallToolRequest {
+                params: rmcp::model::CallToolRequestParam {
+                    name: goose::call_tool::name(&tool_call).to_string().into(),
+                    arguments: match goose::call_tool::args_value(&tool_call) {
+                        serde_json::Value::Object(map) => Some(map),
+                        _ => None,
+                    },
+                },
+                method: Default::default(),
+                extensions: Default::default(),
+            };
+
 
             if !monitor.check_tool_call(tool_call_info) {
                 return (
@@ -395,22 +406,20 @@ impl Agent {
             }
         }
 
-        if tool_call.name == PLATFORM_MANAGE_SCHEDULE_TOOL_NAME {
+        if goose::call_tool::name(&tool_call) == PLATFORM_MANAGE_SCHEDULE_TOOL_NAME {
             let result = self
-                .handle_schedule_management(tool_call.arguments, request_id.clone())
+                .handle_schedule_management(goose::call_tool::args_value(&tool_call), request_id.clone())
                 .await;
             return (request_id, Ok(ToolCallResult::from(result)));
         }
 
-        if tool_call.name == PLATFORM_MANAGE_EXTENSIONS_TOOL_NAME {
-            let extension_name = tool_call
-                .arguments
+        if goose::call_tool::name(&tool_call) == PLATFORM_MANAGE_EXTENSIONS_TOOL_NAME {
+            let extension_name = goose::call_tool::args_value(&tool_call)
                 .get("extension_name")
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .to_string();
-            let action = tool_call
-                .arguments
+            let action = goose::call_tool::args_value(&tool_call)
                 .get("action")
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
@@ -422,7 +431,7 @@ impl Agent {
             return (request_id, Ok(ToolCallResult::from(result)));
         }
 
-        if tool_call.name == FINAL_OUTPUT_TOOL_NAME {
+        if goose::call_tool::name(&tool_call) == FINAL_OUTPUT_TOOL_NAME {
             return if let Some(final_output_tool) = self.final_output_tool.lock().await.as_mut() {
                 let result = final_output_tool.execute_tool_call(tool_call.clone()).await;
                 (request_id, Ok(result))
@@ -440,60 +449,60 @@ impl Agent {
 
         let extension_manager = self.extension_manager.read().await;
         let sub_recipe_manager = self.sub_recipe_manager.lock().await;
-        let result: ToolCallResult = if sub_recipe_manager.is_sub_recipe_tool(&tool_call.name) {
+        let result: ToolCallResult = if sub_recipe_manager.is_sub_recipe_tool(&goose::call_tool::name(&tool_call)) {
             sub_recipe_manager
                 .dispatch_sub_recipe_tool_call(
-                    &tool_call.name,
-                    tool_call.arguments.clone(),
+                    &goose::call_tool::name(&tool_call),
+                    goose::call_tool::args_value(&tool_call).clone(),
                     &self.tasks_manager,
                 )
                 .await
-        } else if tool_call.name == SUBAGENT_EXECUTE_TASK_TOOL_NAME {
+        } else if goose::call_tool::name(&tool_call) == SUBAGENT_EXECUTE_TASK_TOOL_NAME {
             let provider = self.provider().await.ok();
 
             let task_config = TaskConfig::new(provider);
             subagent_execute_task_tool::run_tasks(
-                tool_call.arguments.clone(),
+                goose::call_tool::args_value(&tool_call).clone(),
                 task_config,
                 &self.tasks_manager,
                 cancellation_token,
             )
             .await
-        } else if tool_call.name == DYNAMIC_TASK_TOOL_NAME_PREFIX {
-            create_dynamic_task(tool_call.arguments.clone(), &self.tasks_manager).await
-        } else if tool_call.name == PLATFORM_READ_RESOURCE_TOOL_NAME {
+        } else if goose::call_tool::name(&tool_call) == DYNAMIC_TASK_TOOL_NAME_PREFIX {
+            create_dynamic_task(goose::call_tool::args_value(&tool_call).clone(), &self.tasks_manager).await
+        } else if goose::call_tool::name(&tool_call) == PLATFORM_READ_RESOURCE_TOOL_NAME {
             // Check if the tool is read_resource and handle it separately
             ToolCallResult::from(
                 extension_manager
                     .read_resource(
-                        tool_call.arguments.clone(),
+                        goose::call_tool::args_value(&tool_call).clone(),
                         cancellation_token.unwrap_or_default(),
                     )
                     .await,
             )
-        } else if tool_call.name == PLATFORM_LIST_RESOURCES_TOOL_NAME {
+        } else if goose::call_tool::name(&tool_call) == PLATFORM_LIST_RESOURCES_TOOL_NAME {
             ToolCallResult::from(
                 extension_manager
                     .list_resources(
-                        tool_call.arguments.clone(),
+                        goose::call_tool::args_value(&tool_call).clone(),
                         cancellation_token.unwrap_or_default(),
                     )
                     .await,
             )
-        } else if tool_call.name == PLATFORM_SEARCH_AVAILABLE_EXTENSIONS_TOOL_NAME {
+        } else if goose::call_tool::name(&tool_call) == PLATFORM_SEARCH_AVAILABLE_EXTENSIONS_TOOL_NAME {
             ToolCallResult::from(extension_manager.search_available_extensions().await)
-        } else if self.is_frontend_tool(&tool_call.name).await {
+        } else if self.is_frontend_tool(&goose::call_tool::name(&tool_call)).await {
             // For frontend tools, return an error indicating we need frontend execution
             ToolCallResult::from(Err(ErrorData::new(
                 ErrorCode::INTERNAL_ERROR,
                 "Frontend tool execution required".to_string(),
                 None,
             )))
-        } else if tool_call.name == TODO_READ_TOOL_NAME {
+        } else if goose::call_tool::name(&tool_call) == TODO_READ_TOOL_NAME {
             // Handle task planner read tool
             let todo_content = self.todo_list.lock().await.clone();
             ToolCallResult::from(Ok(vec![Content::text(todo_content)]))
-        } else if tool_call.name == TODO_WRITE_TOOL_NAME {
+        } else if goose::call_tool::name(&tool_call) == TODO_WRITE_TOOL_NAME {
             // Handle task planner write tool
             let content = tool_call
                 .arguments
@@ -530,12 +539,12 @@ impl Agent {
                 "Updated ({} chars)",
                 char_count
             ))]))
-        } else if tool_call.name == ROUTER_VECTOR_SEARCH_TOOL_NAME
-            || tool_call.name == ROUTER_LLM_SEARCH_TOOL_NAME
+        } else if goose::call_tool::name(&tool_call) == ROUTER_VECTOR_SEARCH_TOOL_NAME
+            || goose::call_tool::name(&tool_call) == ROUTER_LLM_SEARCH_TOOL_NAME
         {
             match self
                 .tool_route_manager
-                .dispatch_route_search_tool(tool_call.arguments)
+                .dispatch_route_search_tool(goose::call_tool::args_value(&tool_call))
                 .await
             {
                 Ok(tool_result) => tool_result,
@@ -696,10 +705,10 @@ impl Agent {
                 let mut frontend_tools = self.frontend_tools.lock().await;
                 for tool in tools {
                     let frontend_tool = FrontendTool {
-                        name: tool.name.to_string(),
+                        name: goose::call_tool::name(&tool).to_string(),
                         tool: tool.clone(),
                     };
-                    frontend_tools.insert(tool.name.to_string(), frontend_tool);
+                    frontend_tools.insert(goose::call_tool::name(&tool).to_string(), frontend_tool);
                 }
                 // Store instructions if provided, using "frontend" as the key
                 let mut frontend_instructions = self.frontend_instructions.lock().await;
@@ -727,14 +736,14 @@ impl Agent {
                 if let Err(e) = ToolRouterIndexManager::update_extension_tools(
                     &selector,
                     &extension_manager,
-                    &extension.name(),
+                    &goose::call_tool::name(&extension)(),
                     "add",
                 )
                 .await
                 {
                     return Err(ExtensionError::SetupError(format!(
                         "Failed to index tools for extension {}: {}",
-                        extension.name(),
+                        goose::call_tool::name(&extension)(),
                         e
                     )));
                 }
@@ -1286,7 +1295,7 @@ impl Agent {
 
         if let Some(extension) = prompts
             .iter()
-            .find(|(_, prompt_list)| prompt_list.iter().any(|p| p.name == name))
+            .find(|(_, prompt_list)| prompt_list.iter().any(|p| goose::call_tool::name(&p) == name))
             .map(|(extension, _)| extension)
         {
             return extension_manager
@@ -1305,7 +1314,7 @@ impl Agent {
             .into_iter()
             .map(|tool| {
                 ToolInfo::new(
-                    &tool.name,
+                    &goose::call_tool::name(&tool),
                     tool.description
                         .as_ref()
                         .map(|d| d.as_ref())
@@ -1492,7 +1501,7 @@ mod tests {
         let tools = agent.list_tools(None).await;
         let final_output_tool = tools
             .iter()
-            .find(|tool| tool.name == FINAL_OUTPUT_TOOL_NAME);
+            .find(|tool| goose::call_tool::name(&tool) == FINAL_OUTPUT_TOOL_NAME);
 
         assert!(
             final_output_tool.is_some(),
@@ -1517,8 +1526,8 @@ mod tests {
         // Test that task planner tools are listed
         let tools = agent.list_tools(None).await;
 
-        let todo_read = tools.iter().find(|tool| tool.name == TODO_READ_TOOL_NAME);
-        let todo_write = tools.iter().find(|tool| tool.name == TODO_WRITE_TOOL_NAME);
+        let todo_read = tools.iter().find(|tool| goose::call_tool::name(&tool) == TODO_READ_TOOL_NAME);
+        let todo_write = tools.iter().find(|tool| goose::call_tool::name(&tool) == TODO_WRITE_TOOL_NAME);
 
         assert!(todo_read.is_some(), "TODO read tool should be present");
         assert!(todo_write.is_some(), "TODO write tool should be present");

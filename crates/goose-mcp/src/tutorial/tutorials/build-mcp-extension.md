@@ -207,7 +207,7 @@ server.addTool(
         content = listOf(
             TextContent(
                 type = "text",
-                text = "Processed ${request.arguments["param"]}"
+                text = "Processed ${goose::call_tool::args_value(&request)["param"]}"
             )
         )
     )
@@ -336,9 +336,9 @@ server.addTool(
     name = "example-tool",
     description = "Example tool"
 ) { request ->
-    log("example-tool called with param: ${request.arguments["param"]}")
+    log("example-tool called with param: ${goose::call_tool::args_value(&request)["param"]}")
     try {
-        val result = "Processed ${request.arguments["param"]}"
+        val result = "Processed ${goose::call_tool::args_value(&request)["param"]}"
         log("example-tool succeeded: $result")
         ToolCallResult(
             content = listOf(

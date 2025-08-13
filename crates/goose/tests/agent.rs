@@ -452,7 +452,7 @@ mod schedule_tool_tests {
         let tools = agent.list_tools(None).await;
         let schedule_tool = tools
             .iter()
-            .find(|tool| tool.name == PLATFORM_MANAGE_SCHEDULE_TOOL_NAME);
+            .find(|tool| goose::call_tool::name(&tool) == PLATFORM_MANAGE_SCHEDULE_TOOL_NAME);
         assert!(schedule_tool.is_some());
 
         let tool = schedule_tool.unwrap();
@@ -472,7 +472,7 @@ mod schedule_tool_tests {
         let tools = agent.list_tools(None).await;
         let schedule_tool = tools
             .iter()
-            .find(|tool| tool.name == PLATFORM_MANAGE_SCHEDULE_TOOL_NAME);
+            .find(|tool| goose::call_tool::name(&tool) == PLATFORM_MANAGE_SCHEDULE_TOOL_NAME);
         assert!(schedule_tool.is_some());
     }
 
@@ -484,7 +484,7 @@ mod schedule_tool_tests {
         // Check that the schedule management tool is included in platform tools
         let schedule_tool = tools
             .iter()
-            .find(|tool| tool.name == PLATFORM_MANAGE_SCHEDULE_TOOL_NAME);
+            .find(|tool| goose::call_tool::name(&tool) == PLATFORM_MANAGE_SCHEDULE_TOOL_NAME);
         assert!(schedule_tool.is_some());
 
         let tool = schedule_tool.unwrap();
@@ -521,7 +521,7 @@ mod schedule_tool_tests {
         let tools = agent.list_tools(None).await;
         let schedule_tool = tools
             .iter()
-            .find(|tool| tool.name == PLATFORM_MANAGE_SCHEDULE_TOOL_NAME);
+            .find(|tool| goose::call_tool::name(&tool) == PLATFORM_MANAGE_SCHEDULE_TOOL_NAME);
         assert!(schedule_tool.is_some());
 
         let tool = schedule_tool.unwrap();
@@ -612,7 +612,7 @@ mod final_output_tool_tests {
         agent.add_final_output_tool(response).await;
 
         // Simulate a final output tool call occurring.
-        let tool_call = mcp_core::tool::ToolCall::new(
+        let tool_call = rmcp::model::CallToolRequest::new(
             FINAL_OUTPUT_TOOL_NAME,
             serde_json::json!({
                 "result": "Test output"
@@ -971,7 +971,7 @@ mod max_turns_tests {
     use goose::providers::base::{Provider, ProviderMetadata, ProviderUsage, Usage};
     use goose::providers::errors::ProviderError;
     use goose::session::storage::Identifier;
-    use mcp_core::tool::ToolCall;
+    use rmcp::model::CallToolRequest; use rmcp::model::CallToolRequestParam;
     use rmcp::model::Tool;
     use std::path::PathBuf;
 
@@ -991,7 +991,7 @@ mod max_turns_tests {
             _messages: &[Message],
             _tools: &[Tool],
         ) -> Result<(Message, ProviderUsage), ProviderError> {
-            let tool_call = ToolCall::new("test_tool", serde_json::json!({"param": "value"}));
+            let tool_call = CallToolRequest { params: rmcp::model::CallToolRequestParam { name: "test_tool".to_string().into(), arguments: match (serde_json::json!({"param": "value"}) { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() });
             let message = Message::assistant().with_tool_request("call_123", Ok(tool_call));
 
             let usage = ProviderUsage::new(

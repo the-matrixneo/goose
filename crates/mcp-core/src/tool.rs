@@ -134,23 +134,3 @@ impl Tool {
         }
     }
 }
-
-/// A tool call request that an extension can execute
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ToolCall {
-    /// The name of the tool to execute
-    pub name: String,
-    /// The parameters for the execution
-    pub arguments: Value,
-}
-
-impl ToolCall {
-    /// Create a new ToolUse with the given name and parameters
-    pub fn new<S: Into<String>>(name: S, arguments: Value) -> Self {
-        Self {
-            name: name.into(),
-            arguments,
-        }
-    }
-}

@@ -887,7 +887,7 @@ async fn test_schedule_tool_dispatch() {
         .await;
 
     // Test that the tool is properly dispatched through dispatch_tool_call
-    let tool_call = mcp_core::tool::ToolCall {
+    let tool_call = rmcp::model::CallToolRequest {
         name: PLATFORM_MANAGE_SCHEDULE_TOOL_NAME.to_string(),
         arguments: json!({
             "action": "list"

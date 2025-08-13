@@ -3,7 +3,7 @@ use crate::model::ModelConfig;
 use crate::providers::base::Usage;
 use crate::providers::errors::ProviderError;
 use anyhow::{anyhow, Result};
-use mcp_core::ToolCall;
+use rmcp::model::CallToolRequest; use rmcp::model::CallToolRequestParam;
 use rmcp::model::{ErrorCode, ErrorData, Role, Tool};
 use serde_json::{json, Value};
 use std::collections::HashSet;
@@ -54,8 +54,8 @@ pub fn format_messages(messages: &[Message]) -> Vec<Value> {
                             content.push(json!({
                                 TYPE_FIELD: TOOL_USE_TYPE,
                                 ID_FIELD: tool_request.id,
-                                NAME_FIELD: tool_call.name,
-                                INPUT_FIELD: tool_call.arguments
+                                NAME_FIELD: goose::call_tool::name(&tool_call),
+                                INPUT_FIELD: goose::call_tool::args_value(&tool_call)
                             }));
                         }
                         Err(_tool_error) => {
@@ -115,8 +115,8 @@ pub fn format_messages(messages: &[Message]) -> Vec<Value> {
                         content.push(json!({
                             TYPE_FIELD: TOOL_USE_TYPE,
                             ID_FIELD: tool_request.id,
-                            NAME_FIELD: tool_call.name,
-                            INPUT_FIELD: tool_call.arguments
+                            NAME_FIELD: goose::call_tool::name(&tool_call),
+                            INPUT_FIELD: goose::call_tool::args_value(&tool_call)
                         }));
                     }
                 }
@@ -176,9 +176,9 @@ pub fn format_tools(tools: &[Tool]) -> Vec<Value> {
     let mut tool_specs = Vec::new();
 
     for tool in tools {
-        if unique_tools.insert(tool.name.clone()) {
+        if unique_tools.insert(goose::call_tool::name(&tool).clone()) {
             tool_specs.push(json!({
-                NAME_FIELD: tool.name,
+                NAME_FIELD: goose::call_tool::name(&tool),
                 "description": tool.description,
                 "input_schema": tool.input_schema
             }));
@@ -235,7 +235,7 @@ pub fn response_to_message(response: &Value) -> Result<Message> {
                     .get(INPUT_FIELD)
                     .ok_or_else(|| anyhow!("Missing tool_use input"))?;
 
-                let tool_call = ToolCall::new(name, input.clone());
+                let tool_call = CallToolRequest { params: rmcp::model::CallToolRequestParam { name: (name).to_string().into(), arguments: match (input.clone() { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() });
                 message = message.with_tool_request(id, Ok(tool_call));
             }
             Some(THINKING_TYPE) => {
@@ -589,7 +589,7 @@ where
                                 }
                             };
 
-                            let tool_call = ToolCall::new(&name, parsed_args);
+                            let tool_call = CallToolRequest { params: rmcp::model::CallToolRequestParam { name: (&name).to_string().into(), arguments: match (parsed_args) { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() };
                             let mut message = Message::new(
                                 rmcp::model::Role::Assistant,
                                 chrono::Utc::now().timestamp(),
@@ -749,8 +749,8 @@ mod tests {
 
         if let MessageContent::ToolRequest(tool_request) = &message.content[0] {
             let tool_call = tool_request.tool_call.as_ref().unwrap();
-            assert_eq!(tool_call.name, "calculator");
-            assert_eq!(tool_call.arguments, json!({"expression": "2 + 2"}));
+            assert_eq!(goose::call_tool::name(&tool_call), "calculator");
+            assert_eq!(goose::call_tool::args_value(&tool_call), json!({"expression": "2 + 2"}));
         } else {
             panic!("Expected ToolRequest content");
         }
@@ -992,7 +992,7 @@ mod tests {
         let messages = vec![
             Message::assistant().with_tool_request(
                 "tool_1",
-                Ok(ToolCall::new("calculator", json!({"expression": "2 + 2"}))),
+                Ok(CallToolRequest { params: rmcp::model::CallToolRequestParam { name: "calculator".to_string().into(), arguments: match json!({"expression": "2 + 2"}) { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() })),
             ),
             Message::user().with_tool_response(
                 "tool_1",

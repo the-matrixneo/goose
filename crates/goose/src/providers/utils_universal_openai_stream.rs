@@ -162,8 +162,8 @@ impl OAIStreamCollector {
                 // Always append arguments, regardless of what other fields are present - that's how OpenAI streams them
                 // Merge tool_call fields as they arrive (Go-style). If the field is missing, retain the previous value.
 
-                if let Some(name) = &tc.function.name {
-                    entry.function.name = Some(name.clone());
+                if let Some(name) = &tc.goose::call_tool::name(&function) {
+                    entry.goose::call_tool::name(&function) = Some(name.clone());
                 }
                 entry.id = if let Some(s) = &tc.id {
                     if !s.is_empty() {
@@ -184,12 +184,12 @@ impl OAIStreamCollector {
                     entry.type_.clone()
                 };
                 // Only append non-empty fragments, guard against redundant final braces after JSON is complete
-                if !tc.function.arguments.is_empty() {
+                if !tc.goose::call_tool::args_value(&function).is_empty() {
                     // Skip appending fragments like '"}"' if the current arguments already ends correctly.
                     // This is a naive guard but works with broken completion fragments.
-                    if !(tc.function.arguments == "\"}" && entry.function.arguments.ends_with('\"'))
+                    if !(tc.goose::call_tool::args_value(&function) == "\"}" && entry.goose::call_tool::args_value(&function).ends_with('\"'))
                     {
-                        entry.function.arguments.push_str(&tc.function.arguments);
+                        entry.goose::call_tool::args_value(&function).push_str(&tc.goose::call_tool::args_value(&function));
                     }
                 }
                 if !choice.tool_calls_order.contains(&ix) {
@@ -295,8 +295,8 @@ data: [DONE]
         assert_eq!(choice.message.role, "assistant");
         assert_eq!(choice.message.tool_calls.len(), 1);
         let tc = &choice.message.tool_calls[0];
-        assert_eq!(tc.function.name.as_deref(), Some("get_weather"));
-        assert_eq!(tc.function.arguments, r#"{"location":"San Francisco"}"#);
+        assert_eq!(tc.goose::call_tool::name(&function).as_deref(), Some("get_weather"));
+        assert_eq!(tc.goose::call_tool::args_value(&function), r#"{"location":"San Francisco"}"#);
         assert_eq!(choice.finish_reason, "tool_calls");
     }
 

@@ -1,5 +1,5 @@
 use chrono::Utc;
-use mcp_core::{ToolCall, ToolResult};
+use mcp_core::{CallToolRequest, ToolResult};
 use rmcp::model::{
     AnnotateAble, Content, ImageContent, PromptMessage, PromptMessageContent, PromptMessageRole,
     RawContent, RawImageContent, RawTextContent, ResourceContents, Role, TextContent,
@@ -56,7 +56,7 @@ pub struct ToolRequest {
     pub id: String,
     #[serde(with = "tool_result_serde")]
     #[schema(value_type = Object)]
-    pub tool_call: ToolResult<ToolCall>,
+    pub tool_call: ToolResult<CallToolRequest>,
 }
 
 impl ToolRequest {
@@ -65,8 +65,8 @@ impl ToolRequest {
             Ok(tool_call) => {
                 format!(
                     "Tool: {}, Args: {}",
-                    tool_call.name,
-                    serde_json::to_string_pretty(&tool_call.arguments)
+                    goose::call_tool::name(&tool_call),
+                    serde_json::to_string_pretty(&goose::call_tool::args_value(&tool_call))
                         .unwrap_or_else(|_| "<<invalid json>>".to_string())
                 )
             }
@@ -112,7 +112,7 @@ pub struct FrontendToolRequest {
     pub id: String,
     #[serde(with = "tool_result_serde")]
     #[schema(value_type = Object)]
-    pub tool_call: ToolResult<ToolCall>,
+    pub tool_call: ToolResult<CallToolRequest>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -161,7 +161,7 @@ impl fmt::Display for MessageContent {
                 write!(f, "[ToolConfirmationRequest: {}]", r.tool_name)
             }
             MessageContent::FrontendToolRequest(r) => match &r.tool_call {
-                Ok(tool_call) => write!(f, "[FrontendToolRequest: {}]", tool_call.name),
+                Ok(tool_call) => write!(f, "[FrontendToolRequest: {}]", goose::call_tool::name(&tool_call)),
                 Err(e) => write!(f, "[FrontendToolRequest: Error: {}]", e),
             },
             MessageContent::Thinking(t) => write!(f, "[Thinking: {}]", t.thinking),
@@ -191,7 +191,7 @@ impl MessageContent {
         )
     }
 
-    pub fn tool_request<S: Into<String>>(id: S, tool_call: ToolResult<ToolCall>) -> Self {
+    pub fn tool_request<S: Into<String>>(id: S, tool_call: ToolResult<CallToolRequest>) -> Self {
         MessageContent::ToolRequest(ToolRequest {
             id: id.into(),
             tool_call,
@@ -230,7 +230,7 @@ impl MessageContent {
         MessageContent::RedactedThinking(RedactedThinkingContent { data: data.into() })
     }
 
-    pub fn frontend_tool_request<S: Into<String>>(id: S, tool_call: ToolResult<ToolCall>) -> Self {
+    pub fn frontend_tool_request<S: Into<String>>(id: S, tool_call: ToolResult<CallToolRequest>) -> Self {
         MessageContent::FrontendToolRequest(FrontendToolRequest {
             id: id.into(),
             tool_call,
@@ -469,7 +469,7 @@ impl Message {
     pub fn with_tool_request<S: Into<String>>(
         self,
         id: S,
-        tool_call: ToolResult<ToolCall>,
+        tool_call: ToolResult<CallToolRequest>,
     ) -> Self {
         self.with_content(MessageContent::tool_request(id, tool_call))
     }
@@ -499,7 +499,7 @@ impl Message {
     pub fn with_frontend_tool_request<S: Into<String>>(
         self,
         id: S,
-        tool_call: ToolResult<ToolCall>,
+        tool_call: ToolResult<CallToolRequest>,
     ) -> Self {
         self.with_content(MessageContent::frontend_tool_request(id, tool_call))
     }
@@ -603,7 +603,7 @@ impl Message {
 mod tests {
     use crate::conversation::message::{Message, MessageContent};
     use crate::conversation::*;
-    use mcp_core::ToolCall;
+    use rmcp::model::CallToolRequest; use rmcp::model::CallToolRequestParam;
     use rmcp::model::{
         AnnotateAble, PromptMessage, PromptMessageContent, PromptMessageRole, RawEmbeddedResource,
         RawImageContent, ResourceContents,
@@ -645,7 +645,7 @@ mod tests {
             .with_text("Hello, I'll help you with that.")
             .with_tool_request(
                 "tool123",
-                Ok(ToolCall::new("test_tool", json!({"param": "value"}))),
+                Ok(CallToolRequest { params: rmcp::model::CallToolRequestParam { name: "test_tool".to_string().into(), arguments: match json!({"param": "value"}) { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() })
             );
 
         let json_str = serde_json::to_string_pretty(&message).unwrap();
@@ -744,8 +744,8 @@ mod tests {
         if let MessageContent::ToolRequest(req) = &message.content[1] {
             assert_eq!(req.id, "tool123");
             if let Ok(tool_call) = &req.tool_call {
-                assert_eq!(tool_call.name, "test_tool");
-                assert_eq!(tool_call.arguments, json!({"param": "value"}));
+                assert_eq!(goose::call_tool::name(&tool_call), "test_tool");
+                assert_eq!(goose::call_tool::args_value(&tool_call), json!({"param": "value"}));
             } else {
                 panic!("Expected successful tool call");
             }
@@ -888,11 +888,7 @@ mod tests {
 
     #[test]
     fn test_message_with_tool_request() {
-        let tool_call = Ok(ToolCall {
-            name: "test_tool".to_string(),
-            arguments: serde_json::json!({}),
-        });
-
+        let tool_call = Ok(CallToolRequest { params: rmcp::model::CallToolRequestParam { name: "test_tool".to_string()).to_string().into(), arguments: match (serde_json::json!({}) { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }));
         let message = Message::assistant().with_tool_request("req1", tool_call);
         assert!(message.is_tool_call());
         assert!(!message.is_tool_response());

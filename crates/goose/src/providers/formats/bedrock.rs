@@ -7,7 +7,7 @@ use aws_sdk_bedrockruntime::types as bedrock;
 use aws_smithy_types::{Document, Number};
 use base64::Engine;
 use chrono::Utc;
-use mcp_core::{ToolCall, ToolResult};
+use mcp_core::{CallToolRequest, ToolResult};
 use rmcp::model::{Content, ErrorCode, ErrorData, RawContent, ResourceContents, Role, Tool};
 use serde_json::Value;
 
@@ -56,7 +56,7 @@ pub fn to_bedrock_message_content(content: &MessageContent) -> Result<bedrock::C
             let tool_use = if let Ok(call) = tool_req.tool_call.as_ref() {
                 bedrock::ToolUseBlock::builder()
                     .tool_use_id(tool_use_id)
-                    .name(call.name.to_string())
+                    .name(goose::call_tool::name(&call).to_string())
                     .input(to_bedrock_json(&call.arguments))
                     .build()
             } else {
@@ -71,7 +71,7 @@ pub fn to_bedrock_message_content(content: &MessageContent) -> Result<bedrock::C
             let tool_use = if let Ok(call) = tool_req.tool_call.as_ref() {
                 bedrock::ToolUseBlock::builder()
                     .tool_use_id(tool_use_id)
-                    .name(call.name.to_string())
+                    .name(goose::call_tool::name(&call).to_string())
                     .input(to_bedrock_json(&call.arguments))
                     .build()
             } else {
@@ -184,7 +184,7 @@ pub fn to_bedrock_tool_config(tools: &[Tool]) -> Result<bedrock::ToolConfigurati
 pub fn to_bedrock_tool(tool: &Tool) -> Result<bedrock::Tool> {
     Ok(bedrock::Tool::ToolSpec(
         bedrock::ToolSpecification::builder()
-            .name(tool.name.to_string())
+            .name(goose::call_tool::name(&tool).to_string())
             .description(
                 tool.description
                     .as_ref()
@@ -279,9 +279,7 @@ pub fn from_bedrock_content_block(block: &bedrock::ContentBlock) -> Result<Messa
         bedrock::ContentBlock::Text(text) => MessageContent::text(text),
         bedrock::ContentBlock::ToolUse(tool_use) => MessageContent::tool_request(
             tool_use.tool_use_id.to_string(),
-            Ok(ToolCall::new(
-                tool_use.name.to_string(),
-                from_bedrock_json(&tool_use.input)?,
+            Ok(CallToolRequest { params: rmcp::model::CallToolRequestParam { name: (goose::call_tool::name(&tool_use).to_string()).to_string().into(), arguments: match (from_bedrock_json(&tool_use.input) { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }?,
             )),
         ),
         bedrock::ContentBlock::ToolResult(tool_res) => MessageContent::tool_response(

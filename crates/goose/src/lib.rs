@@ -24,3 +24,6 @@ pub mod utils;
 mod cron_test;
 #[macro_use]
 mod macros;
+
+// Expose CallTool helpers
+pub mod call_tool;

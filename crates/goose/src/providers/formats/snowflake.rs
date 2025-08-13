@@ -3,7 +3,7 @@ use crate::model::ModelConfig;
 use crate::providers::base::Usage;
 use crate::providers::errors::ProviderError;
 use anyhow::{anyhow, Result};
-use mcp_core::tool::ToolCall;
+use rmcp::model::CallToolRequest; use rmcp::model::CallToolRequestParam;
 use rmcp::model::{Role, Tool};
 use serde_json::{json, Value};
 use std::collections::HashSet;
@@ -99,10 +99,10 @@ pub fn format_tools(tools: &[Tool]) -> Vec<Value> {
     let mut tool_specs = Vec::new();
 
     for tool in tools.iter() {
-        if unique_tools.insert(tool.name.clone()) {
+        if unique_tools.insert(goose::call_tool::name(&tool).clone()) {
             let tool_spec = json!({
                 "type": "generic",
-                "name": tool.name,
+                "name": goose::call_tool::name(&tool),
                 "description": tool.description,
                 "input_schema": tool.input_schema
             });
@@ -185,11 +185,11 @@ pub fn parse_streaming_response(sse_data: &str) -> Result<Message> {
         if !tool_input.is_empty() {
             let input_value = serde_json::from_str::<Value>(&tool_input)
                 .unwrap_or_else(|_| Value::String(tool_input.clone()));
-            let tool_call = ToolCall::new(name, input_value);
+            let tool_call = CallToolRequest { params: rmcp::model::CallToolRequestParam { name: (name).to_string().into(), arguments: match (input_value) { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() };
             message = message.with_tool_request(id, Ok(tool_call));
         } else if tool_name.is_some() {
             // Tool with no input - use empty object
-            let tool_call = ToolCall::new(name, Value::Object(serde_json::Map::new()));
+            let tool_call = CallToolRequest { params: rmcp::model::CallToolRequestParam { name: (name).to_string().into(), arguments: match (Value::Object(serde_json::Map::new() { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }));
             message = message.with_tool_request(id, Ok(tool_call));
         }
     }
@@ -245,7 +245,7 @@ pub fn response_to_message(response: &Value) -> Result<Message> {
                     .ok_or_else(|| anyhow!("Missing tool input"))?
                     .clone();
 
-                let tool_call = ToolCall::new(name, input);
+                let tool_call = CallToolRequest { params: rmcp::model::CallToolRequestParam { name: (name).to_string().into(), arguments: match (input) { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() };
                 message = message.with_tool_request(id, Ok(tool_call));
             }
             Some("thinking") => {
@@ -424,8 +424,8 @@ mod tests {
 
         if let MessageContent::ToolRequest(tool_request) = &message.content[0] {
             let tool_call = tool_request.tool_call.as_ref().unwrap();
-            assert_eq!(tool_call.name, "calculator");
-            assert_eq!(tool_call.arguments, json!({"expression": "2 + 2"}));
+            assert_eq!(goose::call_tool::name(&tool_call), "calculator");
+            assert_eq!(goose::call_tool::args_value(&tool_call), json!({"expression": "2 + 2"}));
         } else {
             panic!("Expected ToolRequest content");
         }
@@ -535,8 +535,8 @@ data: {"id":"a9537c2c-2017-4906-9817-2456168d89fa","model":"claude-3-5-sonnet","
 
         if let MessageContent::ToolRequest(tool_request) = &message.content[1] {
             let tool_call = tool_request.tool_call.as_ref().unwrap();
-            assert_eq!(tool_call.name, "get_stock_price");
-            assert_eq!(tool_call.arguments, json!({"symbol": "NVDA"}));
+            assert_eq!(goose::call_tool::name(&tool_call), "get_stock_price");
+            assert_eq!(goose::call_tool::args_value(&tool_call), json!({"symbol": "NVDA"}));
             assert_eq!(tool_request.id, "tooluse_FB_nOElDTAOKa-YnVWI5Uw");
         } else {
             panic!("Expected ToolRequest content second");
@@ -638,7 +638,7 @@ data: {"id":"a9537c2c-2017-4906-9817-2456168d89fa","model":"claude-3-5-sonnet","
 
         if let MessageContent::ToolRequest(tool_request) = &message.content[1] {
             let tool_call = tool_request.tool_call.as_ref().unwrap();
-            assert_eq!(tool_call.name, "calculator");
+            assert_eq!(goose::call_tool::name(&tool_call), "calculator");
             assert_eq!(tool_request.id, "tool_1");
         } else {
             panic!("Expected ToolRequest content second");
@@ -679,10 +679,10 @@ data: {"id":"a9537c2c-2017-4906-9817-2456168d89fa","model":"claude-3-5-sonnet","
     #[test]
     fn test_message_formatting_skips_tool_requests() {
         use crate::conversation::message::Message;
-        use mcp_core::tool::ToolCall;
+        use rmcp::model::CallToolRequest; use rmcp::model::CallToolRequestParam;
 
         // Create a conversation with text, tool requests, and tool responses
-        let tool_call = ToolCall::new("calculator", json!({"expression": "2 + 2"}));
+        let tool_call = CallToolRequest { params: rmcp::model::CallToolRequestParam { name: "calculator".to_string().into(), arguments: match json!({"expression": "2 + 2"}) { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() });
 
         let messages = vec![
             Message::user().with_text("Calculate 2 + 2"),

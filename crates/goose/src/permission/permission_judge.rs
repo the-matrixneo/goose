@@ -80,7 +80,7 @@ fn create_check_messages(tool_requests: Vec<&ToolRequest>) -> Conversation {
         .iter()
         .filter_map(|req| {
             if let Ok(tool_call) = &req.tool_call {
-                Some(tool_call.name.clone())
+                Some(goose::call_tool::name(&tool_call).clone())
             } else {
                 None // Skip requests with errors in tool_call
             }
@@ -108,8 +108,8 @@ fn extract_read_only_tools(response: &Message) -> Option<Vec<String>> {
     for content in &response.content {
         if let MessageContent::ToolRequest(tool_request) = content {
             if let Ok(tool_call) = &tool_request.tool_call {
-                if tool_call.name == "platform__tool_by_tool_permission" {
-                    if let Value::Object(arguments) = &tool_call.arguments {
+                if goose::call_tool::name(&tool_call) == "platform__tool_by_tool_permission" {
+                    if let Value::Object(arguments) = &goose::call_tool::args_value(&tool_call) {
                         if let Some(Value::Array(read_only_tools)) =
                             arguments.get("read_only_tools")
                         {
@@ -184,12 +184,12 @@ pub async fn check_tool_permissions(
             } else if mode == "auto" {
                 approved.push(request.clone());
             } else {
-                if tool_call.name == PLATFORM_MANAGE_EXTENSIONS_TOOL_NAME {
+                if goose::call_tool::name(&tool_call) == PLATFORM_MANAGE_EXTENSIONS_TOOL_NAME {
                     extension_request_ids.push(request.id.clone());
                 }
 
                 // 1. Check user-defined permission
-                if let Some(level) = permission_manager.get_user_permission(&tool_call.name) {
+                if let Some(level) = permission_manager.get_user_permission(&goose::call_tool::name(&tool_call)) {
                     match level {
                         PermissionLevel::AlwaysAllow => approved.push(request.clone()),
                         PermissionLevel::AskBefore => needs_approval.push(request.clone()),
@@ -205,7 +205,7 @@ pub async fn check_tool_permissions(
                     }
                     "smart_approve" => {
                         if let Some(level) =
-                            permission_manager.get_smart_approve_permission(&tool_call.name)
+                            permission_manager.get_smart_approve_permission(&goose::call_tool::name(&tool_call))
                         {
                             match level {
                                 PermissionLevel::AlwaysAllow => approved.push(request.clone()),
@@ -215,9 +215,9 @@ pub async fn check_tool_permissions(
                             continue;
                         }
 
-                        if tools_with_readonly_annotation.contains(&tool_call.name) {
+                        if tools_with_readonly_annotation.contains(&goose::call_tool::name(&tool_call)) {
                             approved.push(request.clone());
-                        } else if tools_without_annotation.contains(&tool_call.name) {
+                        } else if tools_without_annotation.contains(&goose::call_tool::name(&tool_call)) {
                             llm_detect_candidates.push(request.clone());
                         } else {
                             needs_approval.push(request.clone());
@@ -237,16 +237,16 @@ pub async fn check_tool_permissions(
             detect_read_only_tools(provider, llm_detect_candidates.iter().collect()).await;
         for request in llm_detect_candidates {
             if let Ok(tool_call) = request.tool_call.clone() {
-                if detected_readonly_tools.contains(&tool_call.name) {
+                if detected_readonly_tools.contains(&goose::call_tool::name(&tool_call)) {
                     approved.push(request.clone());
                     permission_manager.update_smart_approve_permission(
-                        &tool_call.name,
+                        &goose::call_tool::name(&tool_call),
                         PermissionLevel::AlwaysAllow,
                     );
                 } else {
                     needs_approval.push(request.clone());
                     permission_manager.update_smart_approve_permission(
-                        &tool_call.name,
+                        &goose::call_tool::name(&tool_call),
                         PermissionLevel::AskBefore,
                     );
                 }
@@ -272,7 +272,7 @@ mod tests {
     use crate::providers::base::{Provider, ProviderMetadata, ProviderUsage, Usage};
     use crate::providers::errors::ProviderError;
     use chrono::Utc;
-    use mcp_core::{ToolCall, ToolResult};
+    use mcp_core::{CallToolRequest, ToolResult};
     use rmcp::model::{Role, Tool};
     use serde_json::json;
     use tempfile::NamedTempFile;
@@ -304,12 +304,9 @@ mod tests {
                     Utc::now().timestamp(),
                     vec![MessageContent::ToolRequest(ToolRequest {
                         id: "mock_tool_request".to_string(),
-                        tool_call: ToolResult::Ok(ToolCall {
-                            name: "platform__tool_by_tool_permission".to_string(),
-                            arguments: json!({
+                        tool_call: ToolResult::Ok(CallToolRequest { params: rmcp::model::CallToolRequestParam { name: "platform__tool_by_tool_permission".to_string()).to_string().into(), arguments: match json!({
                                 "read_only_tools": ["file_reader", "data_fetcher"]
-                            }),
-                        }),
+                            }) { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() })),
                     })],
                 ),
                 ProviderUsage::new("mock".to_string(), Usage::default()),
@@ -328,7 +325,7 @@ mod tests {
     #[tokio::test]
     async fn test_create_read_only_tool() {
         let tool = create_read_only_tool();
-        assert_eq!(tool.name, "platform__tool_by_tool_permission");
+        assert_eq!(goose::call_tool::name(&tool), "platform__tool_by_tool_permission");
         assert!(tool
             .description
             .as_ref()
@@ -339,10 +336,8 @@ mod tests {
     fn test_create_check_messages() {
         let tool_request = ToolRequest {
             id: "tool_1".to_string(),
-            tool_call: ToolResult::Ok(ToolCall {
-                name: "file_reader".to_string(),
-                arguments: json!({"path": "/path/to/file"}),
-            }),
+            tool_call: ToolResult::Ok(CallToolRequest { params: rmcp::model::CallToolRequestParam { name: "file_reader".to_string()).to_string().into(), arguments: match json!({"path": "/path/to/file"}) { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }
+            )),
         };
 
         let messages = create_check_messages(vec![&tool_request]);
@@ -365,12 +360,8 @@ mod tests {
             Utc::now().timestamp(),
             vec![MessageContent::ToolRequest(ToolRequest {
                 id: "tool_2".to_string(),
-                tool_call: ToolResult::Ok(ToolCall {
-                    name: "platform__tool_by_tool_permission".to_string(),
-                    arguments: json!({
-                        "read_only_tools": ["file_reader", "data_fetcher"]
-                    }),
-                }),
+                tool_call: ToolResult::Ok(CallToolRequest { params: rmcp::model::CallToolRequestParam { name: "platform__tool_by_tool_permission".to_string()).to_string().into(), arguments: match json!({"read_only_tools": ["file_reader", "data_fetcher"]}) { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }
+                )),
             })],
         );
 
@@ -385,10 +376,8 @@ mod tests {
         let provider = create_mock_provider();
         let tool_request = ToolRequest {
             id: "tool_1".to_string(),
-            tool_call: ToolResult::Ok(ToolCall {
-                name: "file_reader".to_string(),
-                arguments: json!({"path": "/path/to/file"}),
-            }),
+            tool_call: ToolResult::Ok(CallToolRequest { params: rmcp::model::CallToolRequestParam { name: "file_reader".to_string()).to_string().into(), arguments: match json!({"path": "/path/to/file"}) { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }
+            )),
         };
 
         let result = detect_read_only_tools(provider, vec![&tool_request]).await;
@@ -421,26 +410,20 @@ mod tests {
 
         let tool_request_1 = ToolRequest {
             id: "tool_1".to_string(),
-            tool_call: ToolResult::Ok(ToolCall {
-                name: "file_reader".to_string(),
-                arguments: serde_json::json!({"path": "/path/to/file"}),
-            }),
+            tool_call: ToolResult::Ok(CallToolRequest { params: rmcp::model::CallToolRequestParam { name: "file_reader".to_string()).to_string().into(), arguments: match (serde_json::json!({"path": "/path/to/file"}) { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }
+            )),
         };
 
         let tool_request_2 = ToolRequest {
             id: "tool_2".to_string(),
-            tool_call: ToolResult::Ok(ToolCall {
-                name: "data_fetcher".to_string(),
-                arguments: serde_json::json!({"url": "http://example.com"}),
-            }),
+            tool_call: ToolResult::Ok(CallToolRequest { params: rmcp::model::CallToolRequestParam { name: "data_fetcher".to_string()).to_string().into(), arguments: match (serde_json::json!({"url": "http://example.com"}) { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }
+            )),
         };
 
         let enable_extension = ToolRequest {
             id: "tool_3".to_string(),
-            tool_call: ToolResult::Ok(ToolCall {
-                name: PLATFORM_MANAGE_EXTENSIONS_TOOL_NAME.to_string(),
-                arguments: serde_json::json!({"action": "enable", "extension_name": "data_fetcher"}),
-            }),
+            tool_call: ToolResult::Ok(CallToolRequest { params: rmcp::model::CallToolRequestParam { name: (PLATFORM_MANAGE_EXTENSIONS_TOOL_NAME.to_string()).to_string().into(), arguments: match (serde_json::json!({"action": "enable", "extension_name": "data_fetcher"}) { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }
+            )),
         };
 
         let candidate_requests: Vec<ToolRequest> =
@@ -489,18 +472,14 @@ mod tests {
 
         let tool_request_1 = ToolRequest {
             id: "tool_1".to_string(),
-            tool_call: ToolResult::Ok(ToolCall {
-                name: "file_reader".to_string(),
-                arguments: serde_json::json!({"path": "/path/to/file"}),
-            }),
+            tool_call: ToolResult::Ok(CallToolRequest { params: rmcp::model::CallToolRequestParam { name: "file_reader".to_string()).to_string().into(), arguments: match (serde_json::json!({"path": "/path/to/file"}) { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }
+            )),
         };
 
         let tool_request_2 = ToolRequest {
             id: "tool_2".to_string(),
-            tool_call: ToolResult::Ok(ToolCall {
-                name: "data_fetcher".to_string(),
-                arguments: serde_json::json!({"url": "http://example.com"}),
-            }),
+            tool_call: ToolResult::Ok(CallToolRequest { params: rmcp::model::CallToolRequestParam { name: "data_fetcher".to_string()).to_string().into(), arguments: match (serde_json::json!({"url": "http://example.com"}) { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }
+            )),
         };
 
         let candidate_requests: Vec<ToolRequest> = vec![tool_request_1, tool_request_2];

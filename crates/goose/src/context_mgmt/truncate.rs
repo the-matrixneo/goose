@@ -390,7 +390,7 @@ mod tests {
     use super::*;
     use crate::conversation::message::Message;
     use anyhow::Result;
-    use mcp_core::tool::ToolCall;
+    use rmcp::model::CallToolRequest; use rmcp::model::CallToolRequestParam;
     use rmcp::model::Content;
     use serde_json::json;
 
@@ -407,7 +407,7 @@ mod tests {
     }
 
     // Helper function to create a tool request message with a specified token count
-    fn assistant_tool_request(id: &str, tool_call: ToolCall, tokens: usize) -> (Message, usize) {
+    fn assistant_tool_request(id: &str, tool_call: CallToolRequest, tokens: usize) -> (Message, usize) {
         (
             Message::assistant().with_tool_request(id, Ok(tool_call)),
             tokens,
@@ -458,7 +458,13 @@ mod tests {
             user_text(1, 10).0,
             assistant_tool_request(
                 "tool1",
-                ToolCall::new("read_file", json!({"path": "large_file.txt"})),
+                CallToolRequest {
+                    method: Default::default(),
+                    params: rmcp::model::CallToolRequestParam {
+                    name: "read_file".to_string().into(),
+                    arguments: match json!({"path": "large_file.txt"}) { serde_json::Value::Object(map) => Some(map), _ => None } },
+                    extensions: Default::default(),
+                },
                 20,
             )
             .0,
@@ -520,8 +526,22 @@ mod tests {
     #[test]
     fn test_complex_conversation_with_tools() -> Result<()> {
         // Simulating a real conversation with multiple tool interactions
-        let tool_call1 = ToolCall::new("file_read", json!({"path": "/tmp/test.txt"}));
-        let tool_call2 = ToolCall::new("database_query", json!({"query": "SELECT * FROM users"}));
+        let tool_call1 = CallToolRequest {
+            params: rmcp::model::CallToolRequestParam {
+                name: "file_read".to_string().into(),
+                arguments: match json!({"path": "/tmp/test.txt"}) {
+                    serde_json::Value::Object(map) => Some(map),
+                    _ => None
+                }
+            },
+            method: Default::default(),
+            extensions: Default::default()
+        };
+        let tool_call2 = CallToolRequest {
+            params: rmcp::model::CallToolRequestParam { name: "database_query".to_string().into(), arguments: match json!({"query": "SELECT * FROM users"}) { serde_json::Value::Object(map) => Some(map), _ => None } },
+            method: Default::default(),
+            extensions: Default::default()
+        };
 
         let messages = vec![
             user_text(1, 15).0, // Initial user query
@@ -622,9 +642,21 @@ mod tests {
     fn test_multi_tool_chain() -> Result<()> {
         // Simulate a chain of dependent tool calls
         let tool_calls = vec![
-            ToolCall::new("git_status", json!({})),
-            ToolCall::new("git_diff", json!({"file": "main.rs"})),
-            ToolCall::new("git_commit", json!({"message": "Update"})),
+            CallToolRequest {
+                params: rmcp::model::CallToolRequestParam { name: "git_status".to_string().into(), arguments: match json!({}) { serde_json::Value::Object(map) => Some(map), _ => None } },
+                method: Default::default(),
+                extensions: Default::default()
+            },
+            CallToolRequest {
+                params: rmcp::model::CallToolRequestParam { name: "git_diff".to_string().into(), arguments: match json!({"file": "main.rs"}) { serde_json::Value::Object(map) => Some(map), _ => None } },
+                method: Default::default(),
+                extensions: Default::default()
+            },
+            CallToolRequest {
+                params: rmcp::model::CallToolRequestParam { name: "git_commit".to_string().into(), arguments: match json!({"message": "Update"}) { serde_json::Value::Object(map) => Some(map), _ => None } },
+                method: Default::default(),
+                extensions: Default::default()
+            }
         ];
 
         let mut messages = Vec::new();

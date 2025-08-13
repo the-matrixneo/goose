@@ -38,7 +38,7 @@ use crate::conversation::Conversation;
 use crate::model::ModelConfig;
 use crate::providers::formats::openai::create_request;
 use anyhow::Result;
-use mcp_core::tool::ToolCall;
+use rmcp::model::CallToolRequest; use rmcp::model::CallToolRequestParam;
 use reqwest::Client;
 use rmcp::model::{RawContent, Tool};
 use serde_json::{json, Value};
@@ -60,7 +60,7 @@ pub trait ToolInterpreter {
         &self,
         content: &str,
         tools: &[Tool],
-    ) -> Result<Vec<ToolCall>, ProviderError>;
+    ) -> Result<Vec<CallToolRequest>, ProviderError>;
 }
 
 /// Ollama-specific implementation of the ToolInterpreter trait
@@ -198,7 +198,7 @@ impl OllamaInterpreter {
         Ok(response_json)
     }
 
-    fn process_interpreter_response(response: &Value) -> Result<Vec<ToolCall>, ProviderError> {
+    fn process_interpreter_response(response: &Value) -> Result<Vec<CallToolRequest>, ProviderError> {
         let mut tool_calls = Vec::new();
         tracing::info!(
             "Tool interpreter response is {}",
@@ -219,12 +219,12 @@ impl OllamaInterpreter {
                                 && item.get("name").is_some()
                                 && item.get("arguments").is_some()
                             {
-                                // Create ToolCall directly from the JSON data
+                                // Create CallToolRequest directly from the JSON data
                                 let name = item["name"].as_str().unwrap_or_default().to_string();
                                 let arguments = item["arguments"].clone();
 
                                 // Add the tool call to our result vector
-                                tool_calls.push(ToolCall::new(name, arguments));
+                                tool_calls.push(CallToolRequest { params: rmcp::model::CallToolRequestParam { name: (name).to_string().into(), arguments: match (arguments) { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() });
                             }
                         }
                     }
@@ -242,7 +242,7 @@ impl ToolInterpreter for OllamaInterpreter {
         &self,
         last_assistant_msg: &str,
         tools: &[Tool],
-    ) -> Result<Vec<ToolCall>, ProviderError> {
+    ) -> Result<Vec<CallToolRequest>, ProviderError> {
         if tools.is_empty() {
             return Ok(vec![]);
         }
@@ -300,7 +300,7 @@ pub fn format_tool_info(tools: &[Tool]) -> String {
     for tool in tools {
         tool_info.push_str(&format!(
             "Tool Name: {}\nSchema: {}\nDescription: {:?}\n\n",
-            tool.name,
+            goose::call_tool::name(&tool),
             serde_json::to_string_pretty(&tool.input_schema).unwrap_or_default(),
             tool.description
         ));
@@ -326,9 +326,9 @@ pub fn convert_tool_messages_to_text(messages: &[Message]) -> Conversation {
                         let text = if let Ok(tool_call) = &req.tool_call {
                             format!(
                                 "Using tool: {}\n{{\n  \"name\": \"{}\",\n  \"arguments\": {}\n}}",
-                                tool_call.name,
-                                tool_call.name,
-                                serde_json::to_string_pretty(&tool_call.arguments)
+                                goose::call_tool::name(&tool_call),
+                                goose::call_tool::name(&tool_call),
+                                serde_json::to_string_pretty(&goose::call_tool::args_value(&tool_call))
                                     .unwrap_or_default()
                             )
                         } else {
@@ -429,7 +429,7 @@ pub async fn augment_message_with_tool_calls<T: ToolInterpreter>(
     // Add each tool call to the message
     let mut final_message = message;
     for tool_call in tool_calls {
-        if tool_call.name != "noop" {
+        if goose::call_tool::name(&tool_call) != "noop" {
             // do not actually execute noop tool
             let id = Uuid::new_v4().to_string();
             final_message = final_message.with_tool_request(id, Ok(tool_call));

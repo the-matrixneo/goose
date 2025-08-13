@@ -1,6 +1,6 @@
 use goose::agents::todo_tools::{TODO_READ_TOOL_NAME, TODO_WRITE_TOOL_NAME};
 use goose::agents::Agent;
-use mcp_core::tool::ToolCall;
+use rmcp::model::CallToolRequest; use rmcp::model::CallToolRequestParam;
 use serde_json::json;
 use serial_test::serial;
 use std::sync::Arc;
@@ -11,8 +11,8 @@ async fn test_todo_tools_in_agent_list() {
     let tools = agent.list_tools(None).await;
 
     // Check that todo tools are present
-    let todo_read = tools.iter().find(|t| t.name == TODO_READ_TOOL_NAME);
-    let todo_write = tools.iter().find(|t| t.name == TODO_WRITE_TOOL_NAME);
+    let todo_read = tools.iter().find(|t| goose::call_tool::name(&t) == TODO_READ_TOOL_NAME);
+    let todo_write = tools.iter().find(|t| goose::call_tool::name(&t) == TODO_WRITE_TOOL_NAME);
 
     assert!(
         todo_read.is_some(),
@@ -33,11 +33,8 @@ async fn test_todo_write_and_read() {
     let agent = Agent::new();
 
     // Write to the todo list
-    let write_call = ToolCall {
-        name: TODO_WRITE_TOOL_NAME.to_string(),
-        arguments: json!({
-            "content": "1. Buy milk\n2. Walk the dog\n3. Review code"
-        }),
+    let write_call = CallToolRequest { params: rmcp::model::CallToolRequestParam { name: (TODO_WRITE_TOOL_NAME.to_string()).to_string().into(), arguments: match json!({
+            "content": "1. Buy milk\n2. Walk the dog\n3. Review code") { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }),
     };
 
     let (_, write_result) = agent
@@ -46,9 +43,7 @@ async fn test_todo_write_and_read() {
     assert!(write_result.is_ok(), "Write should succeed");
 
     // Read from the todo list
-    let read_call = ToolCall {
-        name: TODO_READ_TOOL_NAME.to_string(),
-        arguments: json!({}),
+    let read_call = CallToolRequest { params: rmcp::model::CallToolRequestParam { name: (TODO_READ_TOOL_NAME.to_string()).to_string().into(), arguments: match json!({) { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }),
     };
 
     let (_, read_result) = agent
@@ -76,9 +71,7 @@ async fn test_todo_empty_initially() {
     let agent = Agent::new();
 
     // Read from empty todo list
-    let read_call = ToolCall {
-        name: TODO_READ_TOOL_NAME.to_string(),
-        arguments: json!({}),
+    let read_call = CallToolRequest { params: rmcp::model::CallToolRequestParam { name: (TODO_READ_TOOL_NAME.to_string()).to_string().into(), arguments: match json!({) { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }),
     };
 
     let (_, read_result) = agent
@@ -107,11 +100,8 @@ async fn test_todo_overwrite() {
     let agent = Agent::new();
 
     // Write initial content
-    let write_call1 = ToolCall {
-        name: TODO_WRITE_TOOL_NAME.to_string(),
-        arguments: json!({
-            "content": "Initial todo list"
-        }),
+    let write_call1 = CallToolRequest { params: rmcp::model::CallToolRequestParam { name: (TODO_WRITE_TOOL_NAME.to_string()).to_string().into(), arguments: match json!({
+            "content": "Initial todo list") { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }),
     };
     let (_, write_result1) = agent
         .dispatch_tool_call(write_call1, "test-write-1".to_string(), None)
@@ -119,11 +109,8 @@ async fn test_todo_overwrite() {
     assert!(write_result1.is_ok(), "First write should succeed");
 
     // Overwrite with new content
-    let write_call2 = ToolCall {
-        name: TODO_WRITE_TOOL_NAME.to_string(),
-        arguments: json!({
-            "content": "Completely new todo list"
-        }),
+    let write_call2 = CallToolRequest { params: rmcp::model::CallToolRequestParam { name: (TODO_WRITE_TOOL_NAME.to_string()).to_string().into(), arguments: match json!({
+            "content": "Completely new todo list") { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }),
     };
     let (_, write_result2) = agent
         .dispatch_tool_call(write_call2, "test-write-2".to_string(), None)
@@ -131,9 +118,7 @@ async fn test_todo_overwrite() {
     assert!(write_result2.is_ok(), "Second write should succeed");
 
     // Read and verify it was overwritten
-    let read_call = ToolCall {
-        name: TODO_READ_TOOL_NAME.to_string(),
-        arguments: json!({}),
+    let read_call = CallToolRequest { params: rmcp::model::CallToolRequestParam { name: (TODO_READ_TOOL_NAME.to_string()).to_string().into(), arguments: match json!({) { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }),
     };
 
     let (_, read_result) = agent
@@ -164,10 +149,8 @@ async fn test_todo_concurrent_access() {
     for i in 0..10 {
         let agent_clone = agent.clone();
         let handle = tokio::spawn(async move {
-            let write_call = ToolCall {
-                name: TODO_WRITE_TOOL_NAME.to_string(),
-                arguments: json!({
-                    "content": format!("Todo list {}", i)
+            let write_call = CallToolRequest { params: rmcp::model::CallToolRequestParam { name: (TODO_WRITE_TOOL_NAME.to_string()).to_string().into(), arguments: match json!({
+                    "content": format!("Todo list {) { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }", i)
                 }),
             };
             agent_clone
@@ -183,9 +166,7 @@ async fn test_todo_concurrent_access() {
     }
 
     // Read the final state
-    let read_call = ToolCall {
-        name: TODO_READ_TOOL_NAME.to_string(),
-        arguments: json!({}),
+    let read_call = CallToolRequest { params: rmcp::model::CallToolRequestParam { name: (TODO_READ_TOOL_NAME.to_string()).to_string().into(), arguments: match json!({) { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }),
     };
 
     let (_, read_result) = agent
@@ -218,11 +199,8 @@ async fn test_todo_large_content() {
     // Create a large todo list that exceeds the 50,000 character limit
     let large_content = "X".repeat(100_000);
 
-    let write_call = ToolCall {
-        name: TODO_WRITE_TOOL_NAME.to_string(),
-        arguments: json!({
-            "content": large_content.clone()
-        }),
+    let write_call = CallToolRequest { params: rmcp::model::CallToolRequestParam { name: (TODO_WRITE_TOOL_NAME.to_string()).to_string().into(), arguments: match json!({
+            "content": large_content.clone() { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() })),
     };
 
     let (_, write_result) = agent
@@ -249,11 +227,8 @@ async fn test_todo_large_content() {
     // Test with content within the limit
     let valid_content = "X".repeat(50_000);
 
-    let write_call = ToolCall {
-        name: TODO_WRITE_TOOL_NAME.to_string(),
-        arguments: json!({
-            "content": valid_content.clone()
-        }),
+    let write_call = CallToolRequest { params: rmcp::model::CallToolRequestParam { name: (TODO_WRITE_TOOL_NAME.to_string()).to_string().into(), arguments: match json!({
+            "content": valid_content.clone() { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() })),
     };
 
     let (_, write_result) = agent
@@ -262,9 +237,7 @@ async fn test_todo_large_content() {
     assert!(write_result.is_ok(), "Should handle content within limit");
 
     // Read it back
-    let read_call = ToolCall {
-        name: TODO_READ_TOOL_NAME.to_string(),
-        arguments: json!({}),
+    let read_call = CallToolRequest { params: rmcp::model::CallToolRequestParam { name: (TODO_READ_TOOL_NAME.to_string()).to_string().into(), arguments: match json!({) { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }),
     };
 
     let (_, read_result) = agent
@@ -296,11 +269,8 @@ async fn test_todo_unicode_content() {
 
     let unicode_content = "📝 Todo List:\n✅ Task 1\n⭐ Task 2\n🔥 Urgent: Task 3\n日本語のタスク";
 
-    let write_call = ToolCall {
-        name: TODO_WRITE_TOOL_NAME.to_string(),
-        arguments: json!({
-            "content": unicode_content
-        }),
+    let write_call = CallToolRequest { params: rmcp::model::CallToolRequestParam { name: (TODO_WRITE_TOOL_NAME.to_string()).to_string().into(), arguments: match json!({
+            "content": unicode_content) { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }),
     };
 
     let (_, write_result) = agent
@@ -308,9 +278,7 @@ async fn test_todo_unicode_content() {
         .await;
     assert!(write_result.is_ok(), "Write should succeed");
 
-    let read_call = ToolCall {
-        name: TODO_READ_TOOL_NAME.to_string(),
-        arguments: json!({}),
+    let read_call = CallToolRequest { params: rmcp::model::CallToolRequestParam { name: (TODO_READ_TOOL_NAME.to_string()).to_string().into(), arguments: match json!({) { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }),
     };
 
     let (_, read_result) = agent
@@ -340,11 +308,8 @@ async fn test_todo_character_limit_enforcement() {
     // Create content that exceeds the limit
     let large_content = "x".repeat(101);
 
-    let write_call = ToolCall {
-        name: TODO_WRITE_TOOL_NAME.to_string(),
-        arguments: json!({
-            "content": large_content
-        }),
+    let write_call = CallToolRequest { params: rmcp::model::CallToolRequestParam { name: (TODO_WRITE_TOOL_NAME.to_string()).to_string().into(), arguments: match json!({
+            "content": large_content) { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }),
     };
 
     let (_, result) = agent
@@ -386,11 +351,8 @@ async fn test_todo_character_count_in_write_response() {
     let agent = Agent::new();
 
     let content = "Test todo content";
-    let write_call = ToolCall {
-        name: TODO_WRITE_TOOL_NAME.to_string(),
-        arguments: json!({
-            "content": content
-        }),
+    let write_call = CallToolRequest { params: rmcp::model::CallToolRequestParam { name: (TODO_WRITE_TOOL_NAME.to_string()).to_string().into(), arguments: match json!({
+            "content": content) { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }),
     };
 
     let (_, result) = agent
@@ -415,11 +377,8 @@ async fn test_todo_read_returns_clean_content() {
 
     // Write some content
     let content = "My todo list\n- Task 1\n- Task 2";
-    let write_call = ToolCall {
-        name: TODO_WRITE_TOOL_NAME.to_string(),
-        arguments: json!({
-            "content": content
-        }),
+    let write_call = CallToolRequest { params: rmcp::model::CallToolRequestParam { name: (TODO_WRITE_TOOL_NAME.to_string()).to_string().into(), arguments: match json!({
+            "content": content) { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }),
     };
 
     let (_, write_result) = agent
@@ -428,9 +387,7 @@ async fn test_todo_read_returns_clean_content() {
     assert!(write_result.is_ok(), "Write should succeed");
 
     // Read should return exact content, no metadata
-    let read_call = ToolCall {
-        name: TODO_READ_TOOL_NAME.to_string(),
-        arguments: json!({}),
+    let read_call = CallToolRequest { params: rmcp::model::CallToolRequestParam { name: (TODO_READ_TOOL_NAME.to_string()).to_string().into(), arguments: match json!({) { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }),
     };
 
     let (_, result) = agent
@@ -460,11 +417,8 @@ async fn test_todo_unlimited_with_zero_limit() {
     // Should accept very large content when limit is 0
     let huge_content = "x".repeat(100_000);
 
-    let write_call = ToolCall {
-        name: TODO_WRITE_TOOL_NAME.to_string(),
-        arguments: json!({
-            "content": huge_content
-        }),
+    let write_call = CallToolRequest { params: rmcp::model::CallToolRequestParam { name: (TODO_WRITE_TOOL_NAME.to_string()).to_string().into(), arguments: match json!({
+            "content": huge_content) { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }),
     };
 
     let (_, result) = agent
@@ -488,11 +442,8 @@ async fn test_todo_unicode_character_counting() {
     // Test with emoji - each emoji is 1 character in .chars().count()
     let content = "📝📝📝📝📝📝📝📝📝📝📝"; // 11 emoji = 11 chars
 
-    let write_call = ToolCall {
-        name: TODO_WRITE_TOOL_NAME.to_string(),
-        arguments: json!({
-            "content": content
-        }),
+    let write_call = CallToolRequest { params: rmcp::model::CallToolRequestParam { name: (TODO_WRITE_TOOL_NAME.to_string()).to_string().into(), arguments: match json!({
+            "content": content) { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }),
     };
 
     let (_, result) = agent

@@ -8,7 +8,7 @@ use crate::providers::utils::{
 use anyhow::{anyhow, Error};
 use async_stream::try_stream;
 use futures::Stream;
-use mcp_core::ToolCall;
+use rmcp::model::CallToolRequest; use rmcp::model::CallToolRequestParam;
 use rmcp::model::{
     AnnotateAble, Content, ErrorCode, ErrorData, RawContent, ResourceContents, Role, Tool,
 };
@@ -103,7 +103,7 @@ pub fn format_messages(messages: &[Message], image_format: &ImageFormat) -> Vec<
                 }
                 MessageContent::ToolRequest(request) => match &request.tool_call {
                     Ok(tool_call) => {
-                        let sanitized_name = sanitize_function_name(&tool_call.name);
+                        let sanitized_name = sanitize_function_name(&goose::call_tool::name(&tool_call));
                         let tool_calls = converted
                             .as_object_mut()
                             .unwrap()
@@ -115,7 +115,7 @@ pub fn format_messages(messages: &[Message], image_format: &ImageFormat) -> Vec<
                             "type": "function",
                             "function": {
                                 "name": sanitized_name,
-                                "arguments": tool_call.arguments.to_string(),
+                                "arguments": goose::call_tool::args_value(&tool_call).to_string(),
                             }
                         }));
                     }
@@ -208,7 +208,7 @@ pub fn format_messages(messages: &[Message], image_format: &ImageFormat) -> Vec<
                 }
                 MessageContent::FrontendToolRequest(request) => match &request.tool_call {
                     Ok(tool_call) => {
-                        let sanitized_name = sanitize_function_name(&tool_call.name);
+                        let sanitized_name = sanitize_function_name(&goose::call_tool::name(&tool_call));
                         let tool_calls = converted
                             .as_object_mut()
                             .unwrap()
@@ -220,7 +220,7 @@ pub fn format_messages(messages: &[Message], image_format: &ImageFormat) -> Vec<
                             "type": "function",
                             "function": {
                                 "name": sanitized_name,
-                                "arguments": tool_call.arguments.to_string(),
+                                "arguments": goose::call_tool::args_value(&tool_call).to_string(),
                             }
                         }));
                     }
@@ -250,14 +250,14 @@ pub fn format_tools(tools: &[Tool]) -> anyhow::Result<Vec<Value>> {
     let mut result = Vec::new();
 
     for tool in tools {
-        if !tool_names.insert(&tool.name) {
-            return Err(anyhow!("Duplicate tool name: {}", tool.name));
+        if !tool_names.insert(&goose::call_tool::name(&tool)) {
+            return Err(anyhow!("Duplicate tool name: {}", goose::call_tool::name(&tool)));
         }
 
         result.push(json!({
             "type": "function",
             "function": {
-                "name": tool.name,
+                "name": goose::call_tool::name(&tool),
                 // do not silently truncate description
                 "description": tool.description,
                 "parameters": tool.input_schema,
@@ -316,7 +316,7 @@ pub fn response_to_message(response: &Value) -> anyhow::Result<Message> {
                         Ok(params) => {
                             content.push(MessageContent::tool_request(
                                 id,
-                                Ok(ToolCall::new(&function_name, params)),
+                                Ok(CallToolRequest { params: rmcp::model::CallToolRequestParam { name: (&function_name).to_string().into(), arguments: match (params) { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }),
                             ));
                         }
                         Err(e) => {
@@ -455,8 +455,8 @@ where
                 let mut tool_call_data: std::collections::HashMap<i32, (String, String, String)> = std::collections::HashMap::new();
 
                 for tool_call in tool_calls {
-                    if let (Some(index), Some(id), Some(name)) = (tool_call.index, &tool_call.id, &tool_call.function.name) {
-                        tool_call_data.insert(index, (id.clone(), name.clone(), tool_call.function.arguments.clone()));
+                    if let (Some(index), Some(id), Some(name)) = (tool_call.index, &tool_call.id, &tool_call.goose::call_tool::name(&function)) {
+                        tool_call_data.insert(index, (id.clone(), name.clone(), tool_call.goose::call_tool::args_value(&function).clone()));
                     }
                 }
 
@@ -479,9 +479,9 @@ where
                                     for delta_call in delta_tool_calls {
                                         if let Some(index) = delta_call.index {
                                             if let Some((_, _, ref mut args)) = tool_call_data.get_mut(&index) {
-                                                args.push_str(&delta_call.function.arguments);
-                                            } else if let (Some(id), Some(name)) = (&delta_call.id, &delta_call.function.name) {
-                                                tool_call_data.insert(index, (id.clone(), name.clone(), delta_call.function.arguments.clone()));
+                                                args.push_str(&delta_call.goose::call_tool::args_value(&function));
+                                            } else if let (Some(id), Some(name)) = (&delta_call.id, &delta_call.goose::call_tool::name(&function)) {
+                                                tool_call_data.insert(index, (id.clone(), name.clone(), delta_call.goose::call_tool::args_value(&function).clone()));
                                             }
                                         }
                                     }
@@ -515,7 +515,7 @@ where
                             Ok(params) => {
                                 MessageContent::tool_request(
                                     id.clone(),
-                                    Ok(ToolCall::new(function_name.clone(), params)),
+                                    Ok(CallToolRequest { params: rmcp::model::CallToolRequestParam { name: (function_name.clone()).to_string().into(), arguments: match (params) { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() }),
                                 )
                             },
                             Err(e) => {
@@ -809,7 +809,7 @@ mod tests {
             Message::user().with_text("How are you?"),
             Message::assistant().with_tool_request(
                 "tool1",
-                Ok(ToolCall::new("example", json!({"param1": "value1"}))),
+                Ok(CallToolRequest { params: rmcp::model::CallToolRequestParam { name: "example".to_string().into(), arguments: match json!({"param1": "value1"}) { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() })),
             ),
         ];
 
@@ -843,7 +843,7 @@ mod tests {
     fn test_format_messages_multiple_content() -> anyhow::Result<()> {
         let mut messages = vec![Message::assistant().with_tool_request(
             "tool1",
-            Ok(ToolCall::new("example", json!({"param1": "value1"}))),
+            Ok(CallToolRequest { params: rmcp::model::CallToolRequestParam { name: "example".to_string().into(), arguments: match json!({"param1": "value1"}) { serde_json::Value::Object(map) => Some(map), _ => None } }, method: Default::default(), extensions: Default::default() })),
         )];
 
         // Get the ID from the tool request to use in the response
@@ -987,8 +987,8 @@ mod tests {
         assert_eq!(message.content.len(), 1);
         if let MessageContent::ToolRequest(request) = &message.content[0] {
             let tool_call = request.tool_call.as_ref().unwrap();
-            assert_eq!(tool_call.name, "example_fn");
-            assert_eq!(tool_call.arguments, json!({"param": "value"}));
+            assert_eq!(goose::call_tool::name(&tool_call), "example_fn");
+            assert_eq!(goose::call_tool::args_value(&tool_call), json!({"param": "value"}));
         } else {
             panic!("Expected ToolRequest content");
         }
@@ -1058,8 +1058,8 @@ mod tests {
 
         if let MessageContent::ToolRequest(request) = &message.content[0] {
             let tool_call = request.tool_call.as_ref().unwrap();
-            assert_eq!(tool_call.name, "example_fn");
-            assert_eq!(tool_call.arguments, json!({}));
+            assert_eq!(goose::call_tool::name(&tool_call), "example_fn");
+            assert_eq!(goose::call_tool::args_value(&tool_call), json!({}));
         } else {
             panic!("Expected ToolRequest content");
         }
