@@ -4,6 +4,7 @@ mod export;
 mod input;
 mod output;
 mod prompt;
+mod queue_input;
 mod task_execution_display;
 mod thinking;
 
@@ -66,6 +67,7 @@ pub struct Session {
     max_turns: Option<u32>,
     edit_mode: Option<EditMode>,
     retry_config: Option<RetryConfig>,
+    queued_message: Option<String>, // Queued message while agent is processing
 }
 
 // Cache structure for completion data
@@ -152,6 +154,7 @@ impl Session {
             max_turns,
             edit_mode,
             retry_config,
+            queued_message: None,
         }
     }
 
@@ -480,6 +483,70 @@ impl Session {
             // Display context usage before each prompt
             self.display_context_usage().await?;
 
+            // Check if we have a queued message to process first
+            if let Some(queued_content) = self.queued_message.take() {
+                println!(
+                    "{}",
+                    console::style(format!(
+                        "Processing queued message: {}",
+                        safe_truncate(&queued_content, 50)
+                    ))
+                    .cyan()
+                    .dim()
+                );
+
+                // Process the queued message as if it were typed now
+                self.push_message(Message::user().with_text(&queued_content));
+
+                // Track the current directory and last instruction in projects.json
+                let session_id = self
+                    .session_file
+                    .as_ref()
+                    .and_then(|p| p.file_stem())
+                    .and_then(|s| s.to_str())
+                    .map(|s| s.to_string());
+
+                if let Err(e) = crate::project_tracker::update_project_tracker(
+                    Some(&queued_content),
+                    session_id.as_deref(),
+                ) {
+                    eprintln!(
+                        "Warning: Failed to update project tracker with instruction: {}",
+                        e
+                    );
+                }
+
+                let provider = self.agent.provider().await?;
+
+                // Persist messages with provider for automatic description generation
+                if let Some(session_file) = &self.session_file {
+                    let working_dir = Some(std::env::current_dir().unwrap_or_default());
+
+                    session::persist_messages_with_schedule_id(
+                        session_file,
+                        &self.messages,
+                        Some(provider),
+                        self.scheduled_job_id.clone(),
+                        working_dir,
+                    )
+                    .await?;
+                }
+
+                output::show_thinking();
+                println!(
+                    "{}",
+                    console::style("(Type to queue a message for after this completes...)")
+                        .dim()
+                        .italic()
+                );
+                self.process_agent_response(true, CancellationToken::default())
+                    .await?;
+                output::hide_thinking();
+
+                // Continue the loop to check for more queued messages or get new input
+                continue;
+            }
+
             match input::get_input(&mut editor)? {
                 InputResult::Message(content) => {
                     match self.run_mode {
@@ -520,8 +587,20 @@ impl Session {
                             }
 
                             output::show_thinking();
+
+                            // Start listening for queued input
+                            let input_handler = queue_input::QueuedInputHandler::new();
+                            let input_handle = input_handler.start_listening();
+
+                            // Process the agent response
                             self.process_agent_response(true, CancellationToken::default())
                                 .await?;
+
+                            // Check if we captured any input while processing
+                            if let Some(queued) = input_handle.stop() {
+                                self.queued_message = Some(queued);
+                            }
+
                             output::hide_thinking();
                         }
                         RunMode::Plan => {
@@ -577,7 +656,7 @@ impl Session {
 
                     let new_theme = match theme_name.as_str() {
                         "light" => {
-                            println!("Switching to Light theme");
+                            println!("Switchinging to Light theme");
                             output::Theme::Light
                         }
                         "dark" => {
@@ -842,7 +921,7 @@ impl Session {
                 }
             }
             PlannerResponseType::ClarifyingQuestions => {
-                // add the plan response (assistant message) & carry the conversation forward
+                // add the plan response (recipe message) & carry the conversation forward
                 // in the next round, the user will answer the clarifying questions
                 self.push_message(plan_response);
             }
@@ -1200,7 +1279,7 @@ impl Session {
                             }
                         }
                         Some(Ok(AgentEvent::HistoryReplaced(new_messages))) => {
-                            // Replace the session's message history with the compacted messages
+                            // Replace the session's message history with the compacta messages
                             self.messages = Conversation::new_unvalidated(new_messages);
 
                             // Persist the updated messages to the session file
