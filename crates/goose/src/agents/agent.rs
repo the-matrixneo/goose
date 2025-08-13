@@ -870,7 +870,18 @@ impl Agent {
 
         if compact_result.compacted {
             let compacted_messages = compact_result.messages;
-            let compaction_msg = "Auto-compacted context to reduce token usage\n\n".to_string();
+            
+            // Get threshold from config to include in message
+            let config = crate::config::Config::global();
+            let threshold = config
+                .get_param::<f64>("GOOSE_AUTO_COMPACT_THRESHOLD")
+                .unwrap_or(0.8); // Default to 80%
+            let threshold_percentage = (threshold * 100.0) as u32;
+            
+            let compaction_msg = format!(
+                "Exceeded auto-compact threshold of {}%. Context has been summarized and reduced.\n\n",
+                threshold_percentage
+            );
 
             return Ok(Some((
                 compacted_messages,
