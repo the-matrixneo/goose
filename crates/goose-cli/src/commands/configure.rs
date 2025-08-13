@@ -1300,12 +1300,7 @@ pub fn configure_goose_mode_dialog() -> Result<(), Box<dyn Error>> {
 pub fn configure_goose_router_strategy_dialog() -> Result<(), Box<dyn Error>> {
     let config = Config::global();
 
-    // Check if GOOSE_ENABLE_ROUTER is set as an environment variable
-    if std::env::var("GOOSE_ENABLE_ROUTER").is_ok() {
-        let _ = cliclack::log::info("Notice: GOOSE_ENABLE_ROUTER environment variable is set. Configuration will override this.");
-    }
-
-    let enable_router = cliclack::select("Would you like to enable LLM-based tool routing?")
+    let enable_router = cliclack::select("Would you like to enable smart tool routing?")
         .item(
             "true",
             "Enable Router",

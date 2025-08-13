@@ -72,15 +72,9 @@ impl ToolRouteManager {
             return false;
         }
 
-        // Check config first (takes precedence)
         let config = Config::global();
         if let Ok(config_value) = config.get_param::<String>("GOOSE_ENABLE_ROUTER") {
             return config_value.to_lowercase() == "true";
-        }
-
-        // Fall back to environment variable
-        if let Ok(env_value) = std::env::var("GOOSE_ENABLE_ROUTER") {
-            return env_value.to_lowercase() == "true";
         }
 
         // Default to false if neither is set
@@ -154,11 +148,6 @@ impl ToolRouteManager {
     ) -> Vec<Tool> {
         // If router is disabled or overridden, return empty
         if *self.router_disabled_override.lock().await {
-            return vec![];
-        }
-
-        // If router is not enabled, return empty (will fall back to regular tools)
-        if !self.is_router_enabled().await {
             return vec![];
         }
 

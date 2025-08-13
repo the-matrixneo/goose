@@ -670,7 +670,7 @@ impl Agent {
                         Err(ErrorData::new(
                             ErrorCode::INTERNAL_ERROR,
                             format!("Failed to update LLM index: {}", e),
-                            None
+                            None,
                         )),
                     );
                 }

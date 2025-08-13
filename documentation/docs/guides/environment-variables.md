@@ -228,25 +228,6 @@ export GOOSE_EDITOR_HOST="http://localhost:8000/v1"
 export GOOSE_EDITOR_MODEL="your-model"
 ```
 
-
-## Tool Selection Strategy
-
-These variables configure the [tool selection strategy](/docs/guides/managing-tools/tool-router).
-
-| Variable | Purpose | Values | Default |
-|----------|---------|---------|--------|
-| `GOOSE_ROUTER_TOOL_SELECTION_STRATEGY` | The tool selection strategy to use | "default", "llm" | "default" |
-
-**Examples**
-
-```bash
-# Use LLM-based selection
-export GOOSE_ROUTER_TOOL_SELECTION_STRATEGY=llm
-
-# Or use default selection
-export GOOSE_ROUTER_TOOL_SELECTION_STRATEGY=default
-```
-
 ## Security Configuration
 
 These variables control security related features.
