@@ -40,7 +40,7 @@ impl fmt::Debug for TaskConfig {
 impl TaskConfig {
     /// Get a configuration value with environment variable precedence
     /// First checks environment variable, then falls back to config
-    fn get_var(var_name: &str) -> Option<String> {
+    pub fn get_var(var_name: &str) -> Option<String> {
         // First try environment variable
         // Do not remove this, it is used by goose-responder client
         if let Ok(value) = env::var(var_name) {

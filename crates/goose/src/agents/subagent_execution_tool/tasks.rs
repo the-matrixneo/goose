@@ -9,7 +9,7 @@ use crate::agents::subagent_execution_tool::task_execution_tracker::TaskExecutio
 use crate::agents::subagent_execution_tool::task_types::{Task, TaskResult, TaskStatus};
 use crate::agents::subagent_execution_tool::utils::strip_ansi_codes;
 use crate::agents::subagent_handler::run_complete_subagent_task;
-use crate::agents::subagent_task_config::TaskConfig;
+use crate::agents::subagent_task_config::{TaskConfig, GOOSE_SUBAGENT_PROVIDER};
 
 pub async fn process_task(
     task: &Task,
@@ -100,13 +100,11 @@ async fn handle_text_instruction_task(
             let provider_info = if let Some(provider) = task_config.provider() {
                 let model_config = provider.get_model_config();
 
-                // Extract provider name from the provider's type name
-                let provider_name = std::any::type_name_of_val(&**provider)
-                    .split("::")
-                    .last()
-                    .unwrap_or("unknown")
-                    .replace("Provider", "")
-                    .to_lowercase();
+                // Get provider name from config
+                // See comment in agent.rs - difficult to get the provider name from provider trait
+                let provider_name = task_config
+                    .get_var(GOOSE_SUBAGENT_PROVIDER)
+                    .unwrap_or_else(|| "unknown".to_string());
 
                 serde_json::json!({
                     "provider_name": provider_name,
