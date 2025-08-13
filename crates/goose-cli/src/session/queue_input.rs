@@ -19,29 +19,55 @@ impl QueuedInputHandler {
     pub fn start_listening(&self) -> InputHandle {
         let queued = self.queued_message.clone();
 
+        // Print prompt instructions right before we start listening
+        println!();
+        println!(
+            "{}",
+            console::style("╭─────────────────────────────────────────────────╮").dim()
+        );
+        println!(
+            "{}",
+            console::style("│ 💡 Type your next message below (it will queue) │")
+                .cyan()
+                .dim()
+        );
+        println!(
+            "{}",
+            console::style("╰─────────────────────────────────────────────────╯").dim()
+        );
+        print!("{} ", console::style("queue>").cyan().bold());
+
+        // Flush to ensure the prompt is displayed
+        use std::io::{self, Write};
+        let _ = io::stdout().flush();
+
         // Spawn a thread to listen for input
         let handle = thread::spawn(move || {
-            // Create a simple readline editor for capturing input
-            let builder = rustyline::Config::builder()
-                .completion_type(rustyline::CompletionType::Circular)
-                .auto_add_history(false);
-            let config = builder.build();
+            // Use stdin directly to read a line
+            use std::io::{BufRead, BufReader};
 
-            if let Ok(mut editor) =
-                rustyline::Editor::<(), rustyline::history::DefaultHistory>::with_config(config)
-            {
-                let prompt = format!("{} ", console::style("(queue)>").cyan().dim());
+            let stdin = io::stdin();
+            let mut reader = BufReader::new(stdin);
+            let mut line = String::new();
 
-                // Try to read a line with a timeout-like behavior
-                if let Ok(text) = editor.readline(&prompt) {
-                    let trimmed = text.trim();
-                    if !trimmed.is_empty()
-                        && !trimmed.starts_with("/exit")
-                        && !trimmed.starts_with("/quit")
-                    {
-                        if let Ok(mut queued_guard) = queued.lock() {
-                            *queued_guard = Some(text);
-                        }
+            // Try to read a line from stdin
+            if reader.read_line(&mut line).is_ok() {
+                let trimmed = line.trim();
+                if !trimmed.is_empty()
+                    && !trimmed.starts_with("/exit")
+                    && !trimmed.starts_with("/quit")
+                {
+                    if let Ok(mut queued_guard) = queued.lock() {
+                        *queued_guard = Some(line.trim().to_string());
+                        // Print confirmation that we captured the input
+                        println!(
+                            "{}",
+                            console::style(format!(
+                                "✓ Queued message will run after current task completes"
+                            ))
+                            .green()
+                            .dim()
+                        );
                     }
                 }
             }
