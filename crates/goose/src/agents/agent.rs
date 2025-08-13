@@ -870,14 +870,14 @@ impl Agent {
 
         if compact_result.compacted {
             let compacted_messages = compact_result.messages;
-            
+
             // Get threshold from config to include in message
             let config = crate::config::Config::global();
             let threshold = config
                 .get_param::<f64>("GOOSE_AUTO_COMPACT_THRESHOLD")
                 .unwrap_or(0.8); // Default to 80%
             let threshold_percentage = (threshold * 100.0) as u32;
-            
+
             let compaction_msg = format!(
                 "Exceeded auto-compact threshold of {}%. Context has been summarized and reduced.\n\n",
                 threshold_percentage
@@ -929,8 +929,7 @@ impl Agent {
         }
 
         // No compaction needed, proceed with normal processing
-        self.reply_internal(messages, session, cancel_token)
-            .await
+        self.reply_internal(messages, session, cancel_token).await
     }
 
     /// Main reply method that handles the actual agent processing
