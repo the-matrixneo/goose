@@ -24,6 +24,7 @@ pub const GOOSE_SUBAGENT_MODEL: &str = "GOOSE_SUBAGENT_MODEL";
 pub struct TaskConfig {
     pub id: String,
     pub provider: Option<Arc<dyn Provider>>,
+    pub provider_name: Option<String>,
     pub max_turns: Option<usize>,
 }
 
@@ -42,7 +43,7 @@ impl TaskConfig {
     /// First checks environment variable, then falls back to config
     pub fn get_var(var_name: &str) -> Option<String> {
         // First try environment variable
-        // Do not remove this, it is used by goose-responder client
+        // Do not remove this, env var is used by goose-responder client
         if let Ok(value) = env::var(var_name) {
             return Some(value);
         }
@@ -60,11 +61,12 @@ impl TaskConfig {
             .unwrap_or(DEFAULT_SUBAGENT_MAX_TURNS);
 
         // Determine provider with environment variable precedence
-        let provider = Self::determine_subagent_provider(fallback_provider);
+        let (provider, provider_name) = Self::determine_subagent_provider(fallback_provider);
 
         Self {
             id: Uuid::new_v4().to_string(),
             provider,
+            provider_name,
             max_turns: Some(max_turns),
         }
     }
@@ -78,7 +80,7 @@ impl TaskConfig {
     /// First tries to use GOOSE_SUBAGENT_PROVIDER from env/config, then falls back to provided provider
     fn determine_subagent_provider(
         fallback_provider: Option<Arc<dyn Provider>>,
-    ) -> Option<Arc<dyn Provider>> {
+    ) -> (Option<Arc<dyn Provider>>, Option<String>) {
         // First try to get the subagent provider from env/config
         if let Some(provider_name) = Self::get_var(GOOSE_SUBAGENT_PROVIDER) {
             // Try to get the model config for the subagent provider
@@ -86,13 +88,19 @@ impl TaskConfig {
                 if let Ok(model_config) = ModelConfig::new(&model_name) {
                     // Create the provider using the factory
                     if let Ok(provider) = create(&provider_name, model_config) {
-                        return Some(provider);
+                        return (Some(provider), Some(provider_name));
                     }
                 }
             }
         }
 
-        // Fall back to provided provider
-        fallback_provider
+        // Fall back to provided provider - get name from GOOSE_PROVIDER config
+        if fallback_provider.is_some() {
+            let provider_name =
+                Self::get_var("GOOSE_PROVIDER").unwrap_or_else(|| "unknown".to_string());
+            return (fallback_provider, Some(provider_name));
+        }
+
+        (fallback_provider, None)
     }
 }
