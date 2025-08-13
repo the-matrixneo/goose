@@ -1,11 +1,11 @@
-use mcp_core::ToolError;
-use rmcp::model::Content;
 use rmcp::model::Tool;
+use rmcp::model::{Content, ErrorCode, ErrorData};
 
 use anyhow::Result;
 use async_trait::async_trait;
 use serde::Serialize;
 use serde_json::Value;
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::sync::Arc;
@@ -23,11 +23,11 @@ struct ToolSelectorContext {
 
 #[async_trait]
 pub trait RouterToolSelector: Send + Sync {
-    async fn select_tools(&self, params: Value) -> Result<Vec<Content>, ToolError>;
-    async fn index_tools(&self, tools: &[Tool], extension_name: &str) -> Result<(), ToolError>;
-    async fn remove_tool(&self, tool_name: &str) -> Result<(), ToolError>;
-    async fn record_tool_call(&self, tool_name: &str) -> Result<(), ToolError>;
-    async fn get_recent_tool_calls(&self, limit: usize) -> Result<Vec<String>, ToolError>;
+    async fn select_tools(&self, params: Value) -> Result<Vec<Content>, ErrorData>;
+    async fn index_tools(&self, tools: &[Tool], extension_name: &str) -> Result<(), ErrorData>;
+    async fn remove_tool(&self, tool_name: &str) -> Result<(), ErrorData>;
+    async fn record_tool_call(&self, tool_name: &str) -> Result<(), ErrorData>;
+    async fn get_recent_tool_calls(&self, limit: usize) -> Result<Vec<String>, ErrorData>;
 }
 
 pub struct LLMToolSelector {
@@ -48,11 +48,15 @@ impl LLMToolSelector {
 
 #[async_trait]
 impl RouterToolSelector for LLMToolSelector {
-    async fn select_tools(&self, params: Value) -> Result<Vec<Content>, ToolError> {
+    async fn select_tools(&self, params: Value) -> Result<Vec<Content>, ErrorData> {
         let query = params
             .get("query")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| ToolError::InvalidParameters("Missing 'query' parameter".to_string()))?;
+            .ok_or_else(|| ErrorData {
+                code: ErrorCode::INVALID_PARAMS,
+                message: Cow::from("Missing 'query' parameter"),
+                data: None,
+            })?;
 
         let extension_name = params
             .get("extension_name")
@@ -82,8 +86,10 @@ impl RouterToolSelector for LLMToolSelector {
             };
 
             let user_prompt =
-                render_global_file("router_tool_selector.md", &context).map_err(|e| {
-                    ToolError::ExecutionError(format!("Failed to render prompt template: {}", e))
+                render_global_file("router_tool_selector.md", &context).map_err(|e| ErrorData {
+                    code: ErrorCode::INTERNAL_ERROR,
+                    message: Cow::from(format!("Failed to render prompt template: {}", e)),
+                    data: None,
                 })?;
 
             let user_message = Message::user().with_text(&user_prompt);
@@ -91,7 +97,11 @@ impl RouterToolSelector for LLMToolSelector {
                 .llm_provider
                 .complete("system", &[user_message], &[])
                 .await
-                .map_err(|e| ToolError::ExecutionError(format!("Failed to search tools: {}", e)))?;
+                .map_err(|e| ErrorData {
+                    code: ErrorCode::INTERNAL_ERROR,
+                    message: Cow::from(format!("Failed to search tools: {}", e)),
+                    data: None,
+                })?;
 
             // Extract just the message content from the response
             let (message, _usage) = response;
@@ -110,7 +120,7 @@ impl RouterToolSelector for LLMToolSelector {
         }
     }
 
-    async fn index_tools(&self, tools: &[Tool], extension_name: &str) -> Result<(), ToolError> {
+    async fn index_tools(&self, tools: &[Tool], extension_name: &str) -> Result<(), ErrorData> {
         let mut tool_strings = self.tool_strings.write().await;
 
         for tool in tools {
@@ -139,7 +149,7 @@ impl RouterToolSelector for LLMToolSelector {
 
         Ok(())
     }
-    async fn remove_tool(&self, tool_name: &str) -> Result<(), ToolError> {
+    async fn remove_tool(&self, tool_name: &str) -> Result<(), ErrorData> {
         let mut tool_strings = self.tool_strings.write().await;
         if let Some(extension_name) = tool_name.split("__").next() {
             tool_strings.remove(extension_name);
@@ -147,7 +157,7 @@ impl RouterToolSelector for LLMToolSelector {
         Ok(())
     }
 
-    async fn record_tool_call(&self, tool_name: &str) -> Result<(), ToolError> {
+    async fn record_tool_call(&self, tool_name: &str) -> Result<(), ErrorData> {
         let mut recent_calls = self.recent_tool_calls.write().await;
         if recent_calls.len() >= 100 {
             recent_calls.pop_front();
@@ -156,7 +166,7 @@ impl RouterToolSelector for LLMToolSelector {
         Ok(())
     }
 
-    async fn get_recent_tool_calls(&self, limit: usize) -> Result<Vec<String>, ToolError> {
+    async fn get_recent_tool_calls(&self, limit: usize) -> Result<Vec<String>, ErrorData> {
         let recent_calls = self.recent_tool_calls.read().await;
         Ok(recent_calls.iter().rev().take(limit).cloned().collect())
     }
