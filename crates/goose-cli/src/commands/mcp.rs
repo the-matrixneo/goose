@@ -1,6 +1,6 @@
 use anyhow::Result;
 use goose_mcp::{
-    BuildRouter, ComputerControllerRouter, DeveloperRouter, GoogleDriveRouter, MemoryRouter,
+    cleanup_global_dev_server, BuildRouter, ComputerControllerRouter, DeveloperRouter, GoogleDriveRouter, MemoryRouter,
     TutorialRouter,
 };
 use mcp_server::router::RouterService;
@@ -54,9 +54,18 @@ pub async fn run_server(name: &str) -> Result<()> {
 
     tokio::select! {
         result = server.run(transport) => {
+            // Clean up dev servers when exiting
+            if name == "build" {
+                cleanup_global_dev_server();
+            }
             Ok(result?)
         }
         _ = shutdown.notified() => {
+            // Clean up dev servers when shutting down
+            if name == "build" {
+                cleanup_global_dev_server();
+            }
+            
             // On Unix systems, kill the entire process group
             #[cfg(unix)]
             {

@@ -14,7 +14,7 @@ pub mod google_drive;
 mod memory;
 mod tutorial;
 
-pub use build::BuildRouter;
+pub use build::{cleanup_global_dev_server, BuildRouter};
 pub use computercontroller::ComputerControllerRouter;
 pub use developer::DeveloperRouter;
 pub use google_drive::GoogleDriveRouter;

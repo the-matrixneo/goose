@@ -20,11 +20,10 @@ use std::net::{SocketAddr, TcpListener};
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::process::Stdio;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::{Child, Command};
 #[cfg(unix)]
-use std::os::unix::process::CommandExt;
 use tokio::sync::mpsc;
 use walkdir::WalkDir;
 use zip::write::FileOptions;
@@ -32,6 +31,10 @@ use zip::write::FileOptions;
 use crate::developer::DeveloperRouter;
 
 const PM: &str = "npm";
+
+// Global dev server state that persists across router instances
+static GLOBAL_DEV_SERVER: OnceLock<Mutex<Option<Child>>> = OnceLock::new();
+
 
 #[derive(Clone)]
 pub struct BuildRouter {
@@ -55,43 +58,34 @@ impl Default for BuildRouter {
     }
 }
 
-impl Drop for BuildRouter {
-    fn drop(&mut self) {
-        // Clean up the dev server process when the router is dropped
-        if let Ok(mut state) = self.state.lock() {
-            if let Some(mut child) = state.child.take() {
-                // Log that we're terminating the process
-                let pid = child.id().map(|id| id.to_string()).unwrap_or_else(|| "unknown".to_string());
-                eprintln!("[BuildRouter] Terminating dev server process (pid: {})", pid);
-                
-                // Try to kill the child process
-                // Note: kill_on_drop is already set, but we're being explicit here
-                let _ = child.start_kill();
-                
-                // For good measure, also try platform-specific termination
-                #[cfg(unix)]
-                {
-                    if let Some(id) = child.id() {
-                        // npm/node often spawns child processes, we need to kill the entire process group
-                        // The process group ID is typically the negative of the process ID
-                        let pgid = -(id as i32);
-                        
-                        // Send SIGTERM to the entire process group for graceful shutdown
-                        let _ = unix_kill(Pid::from_raw(pgid), Signal::SIGTERM);
-                        
-                        // Give it a moment to exit gracefully
-                        std::thread::sleep(std::time::Duration::from_millis(500));
-                        
-                        // Force kill the process group if still running
+fn get_global_dev_server() -> &'static Mutex<Option<Child>> {
+    GLOBAL_DEV_SERVER.get_or_init(|| Mutex::new(None))
+}
+
+pub fn cleanup_global_dev_server() {
+    eprintln!("[BuildRouter] Cleaning up global dev server");
+    if let Some(global) = GLOBAL_DEV_SERVER.get() {
+        if let Ok(mut child_opt) = global.lock() {
+            if let Some(mut child) = child_opt.take() {
+                if let Some(pid) = child.id() {
+                    eprintln!("[BuildRouter] Killing dev server process group for PID: {}", pid);
+                    
+                    #[cfg(unix)]
+                    {
+                        // Kill the entire process group to ensure npm and its node children are killed
+                        let pgid = -(pid as i32);
                         let _ = unix_kill(Pid::from_raw(pgid), Signal::SIGKILL);
-                        
-                        // Also try to kill the specific process in case it's not in a group
-                        let _ = unix_kill(Pid::from_raw(id as i32), Signal::SIGKILL);
+                        let _ = unix_kill(Pid::from_raw(pid as i32), Signal::SIGKILL);
+                    }
+                    
+                    #[cfg(not(unix))]
+                    {
+                        let _ = std::process::Command::new("taskkill")
+                            .args(["/F", "/T", "/PID", &pid.to_string()])
+                            .output();
                     }
                 }
-                
-                // Block briefly to ensure the process is terminated
-                std::thread::sleep(std::time::Duration::from_millis(200));
+                let _ = child.start_kill();
             }
         }
     }
@@ -117,7 +111,7 @@ impl BuildRouter {
                     s.port = Some(port);
                 }
 
-                tokio::spawn(async move {
+                               tokio::spawn(async move {
                     let _ = install_deps_if_needed(&cwd).await;
                     let _ = start_dev_server(state.clone(), &cwd).await;
                 });
@@ -299,7 +293,18 @@ impl BuildRouter {
             let end = s.logs.len();
             let new_logs = s.logs[start..end].join("");
             s.last_read_index = end;
-            let running = s.child.as_ref().is_some();
+            
+            // Check if global dev server is running
+            let running = if let Some(global) = GLOBAL_DEV_SERVER.get() {
+                if let Ok(child_opt) = global.lock() {
+                    child_opt.is_some()
+                } else {
+                    false
+                }
+            } else {
+                false
+            };
+            
             (
                 new_logs.to_string(),
                 format!("running: {running}, package_manager: {}", PM),
@@ -308,31 +313,41 @@ impl BuildRouter {
         Ok(vec![
             Content::text(meta).with_audience(vec![Role::Assistant]),
             Content::text(text)
-                .with_audience(vec![Role::User])
-                .with_priority(0.0),
         ])
     }
 
     async fn handle_restart_action(&self) -> Result<Vec<Content>, ToolError> {
-        let (project, child_opt) = {
+        let project = {
             let mut s = self.state.lock().unwrap();
             let project = s
                 .project_path
                 .clone()
                 .unwrap_or(std::env::current_dir().unwrap());
 
-            // take existing process if any (drop lock before await)
-            let child_opt = s.child.take();
             s.logs.push(format!(
                 "[{}] Restart requested for project: {}\n",
                 Utc::now(),
                 project.display()
             ));
-            (project, child_opt)
+            project
         };
 
-        // kill outside lock
-        if let Some(child) = child_opt {
+        // Check for existing global process and terminate it
+        let child_to_terminate = {
+            let global = get_global_dev_server();
+            if let Ok(mut child_opt) = global.lock() {
+                if let Some(child) = child_opt.take() {
+                    eprintln!("[BuildRouter] Terminating existing global dev server for restart");
+                    Some(child)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        };
+        
+        if let Some(child) = child_to_terminate {
             self.terminate_child_process(child).await;
         }
 
@@ -346,7 +361,7 @@ impl BuildRouter {
 
         Ok(vec![
             Content::text("Server restarted").with_audience(vec![Role::Assistant])
-        ])
+        ])    
     }
 
     async fn terminate_child_process(&self, mut child: Child) {
@@ -442,7 +457,8 @@ impl BuildRouter {
                 .unwrap_or(std::env::current_dir().unwrap())
         };
         let report = deploy_from_project(&project, message).await?;
-        Ok(vec![Content::text(report).with_audience(vec![Role::User])])
+
+        Ok(vec![Content::text(report)])
     }
 }
 
@@ -509,12 +525,20 @@ async fn install_deps_if_needed(project_path: &Path) -> Result<()> {
 }
 
 async fn start_dev_server(state: Arc<Mutex<BuildState>>, project_path: &Path) -> Result<()> {
+    // Check if global dev server is already running
+    {
+        let global = get_global_dev_server();
+        if let Ok(child_opt) = global.lock() {
+            if child_opt.is_some() {
+                eprintln!("[BuildRouter] Dev server already running globally");
+                return Ok(());
+            }
+        }
+    }
+    
     // Get the port that was already set synchronously, or find a new one if needed
     let port = {
         let mut s = state.lock().unwrap();
-        if s.child.is_some() {
-            return Ok(()); // already running
-        }
 
         // Use existing port if set, otherwise find a new one
         let port = s.port.unwrap_or_else(|| {
@@ -550,15 +574,33 @@ async fn start_dev_server(state: Arc<Mutex<BuildState>>, project_path: &Path) ->
         .stderr(Stdio::piped())
         .stdin(Stdio::null())
         .kill_on_drop(true)
-        .spawn()?;
+        .spawn()
+        .map_err(|e| {
+            eprintln!("[BuildRouter] Failed to spawn dev server: {}", e);
+            e
+        })?;
 
     let stdout = child.stdout.take();
     let stderr = child.stderr.take();
 
+    // Get the process ID before moving the child
+    let child_pid = child.id();
+    eprintln!("[BuildRouter] Dev server started with PID: {:?}", child_pid);
+    
+    eprintln!("[BuildRouter] Dev server running with PID: {:?}", child_pid);
+    
+    // Store in global state
+    {
+        let global = get_global_dev_server();
+        if let Ok(mut child_opt) = global.lock() {
+            *child_opt = Some(child);
+            eprintln!("[BuildRouter] Stored dev server in global state");
+        }
+    }
+    
     {
         let mut s = state.lock().unwrap();
         s.start_time = Some(Utc::now());
-        s.child = Some(child);
     }
 
     // Spawn log readers
@@ -570,6 +612,8 @@ async fn start_dev_server(state: Arc<Mutex<BuildState>>, project_path: &Path) ->
                 let mut s = state_clone.lock().unwrap();
                 s.logs.push(format!("[stdout] {line}\n"));
             }
+            let mut s = state_clone.lock().unwrap();
+            s.logs.push(format!("[{}] Dev server stdout stream closed\n", Utc::now()));
         });
     }
     if let Some(stderr) = stderr {
@@ -579,10 +623,50 @@ async fn start_dev_server(state: Arc<Mutex<BuildState>>, project_path: &Path) ->
             while let Ok(Some(line)) = reader.next_line().await {
                 let mut s = state_clone.lock().unwrap();
                 s.logs.push(format!("[stderr] {line}\n"));
+                // Also log errors to stderr for debugging
+                if line.contains("error") || line.contains("Error") || line.contains("ERROR") {
+                    eprintln!("[BuildRouter] Dev server error: {}", line);
+                }
+            }
+            // Log when stderr closes
+            eprintln!("[BuildRouter] Dev server stderr closed");
+            let mut s = state_clone.lock().unwrap();
+            s.logs.push(format!("[{}] Dev server stderr stream closed\n", Utc::now()));
+        });
+    }
+    
+    // Monitor the process for early termination
+    if let Some(pid) = child_pid {
+        let state_clone = state.clone();
+        tokio::spawn(async move {
+            // Wait a bit then check if process is still alive
+            tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+            
+            // Try to get a reference to the child to check its status
+            let process_alive = {
+                let s = state_clone.lock().unwrap();
+                s.child.is_some()
+            };
+            
+            if process_alive {
+                eprintln!("[BuildRouter] Process {} still alive after 2 seconds", pid);
+            } else {
+                eprintln!("[BuildRouter] Process {} terminated within 2 seconds!", pid);
+            }
+            
+            // Check again after 5 seconds
+            tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
+            let process_still_alive = {
+                let s = state_clone.lock().unwrap();
+                s.child.is_some()
+            };
+            
+            if !process_still_alive {
+                eprintln!("[BuildRouter] Process {} confirmed dead after 5 seconds", pid);
             }
         });
     }
-
+    
     Ok(())
 }
 

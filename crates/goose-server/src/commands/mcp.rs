@@ -1,6 +1,6 @@
 use anyhow::Result;
 use goose_mcp::{
-    BuildRouter, ComputerControllerRouter, DeveloperRouter, GoogleDriveRouter, MemoryRouter,
+    cleanup_global_dev_server, BuildRouter, ComputerControllerRouter, DeveloperRouter, GoogleDriveRouter, MemoryRouter,
     TutorialRouter,
 };
 use mcp_server::router::RouterService;
@@ -30,5 +30,13 @@ pub async fn run(name: &str) -> Result<()> {
     let transport = ByteTransport::new(stdin(), stdout());
 
     tracing::info!("Server initialized and ready to handle requests");
-    Ok(server.run(transport).await?)
+    
+    let result = server.run(transport).await;
+    
+    // Clean up dev servers when exiting
+    if name == "build" {
+        cleanup_global_dev_server();
+    }
+    
+    Ok(result?)
 }
