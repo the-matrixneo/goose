@@ -152,12 +152,12 @@ impl ToolRouteManager {
         }
 
         let mut prefixed_tools = vec![];
-        prefixed_tools.push(router_tools::llm_search_tool());
 
         // If router is enabled but not functional (no provider), just return the search tool
         if !self.is_router_functional().await {
             return prefixed_tools;
         }
+        prefixed_tools.push(router_tools::llm_search_tool());
 
         // Get recent tool calls from router tool selector
         let selector = self.router_tool_selector.lock().await.clone();
