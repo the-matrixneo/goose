@@ -169,7 +169,7 @@ export default function ProgressiveMessageList({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isLoading, messages.length]);
 
-  // Track which alerts have been displayed to avoid duplicates
+  // Track which alerts have been displayed to avoid duplicates and trigger scroll
   useEffect(() => {
     if (systemAlerts.length > 0) {
       const newAlerts = systemAlerts.filter(alert => !displayedAlerts.has(alert.timestamp));
@@ -179,8 +179,28 @@ export default function ProgressiveMessageList({
           newAlerts.forEach(alert => updated.add(alert.timestamp));
           return updated;
         });
-        // Trigger scroll when new alerts are added
-        setTimeout(() => onScrollToBottom?.(), 100);
+        
+        // Ensure scroll happens after DOM updates and animations
+        // Use multiple techniques to ensure reliable scrolling
+        const scrollToBottom = () => {
+          onScrollToBottom?.();
+          // Also try to scroll the last alert into view
+          requestAnimationFrame(() => {
+            const alerts = document.querySelectorAll('[data-testid="system-alert-message"]');
+            if (alerts.length > 0) {
+              const lastAlert = alerts[alerts.length - 1];
+              lastAlert.scrollIntoView({ behavior: 'smooth', block: 'end' });
+            }
+          });
+        };
+        
+        // Initial scroll attempt
+        requestAnimationFrame(() => {
+          setTimeout(scrollToBottom, 50);
+        });
+        
+        // Backup scroll attempt after animation completes
+        setTimeout(scrollToBottom, 350);
       }
     }
   }, [systemAlerts, displayedAlerts, onScrollToBottom]);
