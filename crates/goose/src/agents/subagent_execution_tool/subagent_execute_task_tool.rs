@@ -105,5 +105,6 @@ pub async fn run_tasks(
     ToolCallResult {
         result: Box::new(Box::pin(result_future)),
         notification_stream: Some(Box::new(notification_stream)),
+        todo_update: None,
     }
 }

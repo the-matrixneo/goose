@@ -3,6 +3,7 @@ mod context;
 pub mod extension;
 pub mod extension_manager;
 pub mod final_output_tool;
+mod internal_tool_state;
 mod large_response_handler;
 pub mod platform_tools;
 pub mod prompt_manager;

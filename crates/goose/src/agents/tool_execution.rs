@@ -18,6 +18,7 @@ use rmcp::model::{Content, ServerNotification};
 pub struct ToolCallResult {
     pub result: Box<dyn Future<Output = ToolResult<Vec<Content>>> + Send + Unpin>,
     pub notification_stream: Option<Box<dyn Stream<Item = ServerNotification> + Send + Unpin>>,
+    pub todo_update: Option<String>, // NEW: Optional TODO list update
 }
 
 impl From<ToolResult<Vec<Content>>> for ToolCallResult {
@@ -25,6 +26,7 @@ impl From<ToolResult<Vec<Content>>> for ToolCallResult {
         Self {
             result: Box::new(futures::future::ready(result)),
             notification_stream: None,
+            todo_update: None,
         }
     }
 }

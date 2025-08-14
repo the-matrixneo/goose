@@ -65,9 +65,11 @@ pub struct SessionMetadata {
     pub accumulated_input_tokens: Option<i32>,
     /// The number of output tokens used in the session. Accumulated across all messages.
     pub accumulated_output_tokens: Option<i32>,
+    /// The TODO list content for this session
+    pub todo_list: Option<String>,
 }
 
-// Custom deserializer to handle old sessions without working_dir
+// Custom deserializer to handle old sessions without working_dir and todo_list
 impl<'de> Deserialize<'de> for SessionMetadata {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -86,6 +88,7 @@ impl<'de> Deserialize<'de> for SessionMetadata {
             accumulated_input_tokens: Option<i32>,
             accumulated_output_tokens: Option<i32>,
             working_dir: Option<PathBuf>,
+            todo_list: Option<String>, // For backward compatibility
         }
 
         let helper = Helper::deserialize(deserializer)?;
@@ -108,6 +111,7 @@ impl<'de> Deserialize<'de> for SessionMetadata {
             accumulated_input_tokens: helper.accumulated_input_tokens,
             accumulated_output_tokens: helper.accumulated_output_tokens,
             working_dir,
+            todo_list: helper.todo_list,
         })
     }
 }
@@ -133,6 +137,7 @@ impl SessionMetadata {
             accumulated_total_tokens: None,
             accumulated_input_tokens: None,
             accumulated_output_tokens: None,
+            todo_list: None,
         }
     }
 }

@@ -55,6 +55,7 @@ use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info, instrument};
 
 use super::final_output_tool::FinalOutputTool;
+use super::internal_tool_state::{InternalToolState, tool_state_keys};
 use super::platform_tools;
 use super::tool_execution::{ToolCallResult, CHAT_MODE_TOOL_SKIPPED_RESPONSE, DECLINED_RESPONSE};
 use crate::agents::subagent_task_config::TaskConfig;
@@ -102,7 +103,7 @@ pub struct Agent {
     pub(super) tool_route_manager: ToolRouteManager,
     pub(super) scheduler_service: Mutex<Option<Arc<dyn SchedulerTrait>>>,
     pub(super) retry_manager: RetryManager,
-    pub(super) todo_list: Arc<Mutex<String>>,
+    pub(super) internal_tool_state: InternalToolState,
 }
 
 #[derive(Clone, Debug)]
@@ -188,7 +189,7 @@ impl Agent {
             tool_route_manager: ToolRouteManager::new(),
             scheduler_service: Mutex::new(None),
             retry_manager,
-            todo_list: Arc::new(Mutex::new(String::new())),
+            internal_tool_state: InternalToolState::new(),
         }
     }
 
@@ -490,20 +491,22 @@ impl Agent {
                 None,
             )))
         } else if tool_call.name == TODO_READ_TOOL_NAME {
-            // Handle task planner read tool
-            let todo_content = self.todo_list.lock().await.clone();
+            // Handle task planner read tool - read from internal state
+            let todo_content = self.internal_tool_state
+                .get(tool_state_keys::TODO_LIST)
+                .await
+                .and_then(|v| v.as_str().map(String::from))
+                .unwrap_or_default();
+            
             ToolCallResult::from(Ok(vec![Content::text(todo_content)]))
         } else if tool_call.name == TODO_WRITE_TOOL_NAME {
-            // Handle task planner write tool
+            // Handle task planner write tool - write to internal state
             let content = tool_call
                 .arguments
                 .get("content")
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .to_string();
-
-            // Acquire lock first to prevent race condition
-            let mut todo_list = self.todo_list.lock().await;
 
             // Character limit validation
             let char_count = content.chars().count();
@@ -524,12 +527,18 @@ impl Agent {
                 );
             }
 
-            *todo_list = content;
+            // Store in internal state
+            self.internal_tool_state
+                .set(tool_state_keys::TODO_LIST.to_string(), serde_json::json!(content))
+                .await;
 
-            ToolCallResult::from(Ok(vec![Content::text(format!(
+            // Return success with the TODO update in the result
+            let mut result = ToolCallResult::from(Ok(vec![Content::text(format!(
                 "Updated ({} chars)",
                 char_count
-            ))]))
+            ))]));
+            result.todo_update = Some(content);
+            result
         } else if tool_call.name == ROUTER_VECTOR_SEARCH_TOOL_NAME
             || tool_call.name == ROUTER_LLM_SEARCH_TOOL_NAME
         {
@@ -564,6 +573,7 @@ impl Agent {
                         .result
                         .map(super::large_response_handler::process_tool_response),
                 ),
+                todo_update: result.todo_update,
             }),
         )
     }
@@ -1530,10 +1540,6 @@ mod tests {
 
         assert!(todo_read.is_some(), "TODO read tool should be present");
         assert!(todo_write.is_some(), "TODO write tool should be present");
-
-        // Test todo_list initialization
-        let todo_content = agent.todo_list.lock().await;
-        assert_eq!(*todo_content, "", "TODO list should be initially empty");
 
         Ok(())
     }
