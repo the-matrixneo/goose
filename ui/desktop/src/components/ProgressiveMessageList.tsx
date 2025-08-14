@@ -22,6 +22,7 @@ import { ContextHandler } from './context_management/ContextHandler';
 import { useChatContextManager } from './context_management/ChatContextManager';
 import { NotificationEvent } from '../hooks/useMessageStream';
 import LoadingGoose from './LoadingGoose';
+import SystemAlertMessage from './SystemAlertMessage';
 
 interface ProgressiveMessageListProps {
   messages: Message[];
@@ -37,6 +38,7 @@ interface ProgressiveMessageListProps {
   // Custom render function for messages
   renderMessage?: (message: Message, index: number) => React.ReactNode | null;
   isStreamingMessage?: boolean; // Whether messages are currently being streamed
+  systemAlerts?: Array<{ message: string; level: string; timestamp: number }>; // System alerts to display inline
 }
 
 export default function ProgressiveMessageList({
@@ -52,6 +54,7 @@ export default function ProgressiveMessageList({
   showLoadingThreshold = 50,
   renderMessage, // Custom render function
   isStreamingMessage = false, // Whether messages are currently being streamed
+  systemAlerts = [], // System alerts to display inline
 }: ProgressiveMessageListProps) {
   const [renderedCount, setRenderedCount] = useState(() => {
     // Initialize with either all messages (if small) or first batch (if large)
@@ -60,6 +63,7 @@ export default function ProgressiveMessageList({
       : Math.min(batchSize, messages.length);
   });
   const [isLoading, setIsLoading] = useState(() => messages.length > showLoadingThreshold);
+  const [displayedAlerts, setDisplayedAlerts] = useState<Set<number>>(new Set());
   const timeoutRef = useRef<number | null>(null);
   const mountedRef = useRef(true);
   const hasOnlyToolResponses = (message: Message) =>
@@ -165,31 +169,76 @@ export default function ProgressiveMessageList({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isLoading, messages.length]);
 
+  // Track which alerts have been displayed to avoid duplicates
+  useEffect(() => {
+    if (systemAlerts.length > 0) {
+      const newAlerts = systemAlerts.filter(alert => !displayedAlerts.has(alert.timestamp));
+      if (newAlerts.length > 0) {
+        setDisplayedAlerts(prev => {
+          const updated = new Set(prev);
+          newAlerts.forEach(alert => updated.add(alert.timestamp));
+          return updated;
+        });
+        // Trigger scroll when new alerts are added
+        setTimeout(() => onScrollToBottom?.(), 100);
+      }
+    }
+  }, [systemAlerts, displayedAlerts, onScrollToBottom]);
+
   // Render messages up to the current rendered count
   const renderMessages = useCallback(() => {
     const messagesToRender = messages.slice(0, renderedCount);
+    const renderedElements: React.ReactNode[] = [];
+    
+    // Add system alerts that should appear before the first message
+    const alertsBeforeMessages = systemAlerts.filter(alert => {
+      // Show alerts that came before the first message or if there are no messages
+      return messagesToRender.length === 0 || 
+             (messagesToRender[0].created && alert.timestamp < messagesToRender[0].created * 1000);
+    });
+    
+    alertsBeforeMessages.forEach((alert, idx) => {
+      renderedElements.push(
+        <div key={`alert-before-${alert.timestamp}-${idx}`} className="mt-4">
+          <SystemAlertMessage
+            message={alert.message}
+            level={alert.level as 'info' | 'warning' | 'error' | 'success'}
+            timestamp={alert.timestamp}
+          />
+        </div>
+      );
+    });
 
-    const renderedMessages = messagesToRender
-      .map((message, index) => {
-        // Use custom render function if provided
-        if (renderMessage) {
-          return renderMessage(message, index);
+    messagesToRender.forEach((message, index) => {
+      // Check for alerts that should appear between this message and the next
+      const nextMessage = messagesToRender[index + 1];
+      const alertsBetween = systemAlerts.filter(alert => {
+        const afterCurrent = alert.timestamp >= (message.created * 1000);
+        const beforeNext = !nextMessage || alert.timestamp < (nextMessage.created * 1000);
+        return afterCurrent && beforeNext;
+      });
+
+      // Use custom render function if provided
+      if (renderMessage) {
+        const rendered = renderMessage(message, index);
+        if (rendered) {
+          renderedElements.push(rendered);
         }
-
+      } else {
         // Default rendering logic (for BaseChat)
         if (!chat) {
           console.warn(
             'ProgressiveMessageList: chat prop is required when not using custom renderMessage'
           );
-          return null;
+          return;
         }
 
         const isUser = isUserMessage(message);
 
-        const result = (
+        const messageElement = (
           <div
             key={message.id && `${message.id}-${message.content.length}`}
-            className={`relative ${index === 0 ? 'mt-0' : 'mt-4'} ${isUser ? 'user' : 'assistant'}`}
+            className={`relative ${index === 0 && alertsBeforeMessages.length === 0 ? 'mt-0' : 'mt-4'} ${isUser ? 'user' : 'assistant'}`}
             data-testid="message-container"
           >
             {isUser ? (
@@ -242,12 +291,25 @@ export default function ProgressiveMessageList({
             )}
           </div>
         );
+        
+        renderedElements.push(messageElement);
+      }
+      
+      // Add alerts that come after this message
+      alertsBetween.forEach((alert, idx) => {
+        renderedElements.push(
+          <div key={`alert-${alert.timestamp}-${idx}`} className="mt-4">
+            <SystemAlertMessage
+              message={alert.message}
+              level={alert.level as 'info' | 'warning' | 'error' | 'success'}
+              timestamp={alert.timestamp}
+            />
+          </div>
+        );
+      });
+    });
 
-        return result;
-      })
-      .filter(Boolean); // Filter out null values
-
-    return renderedMessages;
+    return renderedElements;
   }, [
     messages,
     renderedCount,
@@ -261,6 +323,8 @@ export default function ProgressiveMessageList({
     hasContextHandlerContent,
     getContextHandlerType,
     onScrollToBottom,
+    systemAlerts,
+    hasOnlyToolResponses,
   ]);
 
   return (

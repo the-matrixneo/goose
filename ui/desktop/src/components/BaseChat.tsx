@@ -420,6 +420,7 @@ function BaseChatContent({
                       isUserMessage={isUserMessage}
                       onScrollToBottom={handleScrollToBottom}
                       isStreamingMessage={chatState !== ChatState.Idle}
+                      systemAlerts={systemAlerts}
                     />
                   ) : (
                     // Render messages with SearchView wrapper when search is enabled
@@ -436,6 +437,7 @@ function BaseChatContent({
                         isUserMessage={isUserMessage}
                         onScrollToBottom={handleScrollToBottom}
                         isStreamingMessage={chatState !== ChatState.Idle}
+                        systemAlerts={systemAlerts}
                       />
                     </SearchView>
                   )}
@@ -522,28 +524,6 @@ function BaseChatContent({
                 }
                 chatState={chatState}
               />
-            </div>
-          )}
-
-          {/* System alerts display */}
-          {systemAlerts.length > 0 && (
-            <div className="absolute top-4 right-4 z-30 space-y-2 max-w-md">
-              {systemAlerts.slice(-3).map((alert, index) => (
-                <div
-                  key={alert.timestamp + index}
-                  className={`p-3 rounded-lg shadow-lg animate-fade-slide-up ${
-                    alert.level === 'error'
-                      ? 'bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200 border border-red-300 dark:border-red-700'
-                      : alert.level === 'warning'
-                        ? 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-200 border border-yellow-300 dark:border-yellow-700'
-                        : alert.level === 'success'
-                          ? 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200 border border-green-300 dark:border-green-700'
-                          : 'bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 border border-blue-300 dark:border-blue-700'
-                  }`}
-                >
-                  <div className="text-sm font-medium">{alert.message}</div>
-                </div>
-              ))}
             </div>
           )}
         </div>
