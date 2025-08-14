@@ -1071,7 +1071,7 @@ impl Session {
                             else {
                                 // Check if this message should keep thinking mode active
                                 let keep_thinking_message = message.keep_thinking.clone();
-                                
+
                                 for content in &message.content {
                                     if let MessageContent::ToolRequest(tool_request) = content {
                                         if let Ok(tool_call) = &tool_request.tool_call {
@@ -1275,6 +1275,21 @@ impl Session {
                             // Log model change if in debug mode
                             if self.debug {
                                 eprintln!("Model changed to {} in {} mode", model, mode);
+                            }
+                        }
+                        Some(Ok(AgentEvent::SystemAlert { message, level: _ })) => {
+                            // Display system alerts but don't add to session
+                            output::hide_thinking();
+                            output::render_text(&message, Some(Color::Yellow), true);
+                        }
+                        Some(Ok(AgentEvent::ThinkingUpdate { message })) => {
+                            // Update thinking message
+                            if interactive {
+                                // Show thinking indicator if not already visible
+                                if !output::is_showing_thinking() {
+                                    output::show_thinking();
+                                }
+                                output::set_thinking_message(&message);
                             }
                         }
 

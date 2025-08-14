@@ -108,8 +108,27 @@ pub struct Agent {
 pub enum AgentEvent {
     Message(Message),
     McpNotification((String, ServerNotification)),
-    ModelChange { model: String, mode: String },
+    ModelChange {
+        model: String,
+        mode: String,
+    },
     HistoryReplaced(Vec<Message>),
+    /// System alert that should be displayed but not added to session history
+    SystemAlert {
+        message: String,
+        level: SystemAlertLevel,
+    },
+    /// Update the thinking/loading message without adding to history
+    ThinkingUpdate {
+        message: String,
+    },
+}
+
+#[derive(Clone, Debug)]
+pub enum SystemAlertLevel {
+    Info,
+    Warning,
+    Success,
 }
 
 impl Default for Agent {
@@ -860,7 +879,8 @@ impl Agent {
             unfixed_conversation.messages(),
             None,
             session_metadata.as_ref(),
-        ).await?;
+        )
+        .await?;
 
         if compaction_check.needs_compaction {
             // Get threshold for message
@@ -869,35 +889,43 @@ impl Agent {
                 .get_param::<f64>("GOOSE_AUTO_COMPACT_THRESHOLD")
                 .unwrap_or(0.8);
             let threshold_percentage = (threshold * 100.0) as u32;
-            
-            let compaction_msg = format!(
+
+            let _compaction_msg = format!(
                 "Exceeded auto-compact threshold of {}%.\n\n",
                 threshold_percentage
             );
 
             return Ok(Box::pin(async_stream::try_stream! {
-                // Yield the initial message with keep_thinking flag to maintain spinner
-                yield AgentEvent::Message(
-                    Message::assistant()
-                        .with_text(compaction_msg)
-                        .with_keep_thinking("Compacting conversation history...")
-                );
-                
-                // Now do the actual compaction (thinking spinner stays active)
+                // Send system alert about compaction starting
+                yield AgentEvent::SystemAlert {
+                    message: format!("Exceeded auto-compact threshold of {}%. Compacting conversation history...", threshold_percentage),
+                    level: SystemAlertLevel::Info,
+                };
+
+                // Send thinking update
+                yield AgentEvent::ThinkingUpdate {
+                    message: "Compacting conversation history...".to_string(),
+                };
+
+                // Now do the actual compaction
                 let compact_result = crate::context_mgmt::auto_compact::check_and_compact_messages(
                     self,
                     unfixed_conversation.messages(),
                     None,
                     session_metadata.as_ref(),
                 ).await?;
-                
-                // Yield completion message (without keep_thinking, so spinner stops)
-                yield AgentEvent::Message(
-                    Message::assistant()
-                        .with_text("Auto-compaction complete!\n\n".to_string())
-                        .with_keep_thinking("Processing your request...")
-                );
-                
+
+                // Send success alert
+                yield AgentEvent::SystemAlert {
+                    message: "Auto-compaction complete!".to_string(),
+                    level: SystemAlertLevel::Success,
+                };
+
+                // Update thinking message
+                yield AgentEvent::ThinkingUpdate {
+                    message: "Processing your request...".to_string(),
+                };
+
                 // Yield history replacement with compacted messages
                 yield AgentEvent::HistoryReplaced(compact_result.messages.messages().clone());
 
@@ -910,8 +938,11 @@ impl Agent {
         }
 
         // No compaction needed, proceed with normal processing
-        let context = self.prepare_reply_context(unfixed_conversation, &session).await?;
-        self.reply_internal(context.messages, session, cancel_token).await
+        let context = self
+            .prepare_reply_context(unfixed_conversation, &session)
+            .await?;
+        self.reply_internal(context.messages, session, cancel_token)
+            .await
     }
 
     /// Main reply method that handles the actual agent processing
@@ -1158,7 +1189,7 @@ impl Agent {
                                     .with_text("Context length exceeded. Summarizing context...")
                                     .with_keep_thinking("Summarizing conversation history...")
                             );
-                            
+
                             // Perform summarization
                             match self.summarize_context(messages.messages()).await {
                                 Ok((summarized_messages, _, _)) => {
@@ -1168,13 +1199,13 @@ impl Agent {
                                             .with_text("Context summarized. Continuing with your request.\n\n")
                                             .with_keep_thinking("Processing your request...")
                                     );
-                                    
+
                                     // Replace history with summarized messages
                                     yield AgentEvent::HistoryReplaced(summarized_messages.messages().clone());
-                                    
+
                                     // Update the messages for the next iteration
                                     messages = summarized_messages;
-                                    
+
                                     // Continue the loop instead of breaking
                                     continue;
                                 }

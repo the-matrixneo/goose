@@ -2,6 +2,8 @@ import GooseLogo from './GooseLogo';
 import AnimatedIcons from './AnimatedIcons';
 import FlyingBird from './FlyingBird';
 import { ChatState } from '../types/chatState';
+import { getThinkingMessage } from '../utils/thinkingMessages';
+import { useEffect, useState } from 'react';
 
 interface LoadingGooseProps {
   message?: string;
@@ -9,11 +11,20 @@ interface LoadingGooseProps {
 }
 
 const LoadingGoose = ({ message, chatState = ChatState.Idle }: LoadingGooseProps) => {
+  const [thinkingMessage, setThinkingMessage] = useState<string>('goose is thinking…');
+
+  useEffect(() => {
+    // Load thinking message asynchronously
+    if (chatState === ChatState.Thinking && !message) {
+      getThinkingMessage().then((msg) => setThinkingMessage(`goose is ${msg}`));
+    }
+  }, [chatState, message]);
+
   // Determine the appropriate message based on state
   const getLoadingMessage = () => {
     if (message) return message; // Custom message takes priority
 
-    if (chatState === ChatState.Thinking) return 'goose is thinking…';
+    if (chatState === ChatState.Thinking) return thinkingMessage;
     if (chatState === ChatState.Streaming) return 'goose is working on it…';
     if (chatState === ChatState.WaitingForUserInput) return 'goose is waiting…';
 

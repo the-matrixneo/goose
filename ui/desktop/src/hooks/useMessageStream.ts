@@ -45,6 +45,8 @@ type MessageEvent =
   | { type: 'Error'; error: string }
   | { type: 'Finish'; reason: string }
   | { type: 'ModelChange'; model: string; mode: string }
+  | { type: 'SystemAlert'; message: string; level: string }
+  | { type: 'ThinkingUpdate'; message: string }
   | NotificationEvent;
 
 export interface UseMessageStreamOptions {
@@ -282,8 +284,15 @@ export function useMessageStream({
 
                 switch (parsedEvent.type) {
                   case 'Message': {
-                    // Transition from waiting to streaming on first message
-                    mutateChatState(ChatState.Streaming);
+                    // Check if this message has keepThinking flag
+                    const hasKeepThinking =
+                      parsedEvent.message.keepThinking !== null &&
+                      parsedEvent.message.keepThinking !== undefined;
+
+                    // Only transition from thinking to streaming if no keepThinking flag
+                    if (!hasKeepThinking && mutateChatState) {
+                      mutateChatState(ChatState.Streaming);
+                    }
 
                     // Create a new message object with the properties preserved or defaulted
                     const newMessage = {
@@ -343,6 +352,21 @@ export function useMessageStream({
                       mode: parsedEvent.mode,
                     };
                     setCurrentModelInfo(modelInfo);
+                    break;
+                  }
+
+                  case 'SystemAlert': {
+                    // Log system alerts to console - they don't get added to messages
+                    console.log(`[System Alert - ${parsedEvent.level}] ${parsedEvent.message}`);
+                    // Could also show a toast notification here if desired
+                    break;
+                  }
+
+                  case 'ThinkingUpdate': {
+                    // Update the thinking message in the UI
+                    // This would typically update a loading indicator or status message
+                    console.log(`[Thinking] ${parsedEvent.message}`);
+                    // Could update a state variable here to show in the UI
                     break;
                   }
 
