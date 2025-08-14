@@ -890,11 +890,6 @@ impl Agent {
                 .unwrap_or(0.8);
             let threshold_percentage = (threshold * 100.0) as u32;
 
-            let _compaction_msg = format!(
-                "Exceeded auto-compact threshold of {}%.\n\n",
-                threshold_percentage
-            );
-
             return Ok(Box::pin(async_stream::try_stream! {
                 // Send system alert about compaction starting
                 yield AgentEvent::SystemAlert {
