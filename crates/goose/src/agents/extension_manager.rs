@@ -115,18 +115,15 @@ async fn child_process_client(
     #[cfg(unix)]
     command.process_group(0);
 
-    // Extract the command name for better error messages
     let cmd_name = command.as_std().get_program().to_string_lossy().to_string();
-
     let (transport, mut stderr) = TokioChildProcess::builder(command)
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|e| {
-            // Check if it's a "command not found" error
+        .map_err(|e| {            
             if e.kind() == std::io::ErrorKind::NotFound {
                 ExtensionError::SetupError(format!(
-                    "Command '{}' not found. Please ensure it is installed and available in PATH. Original error: {}",
-                    cmd_name, e
+                    "Command '{}' not found. Please ensure it is installed and available in PATH.",
+                    cmd_name
                 ))
             } else {
                 ExtensionError::IoError(e)
