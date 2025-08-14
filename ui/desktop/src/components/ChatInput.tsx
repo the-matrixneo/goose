@@ -103,7 +103,7 @@ export default function ChatInput({
   const [displayValue, setDisplayValue] = useState(initialValue); // For immediate visual feedback
   const [isFocused, setIsFocused] = useState(false);
   const [pastedImages, setPastedImages] = useState<PastedImage[]>([]);
-  const [queuedMessage, setQueuedMessage] = useState(''); // Single queued message
+  const [queuedMessage, setQueuedMessage] = useState('');
 
   // Derived state - chatState != Idle means we're in some form of loading state
   const isLoading = chatState !== ChatState.Idle;
@@ -964,11 +964,10 @@ export default function ChatInput({
   const isAnyImageLoading = pastedImages.some((img) => img.isLoading);
   const isAnyDroppedFileLoading = allDroppedFiles.some((file) => file.isLoading);
 
-  // Submit queued message when loading ends
   const wasLoadingRef = useRef(isLoading);
   useEffect(() => {
     if (wasLoadingRef.current && !isLoading && queuedMessage) {
-      // Submit the queued message directly
+      // submit the queued message directly when ready
       LocalMessageStorage.addMessage(queuedMessage);
       handleSubmit(
         new CustomEvent('submit', {
@@ -976,14 +975,13 @@ export default function ChatInput({
         }) as unknown as React.FormEvent
       );
 
-      // Clear everything
       setQueuedMessage('');
       setDisplayValue('');
       setValue('');
     }
     wasLoadingRef.current = isLoading;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoading]); // Only react to isLoading changes
+  }, [isLoading]);
 
   return (
     <div
