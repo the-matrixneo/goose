@@ -837,8 +837,6 @@ impl Agent {
         }
     }
 
-
-
     #[instrument(skip(self, unfixed_conversation, session), fields(user_message))]
     pub async fn reply(
         &self,
