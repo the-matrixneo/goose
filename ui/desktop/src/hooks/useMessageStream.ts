@@ -172,6 +172,12 @@ export interface UseMessageStreamHelpers {
 
   /** Clear error state */
   setError: (error: Error | undefined) => void;
+
+  /** System alerts from the backend */
+  systemAlerts: Array<{ message: string; level: string; timestamp: number }>;
+
+  /** Current thinking message from the backend */
+  thinkingMessage: string | null;
 }
 
 /**
@@ -204,6 +210,10 @@ export function useMessageStream({
     null
   );
   const [sessionMetadata, setSessionMetadata] = useState<SessionMetadata | null>(null);
+  const [systemAlerts, setSystemAlerts] = useState<
+    Array<{ message: string; level: string; timestamp: number }>
+  >([]);
+  const [thinkingMessage, setThinkingMessage] = useState<string | null>(null);
 
   // expose a way to update the body so we can update the session id when CLE occurs
   const updateMessageStreamBody = useCallback((newBody: object) => {
@@ -356,17 +366,21 @@ export function useMessageStream({
                   }
 
                   case 'SystemAlert': {
-                    // Log system alerts to console - they don't get added to messages
+                    // Add system alert to state
+                    const alert = {
+                      message: parsedEvent.message,
+                      level: parsedEvent.level,
+                      timestamp: Date.now(),
+                    };
+                    setSystemAlerts((prev) => [...prev, alert]);
                     console.log(`[System Alert - ${parsedEvent.level}] ${parsedEvent.message}`);
-                    // Could also show a toast notification here if desired
                     break;
                   }
 
                   case 'ThinkingUpdate': {
-                    // Update the thinking message in the UI
-                    // This would typically update a loading indicator or status message
+                    // Update the thinking message state
+                    setThinkingMessage(parsedEvent.message);
                     console.log(`[Thinking] ${parsedEvent.message}`);
-                    // Could update a state variable here to show in the UI
                     break;
                   }
 
@@ -726,5 +740,7 @@ export function useMessageStream({
     currentModelInfo,
     sessionMetadata,
     setError,
+    systemAlerts,
+    thinkingMessage,
   };
 }
