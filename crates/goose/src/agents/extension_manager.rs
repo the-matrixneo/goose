@@ -119,7 +119,7 @@ async fn child_process_client(
     let (transport, mut stderr) = TokioChildProcess::builder(command)
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|e| {            
+        .map_err(|e| {
             if e.kind() == std::io::ErrorKind::NotFound {
                 ExtensionError::SetupError(format!(
                     "Command '{}' not found. Please ensure it is installed and available in PATH.",
