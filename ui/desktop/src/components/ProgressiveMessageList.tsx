@@ -66,8 +66,10 @@ export default function ProgressiveMessageList({
   const [displayedAlerts, setDisplayedAlerts] = useState<Set<number>>(new Set());
   const timeoutRef = useRef<number | null>(null);
   const mountedRef = useRef(true);
-  const hasOnlyToolResponses = (message: Message) =>
-    message.content.every((c) => c.type === 'toolResponse');
+  const hasOnlyToolResponses = useCallback(
+    (message: Message) => message.content.every((c) => c.type === 'toolResponse'),
+    []
+  );
 
   // Try to use context manager, but don't require it for session history
   let hasContextHandlerContent: ((message: Message) => boolean) | undefined;
@@ -172,14 +174,14 @@ export default function ProgressiveMessageList({
   // Track which alerts have been displayed to avoid duplicates and trigger scroll
   useEffect(() => {
     if (systemAlerts.length > 0) {
-      const newAlerts = systemAlerts.filter(alert => !displayedAlerts.has(alert.timestamp));
+      const newAlerts = systemAlerts.filter((alert) => !displayedAlerts.has(alert.timestamp));
       if (newAlerts.length > 0) {
-        setDisplayedAlerts(prev => {
+        setDisplayedAlerts((prev) => {
           const updated = new Set(prev);
-          newAlerts.forEach(alert => updated.add(alert.timestamp));
+          newAlerts.forEach((alert) => updated.add(alert.timestamp));
           return updated;
         });
-        
+
         // Ensure scroll happens after DOM updates and animations
         // Use multiple techniques to ensure reliable scrolling
         const scrollToBottom = () => {
@@ -193,12 +195,12 @@ export default function ProgressiveMessageList({
             }
           });
         };
-        
+
         // Initial scroll attempt
         requestAnimationFrame(() => {
           setTimeout(scrollToBottom, 50);
         });
-        
+
         // Backup scroll attempt after animation completes
         setTimeout(scrollToBottom, 350);
       }
@@ -209,14 +211,16 @@ export default function ProgressiveMessageList({
   const renderMessages = useCallback(() => {
     const messagesToRender = messages.slice(0, renderedCount);
     const renderedElements: React.ReactNode[] = [];
-    
+
     // Add system alerts that should appear before the first message
-    const alertsBeforeMessages = systemAlerts.filter(alert => {
+    const alertsBeforeMessages = systemAlerts.filter((alert) => {
       // Show alerts that came before the first message or if there are no messages
-      return messagesToRender.length === 0 || 
-             (messagesToRender[0].created && alert.timestamp < messagesToRender[0].created * 1000);
+      return (
+        messagesToRender.length === 0 ||
+        (messagesToRender[0].created && alert.timestamp < messagesToRender[0].created * 1000)
+      );
     });
-    
+
     alertsBeforeMessages.forEach((alert, idx) => {
       renderedElements.push(
         <div key={`alert-before-${alert.timestamp}-${idx}`} className="mt-4">
@@ -232,9 +236,9 @@ export default function ProgressiveMessageList({
     messagesToRender.forEach((message, index) => {
       // Check for alerts that should appear between this message and the next
       const nextMessage = messagesToRender[index + 1];
-      const alertsBetween = systemAlerts.filter(alert => {
-        const afterCurrent = alert.timestamp >= (message.created * 1000);
-        const beforeNext = !nextMessage || alert.timestamp < (nextMessage.created * 1000);
+      const alertsBetween = systemAlerts.filter((alert) => {
+        const afterCurrent = alert.timestamp >= message.created * 1000;
+        const beforeNext = !nextMessage || alert.timestamp < nextMessage.created * 1000;
         return afterCurrent && beforeNext;
       });
 
@@ -311,10 +315,10 @@ export default function ProgressiveMessageList({
             )}
           </div>
         );
-        
+
         renderedElements.push(messageElement);
       }
-      
+
       // Add alerts that come after this message
       alertsBetween.forEach((alert, idx) => {
         renderedElements.push(
