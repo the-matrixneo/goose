@@ -134,9 +134,9 @@ export default function MCPUIResourceRenderer({ content }: MCPUIResourceRenderer
               throw new Error(data.error || 'Tool execution failed');
             }
           } catch (error) {
-            toast.error(
-              `Failed to execute tool: ${error instanceof Error ? error.message : String(error)}`
-            );
+            // toast.error(
+            //   `Failed to execute tool: ${error instanceof Error ? error.message : String(error)}`
+            // );
             console.error(error);
           }
           break;
@@ -152,12 +152,13 @@ export default function MCPUIResourceRenderer({ content }: MCPUIResourceRenderer
   );
 
   return (
-    <div className="mt-3 p-1 border border-borderSubtle rounded-lg bg-background-muted">
+    <div className="p-1 border border-borderSubtle rounded-lg bg-background-muted">
       <div className="overflow-hidden rounded-sm">
         <UIResourceRenderer
           resource={content.resource}
           onUIAction={handleUIAction}
           htmlProps={{
+            style: { height: '400px', minHeight: 0 },
             autoResizeIframe: {
               height: true,
               width: false, // set to false to allow for responsive design
