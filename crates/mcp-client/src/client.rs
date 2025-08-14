@@ -1,3 +1,4 @@
+use rmcp::model::JsonObject;
 use rmcp::{
     model::{
         CallToolRequest, CallToolRequestParam, CallToolResult, CancelledNotification,
@@ -50,7 +51,7 @@ pub trait McpClientTrait: Send + Sync {
     async fn call_tool(
         &self,
         name: &str,
-        arguments: Value,
+        arguments: JsonObject,
         cancel_token: CancellationToken,
     ) -> Result<CallToolResult, Error>;
 
@@ -302,19 +303,15 @@ impl McpClientTrait for McpClient {
     async fn call_tool(
         &self,
         name: &str,
-        arguments: Value,
+        arguments: JsonObject,
         cancel_token: CancellationToken,
     ) -> Result<CallToolResult, Error> {
-        let arguments = match arguments {
-            Value::Object(map) => Some(map),
-            _ => None,
-        };
         let res = self
             .send_request(
                 ClientRequest::CallToolRequest(CallToolRequest {
                     params: CallToolRequestParam {
                         name: name.to_string().into(),
-                        arguments,
+                        arguments: Some(arguments),
                     },
                     method: Default::default(),
                     extensions: Default::default(),

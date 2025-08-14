@@ -6,13 +6,13 @@ use crate::agents::subagent_execution_tool::{
     tasks_manager::TasksManager,
 };
 use crate::agents::subagent_task_config::TaskConfig;
-use rmcp::model::ServerNotification;
+use rmcp::model::{JsonObject, ServerNotification};
 use serde_json::{json, Value};
 use tokio::sync::mpsc::Sender;
 use tokio_util::sync::CancellationToken;
 
 pub async fn execute_tasks(
-    input: Value,
+    input: JsonObject,
     execution_mode: ExecutionMode,
     notifier: Sender<ServerNotification>,
     task_config: TaskConfig,

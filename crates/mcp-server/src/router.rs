@@ -14,9 +14,9 @@ use mcp_core::{
     },
 };
 use rmcp::model::{
-    Content, ErrorData, GetPromptResult, JsonRpcMessage, JsonRpcRequest, JsonRpcResponse,
-    JsonRpcVersion2_0, Prompt, PromptMessage, PromptMessageRole, RequestId, Resource,
-    ResourceContents,
+    Content, ErrorData, GetPromptResult, JsonObject, JsonRpcMessage, JsonRpcRequest,
+    JsonRpcResponse, JsonRpcVersion2_0, Prompt, PromptMessage, PromptMessageRole, RequestId,
+    Resource, ResourceContents,
 };
 use serde_json::Value;
 use tokio::sync::mpsc;
@@ -91,7 +91,7 @@ pub trait Router: Send + Sync + 'static {
     fn call_tool(
         &self,
         tool_name: &str,
-        arguments: Value,
+        arguments: JsonObject,
         notifier: mpsc::Sender<JsonRpcMessage>,
     ) -> Pin<Box<dyn Future<Output = Result<Vec<Content>, ErrorData>> + Send + 'static>>;
     fn list_resources(&self) -> Vec<Resource>;
@@ -180,7 +180,11 @@ pub trait Router: Send + Sync + 'static {
                 .and_then(Value::as_str)
                 .ok_or_else(|| RouterError::InvalidParams("Missing tool name".into()))?;
 
-            let arguments = params.get("arguments").cloned().unwrap_or(Value::Null);
+            let arguments = params
+                .get("arguments")
+                .and_then(|v| v.as_object())
+                .cloned()
+                .unwrap_or_else(JsonObject::new);
 
             let result = match self.call_tool(name, arguments, notifier).await {
                 Ok(result) => CallToolResult {

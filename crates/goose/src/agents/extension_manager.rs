@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 use futures::stream::{FuturesUnordered, StreamExt};
 use futures::{future, FutureExt};
 use mcp_core::handler::require_str_parameter;
-use mcp_core::ToolCall;
+use rmcp::model::{CallToolRequestParam, JsonObject};
 use rmcp::service::ClientInitializeError;
 use rmcp::transport::streamable_http_client::StreamableHttpClientTransportConfig;
 use rmcp::transport::{
@@ -537,7 +537,7 @@ impl ExtensionManager {
     // Function that gets executed for read_resource tool
     pub async fn read_resource(
         &self,
-        params: Value,
+        params: JsonObject,
         cancellation_token: CancellationToken,
     ) -> Result<Vec<Content>, ErrorData> {
         let uri = require_str_parameter(&params, "uri")?;
@@ -673,7 +673,7 @@ impl ExtensionManager {
 
     pub async fn list_resources(
         &self,
-        params: Value,
+        params: JsonObject,
         cancellation_token: CancellationToken,
     ) -> Result<Vec<Content>, ErrorData> {
         let extension = params.get("extension").and_then(|v| v.as_str());
@@ -730,7 +730,7 @@ impl ExtensionManager {
 
     pub async fn dispatch_tool_call(
         &self,
-        tool_call: ToolCall,
+        tool_call: CallToolRequestParam,
         cancellation_token: CancellationToken,
     ) -> Result<ToolCallResult> {
         // Dispatch tool call based on the prefix naming convention
@@ -748,7 +748,7 @@ impl ExtensionManager {
             })?
             .to_string();
 
-        let arguments = tool_call.arguments.clone();
+        let arguments = tool_call.arguments.clone().unwrap_or_default();
         let client = client.clone();
         let notifications_receiver = client.lock().await.subscribe().await;
 
@@ -1089,7 +1089,7 @@ mod tests {
         );
 
         // verify a normal tool call
-        let tool_call = ToolCall {
+        let tool_call = CallToolRequestParam {
             name: "test_client__tool".to_string(),
             arguments: json!({}),
         };
@@ -1099,7 +1099,7 @@ mod tests {
             .await;
         assert!(result.is_ok());
 
-        let tool_call = ToolCall {
+        let tool_call = CallToolRequestParam {
             name: "test_client__test__tool".to_string(),
             arguments: json!({}),
         };
@@ -1110,7 +1110,7 @@ mod tests {
         assert!(result.is_ok());
 
         // verify a multiple underscores dispatch
-        let tool_call = ToolCall {
+        let tool_call = CallToolRequestParam {
             name: "__cli__ent____tool".to_string(),
             arguments: json!({}),
         };
@@ -1121,7 +1121,7 @@ mod tests {
         assert!(result.is_ok());
 
         // Test unicode in tool name, "client 🚀" should become "client_"
-        let tool_call = ToolCall {
+        let tool_call = CallToolRequestParam {
             name: "client___tool".to_string(),
             arguments: json!({}),
         };
@@ -1131,7 +1131,7 @@ mod tests {
             .await;
         assert!(result.is_ok());
 
-        let tool_call = ToolCall {
+        let tool_call = CallToolRequestParam {
             name: "client___test__tool".to_string(),
             arguments: json!({}),
         };
@@ -1142,7 +1142,7 @@ mod tests {
         assert!(result.is_ok());
 
         // this should error out, specifically for an ToolError::ExecutionError
-        let invalid_tool_call = ToolCall {
+        let invalid_tool_call = CallToolRequestParam {
             name: "client___tools".to_string(),
             arguments: json!({}),
         };
@@ -1163,7 +1163,7 @@ mod tests {
 
         // this should error out, specifically with an ToolError::NotFound
         // this client doesn't exist
-        let invalid_tool_call = ToolCall {
+        let invalid_tool_call = CallToolRequestParam {
             name: "_client__tools".to_string(),
             arguments: json!({}),
         };

@@ -4,11 +4,10 @@ use mcp_core::protocol::ServerCapabilities;
 use mcp_server::router::{CapabilitiesBuilder, RouterService};
 use mcp_server::{ByteTransport, Router, Server};
 use rmcp::model::{
-    Content, ErrorCode, ErrorData, JsonRpcMessage, Prompt, PromptArgument, RawResource, Resource,
-    Tool, ToolAnnotations,
+    Content, ErrorCode, ErrorData, JsonObject, JsonRpcMessage, Prompt, PromptArgument, RawResource,
+    Resource, Tool, ToolAnnotations,
 };
 use rmcp::object;
-use serde_json::Value;
 use std::borrow::Cow;
 use std::{future::Future, pin::Pin, sync::Arc};
 use tokio::sync::mpsc;
@@ -127,7 +126,7 @@ impl Router for CounterRouter {
     fn call_tool(
         &self,
         tool_name: &str,
-        _arguments: Value,
+        _arguments: JsonObject,
         _notifier: mpsc::Sender<JsonRpcMessage>,
     ) -> Pin<Box<dyn Future<Output = Result<Vec<Content>, ErrorData>> + Send + 'static>> {
         let this = self.clone();

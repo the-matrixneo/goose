@@ -362,7 +362,7 @@ pub fn debug_conversation_fix(
 mod tests {
     use crate::conversation::message::Message;
     use crate::conversation::{debug_conversation_fix, fix_conversation, Conversation};
-    use mcp_core::tool::ToolCall;
+    use rmcp::model::CallToolRequestParam;
     use rmcp::model::Role;
     use serde_json::json;
 
@@ -392,10 +392,10 @@ mod tests {
                 .with_text("I'll help you search.")
                 .with_tool_request(
                     "search_1",
-                    Ok(ToolCall::new(
-                        "web_search",
-                        json!({"query": "rust programming"}),
-                    )),
+                    Ok(CallToolRequestParam {
+                        name: "web_search".into(),
+                        arguments: json!({"query": "rust programming"}).as_object().cloned(),
+                    }),
                 ),
             Message::user().with_tool_response("search_1", Ok(vec![])),
             Message::assistant().with_text("Based on the search results, here's what I found..."),
@@ -437,7 +437,13 @@ mod tests {
                 .with_tool_response("orphan_1", Ok(vec![])), // Wrong role
             Message::assistant().with_thinking("Let me think", "sig"),
             Message::user()
-                .with_tool_request("bad_req", Ok(ToolCall::new("search", json!({}))))
+                .with_tool_request(
+                    "bad_req",
+                    Ok(CallToolRequestParam {
+                        name: "search".into(),
+                        arguments: json!({}).as_object().cloned(),
+                    }),
+                )
                 .with_text("User with bad tool request"),
         ];
 
@@ -472,11 +478,22 @@ mod tests {
         let messages = vec![
             Message::assistant()
                 .with_text("I'll search for you")
-                .with_tool_request("search_1", Ok(ToolCall::new("search", json!({})))),
+                .with_tool_request(
+                    "search_1",
+                    Ok(CallToolRequestParam {
+                        name: "search".into(),
+                        arguments: json!({}).as_object().cloned(),
+                    }),
+                ),
             Message::user(),
             Message::user().with_tool_response("wrong_id", Ok(vec![])),
-            Message::assistant()
-                .with_tool_request("search_2", Ok(ToolCall::new("search", json!({})))),
+            Message::assistant().with_tool_request(
+                "search_2",
+                Ok(CallToolRequestParam {
+                    name: "search".into(),
+                    arguments: json!({}).as_object().cloned(),
+                }),
+            ),
         ];
 
         let (fixed, issues) = run_verify(messages);
@@ -498,10 +515,16 @@ mod tests {
             Message::user().with_text("run ls in the current directory and then run a word count on the smallest file"),
             Message::assistant()
                 .with_text("I'll help you run `ls` in the current directory and then perform a word count on the smallest file. Let me start by listing the directory contents.")
-                .with_tool_request("toolu_bdrk_018adWbP4X26CfoJU5hkhu3i", Ok(ToolCall::new("developer__shell", json!({"command": "ls -la"})))),
+                .with_tool_request("toolu_bdrk_018adWbP4X26CfoJU5hkhu3i", Ok(CallToolRequestParam { 
+                    name: "developer__shell".into(),
+                    arguments: json!({"command": "ls -la"}).as_object().cloned() 
+                })),
             Message::assistant()
                 .with_text("Now I'll identify the smallest file by size. Looking at the output, I can see that both `slack.yaml` and `subrecipes.yaml` have a size of 0 bytes, making them the smallest files. I'll run a word count on one of them:")
-                .with_tool_request("toolu_bdrk_01KgDYHs4fAodi22NqxRzmwx", Ok(ToolCall::new("developer__shell", json!({"command": "wc slack.yaml"})))),
+                .with_tool_request("toolu_bdrk_01KgDYHs4fAodi22NqxRzmwx", Ok(CallToolRequestParam { 
+                    name: "developer__shell".into(),
+                    arguments: json!({"command": "wc slack.yaml"}).as_object().cloned() 
+                })),
             Message::user()
                 .with_tool_response("toolu_bdrk_01KgDYHs4fAodi22NqxRzmwx", Ok(vec![])),
             Message::assistant()
@@ -523,7 +546,13 @@ mod tests {
             Message::user().with_text("Search for something"),
             Message::assistant()
                 .with_text("I'll search for you")
-                .with_tool_request("search_1", Ok(ToolCall::new("search", json!({})))),
+                .with_tool_request(
+                    "search_1",
+                    Ok(CallToolRequestParam {
+                        name: "search".into(),
+                        arguments: json!({}).as_object().cloned(),
+                    }),
+                ),
             Message::user().with_tool_response("search_1", Ok(vec![])),
             Message::user().with_text("Thanks!"),
         ];

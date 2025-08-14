@@ -390,7 +390,7 @@ mod tests {
     use super::*;
     use crate::conversation::message::Message;
     use anyhow::Result;
-    use mcp_core::tool::ToolCall;
+    use rmcp::model::CallToolRequestParam;
     use rmcp::model::Content;
     use serde_json::json;
 
@@ -407,7 +407,11 @@ mod tests {
     }
 
     // Helper function to create a tool request message with a specified token count
-    fn assistant_tool_request(id: &str, tool_call: ToolCall, tokens: usize) -> (Message, usize) {
+    fn assistant_tool_request(
+        id: &str,
+        tool_call: CallToolRequestParam,
+        tokens: usize,
+    ) -> (Message, usize) {
         (
             Message::assistant().with_tool_request(id, Ok(tool_call)),
             tokens,
@@ -458,7 +462,10 @@ mod tests {
             user_text(1, 10).0,
             assistant_tool_request(
                 "tool1",
-                ToolCall::new("read_file", json!({"path": "large_file.txt"})),
+                CallToolRequestParam {
+                    name: "read_file".into(),
+                    arguments: json!({"path": "large_file.txt"}).as_object().cloned(),
+                },
                 20,
             )
             .0,
@@ -520,8 +527,14 @@ mod tests {
     #[test]
     fn test_complex_conversation_with_tools() -> Result<()> {
         // Simulating a real conversation with multiple tool interactions
-        let tool_call1 = ToolCall::new("file_read", json!({"path": "/tmp/test.txt"}));
-        let tool_call2 = ToolCall::new("database_query", json!({"query": "SELECT * FROM users"}));
+        let tool_call1 = CallToolRequestParam {
+            name: "file_read".into(),
+            arguments: json!({"path": "/tmp/test.txt"}).as_object().cloned(),
+        };
+        let tool_call2 = CallToolRequestParam {
+            name: "database_query".into(),
+            arguments: json!({"query": "SELECT * FROM users"}).as_object().cloned(),
+        };
 
         let messages = vec![
             user_text(1, 15).0, // Initial user query
@@ -622,9 +635,18 @@ mod tests {
     fn test_multi_tool_chain() -> Result<()> {
         // Simulate a chain of dependent tool calls
         let tool_calls = vec![
-            ToolCall::new("git_status", json!({})),
-            ToolCall::new("git_diff", json!({"file": "main.rs"})),
-            ToolCall::new("git_commit", json!({"message": "Update"})),
+            CallToolRequestParam {
+                name: "git_status".into(),
+                arguments: json!({}).as_object().cloned(),
+            },
+            CallToolRequestParam {
+                name: "git_diff".into(),
+                arguments: json!({"file": "main.rs"}).as_object().cloned(),
+            },
+            CallToolRequestParam {
+                name: "git_commit".into(),
+                arguments: json!({"message": "Update"}).as_object().cloned(),
+            },
         ];
 
         let mut messages = Vec::new();

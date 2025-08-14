@@ -1,7 +1,7 @@
 use crate::agents::tool_execution::ToolCallResult;
 use crate::recipe::Response;
 use indoc::formatdoc;
-use mcp_core::ToolCall;
+use rmcp::model::{CallToolRequestParam, JsonObject};
 use rmcp::model::{Content, ErrorCode, ErrorData, Tool, ToolAnnotations};
 use serde_json::Value;
 use std::borrow::Cow;
@@ -92,7 +92,7 @@ impl FinalOutputTool {
         "#, serde_json::to_string_pretty(self.response.json_schema.as_ref().unwrap()).unwrap()}
     }
 
-    async fn validate_json_output(&self, output: &Value) -> Result<Value, String> {
+    async fn validate_json_output(&self, output: &JsonObject) -> Result<JsonObject, String> {
         let compiled_schema =
             match jsonschema::validator_for(self.response.json_schema.as_ref().unwrap()) {
                 Ok(schema) => schema,
@@ -102,7 +102,7 @@ impl FinalOutputTool {
             };
 
         let validation_errors: Vec<String> = compiled_schema
-            .iter_errors(output)
+            .iter_errors(&Value::Object(output.clone()))
             .map(|error| format!("- {}: {}", error.instance_path, error))
             .collect();
 
@@ -117,10 +117,12 @@ impl FinalOutputTool {
         }
     }
 
-    pub async fn execute_tool_call(&mut self, tool_call: ToolCall) -> ToolCallResult {
-        match tool_call.name.as_str() {
+    pub async fn execute_tool_call(&mut self, tool_call: CallToolRequestParam) -> ToolCallResult {
+        match tool_call.name.as_ref() {
             FINAL_OUTPUT_TOOL_NAME => {
-                let result = self.validate_json_output(&tool_call.arguments).await;
+                let result = self
+                    .validate_json_output(&tool_call.arguments.unwrap_or_default())
+                    .await;
                 match result {
                     Ok(parsed_value) => {
                         self.final_output = Some(Self::parsed_final_output_string(parsed_value));
@@ -144,7 +146,7 @@ impl FinalOutputTool {
     }
 
     // Formats the parsed JSON as a single line string so its easy to extract from the output
-    fn parsed_final_output_string(parsed_json: Value) -> String {
+    fn parsed_final_output_string(parsed_json: JsonObject) -> String {
         serde_json::to_string(&parsed_json).unwrap()
     }
 }
@@ -226,7 +228,7 @@ mod tests {
         };
 
         let mut tool = FinalOutputTool::new(response);
-        let tool_call = ToolCall {
+        let tool_call = CallToolRequestParam {
             name: FINAL_OUTPUT_TOOL_NAME.to_string(),
             arguments: json!({
                 "message": "Hello"  // Missing required "count" field
@@ -248,7 +250,7 @@ mod tests {
         };
 
         let mut tool = FinalOutputTool::new(response);
-        let tool_call = ToolCall {
+        let tool_call = CallToolRequestParam {
             name: FINAL_OUTPUT_TOOL_NAME.to_string(),
             arguments: json!({
                 "user": {

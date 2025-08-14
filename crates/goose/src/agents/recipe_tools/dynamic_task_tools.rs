@@ -5,7 +5,7 @@
 use crate::agents::subagent_execution_tool::tasks_manager::TasksManager;
 use crate::agents::subagent_execution_tool::{lib::ExecutionMode, task_types::Task};
 use crate::agents::tool_execution::ToolCallResult;
-use rmcp::model::{Content, ErrorCode, ErrorData, Tool, ToolAnnotations};
+use rmcp::model::{Content, ErrorCode, ErrorData, JsonObject, Tool, ToolAnnotations};
 use rmcp::object;
 use serde_json::{json, Value};
 use std::borrow::Cow;
@@ -67,7 +67,7 @@ pub fn create_dynamic_task_tool() -> Tool {
     })
 }
 
-fn extract_task_parameters(params: &Value) -> Vec<Value> {
+fn extract_task_parameters(params: &JsonObject) -> Vec<Value> {
     params
         .get("task_parameters")
         .and_then(|v| v.as_array())
@@ -106,7 +106,10 @@ fn create_task_execution_payload(tasks: Vec<Task>, execution_mode: ExecutionMode
     })
 }
 
-pub async fn create_dynamic_task(params: Value, tasks_manager: &TasksManager) -> ToolCallResult {
+pub async fn create_dynamic_task(
+    params: JsonObject,
+    tasks_manager: &TasksManager,
+) -> ToolCallResult {
     let task_params_array = extract_task_parameters(&params);
 
     if task_params_array.is_empty() {

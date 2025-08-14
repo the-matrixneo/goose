@@ -1,7 +1,8 @@
 use std::borrow::Cow;
 
-use rmcp::model::{Content, ErrorCode, ErrorData, ServerNotification, Tool, ToolAnnotations};
-use serde_json::Value;
+use rmcp::model::{
+    Content, ErrorCode, ErrorData, JsonObject, ServerNotification, Tool, ToolAnnotations,
+};
 
 use crate::agents::subagent_task_config::TaskConfig;
 use crate::agents::{
@@ -62,7 +63,7 @@ pub fn create_subagent_execute_task_tool() -> Tool {
 }
 
 pub async fn run_tasks(
-    execute_data: Value,
+    execute_data: JsonObject,
     task_config: TaskConfig,
     tasks_manager: &TasksManager,
     cancellation_token: Option<CancellationToken>,
@@ -78,7 +79,7 @@ pub async fn run_tasks(
             .unwrap_or_default();
 
         match execute_tasks(
-            execute_data,
+            execute_data_clone,
             execution_mode,
             notification_tx,
             task_config,

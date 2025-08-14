@@ -112,13 +112,16 @@ mod tests {
     }
 
     // A simple function to help us test missing or partial data
-    fn build_context(name: Option<&str>, age: Option<u32>) -> HashMap<String, serde_json::Value> {
+    fn build_context(
+        name: Option<&str>,
+        age: Option<u32>,
+    ) -> HashMap<String, serde_json::JsonObject> {
         let mut ctx = HashMap::new();
         if let Some(n) = name {
-            ctx.insert("name".to_string(), json!(n));
+            ctx.insert("name".to_string(), MJValue::from(n));
         }
         if let Some(a) = age {
-            ctx.insert("age".to_string(), json!(a));
+            ctx.insert("age".to_string(), MJValue::from(a));
         }
         ctx
     }

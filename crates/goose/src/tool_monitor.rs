@@ -1,26 +1,10 @@
-use serde::{Deserialize, Serialize};
+use rmcp::model::CallToolRequestParam;
 use std::collections::HashMap;
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ToolCall {
-    name: String,
-    parameters: serde_json::Value,
-}
-
-impl ToolCall {
-    pub fn new(name: String, parameters: serde_json::Value) -> Self {
-        Self { name, parameters }
-    }
-
-    fn matches(&self, other: &ToolCall) -> bool {
-        self.name == other.name && self.parameters == other.parameters
-    }
-}
 
 #[derive(Debug)]
 pub struct ToolMonitor {
     max_repetitions: Option<u32>,
-    last_call: Option<ToolCall>,
+    last_call: Option<CallToolRequestParam>,
     repeat_count: u32,
     call_counts: HashMap<String, u32>,
 }
@@ -35,8 +19,11 @@ impl ToolMonitor {
         }
     }
 
-    pub fn check_tool_call(&mut self, tool_call: ToolCall) -> bool {
-        let total_calls = self.call_counts.entry(tool_call.name.clone()).or_insert(0);
+    pub fn check_tool_call(&mut self, tool_call: CallToolRequestParam) -> bool {
+        let total_calls = self
+            .call_counts
+            .entry(tool_call.name.to_string())
+            .or_insert(0);
         *total_calls += 1;
 
         if self.max_repetitions.is_none() {

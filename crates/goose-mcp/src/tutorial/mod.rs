@@ -8,10 +8,10 @@ use mcp_core::{
 use mcp_server::router::CapabilitiesBuilder;
 use mcp_server::Router;
 use rmcp::model::{
-    Content, ErrorCode, ErrorData, JsonRpcMessage, Prompt, Resource, Role, Tool, ToolAnnotations,
+    Content, ErrorCode, ErrorData, JsonObject, JsonRpcMessage, Prompt, Resource, Role, Tool,
+    ToolAnnotations,
 };
 use rmcp::object;
-use serde_json::Value;
 use std::{future::Future, pin::Pin};
 use tokio::sync::mpsc;
 
@@ -125,7 +125,7 @@ impl Router for TutorialRouter {
     fn call_tool(
         &self,
         tool_name: &str,
-        arguments: Value,
+        arguments: JsonObject,
         _notifier: mpsc::Sender<JsonRpcMessage>,
     ) -> Pin<Box<dyn Future<Output = Result<Vec<Content>, ErrorData>> + Send + 'static>> {
         let this = self.clone();

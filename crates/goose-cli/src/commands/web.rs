@@ -50,7 +50,7 @@ enum WebSocketMessage {
     ToolRequest {
         id: String,
         tool_name: String,
-        arguments: serde_json::Value,
+        arguments: JsonObject,
     },
     #[serde(rename = "tool_response")]
     ToolResponse {
@@ -62,7 +62,7 @@ enum WebSocketMessage {
     ToolConfirmation {
         id: String,
         tool_name: String,
-        arguments: serde_json::Value,
+        arguments: JsonObject,
         needs_confirmation: bool,
     },
     #[serde(rename = "error")]

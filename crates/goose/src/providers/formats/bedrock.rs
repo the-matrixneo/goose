@@ -7,7 +7,8 @@ use aws_sdk_bedrockruntime::types as bedrock;
 use aws_smithy_types::{Document, Number};
 use base64::Engine;
 use chrono::Utc;
-use mcp_core::{ToolCall, ToolResult};
+use mcp_core::ToolResult;
+use rmcp::model::{CallToolRequestParam, JsonObject};
 use rmcp::model::{Content, ErrorCode, ErrorData, RawContent, ResourceContents, Role, Tool};
 use serde_json::Value;
 
@@ -57,7 +58,7 @@ pub fn to_bedrock_message_content(content: &MessageContent) -> Result<bedrock::C
                 bedrock::ToolUseBlock::builder()
                     .tool_use_id(tool_use_id)
                     .name(call.name.to_string())
-                    .input(to_bedrock_json(&call.arguments))
+                    .input(to_bedrock_json(&call.arguments.clone().unwrap_or_default()))
                     .build()
             } else {
                 bedrock::ToolUseBlock::builder()
@@ -72,7 +73,7 @@ pub fn to_bedrock_message_content(content: &MessageContent) -> Result<bedrock::C
                 bedrock::ToolUseBlock::builder()
                     .tool_use_id(tool_use_id)
                     .name(call.name.to_string())
-                    .input(to_bedrock_json(&call.arguments))
+                    .input(to_bedrock_json(&call.arguments.clone().unwrap_or_default()))
                     .build()
             } else {
                 bedrock::ToolUseBlock::builder()
@@ -192,34 +193,44 @@ pub fn to_bedrock_tool(tool: &Tool) -> Result<bedrock::Tool> {
                     .unwrap_or_default(),
             )
             .input_schema(bedrock::ToolInputSchema::Json(to_bedrock_json(
-                &Value::Object(tool.input_schema.as_ref().clone()),
+                tool.input_schema.as_ref(),
             )))
             .build()?,
     ))
 }
 
-pub fn to_bedrock_json(value: &Value) -> Document {
-    match value {
-        Value::Null => Document::Null,
-        Value::Bool(bool) => Document::Bool(*bool),
-        Value::Number(num) => {
-            if let Some(n) = num.as_u64() {
-                Document::Number(Number::PosInt(n))
-            } else if let Some(n) = num.as_i64() {
-                Document::Number(Number::NegInt(n))
-            } else if let Some(n) = num.as_f64() {
-                Document::Number(Number::Float(n))
-            } else {
-                unreachable!()
+pub fn to_bedrock_json(obj: &JsonObject) -> Document {
+    fn convert(value: &Value) -> Document {
+        match value {
+            Value::Null => Document::Null,
+            Value::Bool(b) => Document::Bool(*b),
+            Value::Number(num) => {
+                if let Some(n) = num.as_u64() {
+                    Document::Number(Number::PosInt(n))
+                } else if let Some(n) = num.as_i64() {
+                    Document::Number(Number::NegInt(n))
+                } else if let Some(n) = num.as_f64() {
+                    Document::Number(Number::Float(n))
+                } else {
+                    unreachable!()
+                }
             }
+            Value::String(s) => Document::String(s.clone()),
+            Value::Array(arr) => Document::Array(arr.iter().map(convert).collect()),
+            Value::Object(inner) => Document::Object(
+                inner
+                    .iter()
+                    .map(|(k, v)| (k.clone(), convert(v)))
+                    .collect::<HashMap<String, Document>>(),
+            ),
         }
-        Value::String(str) => Document::String(str.to_string()),
-        Value::Array(arr) => Document::Array(arr.iter().map(to_bedrock_json).collect()),
-        Value::Object(obj) => Document::Object(HashMap::from_iter(
-            obj.into_iter()
-                .map(|(key, val)| (key.to_string(), to_bedrock_json(val))),
-        )),
     }
+
+    Document::Object(
+        obj.iter()
+            .map(|(k, v)| (k.clone(), convert(v)))
+            .collect::<HashMap<String, Document>>(),
+    )
 }
 
 fn to_bedrock_document(
@@ -279,10 +290,10 @@ pub fn from_bedrock_content_block(block: &bedrock::ContentBlock) -> Result<Messa
         bedrock::ContentBlock::Text(text) => MessageContent::text(text),
         bedrock::ContentBlock::ToolUse(tool_use) => MessageContent::tool_request(
             tool_use.tool_use_id.to_string(),
-            Ok(ToolCall::new(
-                tool_use.name.to_string(),
-                from_bedrock_json(&tool_use.input)?,
-            )),
+            Ok(CallToolRequestParam {
+                name: (tool_use.name.to_string()).into(),
+                arguments: from_bedrock_json(&tool_use.input)?.as_object().cloned(),
+            }),
         ),
         bedrock::ContentBlock::ToolResult(tool_res) => MessageContent::tool_response(
             tool_res.tool_use_id.to_string(),

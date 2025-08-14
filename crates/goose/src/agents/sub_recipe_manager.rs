@@ -1,6 +1,5 @@
-use rmcp::model::Tool;
 use rmcp::model::{Content, ErrorCode, ErrorData};
-use serde_json::Value;
+use rmcp::model::{JsonObject, Tool};
 use std::borrow::Cow;
 use std::collections::HashMap;
 
@@ -55,7 +54,7 @@ impl SubRecipeManager {
     pub async fn dispatch_sub_recipe_tool_call(
         &self,
         tool_name: &str,
-        params: Value,
+        params: JsonObject,
         tasks_manager: &TasksManager,
     ) -> ToolCallResult {
         let result = self
@@ -74,7 +73,7 @@ impl SubRecipeManager {
     async fn call_sub_recipe_tool(
         &self,
         tool_name: &str,
-        params: Value,
+        params: JsonObject,
         tasks_manager: &TasksManager,
     ) -> Result<Vec<Content>, ErrorData> {
         let sub_recipe = self.sub_recipes.get(tool_name).ok_or_else(|| {

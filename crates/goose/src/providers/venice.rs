@@ -12,7 +12,8 @@ use super::utils::map_http_error_to_provider_error;
 use crate::conversation::message::{Message, MessageContent};
 use crate::impl_provider_default;
 use crate::model::ModelConfig;
-use mcp_core::{ToolCall, ToolResult};
+use mcp_core::ToolResult;
+use rmcp::model::{object, CallToolRequestParam};
 use rmcp::model::{Role, Tool};
 
 // ---------- Capability Flags ----------
@@ -343,7 +344,7 @@ impl Provider for VeniceProvider {
                                     "Tool call conversion: id={}, name={}, args_len={}",
                                     tr.id,
                                     tool_call.name,
-                                    tool_call.arguments.to_string().len()
+                                    serde_json::to_string(&tool_call.arguments).unwrap_or_default().len()
                                 );
 
                                 // Convert to Venice format
@@ -352,7 +353,7 @@ impl Provider for VeniceProvider {
                                     "type": "function",
                                     "function": {
                                         "name": tool_call.name,
-                                        "arguments": tool_call.arguments.to_string()
+                                        "arguments": serde_json::to_string(&tool_call.arguments).unwrap_or_default()
                                     }
                                 }))
                             } else {
@@ -452,8 +453,11 @@ impl Provider for VeniceProvider {
                         function["arguments"].clone()
                     };
 
-                    // Create a ToolCall using the function name and arguments
-                    let tool_call = ToolCall { name, arguments };
+                    // Create a CallToolRequestParam using the function name and arguments
+                    let tool_call = CallToolRequestParam {
+                        name: name.into(),
+                        arguments: Some(object(arguments)),
+                    };
 
                     // Create a ToolRequest MessageContent
                     let tool_request = MessageContent::tool_request(id, ToolResult::Ok(tool_call));

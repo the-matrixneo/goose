@@ -10,8 +10,7 @@ use crate::config::Config;
 use crate::conversation::message::ToolRequest;
 use crate::providers::base::Provider;
 use anyhow::{anyhow, Result};
-use rmcp::model::{ErrorCode, ErrorData, Tool};
-use serde_json::Value;
+use rmcp::model::{ErrorCode, ErrorData, JsonObject, Tool};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::sync::RwLock;
@@ -50,7 +49,7 @@ impl ToolRouteManager {
 
     pub async fn dispatch_route_search_tool(
         &self,
-        arguments: Value,
+        arguments: JsonObject,
     ) -> Result<ToolCallResult, ErrorData> {
         let selector = self.router_tool_selector.lock().await.clone();
         match selector.as_ref() {

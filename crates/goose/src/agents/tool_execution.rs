@@ -60,8 +60,8 @@ impl Agent {
                 if let Ok(tool_call) = request.tool_call.clone() {
                     let confirmation = Message::user().with_tool_confirmation_request(
                         request.id.clone(),
-                        tool_call.name.clone(),
-                        tool_call.arguments.clone(),
+                        tool_call.name.to_string(),
+                        tool_call.arguments.clone().unwrap_or_default(),
                         Some("Goose would like to call the above tool. Allow? (y/n):".to_string()),
                     );
                     yield confirmation;

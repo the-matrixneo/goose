@@ -612,11 +612,9 @@ mod final_output_tool_tests {
         agent.add_final_output_tool(response).await;
 
         // Simulate a final output tool call occurring.
-        let tool_call = mcp_core::tool::ToolCall::new(
-            FINAL_OUTPUT_TOOL_NAME,
-            serde_json::json!({
+        let tool_call = mcp_core::tool::CallToolRequestParam { name: (FINAL_OUTPUT_TOOL_NAME).into(), arguments: (serde_json::json!({
                 "result": "Test output"
-            }),
+            }).as_object().cloned() },
         );
         let (_, result) = agent
             .dispatch_tool_call(tool_call, "request_id".to_string(), None)
@@ -971,7 +969,7 @@ mod max_turns_tests {
     use goose::providers::base::{Provider, ProviderMetadata, ProviderUsage, Usage};
     use goose::providers::errors::ProviderError;
     use goose::session::storage::Identifier;
-    use mcp_core::tool::ToolCall;
+    use rmcp::model::CallToolRequestParam;
     use rmcp::model::Tool;
     use std::path::PathBuf;
 
@@ -991,7 +989,7 @@ mod max_turns_tests {
             _messages: &[Message],
             _tools: &[Tool],
         ) -> Result<(Message, ProviderUsage), ProviderError> {
-            let tool_call = ToolCall::new("test_tool", serde_json::json!({"param": "value"}));
+            let tool_call = CallToolRequestParam { name: "test_tool".into(), arguments: (serde_json::json!({"param": "value"}).as_object().cloned() });
             let message = Message::assistant().with_tool_request("call_123", Ok(tool_call));
 
             let usage = ProviderUsage::new(

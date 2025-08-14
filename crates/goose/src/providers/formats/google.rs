@@ -3,8 +3,8 @@ use crate::providers::base::Usage;
 use crate::providers::errors::ProviderError;
 use crate::providers::utils::{is_valid_function_name, sanitize_function_name};
 use anyhow::Result;
-use mcp_core::ToolCall;
 use rand::{distributions::Alphanumeric, Rng};
+use rmcp::model::CallToolRequestParam;
 use rmcp::model::{AnnotateAble, ErrorCode, ErrorData, RawContent, Role, Tool};
 use std::borrow::Cow;
 
@@ -43,11 +43,13 @@ pub fn format_messages(messages: &[Message]) -> Vec<Value> {
                                 "name".to_string(),
                                 json!(sanitize_function_name(&tool_call.name)),
                             );
-                            if tool_call.arguments.is_object()
-                                && !tool_call.arguments.as_object().unwrap().is_empty()
-                            {
-                                function_call_part
-                                    .insert("args".to_string(), tool_call.arguments.clone());
+                            if let Some(args) = &tool_call.arguments {
+                                if !args.is_empty() {
+                                    function_call_part.insert(
+                                        "args".to_string(),
+                                        serde_json::Value::Object(args.clone()),
+                                    );
+                                }
                             }
                             parts.push(json!({
                                 "functionCall": function_call_part
@@ -269,7 +271,10 @@ pub fn response_to_message(response: Value) -> Result<Message> {
                 if let Some(params) = parameters {
                     content.push(MessageContent::tool_request(
                         id,
-                        Ok(ToolCall::new(&name, params.clone())),
+                        Ok(CallToolRequestParam {
+                            name: name.into(),
+                            arguments: params.clone().as_object().cloned(),
+                        }),
                     ));
                 }
             }
@@ -348,7 +353,7 @@ mod tests {
         Message::new(role, 0, vec![MessageContent::text(text.to_string())])
     }
 
-    fn set_up_tool_request_message(id: &str, tool_call: ToolCall) -> Message {
+    fn set_up_tool_request_message(id: &str, tool_call: CallToolRequestParam) -> Message {
         Message::new(
             Role::User,
             0,
@@ -356,7 +361,7 @@ mod tests {
         )
     }
 
-    fn set_up_tool_confirmation_message(id: &str, tool_call: ToolCall) -> Message {
+    fn set_up_tool_confirmation_message(id: &str, tool_call: CallToolRequestParam) -> Message {
         Message::new(
             Role::User,
             0,
@@ -415,10 +420,19 @@ mod tests {
             "param1": "value1"
         });
         let messages = vec![
-            set_up_tool_request_message("id", ToolCall::new("tool_name", arguments.clone())),
+            set_up_tool_request_message(
+                "id",
+                CallToolRequestParam {
+                    name: "tool_name".into(),
+                    arguments: arguments.clone().as_object().cloned(),
+                },
+            ),
             set_up_tool_confirmation_message(
                 "id2",
-                ToolCall::new("tool_name_2", arguments.clone()),
+                CallToolRequestParam {
+                    name: "tool_name_2".into(),
+                    arguments: arguments.clone().as_object().cloned(),
+                },
             ),
         ];
         let payload = format_messages(&messages);

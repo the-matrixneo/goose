@@ -4,10 +4,10 @@ use indoc::formatdoc;
 use mcp_core::{
     handler::{PromptError, ResourceError},
     protocol::ServerCapabilities,
-    tool::ToolCall,
 };
 use mcp_server::router::CapabilitiesBuilder;
 use mcp_server::Router;
+use rmcp::model::{CallToolRequestParam, JsonObject};
 use rmcp::model::{
     Content, ErrorCode, ErrorData, JsonRpcMessage, Prompt, Resource, Tool, ToolAnnotations,
 };
@@ -453,10 +453,17 @@ impl MemoryRouter {
         Ok(())
     }
 
-    async fn execute_tool_call(&self, tool_call: ToolCall) -> Result<String, io::Error> {
-        match tool_call.name.as_str() {
+    async fn execute_tool_call(
+        &self,
+        tool_call: CallToolRequestParam,
+    ) -> Result<String, io::Error> {
+        match tool_call.name.as_ref() {
             "remember_memory" => {
-                let args = MemoryArgs::from_value(&tool_call.arguments)?;
+                let args_value = tool_call
+                    .arguments
+                    .map(|args| serde_json::Value::Object(args))
+                    .unwrap_or(serde_json::Value::Null);
+                let args = MemoryArgs::from_value(&args_value)?;
                 let data = args.data.filter(|d| !d.is_empty()).ok_or_else(|| {
                     io::Error::new(
                         io::ErrorKind::InvalidInput,
@@ -467,7 +474,11 @@ impl MemoryRouter {
                 Ok(format!("Stored memory in category: {}", args.category))
             }
             "retrieve_memories" => {
-                let args = MemoryArgs::from_value(&tool_call.arguments)?;
+                let args_value = tool_call
+                    .arguments
+                    .map(|args| serde_json::Value::Object(args))
+                    .unwrap_or(serde_json::Value::Null);
+                let args = MemoryArgs::from_value(&args_value)?;
                 let memories = if args.category == "*" {
                     self.retrieve_all(args.is_global)?
                 } else {
@@ -476,7 +487,11 @@ impl MemoryRouter {
                 Ok(format!("Retrieved memories: {:?}", memories))
             }
             "remove_memory_category" => {
-                let args = MemoryArgs::from_value(&tool_call.arguments)?;
+                let args_value = tool_call
+                    .arguments
+                    .map(|args| serde_json::Value::Object(args))
+                    .unwrap_or(serde_json::Value::Null);
+                let args = MemoryArgs::from_value(&args_value)?;
                 if args.category == "*" {
                     self.clear_all_global_or_local_memories(args.is_global)?;
                     Ok(format!(
@@ -489,8 +504,12 @@ impl MemoryRouter {
                 }
             }
             "remove_specific_memory" => {
-                let args = MemoryArgs::from_value(&tool_call.arguments)?;
-                let memory_content = tool_call.arguments["memory_content"].as_str().unwrap();
+                let args_value = tool_call
+                    .arguments
+                    .map(|args| serde_json::Value::Object(args))
+                    .unwrap_or(serde_json::Value::Null);
+                let args = MemoryArgs::from_value(&args_value)?;
+                let memory_content = args_value["memory_content"].as_str().unwrap();
                 self.remove_specific_memory(args.category, memory_content, args.is_global)?;
                 Ok(format!(
                     "Removed specific memory from category: {}",
@@ -523,16 +542,16 @@ impl Router for MemoryRouter {
     fn call_tool(
         &self,
         tool_name: &str,
-        arguments: Value,
+        arguments: JsonObject,
         _notifier: mpsc::Sender<JsonRpcMessage>,
     ) -> Pin<Box<dyn Future<Output = Result<Vec<Content>, ErrorData>> + Send + 'static>> {
         let this = self.clone();
         let tool_name = tool_name.to_string();
 
         Box::pin(async move {
-            let tool_call = ToolCall {
-                name: tool_name,
-                arguments,
+            let tool_call = CallToolRequestParam {
+                name: tool_name.into(),
+                arguments: Some(arguments),
             };
             match this.execute_tool_call(tool_call).await {
                 Ok(result) => Ok(vec![Content::text(result)]),

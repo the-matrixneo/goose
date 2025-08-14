@@ -34,7 +34,7 @@ A tool must take a Value and return an `AgentResult<Value>` (it must also be asy
 is what makes it compatible with the tool calling framework from the agent. 
 
 ```rust
-async fn echo(&self, params: Value) -> AgentResult<Value>
+async fn echo(&self, params: JsonObject) -> AgentResult<Value>
 ```
 
 ## Architecture

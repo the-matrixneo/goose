@@ -6,8 +6,8 @@ use goose::conversation::message::{Message, MessageContent, ToolRequest, ToolRes
 use goose::providers::pricing::get_model_pricing;
 use goose::providers::pricing::parse_model_id;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
-use mcp_core::tool::ToolCall;
 use regex::Regex;
+use rmcp::model::CallToolRequestParam;
 use rmcp::model::PromptArgument;
 use serde_json::Value;
 use std::cell::RefCell;
@@ -386,7 +386,7 @@ pub fn render_builtin_error(names: &str, error: &str) {
     println!();
 }
 
-fn render_text_editor_request(call: &ToolCall, debug: bool) {
+fn render_text_editor_request(call: &CallToolRequestParam, debug: bool) {
     print_tool_header(call);
 
     // Print path first with special formatting
@@ -411,7 +411,7 @@ fn render_text_editor_request(call: &ToolCall, debug: bool) {
     println!();
 }
 
-fn render_shell_request(call: &ToolCall, debug: bool) {
+fn render_shell_request(call: &CallToolRequestParam, debug: bool) {
     print_tool_header(call);
 
     match call.arguments.get("command") {
@@ -422,7 +422,7 @@ fn render_shell_request(call: &ToolCall, debug: bool) {
     }
 }
 
-fn render_dynamic_task_request(call: &ToolCall, debug: bool) {
+fn render_dynamic_task_request(call: &CallToolRequestParam, debug: bool) {
     print_tool_header(call);
 
     // Print task_parameters array
@@ -453,7 +453,7 @@ fn render_dynamic_task_request(call: &ToolCall, debug: bool) {
     println!();
 }
 
-fn render_todo_request(call: &ToolCall, _debug: bool) {
+fn render_todo_request(call: &CallToolRequestParam, _debug: bool) {
     print_tool_header(call);
 
     // For todo tools, always show the full content without redaction
@@ -466,7 +466,7 @@ fn render_todo_request(call: &ToolCall, _debug: bool) {
     println!();
 }
 
-fn render_default_request(call: &ToolCall, debug: bool) {
+fn render_default_request(call: &CallToolRequestParam, debug: bool) {
     print_tool_header(call);
     print_params(&call.arguments, 0, debug);
     println!();
@@ -474,7 +474,7 @@ fn render_default_request(call: &ToolCall, debug: bool) {
 
 // Helper functions
 
-fn print_tool_header(call: &ToolCall) {
+fn print_tool_header(call: &CallToolRequestParam) {
     let parts: Vec<_> = call.name.rsplit("__").collect();
     let tool_header = format!(
         "─── {} | {} ──────────────────────────",

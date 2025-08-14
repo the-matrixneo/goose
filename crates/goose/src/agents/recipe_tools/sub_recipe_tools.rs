@@ -3,7 +3,7 @@ use std::fs;
 use std::sync::Arc;
 
 use anyhow::Result;
-use rmcp::model::{Tool, ToolAnnotations};
+use rmcp::model::{JsonObject, Tool, ToolAnnotations};
 use serde_json::{json, Map, Value};
 
 use crate::agents::subagent_execution_tool::lib::{ExecutionMode, Task};
@@ -42,7 +42,7 @@ pub fn create_sub_recipe_task_tool(sub_recipe: &SubRecipe) -> Tool {
     })
 }
 
-fn extract_task_parameters(params: &Value) -> Vec<Value> {
+fn extract_task_parameters(params: &JsonObject) -> Vec<Value> {
     params
         .get("task_parameters")
         .and_then(|v| v.as_array())
@@ -91,7 +91,7 @@ fn create_task_execution_payload(tasks: &[Task], sub_recipe: &SubRecipe) -> Valu
 
 pub async fn create_sub_recipe_task(
     sub_recipe: &SubRecipe,
-    params: Value,
+    params: JsonObject,
     tasks_manager: &TasksManager,
 ) -> Result<String> {
     let task_params_array = extract_task_parameters(&params);

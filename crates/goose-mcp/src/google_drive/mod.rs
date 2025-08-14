@@ -16,11 +16,11 @@ use mcp_server::Router;
 use oauth_pkce::PkceOAuth2Client;
 use regex::Regex;
 use rmcp::model::{
-    AnnotateAble, Content, ErrorCode, ErrorData, JsonRpcMessage, Prompt, RawResource, Resource,
-    Tool, ToolAnnotations,
+    AnnotateAble, Content, ErrorCode, ErrorData, JsonObject, JsonRpcMessage, Prompt, RawResource,
+    Resource, Tool, ToolAnnotations,
 };
 use rmcp::object;
-use serde_json::{json, Value};
+use serde_json::Value;
 use std::borrow::Cow;
 use std::io::Cursor;
 use std::{env, fs, future::Future, path::Path, pin::Pin, sync::Arc};
@@ -989,7 +989,7 @@ impl GoogleDriveRouter {
     }
 
     // Implement search tool functionality
-    async fn search(&self, params: Value) -> Result<Vec<Content>, ErrorData> {
+    async fn search(&self, params: JsonObject) -> Result<Vec<Content>, ErrorData> {
         // To minimize tool growth, we search/list for a number of different
         // objects in Gdrive with sub-funcs.
         let drive_type = params
@@ -1014,7 +1014,7 @@ impl GoogleDriveRouter {
         }
     }
 
-    async fn search_files(&self, params: Value) -> Result<Vec<Content>, ErrorData> {
+    async fn search_files(&self, params: JsonObject) -> Result<Vec<Content>, ErrorData> {
         let name = params.get("name").and_then(|q| q.as_str());
         let mime_type = params.get("mimeType").and_then(|q| q.as_str());
         let drive_id = params.get("driveId").and_then(|q| q.as_str());
@@ -1434,7 +1434,7 @@ impl GoogleDriveRouter {
         }
     }
 
-    async fn read(&self, params: Value) -> Result<Vec<Content>, ErrorData> {
+    async fn read(&self, params: JsonObject) -> Result<Vec<Content>, ErrorData> {
         let (maybe_uri, maybe_url) = (
             params.get("uri").and_then(|q| q.as_str()),
             params.get("url").and_then(|q| q.as_str()),
@@ -1514,7 +1514,7 @@ impl GoogleDriveRouter {
     }
 
     // Implement sheets_tool functionality
-    async fn sheets_tool(&self, params: Value) -> Result<Vec<Content>, ErrorData> {
+    async fn sheets_tool(&self, params: JsonObject) -> Result<Vec<Content>, ErrorData> {
         let spreadsheet_id = params
             .get("spreadsheetId")
             .and_then(|q| q.as_str())
@@ -1934,7 +1934,7 @@ impl GoogleDriveRouter {
     }
 
     async fn read_google_resource(&self, uri: String) -> Result<String, ResourceError> {
-        self.read(json!({"uri": uri}))
+        self.read(object!({"uri": uri}))
             .await
             .map_err(|e| ResourceError::ExecutionError(e.to_string()))
             .map(|contents| {
@@ -1951,7 +1951,7 @@ impl GoogleDriveRouter {
             })
     }
 
-    async fn list_google_resources(&self, params: Value) -> Vec<Resource> {
+    async fn list_google_resources(&self, params: JsonObject) -> Vec<Resource> {
         let next_page_token = params.get("cursor").and_then(|q| q.as_str());
 
         let mut query = self
@@ -2075,7 +2075,7 @@ impl GoogleDriveRouter {
         }
     }
 
-    async fn create_file(&self, params: Value) -> Result<Vec<Content>, ErrorData> {
+    async fn create_file(&self, params: JsonObject) -> Result<Vec<Content>, ErrorData> {
         // Extract common parameters
         let filename = params
             .get("name")
@@ -2230,7 +2230,7 @@ impl GoogleDriveRouter {
         .await
     }
 
-    async fn move_file(&self, params: Value) -> Result<Vec<Content>, ErrorData> {
+    async fn move_file(&self, params: JsonObject) -> Result<Vec<Content>, ErrorData> {
         let file_id = params
             .get("fileId")
             .and_then(|q| q.as_str())
@@ -2286,7 +2286,7 @@ impl GoogleDriveRouter {
         }
     }
 
-    async fn update_file(&self, params: Value) -> Result<Vec<Content>, ErrorData> {
+    async fn update_file(&self, params: JsonObject) -> Result<Vec<Content>, ErrorData> {
         let file_id = params
             .get("fileId")
             .and_then(|q| q.as_str())
@@ -2587,7 +2587,7 @@ impl GoogleDriveRouter {
         .await
     }
 
-    async fn get_comments(&self, params: Value) -> Result<Vec<Content>, ErrorData> {
+    async fn get_comments(&self, params: JsonObject) -> Result<Vec<Content>, ErrorData> {
         let file_id = params
             .get("fileId")
             .and_then(|q| q.as_str())
@@ -2658,7 +2658,7 @@ impl GoogleDriveRouter {
     }
 
     #[allow(clippy::too_many_lines)]
-    async fn manage_comment(&self, params: Value) -> Result<Vec<Content>, ErrorData> {
+    async fn manage_comment(&self, params: JsonObject) -> Result<Vec<Content>, ErrorData> {
         let file_id = params
             .get("fileId")
             .and_then(|q| q.as_str())
@@ -2783,7 +2783,7 @@ impl GoogleDriveRouter {
         }
     }
 
-    async fn docs_tool(&self, params: Value) -> Result<Vec<Content>, ErrorData> {
+    async fn docs_tool(&self, params: JsonObject) -> Result<Vec<Content>, ErrorData> {
         let document_id = params
             .get("documentId")
             .and_then(|q| q.as_str())
@@ -3194,7 +3194,7 @@ impl GoogleDriveRouter {
         }
     }
 
-    async fn list_drives(&self, params: Value) -> Result<Vec<Content>, ErrorData> {
+    async fn list_drives(&self, params: JsonObject) -> Result<Vec<Content>, ErrorData> {
         let query = params.get("name_contains").and_then(|q| q.as_str());
 
         let mut results: Vec<String> = Vec::new();
@@ -3263,7 +3263,7 @@ impl GoogleDriveRouter {
             p.id.unwrap_or_default())
     }
 
-    async fn get_permissions(&self, params: Value) -> Result<Vec<Content>, ErrorData> {
+    async fn get_permissions(&self, params: JsonObject) -> Result<Vec<Content>, ErrorData> {
         let file_id = params
             .get("fileId")
             .and_then(|q| q.as_str())
@@ -3316,7 +3316,7 @@ impl GoogleDriveRouter {
         Ok(vec![Content::text(results.join("\n"))])
     }
 
-    async fn sharing(&self, params: Value) -> Result<Vec<Content>, ErrorData> {
+    async fn sharing(&self, params: JsonObject) -> Result<Vec<Content>, ErrorData> {
         let file_id = params
             .get("fileId")
             .and_then(|q| q.as_str())
@@ -3501,7 +3501,7 @@ impl GoogleDriveRouter {
         }
     }
 
-    async fn list_labels(&self, _params: Value) -> Result<Vec<Content>, ErrorData> {
+    async fn list_labels(&self, _params: JsonObject) -> Result<Vec<Content>, ErrorData> {
         let builder = self
             .drive_labels
             .labels()
@@ -3563,7 +3563,7 @@ impl Router for GoogleDriveRouter {
     fn call_tool(
         &self,
         tool_name: &str,
-        arguments: Value,
+        arguments: JsonObject,
         _notifier: mpsc::Sender<JsonRpcMessage>,
     ) -> Pin<Box<dyn Future<Output = Result<Vec<Content>, ErrorData>> + Send + 'static>> {
         let this = self.clone();
@@ -3594,7 +3594,7 @@ impl Router for GoogleDriveRouter {
     fn list_resources(&self) -> Vec<Resource> {
         tokio::task::block_in_place(|| {
             tokio::runtime::Handle::current()
-                .block_on(async { self.list_google_resources(json!({})).await })
+                .block_on(async { self.list_google_resources(object!({})).await })
         })
     }
 

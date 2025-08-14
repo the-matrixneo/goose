@@ -3,7 +3,7 @@ use crate::model::ModelConfig;
 use crate::providers::base::Usage;
 use crate::providers::errors::ProviderError;
 use anyhow::{anyhow, Result};
-use mcp_core::tool::ToolCall;
+use rmcp::model::CallToolRequestParam;
 use rmcp::model::{Role, Tool};
 use serde_json::{json, Value};
 use std::collections::HashSet;
@@ -185,11 +185,17 @@ pub fn parse_streaming_response(sse_data: &str) -> Result<Message> {
         if !tool_input.is_empty() {
             let input_value = serde_json::from_str::<Value>(&tool_input)
                 .unwrap_or_else(|_| Value::String(tool_input.clone()));
-            let tool_call = ToolCall::new(name, input_value);
+            let tool_call = CallToolRequestParam {
+                name: name.into(),
+                arguments: input_value.as_object().cloned(),
+            };
             message = message.with_tool_request(id, Ok(tool_call));
         } else if tool_name.is_some() {
             // Tool with no input - use empty object
-            let tool_call = ToolCall::new(name, Value::Object(serde_json::Map::new()));
+            let tool_call = CallToolRequestParam {
+                name: (name).into(),
+                arguments: Value::Object(serde_json::Map::new()).as_object().cloned(),
+            };
             message = message.with_tool_request(id, Ok(tool_call));
         }
     }
@@ -245,7 +251,10 @@ pub fn response_to_message(response: &Value) -> Result<Message> {
                     .ok_or_else(|| anyhow!("Missing tool input"))?
                     .clone();
 
-                let tool_call = ToolCall::new(name, input);
+                let tool_call = CallToolRequestParam {
+                    name: (name).into(),
+                    arguments: (input).as_object().cloned(),
+                };
                 message = message.with_tool_request(id, Ok(tool_call));
             }
             Some("thinking") => {
@@ -679,10 +688,13 @@ data: {"id":"a9537c2c-2017-4906-9817-2456168d89fa","model":"claude-3-5-sonnet","
     #[test]
     fn test_message_formatting_skips_tool_requests() {
         use crate::conversation::message::Message;
-        use mcp_core::tool::ToolCall;
+        use rmcp::model::CallToolRequestParam;
 
         // Create a conversation with text, tool requests, and tool responses
-        let tool_call = ToolCall::new("calculator", json!({"expression": "2 + 2"}));
+        let tool_call = CallToolRequestParam {
+            name: "calculator".into(),
+            arguments: json!({"expression": "2 + 2"}).as_object().cloned(),
+        };
 
         let messages = vec![
             Message::user().with_text("Calculate 2 + 2"),

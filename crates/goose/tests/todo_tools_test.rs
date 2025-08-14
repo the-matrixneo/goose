@@ -1,6 +1,6 @@
 use goose::agents::todo_tools::{TODO_READ_TOOL_NAME, TODO_WRITE_TOOL_NAME};
 use goose::agents::Agent;
-use mcp_core::tool::ToolCall;
+use rmcp::model::CallToolRequestParam;
 use serde_json::json;
 use serial_test::serial;
 use std::sync::Arc;
@@ -33,7 +33,7 @@ async fn test_todo_write_and_read() {
     let agent = Agent::new();
 
     // Write to the todo list
-    let write_call = ToolCall {
+    let write_call = CallToolRequestParam {
         name: TODO_WRITE_TOOL_NAME.to_string(),
         arguments: json!({
             "content": "1. Buy milk\n2. Walk the dog\n3. Review code"
@@ -46,7 +46,7 @@ async fn test_todo_write_and_read() {
     assert!(write_result.is_ok(), "Write should succeed");
 
     // Read from the todo list
-    let read_call = ToolCall {
+    let read_call = CallToolRequestParam {
         name: TODO_READ_TOOL_NAME.to_string(),
         arguments: json!({}),
     };
@@ -76,7 +76,7 @@ async fn test_todo_empty_initially() {
     let agent = Agent::new();
 
     // Read from empty todo list
-    let read_call = ToolCall {
+    let read_call = CallToolRequestParam {
         name: TODO_READ_TOOL_NAME.to_string(),
         arguments: json!({}),
     };
@@ -107,7 +107,7 @@ async fn test_todo_overwrite() {
     let agent = Agent::new();
 
     // Write initial content
-    let write_call1 = ToolCall {
+    let write_call1 = CallToolRequestParam {
         name: TODO_WRITE_TOOL_NAME.to_string(),
         arguments: json!({
             "content": "Initial todo list"
@@ -119,7 +119,7 @@ async fn test_todo_overwrite() {
     assert!(write_result1.is_ok(), "First write should succeed");
 
     // Overwrite with new content
-    let write_call2 = ToolCall {
+    let write_call2 = CallToolRequestParam {
         name: TODO_WRITE_TOOL_NAME.to_string(),
         arguments: json!({
             "content": "Completely new todo list"
@@ -131,7 +131,7 @@ async fn test_todo_overwrite() {
     assert!(write_result2.is_ok(), "Second write should succeed");
 
     // Read and verify it was overwritten
-    let read_call = ToolCall {
+    let read_call = CallToolRequestParam {
         name: TODO_READ_TOOL_NAME.to_string(),
         arguments: json!({}),
     };
@@ -164,7 +164,7 @@ async fn test_todo_concurrent_access() {
     for i in 0..10 {
         let agent_clone = agent.clone();
         let handle = tokio::spawn(async move {
-            let write_call = ToolCall {
+            let write_call = CallToolRequestParam {
                 name: TODO_WRITE_TOOL_NAME.to_string(),
                 arguments: json!({
                     "content": format!("Todo list {}", i)
@@ -183,7 +183,7 @@ async fn test_todo_concurrent_access() {
     }
 
     // Read the final state
-    let read_call = ToolCall {
+    let read_call = CallToolRequestParam {
         name: TODO_READ_TOOL_NAME.to_string(),
         arguments: json!({}),
     };
@@ -218,7 +218,7 @@ async fn test_todo_large_content() {
     // Create a large todo list that exceeds the 50,000 character limit
     let large_content = "X".repeat(100_000);
 
-    let write_call = ToolCall {
+    let write_call = CallToolRequestParam {
         name: TODO_WRITE_TOOL_NAME.to_string(),
         arguments: json!({
             "content": large_content.clone()
@@ -249,7 +249,7 @@ async fn test_todo_large_content() {
     // Test with content within the limit
     let valid_content = "X".repeat(50_000);
 
-    let write_call = ToolCall {
+    let write_call = CallToolRequestParam {
         name: TODO_WRITE_TOOL_NAME.to_string(),
         arguments: json!({
             "content": valid_content.clone()
@@ -262,7 +262,7 @@ async fn test_todo_large_content() {
     assert!(write_result.is_ok(), "Should handle content within limit");
 
     // Read it back
-    let read_call = ToolCall {
+    let read_call = CallToolRequestParam {
         name: TODO_READ_TOOL_NAME.to_string(),
         arguments: json!({}),
     };
@@ -296,7 +296,7 @@ async fn test_todo_unicode_content() {
 
     let unicode_content = "📝 Todo List:\n✅ Task 1\n⭐ Task 2\n🔥 Urgent: Task 3\n日本語のタスク";
 
-    let write_call = ToolCall {
+    let write_call = CallToolRequestParam {
         name: TODO_WRITE_TOOL_NAME.to_string(),
         arguments: json!({
             "content": unicode_content
@@ -308,7 +308,7 @@ async fn test_todo_unicode_content() {
         .await;
     assert!(write_result.is_ok(), "Write should succeed");
 
-    let read_call = ToolCall {
+    let read_call = CallToolRequestParam {
         name: TODO_READ_TOOL_NAME.to_string(),
         arguments: json!({}),
     };
@@ -340,7 +340,7 @@ async fn test_todo_character_limit_enforcement() {
     // Create content that exceeds the limit
     let large_content = "x".repeat(101);
 
-    let write_call = ToolCall {
+    let write_call = CallToolRequestParam {
         name: TODO_WRITE_TOOL_NAME.to_string(),
         arguments: json!({
             "content": large_content
@@ -386,7 +386,7 @@ async fn test_todo_character_count_in_write_response() {
     let agent = Agent::new();
 
     let content = "Test todo content";
-    let write_call = ToolCall {
+    let write_call = CallToolRequestParam {
         name: TODO_WRITE_TOOL_NAME.to_string(),
         arguments: json!({
             "content": content
@@ -415,7 +415,7 @@ async fn test_todo_read_returns_clean_content() {
 
     // Write some content
     let content = "My todo list\n- Task 1\n- Task 2";
-    let write_call = ToolCall {
+    let write_call = CallToolRequestParam {
         name: TODO_WRITE_TOOL_NAME.to_string(),
         arguments: json!({
             "content": content
@@ -428,7 +428,7 @@ async fn test_todo_read_returns_clean_content() {
     assert!(write_result.is_ok(), "Write should succeed");
 
     // Read should return exact content, no metadata
-    let read_call = ToolCall {
+    let read_call = CallToolRequestParam {
         name: TODO_READ_TOOL_NAME.to_string(),
         arguments: json!({}),
     };
@@ -460,7 +460,7 @@ async fn test_todo_unlimited_with_zero_limit() {
     // Should accept very large content when limit is 0
     let huge_content = "x".repeat(100_000);
 
-    let write_call = ToolCall {
+    let write_call = CallToolRequestParam {
         name: TODO_WRITE_TOOL_NAME.to_string(),
         arguments: json!({
             "content": huge_content
@@ -488,7 +488,7 @@ async fn test_todo_unicode_character_counting() {
     // Test with emoji - each emoji is 1 character in .chars().count()
     let content = "📝📝📝📝📝📝📝📝📝📝📝"; // 11 emoji = 11 chars
 
-    let write_call = ToolCall {
+    let write_call = CallToolRequestParam {
         name: TODO_WRITE_TOOL_NAME.to_string(),
         arguments: json!({
             "content": content

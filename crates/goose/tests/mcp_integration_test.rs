@@ -9,7 +9,7 @@ use tokio_util::sync::CancellationToken;
 
 use goose::agents::extension::{Envs, ExtensionConfig};
 use goose::agents::extension_manager::ExtensionManager;
-use mcp_core::ToolCall;
+use rmcp::model::CallToolRequestParam;
 
 use test_case::test_case;
 
@@ -21,38 +21,38 @@ enum TestMode {
 #[test_case(
     vec!["npx", "-y", "@modelcontextprotocol/server-everything"],
     vec![
-        ToolCall::new("echo", json!({"message": "Hello, world!"})),
-        ToolCall::new("add", json!({"a": 1, "b": 2})),
-        ToolCall::new("longRunningOperation", json!({"duration": 1, "steps": 5})),
-        ToolCall::new("structuredContent", json!({"location": "11238"})),
+        CallToolRequestParam { name: "echo".into(), arguments: (json!({"message": "Hello, world!"}).as_object().cloned() }),
+        CallToolRequestParam { name: "add".into(), arguments: (json!({"a": 1, "b": 2}).as_object().cloned() }),
+        CallToolRequestParam { name: "longRunningOperation".into(), arguments: (json!({"duration": 1, "steps": 5}).as_object().cloned() }),
+        CallToolRequestParam { name: "structuredContent".into(), arguments: (json!({"location": "11238"}).as_object().cloned() }),
     ],
     vec![]
 )]
 #[test_case(
     vec!["github-mcp-server", "stdio"],
     vec![
-        ToolCall::new("get_file_contents", json!({
+        CallToolRequestParam { name: "get_file_contents".into(), arguments: (json!({
             "owner": "block",
             "repo": "goose",
             "path": "README.md",
             "sha": "48c1ec8afdb7d4d5b4f6e67e623926c884034776"
-        })),
+        }).as_object().cloned() }),
     ],
     vec!["GITHUB_PERSONAL_ACCESS_TOKEN"]
 )]
 #[test_case(
     vec!["uvx", "mcp-server-fetch"],
     vec![
-        ToolCall::new("fetch", json!({
+        CallToolRequestParam { name: "fetch".into(), arguments: (json!({
             "url": "https://example.com",
-        })),
+        }).as_object().cloned() }),
     ],
     vec![]
 )]
 #[tokio::test]
 async fn test_replayed_session(
     command: Vec<&str>,
-    tool_calls: Vec<ToolCall>,
+    tool_calls: Vec<CallToolRequestParam>,
     required_envs: Vec<&str>,
 ) {
     let replay_file_name = command
@@ -133,7 +133,7 @@ async fn test_replayed_session(
     let result = (async || -> Result<(), Box<dyn std::error::Error>> {
         let mut results = Vec::new();
         for tool_call in tool_calls {
-            let tool_call = ToolCall::new(format!("test__{}", tool_call.name), tool_call.arguments);
+            let tool_call = CallToolRequestParam { name: (format!("test__{}").into(), arguments: (tool_call.name).as_object().cloned() }, tool_call.arguments);
             let result = extension_manager
                 .dispatch_tool_call(tool_call, CancellationToken::default())
                 .await;

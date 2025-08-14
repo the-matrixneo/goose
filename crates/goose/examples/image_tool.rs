@@ -5,7 +5,7 @@ use goose::conversation::message::Message;
 use goose::providers::{
     bedrock::BedrockProvider, databricks::DatabricksProvider, openai::OpenAiProvider,
 };
-use mcp_core::tool::ToolCall;
+use rmcp::model::CallToolRequestParam;
 use rmcp::model::{Content, Tool};
 use rmcp::object;
 use serde_json::json;
@@ -33,9 +33,7 @@ async fn main() -> Result<()> {
             Message::user().with_text("Read the image at ./test_image.png please"),
             Message::assistant().with_tool_request(
                 "000",
-                Ok(ToolCall::new(
-                    "view_image",
-                    json!({"path": "./test_image.png"}),
+                Ok(CallToolRequestParam { name: "view_image".into(), arguments: (json!({"path": "./test_image.png"}).as_object().cloned() },
                 )),
             ),
             Message::user()

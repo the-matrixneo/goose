@@ -319,9 +319,7 @@ impl ProviderTester {
         let user_message = Message::user().with_text("Take a screenshot please");
         let tool_request = Message::assistant().with_tool_request(
             "test_id",
-            Ok(mcp_core::tool::ToolCall::new(
-                "get_screenshot",
-                serde_json::json!({}),
+            Ok(mcp_core::tool::CallToolRequestParam { name: "get_screenshot".into(), arguments: (serde_json::json!({}).as_object().cloned() },
             )),
         );
         let tool_response = Message::user().with_tool_response(

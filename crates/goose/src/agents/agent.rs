@@ -42,12 +42,13 @@ use crate::providers::errors::ProviderError;
 use crate::recipe::{Author, Recipe, Response, Settings, SubRecipe};
 use crate::scheduler_trait::SchedulerTrait;
 use crate::session;
-use crate::tool_monitor::{ToolCall, ToolMonitor};
+use crate::tool_monitor::ToolMonitor;
 use crate::utils::is_token_cancelled;
 use mcp_core::ToolResult;
 use regex::Regex;
 use rmcp::model::{
-    Content, ErrorCode, ErrorData, GetPromptResult, Prompt, ServerNotification, Tool,
+    CallToolRequestParam, Content, ErrorCode, ErrorData, GetPromptResult, Prompt,
+    ServerNotification, Tool,
 };
 use serde_json::Value;
 use tokio::sync::{mpsc, Mutex, RwLock};
@@ -375,13 +376,16 @@ impl Agent {
     #[instrument(skip(self, tool_call, request_id), fields(input, output))]
     pub async fn dispatch_tool_call(
         &self,
-        tool_call: mcp_core::tool::ToolCall,
+        tool_call: rmcp::model::CallToolRequestParam,
         request_id: String,
         cancellation_token: Option<CancellationToken>,
     ) -> (String, Result<ToolCallResult, ErrorData>) {
         // Check if this tool call should be allowed based on repetition monitoring
         if let Some(monitor) = self.tool_monitor.lock().await.as_mut() {
-            let tool_call_info = ToolCall::new(tool_call.name.clone(), tool_call.arguments.clone());
+            let tool_call_info = CallToolRequestParam {
+                name: tool_call.name.clone().into(),
+                arguments: tool_call.arguments.clone(),
+            };
 
             if !monitor.check_tool_call(tool_call_info) {
                 return (
@@ -397,7 +401,10 @@ impl Agent {
 
         if tool_call.name == PLATFORM_MANAGE_SCHEDULE_TOOL_NAME {
             let result = self
-                .handle_schedule_management(tool_call.arguments, request_id.clone())
+                .handle_schedule_management(
+                    tool_call.arguments.unwrap_or_default(),
+                    request_id.clone(),
+                )
                 .await;
             return (request_id, Ok(ToolCallResult::from(result)));
         }
@@ -405,13 +412,15 @@ impl Agent {
         if tool_call.name == PLATFORM_MANAGE_EXTENSIONS_TOOL_NAME {
             let extension_name = tool_call
                 .arguments
-                .get("extension_name")
+                .as_ref()
+                .and_then(|args| args.get("extension_name"))
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .to_string();
             let action = tool_call
                 .arguments
-                .get("action")
+                .as_ref()
+                .and_then(|args| args.get("action"))
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .to_string();
@@ -440,44 +449,35 @@ impl Agent {
 
         let extension_manager = self.extension_manager.read().await;
         let sub_recipe_manager = self.sub_recipe_manager.lock().await;
+        let arguments = tool_call.arguments.clone().unwrap_or_default();
+
         let result: ToolCallResult = if sub_recipe_manager.is_sub_recipe_tool(&tool_call.name) {
             sub_recipe_manager
-                .dispatch_sub_recipe_tool_call(
-                    &tool_call.name,
-                    tool_call.arguments.clone(),
-                    &self.tasks_manager,
-                )
+                .dispatch_sub_recipe_tool_call(&tool_call.name, arguments, &self.tasks_manager)
                 .await
         } else if tool_call.name == SUBAGENT_EXECUTE_TASK_TOOL_NAME {
             let provider = self.provider().await.ok();
-
             let task_config = TaskConfig::new(provider);
             subagent_execute_task_tool::run_tasks(
-                tool_call.arguments.clone(),
+                arguments,
                 task_config,
                 &self.tasks_manager,
                 cancellation_token,
             )
             .await
         } else if tool_call.name == DYNAMIC_TASK_TOOL_NAME_PREFIX {
-            create_dynamic_task(tool_call.arguments.clone(), &self.tasks_manager).await
+            create_dynamic_task(arguments, &self.tasks_manager).await
         } else if tool_call.name == PLATFORM_READ_RESOURCE_TOOL_NAME {
             // Check if the tool is read_resource and handle it separately
             ToolCallResult::from(
                 extension_manager
-                    .read_resource(
-                        tool_call.arguments.clone(),
-                        cancellation_token.unwrap_or_default(),
-                    )
+                    .read_resource(arguments, cancellation_token.unwrap_or_default())
                     .await,
             )
         } else if tool_call.name == PLATFORM_LIST_RESOURCES_TOOL_NAME {
             ToolCallResult::from(
                 extension_manager
-                    .list_resources(
-                        tool_call.arguments.clone(),
-                        cancellation_token.unwrap_or_default(),
-                    )
+                    .list_resources(arguments, cancellation_token.unwrap_or_default())
                     .await,
             )
         } else if tool_call.name == PLATFORM_SEARCH_AVAILABLE_EXTENSIONS_TOOL_NAME {
@@ -495,8 +495,7 @@ impl Agent {
             ToolCallResult::from(Ok(vec![Content::text(todo_content)]))
         } else if tool_call.name == TODO_WRITE_TOOL_NAME {
             // Handle task planner write tool
-            let content = tool_call
-                .arguments
+            let content = arguments
                 .get("content")
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
@@ -535,7 +534,7 @@ impl Agent {
         {
             match self
                 .tool_route_manager
-                .dispatch_route_search_tool(tool_call.arguments)
+                .dispatch_route_search_tool(tool_call.arguments.unwrap_or_default())
                 .await
             {
                 Ok(tool_result) => tool_result,

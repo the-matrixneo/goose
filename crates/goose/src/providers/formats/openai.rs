@@ -8,7 +8,7 @@ use crate::providers::utils::{
 use anyhow::{anyhow, Error};
 use async_stream::try_stream;
 use futures::Stream;
-use mcp_core::ToolCall;
+use rmcp::model::{object, CallToolRequestParam};
 use rmcp::model::{
     AnnotateAble, Content, ErrorCode, ErrorData, RawContent, ResourceContents, Role, Tool,
 };
@@ -115,7 +115,7 @@ pub fn format_messages(messages: &[Message], image_format: &ImageFormat) -> Vec<
                             "type": "function",
                             "function": {
                                 "name": sanitized_name,
-                                "arguments": tool_call.arguments.to_string(),
+                                "arguments": tool_call.arguments,
                             }
                         }));
                     }
@@ -220,7 +220,7 @@ pub fn format_messages(messages: &[Message], image_format: &ImageFormat) -> Vec<
                             "type": "function",
                             "function": {
                                 "name": sanitized_name,
-                                "arguments": tool_call.arguments.to_string(),
+                                "arguments": tool_call.arguments,
                             }
                         }));
                     }
@@ -316,7 +316,10 @@ pub fn response_to_message(response: &Value) -> anyhow::Result<Message> {
                         Ok(params) => {
                             content.push(MessageContent::tool_request(
                                 id,
-                                Ok(ToolCall::new(&function_name, params)),
+                                Ok(CallToolRequestParam {
+                                    name: function_name.into(),
+                                    arguments: Some(object(params)),
+                                }),
                             ));
                         }
                         Err(e) => {
@@ -515,7 +518,7 @@ where
                             Ok(params) => {
                                 MessageContent::tool_request(
                                     id.clone(),
-                                    Ok(ToolCall::new(function_name.clone(), params)),
+                                    Ok(CallToolRequestParam { name: function_name.clone().into(), arguments: Some(object(params)) }),
                                 )
                             },
                             Err(e) => {
@@ -809,7 +812,10 @@ mod tests {
             Message::user().with_text("How are you?"),
             Message::assistant().with_tool_request(
                 "tool1",
-                Ok(ToolCall::new("example", json!({"param1": "value1"}))),
+                Ok(CallToolRequestParam {
+                    name: "example".into(),
+                    arguments: json!({"param1": "value1"}).as_object().cloned(),
+                }),
             ),
         ];
 
@@ -843,7 +849,10 @@ mod tests {
     fn test_format_messages_multiple_content() -> anyhow::Result<()> {
         let mut messages = vec![Message::assistant().with_tool_request(
             "tool1",
-            Ok(ToolCall::new("example", json!({"param1": "value1"}))),
+            Ok(CallToolRequestParam {
+                name: "example".into(),
+                arguments: json!({"param1": "value1"}).as_object().cloned(),
+            }),
         )];
 
         // Get the ID from the tool request to use in the response

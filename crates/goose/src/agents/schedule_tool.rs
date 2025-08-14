@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use chrono::Utc;
 use mcp_core::ToolResult;
-use rmcp::model::{Content, ErrorCode, ErrorData};
+use rmcp::model::{Content, ErrorCode, ErrorData, JsonObject};
 
 use crate::recipe::Recipe;
 use crate::scheduler_trait::SchedulerTrait;
@@ -18,7 +18,7 @@ impl Agent {
     /// Handle schedule management tool calls
     pub async fn handle_schedule_management(
         &self,
-        arguments: serde_json::Value,
+        arguments: JsonObject,
         _request_id: String,
     ) -> ToolResult<Vec<Content>> {
         let scheduler = match self.scheduler_service.lock().await.as_ref() {
@@ -93,7 +93,7 @@ impl Agent {
     async fn handle_create_job(
         &self,
         scheduler: Arc<dyn SchedulerTrait>,
-        arguments: serde_json::Value,
+        arguments: JsonObject,
     ) -> ToolResult<Vec<Content>> {
         let recipe_path = arguments
             .get("recipe_path")
@@ -206,7 +206,7 @@ impl Agent {
     async fn handle_run_now(
         &self,
         scheduler: Arc<dyn SchedulerTrait>,
-        arguments: serde_json::Value,
+        arguments: JsonObject,
     ) -> ToolResult<Vec<Content>> {
         let job_id = arguments
             .get("job_id")
@@ -236,7 +236,7 @@ impl Agent {
     async fn handle_pause_job(
         &self,
         scheduler: Arc<dyn SchedulerTrait>,
-        arguments: serde_json::Value,
+        arguments: JsonObject,
     ) -> ToolResult<Vec<Content>> {
         let job_id = arguments
             .get("job_id")
@@ -266,7 +266,7 @@ impl Agent {
     async fn handle_unpause_job(
         &self,
         scheduler: Arc<dyn SchedulerTrait>,
-        arguments: serde_json::Value,
+        arguments: JsonObject,
     ) -> ToolResult<Vec<Content>> {
         let job_id = arguments
             .get("job_id")
@@ -296,7 +296,7 @@ impl Agent {
     async fn handle_delete_job(
         &self,
         scheduler: Arc<dyn SchedulerTrait>,
-        arguments: serde_json::Value,
+        arguments: JsonObject,
     ) -> ToolResult<Vec<Content>> {
         let job_id = arguments
             .get("job_id")
@@ -326,7 +326,7 @@ impl Agent {
     async fn handle_kill_job(
         &self,
         scheduler: Arc<dyn SchedulerTrait>,
-        arguments: serde_json::Value,
+        arguments: JsonObject,
     ) -> ToolResult<Vec<Content>> {
         let job_id = arguments
             .get("job_id")
@@ -356,7 +356,7 @@ impl Agent {
     async fn handle_inspect_job(
         &self,
         scheduler: Arc<dyn SchedulerTrait>,
-        arguments: serde_json::Value,
+        arguments: JsonObject,
     ) -> ToolResult<Vec<Content>> {
         let job_id = arguments
             .get("job_id")
@@ -393,7 +393,7 @@ impl Agent {
     async fn handle_list_sessions(
         &self,
         scheduler: Arc<dyn SchedulerTrait>,
-        arguments: serde_json::Value,
+        arguments: JsonObject,
     ) -> ToolResult<Vec<Content>> {
         let job_id = arguments
             .get("job_id")
@@ -447,10 +447,7 @@ impl Agent {
     }
 
     /// Get the full content (metadata and messages) of a specific session
-    async fn handle_session_content(
-        &self,
-        arguments: serde_json::Value,
-    ) -> ToolResult<Vec<Content>> {
+    async fn handle_session_content(&self, arguments: JsonObject) -> ToolResult<Vec<Content>> {
         let session_id = arguments
             .get("session_id")
             .and_then(|v| v.as_str())

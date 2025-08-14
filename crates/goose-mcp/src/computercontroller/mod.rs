@@ -19,8 +19,8 @@ use mcp_core::{
 use mcp_server::router::CapabilitiesBuilder;
 use mcp_server::Router;
 use rmcp::model::{
-    AnnotateAble, Content, ErrorCode, ErrorData, JsonRpcMessage, Prompt, RawResource, Resource,
-    Tool, ToolAnnotations,
+    AnnotateAble, Content, ErrorCode, ErrorData, JsonObject, JsonRpcMessage, Prompt, RawResource,
+    Resource, Tool, ToolAnnotations,
 };
 use rmcp::object;
 
@@ -603,7 +603,7 @@ impl ComputerControllerRouter {
         Ok(())
     }
 
-    async fn web_scrape(&self, params: Value) -> Result<Vec<Content>, ErrorData> {
+    async fn web_scrape(&self, params: JsonObject) -> Result<Vec<Content>, ErrorData> {
         let url = params
             .get("url")
             .and_then(|v| v.as_str())
@@ -696,7 +696,7 @@ impl ComputerControllerRouter {
     }
 
     // Implement quick_script tool functionality
-    async fn quick_script(&self, params: Value) -> Result<Vec<Content>, ErrorData> {
+    async fn quick_script(&self, params: JsonObject) -> Result<Vec<Content>, ErrorData> {
         let language = params
             .get("language")
             .and_then(|v| v.as_str())
@@ -848,7 +848,7 @@ impl ComputerControllerRouter {
     }
 
     // Implement computer control functionality
-    async fn computer_control(&self, params: Value) -> Result<Vec<Content>, ErrorData> {
+    async fn computer_control(&self, params: JsonObject) -> Result<Vec<Content>, ErrorData> {
         let script = params
             .get("script")
             .and_then(|v| v.as_str())
@@ -889,7 +889,7 @@ impl ComputerControllerRouter {
         Ok(vec![Content::text(result)])
     }
 
-    async fn xlsx_tool(&self, params: Value) -> Result<Vec<Content>, ErrorData> {
+    async fn xlsx_tool(&self, params: JsonObject) -> Result<Vec<Content>, ErrorData> {
         let path = params
             .get("path")
             .and_then(|v| v.as_str())
@@ -1131,7 +1131,7 @@ impl ComputerControllerRouter {
     }
 
     // Implement cache tool functionality
-    async fn docx_tool(&self, params: Value) -> Result<Vec<Content>, ErrorData> {
+    async fn docx_tool(&self, params: JsonObject) -> Result<Vec<Content>, ErrorData> {
         let path = params
             .get("path")
             .and_then(|v| v.as_str())
@@ -1159,7 +1159,7 @@ impl ComputerControllerRouter {
         .await
     }
 
-    async fn pdf_tool(&self, params: Value) -> Result<Vec<Content>, ErrorData> {
+    async fn pdf_tool(&self, params: JsonObject) -> Result<Vec<Content>, ErrorData> {
         let path = params
             .get("path")
             .and_then(|v| v.as_str())
@@ -1181,7 +1181,7 @@ impl ComputerControllerRouter {
         crate::computercontroller::pdf_tool::pdf_tool(path, operation, &self.cache_dir).await
     }
 
-    async fn cache(&self, params: Value) -> Result<Vec<Content>, ErrorData> {
+    async fn cache(&self, params: JsonObject) -> Result<Vec<Content>, ErrorData> {
         let command = params
             .get("command")
             .and_then(|v| v.as_str())
@@ -1310,7 +1310,7 @@ impl Router for ComputerControllerRouter {
     fn call_tool(
         &self,
         tool_name: &str,
-        arguments: Value,
+        arguments: JsonObject,
         _notifier: mpsc::Sender<JsonRpcMessage>,
     ) -> Pin<Box<dyn Future<Output = Result<Vec<Content>, ErrorData>> + Send + 'static>> {
         let this = self.clone();

@@ -8,7 +8,6 @@ use base64::Engine;
 use etcetera::{choose_app_strategy, AppStrategy};
 use indoc::formatdoc;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use std::{
     collections::{HashMap, HashSet},
     fs::File,
@@ -35,8 +34,8 @@ use mcp_server::Router;
 use once_cell::sync::Lazy;
 
 use rmcp::model::{
-    Content, ErrorCode, ErrorData, JsonRpcMessage, JsonRpcNotification, JsonRpcVersion2_0,
-    Notification, Prompt, PromptArgument, Resource, Role, Tool, ToolAnnotations,
+    Content, ErrorCode, ErrorData, JsonObject, JsonRpcMessage, JsonRpcNotification,
+    JsonRpcVersion2_0, Notification, Prompt, PromptArgument, Resource, Role, Tool, ToolAnnotations,
 };
 use rmcp::object;
 
@@ -813,7 +812,7 @@ impl DeveloperRouter {
     // Shell command execution with platform-specific handling
     async fn bash(
         &self,
-        params: Value,
+        params: JsonObject,
         notifier: mpsc::Sender<JsonRpcMessage>,
     ) -> Result<Vec<Content>, ErrorData> {
         let command = params
@@ -950,7 +949,7 @@ impl DeveloperRouter {
     }
 
     #[allow(clippy::too_many_lines)]
-    async fn text_editor(&self, params: Value) -> Result<Vec<Content>, ErrorData> {
+    async fn text_editor(&self, params: JsonObject) -> Result<Vec<Content>, ErrorData> {
         let command = params
             .get("command")
             .and_then(|v| v.as_str())
@@ -1608,7 +1607,7 @@ impl DeveloperRouter {
         Ok(())
     }
 
-    async fn list_windows(&self, _params: Value) -> Result<Vec<Content>, ErrorData> {
+    async fn list_windows(&self, _params: JsonObject) -> Result<Vec<Content>, ErrorData> {
         let windows = Window::all().map_err(|_| {
             ErrorData::new(
                 ErrorCode::INTERNAL_ERROR,
@@ -1665,7 +1664,7 @@ impl DeveloperRouter {
         path.to_path_buf()
     }
 
-    async fn image_processor(&self, params: Value) -> Result<Vec<Content>, ErrorData> {
+    async fn image_processor(&self, params: JsonObject) -> Result<Vec<Content>, ErrorData> {
         let path_str = params.get("path").and_then(|v| v.as_str()).ok_or_else(|| {
             ErrorData::new(
                 ErrorCode::INVALID_PARAMS,
@@ -1775,7 +1774,7 @@ impl DeveloperRouter {
         ])
     }
 
-    async fn screen_capture(&self, params: Value) -> Result<Vec<Content>, ErrorData> {
+    async fn screen_capture(&self, params: JsonObject) -> Result<Vec<Content>, ErrorData> {
         let mut image =
             if let Some(window_title) = params.get("window_title").and_then(|v| v.as_str()) {
                 // Try to find and capture the specified window
@@ -1903,7 +1902,7 @@ impl Router for DeveloperRouter {
     fn call_tool(
         &self,
         tool_name: &str,
-        arguments: Value,
+        arguments: JsonObject,
         notifier: mpsc::Sender<JsonRpcMessage>,
     ) -> Pin<Box<dyn Future<Output = Result<Vec<Content>, ErrorData>> + Send + 'static>> {
         let this = self.clone();
