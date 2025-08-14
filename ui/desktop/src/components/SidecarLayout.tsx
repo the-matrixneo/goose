@@ -2,7 +2,7 @@ import React, { useState, createContext, useContext, useEffect } from 'react';
 import { X, FileDiff, SquareSplitHorizontal, BetweenHorizontalStart, Globe } from 'lucide-react';
 import { Button } from './ui/button';
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/Tooltip';
-import LocalhostViewer from './LocalhostViewer';
+import SidecarTabs from './SidecarTabs';
 
 interface SidecarView {
   id: string;
@@ -343,17 +343,7 @@ export function SidecarProvider({ children, showSidecar = true }: SidecarProvide
       id: 'localhost',
       title: title,
       icon: <Globe size={16} />,
-      content: (
-        <LocalhostViewer
-          initialUrl={url}
-          onUrlChange={(newUrl) => {
-            // Update the view title with the current URL
-            setViews((prev) =>
-              prev.map((v) => (v.id === 'localhost' ? { ...v, fileName: newUrl } : v))
-            );
-          }}
-        />
-      ),
+      content: <SidecarTabs initialUrl={url} />,
       fileName: url,
     };
     showView(localhostView);
@@ -435,12 +425,12 @@ export function Sidecar({ className = '' }: { className?: string }) {
   return (
     <div
       className={`bg-background-default overflow-hidden rounded-2xl flex flex-col h-full ${className}`}
-      style={{ 
-        marginTop: '8px',    // Match w-2 (0.5rem = 8px)
+      style={{
+        marginTop: '8px', // Match w-2 (0.5rem = 8px)
         marginBottom: '8px', // Match w-2 (0.5rem = 8px)
-        marginLeft: '2px',   // Match gap-0.5 (0.125rem = 2px)
-        marginRight: '8px',  // Match w-2 (0.5rem = 8px)
-        height: 'calc(100% - 16px)' // Adjust for 8px margin on top and bottom
+        marginLeft: '2px', // Match gap-0.5 (0.125rem = 2px)
+        marginRight: '8px', // Match w-2 (0.5rem = 8px)
+        height: 'calc(100% - 16px)', // Adjust for 8px margin on top and bottom
       }}
     >
       {currentView && (

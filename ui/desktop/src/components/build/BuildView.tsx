@@ -92,18 +92,20 @@ const BuildView: React.FC = () => {
     // Listen for app creation progress
     const handleProgress = (_event: IpcRendererEvent, ...args: unknown[]) => {
       const data = args[0] as { appName: string; lastLine: string; type: 'stdout' | 'stderr' };
-      
+
       // Update the specific creating app's progress
-      setCreatingApps(prev => prev.map(app => 
-        app.appName === data.appName 
-          ? {
-              ...app,
-              progress: data.lastLine,
-              log: [...app.log, data.lastLine],
-              hasError: app.hasError || data.type === 'stderr'
-            }
-          : app
-      ));
+      setCreatingApps((prev) =>
+        prev.map((app) =>
+          app.appName === data.appName
+            ? {
+                ...app,
+                progress: data.lastLine,
+                log: [...app.log, data.lastLine],
+                hasError: app.hasError || data.type === 'stderr',
+              }
+            : app
+        )
+      );
     };
 
     window.electron.on('app-creation-progress', handleProgress);
@@ -225,10 +227,10 @@ const BuildView: React.FC = () => {
       progress: 'Starting app creation...',
       log: [],
       hasError: false,
-      startTime: Date.now()
+      startTime: Date.now(),
     };
 
-    setCreatingApps(prev => [...prev, newCreatingApp]);
+    setCreatingApps((prev) => [...prev, newCreatingApp]);
 
     // Close dialog and reset form
     setShowCreateDialog(false);
@@ -247,12 +249,12 @@ const BuildView: React.FC = () => {
       if (newCreatingApp.subdomain && canConnectToSites && subdomainAvailable) {
         try {
           // Update progress for subdomain claiming
-          setCreatingApps(prev => prev.map(app => 
-            app.id === creatingAppId 
-              ? { ...app, progress: 'Claiming subdomain...' }
-              : app
-          ));
-          
+          setCreatingApps((prev) =>
+            prev.map((app) =>
+              app.id === creatingAppId ? { ...app, progress: 'Claiming subdomain...' } : app
+            )
+          );
+
           await window.electron.ipcRenderer.invoke(
             'claim-subdomain',
             newCreatingApp.subdomain,
@@ -270,21 +272,23 @@ const BuildView: React.FC = () => {
       });
 
       // Remove from creating apps and reload the apps list
-      setCreatingApps(prev => prev.filter(app => app.id !== creatingAppId));
+      setCreatingApps((prev) => prev.filter((app) => app.id !== creatingAppId));
       await loadApps();
     } catch (err) {
       console.error('[BuildView] Failed to create app:', err);
-      
+
       // Mark the creating app as having an error
-      setCreatingApps(prev => prev.map(app => 
-        app.id === creatingAppId 
-          ? { 
-              ...app, 
-              hasError: true, 
-              progress: err instanceof Error ? err.message : 'Unknown error occurred' 
-            }
-          : app
-      ));
+      setCreatingApps((prev) =>
+        prev.map((app) =>
+          app.id === creatingAppId
+            ? {
+                ...app,
+                hasError: true,
+                progress: err instanceof Error ? err.message : 'Unknown error occurred',
+              }
+            : app
+        )
+      );
 
       toastError({
         title: 'Failed to create app',
@@ -315,8 +319,8 @@ const BuildView: React.FC = () => {
           'X-Secret-Key': secretKey,
         },
         body: JSON.stringify({
-          project_dir: app.path
-        })
+          project_dir: app.path,
+        }),
       });
 
       if (!response.ok) {
@@ -342,8 +346,8 @@ const BuildView: React.FC = () => {
           },
           body: JSON.stringify({
             tool_name: 'build__manage_server',
-            arguments: { action: 'port' }
-          })
+            arguments: { action: 'port' },
+          }),
         });
 
         if (portResponse.ok) {
@@ -360,6 +364,7 @@ const BuildView: React.FC = () => {
         console.warn('Failed to get port from manage_server, using default 3000', err);
       }
       localStorage.setItem('goose-sidecar-url', `http://localhost:${port}`);
+      localStorage.setItem('goose-current-project-path', app.path);
 
       // 1) Navigate to ChatView
       window.location.hash = '#/pair';
@@ -368,7 +373,9 @@ const BuildView: React.FC = () => {
       // Use a small delay to let the router/layout mount
       setTimeout(() => {
         try {
-          const evt = new CustomEvent('open-sidecar-localhost', { detail: { url: `http://localhost:${port}` } });
+          const evt = new CustomEvent('open-sidecar-localhost', {
+            detail: { url: `http://localhost:${port}` },
+          });
           window.dispatchEvent(evt);
         } catch (e) {
           console.warn('Failed to auto-open sidecar, user can click the globe button.', e);
@@ -415,11 +422,17 @@ const BuildView: React.FC = () => {
 
         {/* Main content area with card-based layout - matching home page structure */}
         <div className="flex-1 overflow-hidden">
-          <div className="h-full overflow-y-auto scroll-smooth" style={{ scrollSnapType: 'y mandatory' }}>
+          <div
+            className="h-full overflow-y-auto scroll-smooth"
+            style={{ scrollSnapType: 'y mandatory' }}
+          >
             <div className="flex flex-col space-y-0.5 p-0.5">
               {isLoading ? (
                 /* Loading state - single container */
-                <div className="bg-background-default rounded-2xl py-6 px-6 min-h-[400px]" style={{ scrollSnapAlign: 'start' }}>
+                <div
+                  className="bg-background-default rounded-2xl py-6 px-6 min-h-[400px]"
+                  style={{ scrollSnapAlign: 'start' }}
+                >
                   <div className="flex items-center justify-center h-full text-text-muted">
                     <div className="flex items-center gap-2">
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-text-muted"></div>
@@ -427,139 +440,160 @@ const BuildView: React.FC = () => {
                     </div>
                   </div>
                 </div>
-              ) : (apps.length > 0 || creatingApps.length > 0) ? (
+              ) : apps.length > 0 || creatingApps.length > 0 ? (
                 /* Apps exist or creating - individual containers for each app */
                 <>
                   {/* Render creating apps first (skeleton placeholders) */}
                   {creatingApps.map((creatingApp) => (
-                <div key={creatingApp.id} className="bg-background-default rounded-2xl py-6 px-6 shadow-inner animate-pulse-slow" style={{ scrollSnapAlign: 'start' }}>
-                  <div className="flex flex-col h-full text-text-muted page-transition">
-                    <div className="flex flex-col items-start">
-                      {/* App image placeholder - animated skeleton */}
-                      <div className="w-8 h-8 bg-blue-100 rounded-md mb-3 flex items-center justify-center animate-pulse-slow">
-                        <div className="w-4 h-4 bg-blue-200 rounded-sm"></div>
-                      </div>
+                    <div
+                      key={creatingApp.id}
+                      className="bg-background-default rounded-2xl py-6 px-6 shadow-inner animate-pulse-slow"
+                      style={{ scrollSnapAlign: 'start' }}
+                    >
+                      <div className="flex flex-col h-full text-text-muted page-transition">
+                        <div className="flex flex-col items-start">
+                          {/* App image placeholder - animated skeleton */}
+                          <div className="w-8 h-8 bg-blue-100 rounded-md mb-3 flex items-center justify-center animate-pulse-slow">
+                            <div className="w-4 h-4 bg-blue-200 rounded-sm"></div>
+                          </div>
 
-                      <h3 className="text-base truncate mb-1 text-text-default">{creatingApp.displayName}</h3>
+                          <h3 className="text-base truncate mb-1 text-text-default">
+                            {creatingApp.displayName}
+                          </h3>
 
-                      {/* Subdomain if provided */}
-                      {creatingApp.subdomain && (
-                        <div className="flex items-center text-text-muted text-xs mb-1">
-                          <Globe className="w-3 h-3 mr-1 flex-shrink-0" />
-                          <span className="text-blue-600">
-                            {creatingApp.subdomain}
-                            {DOMAIN}
-                          </span>
+                          {/* Subdomain if provided */}
+                          {creatingApp.subdomain && (
+                            <div className="flex items-center text-text-muted text-xs mb-1">
+                              <Globe className="w-3 h-3 mr-1 flex-shrink-0" />
+                              <span className="text-blue-600">
+                                {creatingApp.subdomain}
+                                {DOMAIN}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Creation progress */}
+                          <div className="flex items-center text-text-muted text-xs mb-1">
+                            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-text-subtle mr-1 flex-shrink-0"></div>
+                            <span
+                              className={creatingApp.hasError ? 'text-red-600' : 'text-text-subtle'}
+                            >
+                              {creatingApp.progress}
+                            </span>
+                          </div>
+
+                          {/* Folder path placeholder */}
+                          <div className="flex items-center text-text-muted text-xs mb-4">
+                            <FolderOpen className="w-3 h-3 mr-1 flex-shrink-0" />
+                            <span className="truncate">~/goose/apps/{creatingApp.appName}</span>
+                          </div>
                         </div>
-                      )}
 
-                      {/* Creation progress */}
-                      <div className="flex items-center text-text-muted text-xs mb-1">
-                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-text-subtle mr-1 flex-shrink-0"></div>
-                        <span className={creatingApp.hasError ? 'text-red-600' : 'text-text-subtle'}>
-                          {creatingApp.progress}
-                        </span>
-                      </div>
-
-                      {/* Folder path placeholder */}
-                      <div className="flex items-center text-text-muted text-xs mb-4">
-                        <FolderOpen className="w-3 h-3 mr-1 flex-shrink-0" />
-                        <span className="truncate">~/goose/apps/{creatingApp.appName}</span>
-                      </div>
-                    </div>
-
-                    <div className="flex justify-end mt-auto pt-6">
-                      <Button
-                        variant="secondary"
-                        className="flex items-center gap-2 opacity-50"
-                        disabled={true}
-                      >
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-text-subtle"></div>
-                        Creating...
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-
-              {/* Render existing apps */}
-              {apps.map((app) => (
-                <div key={app.id} className="bg-background-default rounded-2xl py-6 px-6 shadow-lg transition-shadow duration-700 ease-out" style={{ scrollSnapAlign: 'start' }}>
-                  <div className="flex flex-col h-full text-text-muted page-transition">
-                    <div className="flex flex-col items-start">
-                      {/* App image placeholder - 32x32 rounded square */}
-                      <div
-                        className={`w-8 h-8 ${appColors[app.id]?.bg || 'bg-background-medium'} rounded-md mb-3 flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity duration-200`}
-                        onClick={(e) => {
-                          e.stopPropagation(); // Prevent triggering the app click
-                          setColorPickerAppId(app.id);
-                        }}
-                      >
-                        <div
-                          className={`w-4 h-4 ${appColors[app.id]?.inner || 'bg-background-strong'} rounded-sm`}
-                        ></div>
-                      </div>
-
-                      <h3 className="text-base truncate mb-1 text-text-default">{app.app_name}</h3>
-
-                      {/* Subdomain if claimed */}
-                      {app.subdomain && (
-                        <div className="flex items-center text-text-muted text-xs mb-1">
-                          <Globe className="w-3 h-3 mr-1 flex-shrink-0" />
-                          <span className="text-blue-600">
-                            {app.subdomain}
-                            {DOMAIN}
-                          </span>
+                        <div className="flex justify-end mt-auto pt-6">
+                          <Button
+                            variant="secondary"
+                            className="flex items-center gap-2 opacity-50"
+                            disabled={true}
+                          >
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-text-subtle"></div>
+                            Creating...
+                          </Button>
                         </div>
-                      )}
-
-                      {/* Timestamp */}
-                      <div className="flex items-center text-text-muted text-xs mb-1">
-                        <Clock className="w-3 h-3 mr-1 flex-shrink-0" />
-                        <span>{formatMessageTimestamp(app.last_edited)}</span>
-                      </div>
-
-                      {/* Path */}
-                      <div 
-                        className="flex items-center text-text-muted text-xs mb-4 cursor-pointer hover:text-text-standard transition-colors duration-200"
-                        onClick={(e) => {
-                          e.stopPropagation(); // Prevent triggering the app click
-                          window.electron.openDirectoryInExplorer(app.path);
-                        }}
-                        title="Open in Finder"
-                      >
-                        <FolderOpen className="w-3 h-3 mr-1 flex-shrink-0" />
-                        <span className="truncate">{app.path}</span>
                       </div>
                     </div>
+                  ))}
 
-                    <div className="flex justify-end mt-auto pt-6">
-                      <Button
-                        onClick={() => handleAppClick(app)}
-                        variant="secondary"
-                        className="flex items-center gap-2"
-                      >
-                        <ChatSmart className="w-4 h-4" />
-                        Open in chat
-                      </Button>
+                  {/* Render existing apps */}
+                  {apps.map((app) => (
+                    <div
+                      key={app.id}
+                      className="bg-background-default rounded-2xl py-6 px-6 shadow-lg transition-shadow duration-700 ease-out"
+                      style={{ scrollSnapAlign: 'start' }}
+                    >
+                      <div className="flex flex-col h-full text-text-muted page-transition">
+                        <div className="flex flex-col items-start">
+                          {/* App image placeholder - 32x32 rounded square */}
+                          <div
+                            className={`w-8 h-8 ${appColors[app.id]?.bg || 'bg-background-medium'} rounded-md mb-3 flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity duration-200`}
+                            onClick={(e) => {
+                              e.stopPropagation(); // Prevent triggering the app click
+                              setColorPickerAppId(app.id);
+                            }}
+                          >
+                            <div
+                              className={`w-4 h-4 ${appColors[app.id]?.inner || 'bg-background-strong'} rounded-sm`}
+                            ></div>
+                          </div>
+
+                          <h3 className="text-base truncate mb-1 text-text-default">
+                            {app.app_name}
+                          </h3>
+
+                          {/* Subdomain if claimed */}
+                          {app.subdomain && (
+                            <div className="flex items-center text-text-muted text-xs mb-1">
+                              <Globe className="w-3 h-3 mr-1 flex-shrink-0" />
+                              <span className="text-blue-600">
+                                {app.subdomain}
+                                {DOMAIN}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Timestamp */}
+                          <div className="flex items-center text-text-muted text-xs mb-1">
+                            <Clock className="w-3 h-3 mr-1 flex-shrink-0" />
+                            <span>{formatMessageTimestamp(app.last_edited)}</span>
+                          </div>
+
+                          {/* Path */}
+                          <div
+                            className="flex items-center text-text-muted text-xs mb-4 cursor-pointer hover:text-text-standard transition-colors duration-200"
+                            onClick={(e) => {
+                              e.stopPropagation(); // Prevent triggering the app click
+                              window.electron.openDirectoryInExplorer(app.path);
+                            }}
+                            title="Open in Finder"
+                          >
+                            <FolderOpen className="w-3 h-3 mr-1 flex-shrink-0" />
+                            <span className="truncate">{app.path}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex justify-end mt-auto pt-6">
+                          <Button
+                            onClick={() => handleAppClick(app)}
+                            variant="secondary"
+                            className="flex items-center gap-2"
+                          >
+                            <ChatSmart className="w-4 h-4" />
+                            Open in chat
+                          </Button>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              ))}
+                  ))}
 
                   {/* Filler container - extends to fill remaining space */}
-                  <div className="bg-background-default rounded-2xl" style={{ minHeight: "calc(100vh - 300px)" }}></div>
+                  <div
+                    className="bg-background-default rounded-2xl"
+                    style={{ minHeight: 'calc(100vh - 300px)' }}
+                  ></div>
                 </>
               ) : (
                 /* Empty state - two separate containers */
                 <>
                   {/* Empty state content container */}
-                  <div className="bg-background-default rounded-2xl py-6 px-6" style={{ scrollSnapAlign: 'start' }}>
+                  <div
+                    className="bg-background-default rounded-2xl py-6 px-6"
+                    style={{ scrollSnapAlign: 'start' }}
+                  >
                     <div className="flex flex-col h-full text-text-muted page-transition">
                       <div className="flex flex-col items-start">
                         <Hammer className="h-4 w-4 mb-4 text-inverse" />
                         <p className="text-sm">
-                          Your web apps will show up here. Create a new web app to get started in build.
+                          Your web apps will show up here. Create a new web app to get started in
+                          build.
                         </p>
                       </div>
                       <div className="flex justify-end mt-auto pt-6">
@@ -574,9 +608,12 @@ const BuildView: React.FC = () => {
                       </div>
                     </div>
                   </div>
-
                   {/* Filler container - extends to fill remaining space */}
-                  <div className="bg-background-default rounded-2xl" style={{ minHeight: "calc(100vh - 300px)" }}></div>                </>
+                  <div
+                    className="bg-background-default rounded-2xl"
+                    style={{ minHeight: 'calc(100vh - 300px)' }}
+                  ></div>{' '}
+                </>
               )}
             </div>
           </div>
@@ -674,7 +711,9 @@ const BuildView: React.FC = () => {
                   {displayAppName && appName !== displayAppName && (
                     <div className="mt-1 p-2 bg-background-muted rounded text-xs">
                       <span className="text-text-muted">App folder name: </span>
-                      <span className="text-text-standard font-mono">{appName || '(invalid name)'}</span>
+                      <span className="text-text-standard font-mono">
+                        {appName || '(invalid name)'}
+                      </span>
                     </div>
                   )}
                   <p className="text-xs text-text-muted mt-1">
@@ -784,9 +823,7 @@ const BuildView: React.FC = () => {
                 </Button>
                 <Button
                   onClick={handleCreateApp}
-                  disabled={
-                    !appName.trim() || (!!subdomain.trim() && !subdomainAvailable)
-                  }
+                  disabled={!appName.trim() || (!!subdomain.trim() && !subdomainAvailable)}
                   variant="default"
                   className="min-w-[120px]"
                 >

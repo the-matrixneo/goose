@@ -2332,14 +2332,14 @@ ipcMain.handle('create-app', async (event, appName: string, subdomain?: string) 
       try {
         // Create destination directory
         await fs.mkdir(destDir, { recursive: true });
-        
+
         // Read source directory
         const entries = await fs.readdir(srcDir, { withFileTypes: true });
-        
+
         for (const entry of entries) {
           const srcPath = path.join(srcDir, entry.name);
           const destPath = path.join(destDir, entry.name);
-          
+
           if (entry.isDirectory()) {
             // Recursively copy subdirectories
             await copyDirectory(srcPath, destPath, interpolate);
@@ -2820,6 +2820,143 @@ ipcMain.handle('load-app-colors', async () => {
     console.error('[Main] Failed to load app colors:', err);
     return {};
   }
+});
+
+// Spec file methods for sidecar viewer
+interface SpecWatcher {
+  watcher: { close: () => void };
+}
+const specWatchers = new Map<string, SpecWatcher>();
+
+ipcMain.handle('list-spec-files', async (_event, projectPath: string) => {
+  const specsDir = path.join(projectPath, 'specs');
+  try {
+    await fs.access(specsDir);
+
+    const entries = await fs.readdir(specsDir, { withFileTypes: true });
+    const specFiles = [];
+
+    for (const entry of entries) {
+      if (entry.isFile() && entry.name.endsWith('.md')) {
+        const filePath = path.join(specsDir, entry.name);
+        const stats = await fs.stat(filePath);
+        specFiles.push({
+          name: entry.name,
+          path: filePath,
+          lastModified: stats.mtime.getTime(),
+        });
+      }
+    }
+
+    return specFiles.sort((a, b) => a.name.localeCompare(b.name));
+  } catch (error) {
+    return [];
+  }
+});
+
+ipcMain.handle('read-spec-file', async (_event, filePath: string) => {
+  try {
+    const content = await fs.readFile(filePath, 'utf-8');
+    return content;
+  } catch (error) {
+    throw new Error(
+      `Failed to read spec file: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
+  }
+});
+
+ipcMain.handle('watch-spec-directory', async (event, projectPath: string) => {
+  const specsDir = path.join(projectPath, 'specs');
+
+  const existingWatcherData = specWatchers.get(specsDir);
+  if (existingWatcherData) {
+    existingWatcherData.watcher.close();
+    specWatchers.delete(specsDir);
+  }
+
+  try {
+    await fs.access(specsDir);
+
+    let lastModifiedTimes = new Map<string, number>();
+
+    const files = await fs.readdir(specsDir);
+    for (const file of files) {
+      if (file.endsWith('.md')) {
+        const filePath = path.join(specsDir, file);
+        try {
+          const stats = await fs.stat(filePath);
+          lastModifiedTimes.set(file, stats.mtime.getTime());
+        } catch (e) {
+          // Skip
+        }
+      }
+    }
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const currentFiles = await fs.readdir(specsDir);
+
+        for (const file of currentFiles) {
+          if (file.endsWith('.md')) {
+            const filePath = path.join(specsDir, file);
+            try {
+              const stats = await fs.stat(filePath);
+              const currentMtime = stats.mtime.getTime();
+              const lastMtime = lastModifiedTimes.get(file);
+
+              if (!lastMtime || currentMtime !== lastMtime) {
+                lastModifiedTimes.set(file, currentMtime);
+
+                if (event.sender && !event.sender.isDestroyed()) {
+                  event.sender.send('spec-files-changed', {
+                    eventType: lastMtime ? 'change' : 'add',
+                    filename: file,
+                    directory: specsDir,
+                  });
+                }
+              }
+            } catch (e) {
+              // Skip
+            }
+          }
+        }
+
+        for (const [file] of lastModifiedTimes) {
+          if (!currentFiles.includes(file)) {
+            lastModifiedTimes.delete(file);
+
+            if (event.sender && !event.sender.isDestroyed()) {
+              event.sender.send('spec-files-changed', {
+                eventType: 'unlink',
+                filename: file,
+                directory: specsDir,
+              });
+            }
+          }
+        }
+      } catch (error) {
+        // Skip
+      }
+    }, 1000);
+
+    specWatchers.set(specsDir, {
+      watcher: { close: () => clearInterval(pollInterval) },
+    });
+
+    return true;
+  } catch (error) {
+    return false;
+  }
+});
+
+ipcMain.handle('unwatch-spec-directory', async (_event, projectPath: string) => {
+  const specsDir = path.join(projectPath, 'specs');
+  const watcherData = specWatchers.get(specsDir);
+  if (watcherData) {
+    watcherData.watcher.close();
+    specWatchers.delete(specsDir);
+  }
+  return true;
 });
 
 app.on('will-quit', async () => {

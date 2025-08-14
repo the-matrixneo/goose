@@ -126,6 +126,20 @@ type ElectronAPI = {
   saveAppColor: (appId: string, colors: { bg: string; inner: string }) => Promise<boolean>;
   loadAppColors: () => Promise<Record<string, { bg: string; inner: string }>>;
   openDirectoryInExplorer: (directoryPath: string) => Promise<boolean>;
+  // Spec file rendering and refreshing
+  listSpecFiles: (
+    projectPath: string
+  ) => Promise<{ name: string; path: string; lastModified: number }[]>;
+  readSpecFile: (filePath: string) => Promise<string>;
+  watchSpecDirectory: (projectPath: string) => Promise<boolean>;
+  unwatchSpecDirectory: (projectPath: string) => Promise<boolean>;
+  onSpecFilesChanged: (
+    callback: (data: { eventType: string; filename: string; directory: string }) => void
+  ) => void;
+  offSpecFilesChanged: (
+    callback: (data: { eventType: string; filename: string; directory: string }) => void
+  ) => void;
+
   // IPC handlers for subdomain checking and claiming
   ipcRenderer: {
     invoke: (channel: string, ...args: unknown[]) => Promise<unknown>;
@@ -267,7 +281,36 @@ const electronAPI: ElectronAPI = {
   loadAppColors: () => ipcRenderer.invoke('load-app-colors'),
   openDirectoryInExplorer: (directoryPath: string) =>
     ipcRenderer.invoke('open-directory-in-explorer', directoryPath),
-  // IPC handlers for subdomain checking and claiming
+  listSpecFiles: (projectPath: string) => ipcRenderer.invoke('list-spec-files', projectPath),
+  readSpecFile: (filePath: string) => ipcRenderer.invoke('read-spec-file', filePath),
+  watchSpecDirectory: (projectPath: string) =>
+    ipcRenderer.invoke('watch-spec-directory', projectPath),
+  unwatchSpecDirectory: (projectPath: string) =>
+    ipcRenderer.invoke('unwatch-spec-directory', projectPath),
+  onSpecFilesChanged: (
+    callback: (data: { eventType: string; filename: string; directory: string }) => void
+  ) => {
+    const wrapper = (
+      _event: Electron.IpcRendererEvent,
+      data: { eventType: string; filename: string; directory: string }
+    ) => callback(data);
+    ipcRenderer.on('spec-files-changed', wrapper);
+    // Store the wrapper so it can be removed later
+    (callback as unknown as { _wrapper?: typeof wrapper })._wrapper = wrapper;
+  },
+  offSpecFilesChanged: (
+    callback: (data: { eventType: string; filename: string; directory: string }) => void
+  ) => {
+    type WrapperType = (
+      event: Electron.IpcRendererEvent,
+      data: { eventType: string; filename: string; directory: string }
+    ) => void;
+    const wrapper = (callback as unknown as { _wrapper?: WrapperType })._wrapper;
+    if (wrapper) {
+      ipcRenderer.removeListener('spec-files-changed', wrapper);
+      delete (callback as unknown as { _wrapper?: WrapperType })._wrapper;
+    }
+  },
   ipcRenderer: {
     invoke: (channel: string, ...args: unknown[]) => ipcRenderer.invoke(channel, ...args),
   },

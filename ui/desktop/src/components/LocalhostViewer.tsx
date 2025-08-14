@@ -61,7 +61,7 @@ export function LocalhostViewer({
   const [iframeReady, setIframeReady] = useState(false);
   // eslint-disable-next-line no-undef
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
-  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (onUrlChange) {
@@ -72,33 +72,33 @@ export function LocalhostViewer({
   // Poll the server until it's ready before showing iframe
   useEffect(() => {
     if (iframeReady) return; // Don't run if already ready
-    
+
     setIsLoading(true);
     let mounted = true;
-    let pollInterval: NodeJS.Timeout | null = null;
+    let pollInterval: ReturnType<typeof setInterval> | null = null;
     let attemptCount = 0;
     const maxAttempts = 10;
-    
+
     const checkServerReady = async () => {
       attemptCount++;
-      
+
       try {
         // Try to fetch from the URL to see if server is responding
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 second timeout
-        
-        const response = await fetch(url, { 
+
+        await fetch(url, {
           method: 'HEAD',
           signal: controller.signal,
-          mode: 'no-cors' // Use no-cors to avoid CORS issues during check
+          mode: 'no-cors', // Use no-cors to avoid CORS issues during check
         });
-        
-        clearTimeout(timeoutId);
-        
+
+        window.clearTimeout(timeoutId);
+
         // If we get here without throwing, server is likely ready
         // Note: with mode: 'no-cors', we can't read the response but no error means connection succeeded
         console.log(`Server at ${url} is ready`);
-        
+
         if (mounted) {
           setIframeReady(true);
           if (pollInterval) {
@@ -108,7 +108,7 @@ export function LocalhostViewer({
         }
       } catch (error) {
         console.log(`Server not ready yet (attempt ${attemptCount}/${maxAttempts}):`, error);
-        
+
         if (attemptCount >= maxAttempts) {
           // Give up and show the iframe anyway - let the user manually refresh if needed
           console.log('Max attempts reached, showing iframe anyway');
@@ -122,14 +122,14 @@ export function LocalhostViewer({
         }
       }
     };
-    
+
     // Initial delay to let server start
     const initialTimer = setTimeout(() => {
       if (!mounted) return;
-      
+
       // First check
       checkServerReady();
-      
+
       // Set up polling
       pollInterval = setInterval(() => {
         if (mounted && !iframeReady) {
@@ -137,12 +137,12 @@ export function LocalhostViewer({
         }
       }, 1000); // Poll every second
     }, 800); // Wait 800ms before first check
-    
+
     return () => {
       mounted = false;
-      clearTimeout(initialTimer);
+      window.clearTimeout(initialTimer);
       if (pollInterval) {
-        clearInterval(pollInterval);
+        window.clearInterval(pollInterval);
       }
     };
   }, [url, iframeReady]); // Re-run when URL changes or iframeReady resets
@@ -212,10 +212,10 @@ export function LocalhostViewer({
     setIsLoading(false);
     setError(null);
     setRetryCount(0); // Reset retry count on successful load
-    
+
     // Clear any pending retry timeout
     if (retryTimeoutRef.current) {
-      clearTimeout(retryTimeoutRef.current);
+      window.clearTimeout(retryTimeoutRef.current);
       retryTimeoutRef.current = null;
     }
 
@@ -233,19 +233,21 @@ export function LocalhostViewer({
   const handleIframeError = () => {
     // Implement retry logic with exponential backoff
     const maxRetries = 3;
-    
+
     if (retryCount < maxRetries) {
       const retryDelay = Math.min(1000 * Math.pow(2, retryCount), 5000); // Exponential backoff: 1s, 2s, 4s (max 5s)
-      
-      console.log(`Retrying to load ${url} (attempt ${retryCount + 1}/${maxRetries}) in ${retryDelay}ms...`);
-      
+
+      console.log(
+        `Retrying to load ${url} (attempt ${retryCount + 1}/${maxRetries}) in ${retryDelay}ms...`
+      );
+
       // Clear any existing retry timeout
       if (retryTimeoutRef.current) {
-        clearTimeout(retryTimeoutRef.current);
+        window.clearTimeout(retryTimeoutRef.current);
       }
-      
+
       retryTimeoutRef.current = setTimeout(() => {
-        setRetryCount(prev => prev + 1);
+        setRetryCount((prev) => prev + 1);
         if (iframeRef.current) {
           // Force reload by setting src
           const currentSrc = iframeRef.current.src;
@@ -255,7 +257,9 @@ export function LocalhostViewer({
       }, retryDelay);
     } else {
       setIsLoading(false);
-      setError(`Failed to load ${url} after ${maxRetries} attempts. Make sure the server is running.`);
+      setError(
+        `Failed to load ${url} after ${maxRetries} attempts. Make sure the server is running.`
+      );
     }
   };
 
@@ -263,7 +267,7 @@ export function LocalhostViewer({
   useEffect(() => {
     return () => {
       if (retryTimeoutRef.current) {
-        clearTimeout(retryTimeoutRef.current);
+        window.clearTimeout(retryTimeoutRef.current);
       }
     };
   }, []);
