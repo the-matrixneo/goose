@@ -197,7 +197,6 @@ impl Agent {
         *tool_monitor = Some(ToolMonitor::new(max_repetitions));
     }
 
-    /// Clear the TODO list content
     pub async fn clear_todo_list(&self) {
         let mut todo_list = self.todo_list.lock().await;
         todo_list.clear();
@@ -206,28 +205,21 @@ impl Agent {
     /// Reset all session-specific state while preserving configuration
     /// This should be called between sessions to ensure a clean slate
     pub async fn reset_session_state(&self) {
-        // Clear TODO list
         self.clear_todo_list().await;
 
-        // Reset retry attempts
         self.reset_retry_attempts().await;
 
-        // Clear tool monitor (tracking repetitions)
         let mut tool_monitor = self.tool_monitor.lock().await;
         *tool_monitor = None;
 
-        // Clear final output tool
         let mut final_output = self.final_output_tool.lock().await;
         *final_output = None;
 
-        // Clear sub-recipes (these are typically session-specific)
         let mut sub_recipe_manager = self.sub_recipe_manager.lock().await;
         sub_recipe_manager.clear();
 
-        // Reset tasks manager state
         self.tasks_manager.reset().await;
 
-        // Clear any session-specific prompt extensions
         let mut prompt_manager = self.prompt_manager.lock().await;
         prompt_manager.clear_session_extras();
     }
