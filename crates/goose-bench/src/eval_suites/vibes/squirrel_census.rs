@@ -80,8 +80,7 @@ After writing the script, run it using python3 and show the results. Do not ask 
                                 return false;
                             }
 
-                            if let Ok(args) =
-                                serde_json::from_value::<Value>(tool_call.arguments.clone())
+                            if let Some(args) = tool_call.arguments.as_ref()
                             {
                                 args.get("command").and_then(Value::as_str) == Some("write")
                                     && args
@@ -110,8 +109,7 @@ After writing the script, run it using python3 and show the results. Do not ask 
                                 return false;
                             }
 
-                            if let Ok(args) =
-                                serde_json::from_value::<Value>(tool_call.arguments.clone())
+                            if let Some(args) = tool_call.arguments.as_ref()
                             {
                                 args.get("command")
                                     .and_then(Value::as_str)

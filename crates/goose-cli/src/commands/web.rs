@@ -13,6 +13,7 @@ use goose::agents::{Agent, AgentEvent};
 use goose::conversation::message::Message as GooseMessage;
 use goose::conversation::Conversation;
 use goose::session;
+use rmcp::model::JsonObject;
 use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, sync::Arc};
 use tokio::sync::{Mutex, RwLock};
@@ -547,7 +548,7 @@ async fn process_message_streaming(
                                                 serde_json::to_string(
                                                     &WebSocketMessage::ToolRequest {
                                                         id: req.id.clone(),
-                                                        tool_name: tool_call.name.clone(),
+                                                        tool_name: tool_call.name.to_string(),
                                                         arguments: tool_call.arguments.clone(),
                                                     },
                                                 )

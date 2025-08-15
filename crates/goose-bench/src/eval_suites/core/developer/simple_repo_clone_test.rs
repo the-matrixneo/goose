@@ -47,8 +47,8 @@ impl Evaluation for SimpleRepoCloneTest {
                                 return false;
                             }
 
-                            if let Ok(args) =
-                                serde_json::from_value::<Value>(tool_call.arguments.clone())
+                            if let Some(args) =
+                                tool_call.arguments.as_ref()
                             {
                                 let command = args.get("command").and_then(Value::as_str);
                                 command.is_some_and(|cmd| {
@@ -77,8 +77,8 @@ impl Evaluation for SimpleRepoCloneTest {
                                 return false;
                             }
 
-                            if let Ok(args) =
-                                serde_json::from_value::<Value>(tool_call.arguments.clone())
+                            if let Some(args) =
+                                tool_call.arguments.as_ref()
                             {
                                 let command = args.get("command").and_then(Value::as_str);
                                 command.is_some_and(|cmd| {
@@ -109,8 +109,8 @@ impl Evaluation for SimpleRepoCloneTest {
                                 return false;
                             }
 
-                            if let Ok(args) =
-                                serde_json::from_value::<Value>(tool_call.arguments.clone())
+                            if let Some(args) =
+                                tool_call.arguments.as_ref()
                             {
                                 let command = args.get("command").and_then(Value::as_str);
                                 let file_text = args.get("file_text").and_then(Value::as_str);
@@ -151,8 +151,8 @@ impl Evaluation for SimpleRepoCloneTest {
                                 return false;
                             }
 
-                            if let Ok(args) =
-                                serde_json::from_value::<Value>(tool_call.arguments.clone())
+                            if let Some(args) =
+                                tool_call.arguments.as_ref()
                             {
                                 let command = args.get("command").and_then(Value::as_str);
                                 command.is_some_and(|cmd| {

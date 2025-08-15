@@ -127,9 +127,9 @@ pub fn tool_request_to_markdown(req: &ToolRequest, export_all_content: bool) -> 
             ));
             md.push_str("**Arguments:**\n");
 
-            match call.name.as_str() {
+            match call.name.as_ref() {
                 "developer__shell" => {
-                    if let Some(Value::String(command)) = call.arguments.get("command") {
+                    if let Some(Value::String(command)) = call.arguments.as_ref().and_then(|args| args.get("command")) {
                         md.push_str(&format!(
                             "*   **command**:\n    ```sh\n    {}\n    ```\n",
                             command.trim()
@@ -137,7 +137,7 @@ pub fn tool_request_to_markdown(req: &ToolRequest, export_all_content: bool) -> 
                     }
                     let other_args: serde_json::Map<String, Value> = call
                         .arguments
-                        .as_object()
+                        .as_ref()
                         .map(|obj| {
                             obj.iter()
                                 .filter(|(k, _)| k.as_str() != "command")
@@ -154,10 +154,10 @@ pub fn tool_request_to_markdown(req: &ToolRequest, export_all_content: bool) -> 
                     }
                 }
                 "developer__text_editor" => {
-                    if let Some(Value::String(path)) = call.arguments.get("path") {
+                    if let Some(Value::String(path)) = call.arguments.as_ref().and_then(|args| args.get("path")) {
                         md.push_str(&format!("*   **path**: `{}`\n", path));
                     }
-                    if let Some(Value::String(code_edit)) = call.arguments.get("code_edit") {
+                    if let Some(Value::String(code_edit)) = call.arguments.as_ref().and_then(|args| args.get("code_edit")) {
                         md.push_str(&format!(
                             "*   **code_edit**:\n    ```\n{}\n    ```\n",
                             code_edit
@@ -166,7 +166,7 @@ pub fn tool_request_to_markdown(req: &ToolRequest, export_all_content: bool) -> 
 
                     let other_args: serde_json::Map<String, Value> = call
                         .arguments
-                        .as_object()
+                        .as_ref()
                         .map(|obj| {
                             obj.iter()
                                 .filter(|(k, _)| k.as_str() != "path" && k.as_str() != "code_edit")
@@ -183,7 +183,9 @@ pub fn tool_request_to_markdown(req: &ToolRequest, export_all_content: bool) -> 
                     }
                 }
                 _ => {
-                    md.push_str(&value_to_markdown(&call.arguments, 0, export_all_content));
+                    if let Some(args) = &call.arguments {
+                        md.push_str(&value_to_markdown(&serde_json::Value::Object(args.clone()), 0, export_all_content));
+                    }
                 }
             }
         }

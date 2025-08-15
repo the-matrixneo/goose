@@ -244,7 +244,7 @@ pub fn goose_mode_message(text: &str) {
 
 fn render_tool_request(req: &ToolRequest, theme: Theme, debug: bool) {
     match &req.tool_call {
-        Ok(call) => match call.name.as_str() {
+        Ok(call) => match call.name.as_ref() {
             "developer__text_editor" => render_text_editor_request(call, debug),
             "developer__shell" => render_shell_request(call, debug),
             "dynamic_task__create_task" => render_dynamic_task_request(call, debug),
@@ -390,7 +390,8 @@ fn render_text_editor_request(call: &CallToolRequestParam, debug: bool) {
     print_tool_header(call);
 
     // Print path first with special formatting
-    if let Some(Value::String(path)) = call.arguments.get("path") {
+    if let Some(args) = call.arguments.as_ref() {
+        if let Some(Value::String(path)) = args.get("path") {
         println!(
             "{}: {}",
             style("path").dim(),
@@ -398,8 +399,7 @@ fn render_text_editor_request(call: &CallToolRequestParam, debug: bool) {
         );
     }
 
-    // Print other arguments normally, excluding path
-    if let Some(args) = call.arguments.as_object() {
+        // Print other arguments normally, excluding path
         let mut other_args = serde_json::Map::new();
         for (k, v) in args {
             if k != "path" {
@@ -414,11 +414,13 @@ fn render_text_editor_request(call: &CallToolRequestParam, debug: bool) {
 fn render_shell_request(call: &CallToolRequestParam, debug: bool) {
     print_tool_header(call);
 
-    match call.arguments.get("command") {
-        Some(Value::String(s)) => {
-            println!("{}: {}", style("command").dim(), style(s).green());
+    if let Some(args) = call.arguments.as_ref() {
+        match args.get("command") {
+            Some(Value::String(s)) => {
+                println!("{}: {}", style("command").dim(), style(s).green());
+            }
+            _ => print_params(&Value::Object(args.clone()), 0, debug),
         }
-        _ => print_params(&call.arguments, 0, debug),
     }
 }
 
@@ -426,23 +428,25 @@ fn render_dynamic_task_request(call: &CallToolRequestParam, debug: bool) {
     print_tool_header(call);
 
     // Print task_parameters array
-    if let Some(Value::Array(task_parameters)) = call.arguments.get("task_parameters") {
-        println!("{}:", style("task_parameters").dim());
+    if let Some(args) = call.arguments.as_ref() {
+        if let Some(Value::Array(task_parameters)) = args.get("task_parameters") {
+            println!("{}:", style("task_parameters").dim());
 
-        for task_param in task_parameters.iter() {
-            println!("    -");
+            for task_param in task_parameters.iter() {
+                println!("    -");
 
-            if let Some(param_obj) = task_param.as_object() {
-                for (key, value) in param_obj {
-                    match value {
-                        Value::String(s) => {
-                            // For strings, print the full content without truncation
-                            println!("        {}: {}", style(key).dim(), style(s).green());
-                        }
-                        _ => {
-                            // For everything else, use print_params
-                            print!("        ");
-                            print_params(value, 0, debug);
+                if let Some(param_obj) = task_param.as_object() {
+                    for (key, value) in param_obj {
+                        match value {
+                            Value::String(s) => {
+                                // For strings, print the full content without truncation
+                                println!("        {}: {}", style(key).dim(), style(s).green());
+                            }
+                            _ => {
+                                // For everything else, use print_params
+                                print!("        ");
+                                print_params(value, 0, debug);
+                            }
                         }
                     }
                 }
@@ -457,18 +461,19 @@ fn render_todo_request(call: &CallToolRequestParam, _debug: bool) {
     print_tool_header(call);
 
     // For todo tools, always show the full content without redaction
-    if let Some(Value::String(content)) = call.arguments.get("content") {
-        println!("{}: {}", style("content").dim(), style(content).green());
-    } else {
-        // For todo__read, there are no arguments
-        // Just print an empty line for consistency
+    if let Some(args) = call.arguments.as_ref() {
+        if let Some(Value::String(content)) = args.get("content") {
+            println!("{}: {}", style("content").dim(), style(content).green());
+        }
     }
     println!();
 }
 
 fn render_default_request(call: &CallToolRequestParam, debug: bool) {
     print_tool_header(call);
-    print_params(&call.arguments, 0, debug);
+    if let Some(args) = call.arguments.as_ref() {
+        print_params(&Value::Object(args.clone()), 0, debug);
+    }
     println!();
 }
 

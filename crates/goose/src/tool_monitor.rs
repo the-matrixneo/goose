@@ -33,7 +33,7 @@ impl ToolMonitor {
         }
 
         if let Some(last) = &self.last_call {
-            if last.matches(&tool_call) {
+            if last.name == tool_call.name && last.arguments == tool_call.arguments {
                 self.repeat_count += 1;
                 if self.repeat_count > self.max_repetitions.unwrap() {
                     return false;

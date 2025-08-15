@@ -69,7 +69,7 @@ fn track_tool_telemetry(content: &MessageContent, all_messages: &[Message]) {
                         }
                     })
                 })
-                .unwrap_or_else(|| "unknown".to_string());
+                .unwrap_or_else(|| "unknown".to_string().into());
 
             let success = tool_response.tool_result.is_ok();
             let result_status = if success { "success" } else { "error" };

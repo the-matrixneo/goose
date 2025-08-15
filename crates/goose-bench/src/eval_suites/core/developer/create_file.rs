@@ -51,7 +51,7 @@ impl Evaluation for DeveloperCreateFile {
                         }
 
                         // Parse the arguments as JSON
-                        if let Ok(args) = serde_json::from_value::<Value>(tool_call.arguments.clone()) {
+                        if let Some(args) = tool_call.arguments.as_ref() {
                             // Check all required parameters match exactly
                             args.get("command").and_then(Value::as_str) == Some("write") &&
                             args.get("path").and_then(Value::as_str).is_some_and(|s| s.contains("test.txt")) &&
@@ -82,7 +82,7 @@ impl Evaluation for DeveloperCreateFile {
                         }
 
                         // Parse the arguments as JSON
-                        if let Ok(args) = serde_json::from_value::<Value>(tool_call.arguments.clone()) {
+                        if let Some(args) = tool_call.arguments.as_ref() {
                             // Check all required parameters match exactly
                             args.get("command").and_then(Value::as_str) == Some("view") &&
                             args.get("path").and_then(Value::as_str).is_some_and(|s| s.contains("test.txt"))
