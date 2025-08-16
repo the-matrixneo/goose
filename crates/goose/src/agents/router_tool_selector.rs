@@ -11,6 +11,7 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
+use crate::agents::router_tools::ROUTER_LLM_SEARCH_TOOL_NAME;
 use crate::conversation::message::Message;
 use crate::prompt_template::render_global_file;
 use crate::providers::base::Provider;
@@ -28,12 +29,16 @@ pub trait RouterToolSelector: Send + Sync {
     async fn remove_tool(&self, tool_name: &str) -> Result<(), ErrorData>;
     async fn record_tool_call(&self, tool_name: &str) -> Result<(), ErrorData>;
     async fn get_recent_tool_calls(&self, limit: usize) -> Result<Vec<String>, ErrorData>;
+    // NEW: Add method to get selected tools
+    async fn get_selected_tools(&self, limit: usize) -> Result<Vec<String>, ErrorData>;
 }
 
 pub struct LLMToolSelector {
     llm_provider: Arc<dyn Provider>,
     tool_strings: Arc<RwLock<HashMap<String, String>>>, // extension_name -> tool_string
     recent_tool_calls: Arc<RwLock<VecDeque<String>>>,
+    // NEW: Track selected tools from router searches
+    selected_tools: Arc<RwLock<VecDeque<String>>>,
 }
 
 impl LLMToolSelector {
@@ -42,6 +47,8 @@ impl LLMToolSelector {
             llm_provider: provider.clone(),
             tool_strings: Arc::new(RwLock::new(HashMap::new())),
             recent_tool_calls: Arc::new(RwLock::new(VecDeque::with_capacity(100))),
+            // NEW: Initialize selected tools tracking
+            selected_tools: Arc::new(RwLock::new(VecDeque::with_capacity(50))),
         })
     }
 }
@@ -107,6 +114,10 @@ impl RouterToolSelector for LLMToolSelector {
             let (message, _usage) = response;
             let text = message.content[0].as_text().unwrap_or_default();
 
+            // NEW: Extract and record tool names from the response
+            let selected_tool_names = self.extract_tool_names_from_response(&text);
+            self.record_selected_tools(&selected_tool_names).await?;
+
             // Split the response into individual tool entries
             let tool_entries: Vec<Content> = text
                 .split("\n\n")
@@ -118,6 +129,12 @@ impl RouterToolSelector for LLMToolSelector {
         } else {
             Ok(vec![])
         }
+    }
+
+    // NEW: Get selected tools (similar to get_recent_tool_calls)
+    async fn get_selected_tools(&self, limit: usize) -> Result<Vec<String>, ErrorData> {
+        let selected_tools = self.selected_tools.read().await;
+        Ok(selected_tools.iter().take(limit).cloned().collect())
     }
 
     async fn index_tools(&self, tools: &[Tool], extension_name: &str) -> Result<(), ErrorData> {
@@ -172,10 +189,133 @@ impl RouterToolSelector for LLMToolSelector {
     }
 }
 
+impl LLMToolSelector {
+    // NEW: Extract tool names from router response
+    fn extract_tool_names_from_response(&self, response_text: &str) -> Vec<String> {
+        response_text
+            .split("\n\n")
+            .filter(|entry| entry.trim().starts_with("Tool:"))
+            .filter_map(|entry| {
+                entry
+                    .lines()
+                    .next()
+                    .and_then(|line| line.strip_prefix("Tool:"))
+                    .map(|name| name.trim().to_string())
+            })
+            .filter(|tool_name| tool_name != ROUTER_LLM_SEARCH_TOOL_NAME) // Don't include the router tool itself
+            .collect()
+    }
+
+    // NEW: Record selected tools
+    async fn record_selected_tools(&self, tool_names: &[String]) -> Result<(), ErrorData> {
+        let mut selected_tools = self.selected_tools.write().await;
+
+        // Add new selected tools to the front (most recent first)
+        for tool_name in tool_names.iter().rev() {
+            // Remove if already exists (to avoid duplicates)
+            selected_tools.retain(|name| name != tool_name);
+            // Add to front
+            selected_tools.push_front(tool_name.clone());
+        }
+
+        // Keep only the most recent 50 selected tools
+        while selected_tools.len() > 50 {
+            selected_tools.pop_back();
+        }
+
+        Ok(())
+    }
+}
+
 // Helper function to create a boxed tool selector
 pub async fn create_tool_selector(
     provider: Arc<dyn Provider>,
 ) -> Result<Box<dyn RouterToolSelector>> {
     let selector = LLMToolSelector::new(provider).await?;
     Ok(Box::new(selector))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::providers::mock::MockProvider;
+
+    #[tokio::test]
+    async fn test_extract_tool_names_from_response() {
+        let provider = Arc::new(MockProvider::new());
+        let selector = LLMToolSelector::new(provider).await.unwrap();
+
+        let response_text = r#"
+Tool: developer__list_files
+Description: List files in a directory
+Schema: {"type": "object"}
+
+Tool: developer__read_file
+Description: Read file contents
+Schema: {"type": "object"}
+
+Tool: router__llm_search
+Description: Search for tools
+Schema: {"type": "object"}
+"#;
+
+        let tool_names = selector.extract_tool_names_from_response(response_text);
+
+        // Should extract tool names but exclude the router tool itself
+        assert_eq!(tool_names.len(), 2);
+        assert!(tool_names.contains(&"developer__list_files".to_string()));
+        assert!(tool_names.contains(&"developer__read_file".to_string()));
+        assert!(!tool_names.contains(&"router__llm_search".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_record_and_get_selected_tools() {
+        let provider = Arc::new(MockProvider::new());
+        let selector = LLMToolSelector::new(provider).await.unwrap();
+
+        // Record some selected tools
+        let tool_names = vec![
+            "developer__list_files".to_string(),
+            "developer__read_file".to_string(),
+        ];
+
+        selector.record_selected_tools(&tool_names).await.unwrap();
+
+        // Get selected tools
+        let selected = selector.get_selected_tools(10).await.unwrap();
+
+        // Should return tools in reverse order (most recent first)
+        assert_eq!(selected.len(), 2);
+        assert_eq!(selected[0], "developer__read_file");
+        assert_eq!(selected[1], "developer__list_files");
+    }
+
+    #[tokio::test]
+    async fn test_selected_tools_deduplication() {
+        let provider = Arc::new(MockProvider::new());
+        let selector = LLMToolSelector::new(provider).await.unwrap();
+
+        // Record tools first time
+        let tool_names1 = vec![
+            "developer__list_files".to_string(),
+            "developer__read_file".to_string(),
+        ];
+        selector.record_selected_tools(&tool_names1).await.unwrap();
+
+        // Record same tools again (should deduplicate)
+        let tool_names2 = vec![
+            "developer__list_files".to_string(),
+            "developer__write_file".to_string(),
+        ];
+        selector.record_selected_tools(&tool_names2).await.unwrap();
+
+        // Get selected tools
+        let selected = selector.get_selected_tools(10).await.unwrap();
+
+        // Should have 3 unique tools, with most recent first
+        assert_eq!(selected.len(), 3);
+        assert_eq!(selected[0], "developer__write_file");
+        assert_eq!(selected[1], "developer__list_files");
+        assert_eq!(selected[2], "developer__read_file");
+    }
 }
