@@ -17,6 +17,7 @@ use tracing::error;
 pub struct ToolRouteManager {
     router_tool_selector: Mutex<Option<Arc<Box<dyn RouterToolSelector>>>>,
     router_disabled_override: Mutex<bool>,
+    dynamically_selected_tools: Mutex<Vec<Tool>>,
 }
 
 impl ToolRouteManager {
@@ -24,12 +25,15 @@ impl ToolRouteManager {
         Self {
             router_tool_selector: Mutex::new(None),
             router_disabled_override: Mutex::new(false),
+            dynamically_selected_tools: Mutex::new(Vec::new()),
         }
     }
 
     pub async fn disable_router_for_recipe(&self) {
         *self.router_disabled_override.lock().await = true;
         *self.router_tool_selector.lock().await = None;
+        // Clear dynamically selected tools when router is disabled
+        *self.dynamically_selected_tools.lock().await = Vec::new();
     }
 
     pub async fn record_tool_requests(&self, requests: &[ToolRequest]) {
@@ -65,6 +69,86 @@ impl ToolRouteManager {
                 None,
             )),
         }
+    }
+
+    pub async fn dispatch_route_search_tool_names(
+        &self,
+        arguments: Value,
+        extension_manager: &Arc<RwLock<ExtensionManager>>,
+    ) -> Result<ToolCallResult, ErrorData> {
+        let selector = self.router_tool_selector.lock().await.clone();
+        match selector.as_ref() {
+            Some(selector) => {
+                // Get tool names from selector
+                match selector.select_tool_names(arguments).await {
+                    Ok(tool_names) => {
+                        // Load the selected tools dynamically
+                        let loaded_tools = self.load_selected_tools(tool_names, extension_manager).await;
+                        
+                        // Update the dynamically selected tools
+                        *self.dynamically_selected_tools.lock().await = loaded_tools.clone();
+                        
+                        // Return the loaded tools as content
+                        let tool_contents: Vec<rmcp::model::Content> = loaded_tools
+                            .iter()
+                            .map(|tool| {
+                                let description = tool.description.as_ref().unwrap_or(&"".to_string());
+                                rmcp::model::Content::text(format!(
+                                    "Tool: {}\nDescription: {}\nSchema: {}",
+                                    tool.name,
+                                    description,
+                                    serde_json::to_string_pretty(&tool.input_schema)
+                                        .unwrap_or_else(|_| "{}".to_string())
+                                ))
+                            })
+                            .collect();
+                        
+                        Ok(ToolCallResult::from(Ok(tool_contents)))
+                    }
+                    Err(e) => Err(ErrorData::new(
+                        ErrorCode::INTERNAL_ERROR,
+                        format!("Failed to select tool names: {}", e),
+                        None,
+                    )),
+                }
+            }
+            None => Err(ErrorData::new(
+                ErrorCode::INTERNAL_ERROR,
+                "No tool selector available".to_string(),
+                None,
+            )),
+        }
+    }
+
+    async fn load_selected_tools(
+        &self,
+        selected_tool_names: Vec<String>,
+        extension_manager: &Arc<RwLock<ExtensionManager>>,
+    ) -> Vec<Tool> {
+        let mut loaded_tools = Vec::new();
+        let extension_manager = extension_manager.read().await;
+        
+        // Load each selected tool by name
+        for tool_name in selected_tool_names {
+            if let Ok(all_tools) = extension_manager.get_prefixed_tools(None).await {
+                if let Some(tool) = all_tools.iter().find(|t| t.name == tool_name) {
+                    // Dedupe check
+                    if !loaded_tools.iter().any(|t| t.name == tool.name) {
+                        loaded_tools.push(tool.clone());
+                    }
+                }
+            }
+        }
+        
+        loaded_tools
+    }
+
+    pub async fn get_dynamically_selected_tools(&self) -> Vec<Tool> {
+        self.dynamically_selected_tools.lock().await.clone()
+    }
+
+    pub async fn clear_dynamically_selected_tools(&self) {
+        *self.dynamically_selected_tools.lock().await = Vec::new();
     }
 
     pub async fn is_router_enabled(&self) -> bool {
@@ -153,11 +237,23 @@ impl ToolRouteManager {
 
         let mut prefixed_tools = vec![];
 
-        // If router is enabled but not functional (no provider), just return the search tool
+        // If router is enabled but not functional (no provider), just return the search tools
         if !self.is_router_functional().await {
             return prefixed_tools;
         }
+        
+        // Add the search tools
         prefixed_tools.push(router_tools::llm_search_tool());
+        prefixed_tools.push(router_tools::llm_search_tool_names());
+
+        // Add dynamically selected tools
+        let dynamically_selected_tools = self.get_dynamically_selected_tools().await;
+        for tool in dynamically_selected_tools {
+            // Dedupe check
+            if !prefixed_tools.iter().any(|t| t.name == tool.name) {
+                prefixed_tools.push(tool);
+            }
+        }
 
         // Get recent tool calls from router tool selector
         let selector = self.router_tool_selector.lock().await.clone();

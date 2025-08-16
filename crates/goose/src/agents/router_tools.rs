@@ -7,6 +7,7 @@ use rmcp::model::{Tool, ToolAnnotations};
 use rmcp::object;
 
 pub const ROUTER_LLM_SEARCH_TOOL_NAME: &str = "router__llm_search";
+pub const ROUTER_LLM_SEARCH_TOOL_NAMES_NAME: &str = "router__llm_search_tool_names";
 
 pub fn llm_search_tool() -> Tool {
     Tool::new(
@@ -34,6 +35,41 @@ pub fn llm_search_tool() -> Tool {
         })
     ).annotate(ToolAnnotations {
         title: Some("LLM search for relevant tools".to_string()),
+        read_only_hint: Some(true),
+        destructive_hint: Some(false),
+        idempotent_hint: Some(false),
+        open_world_hint: Some(false),
+    })
+}
+
+pub fn llm_search_tool_names() -> Tool {
+    Tool::new(
+        ROUTER_LLM_SEARCH_TOOL_NAMES_NAME.to_string(),
+        indoc! {r#"
+            Dynamically loads and selects relevant tools based on the user's messages.
+            This tool searches for the most relevant tools and automatically loads them for use.
+            Format a query to search for the most relevant tools based on the user's messages.
+            Pay attention to the keywords in the user's messages, especially the last message and potential tools they are asking for.
+            This tool should be invoked when the user's messages suggest they are asking for a tool to be run.
+            Use the extension_name parameter to filter tools by the appropriate extension.
+            For example, if the user is asking to list the files in the current directory, you filter for the "developer" extension.
+            Example: {"User": "list the files in the current directory", "Query": "list files in current directory", "Extension Name": "developer", "k": 5}
+            Extension name is not optional, it is required.
+            The returned result will be the dynamically loaded tools that are now available for use.
+            This approach saves context window space by only loading the tools that are actually needed.
+        "#}
+        .to_string(),
+        object!({
+            "type": "object",
+            "required": ["query", "extension_name"],
+            "properties": {
+                "extension_name": {"type": "string", "description": "The name of the extension to filter tools by"},
+                "query": {"type": "string", "description": "The query to search for the most relevant tools based on the user's messages"},
+                "k": {"type": "integer", "description": "The number of tools to retrieve (defaults to 5)", "default": 5}
+            }
+        })
+    ).annotate(ToolAnnotations {
+        title: Some("Dynamic LLM search and load relevant tools".to_string()),
         read_only_hint: Some(true),
         destructive_hint: Some(false),
         idempotent_hint: Some(false),

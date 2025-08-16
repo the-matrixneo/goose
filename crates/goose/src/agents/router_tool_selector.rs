@@ -24,6 +24,7 @@ struct ToolSelectorContext {
 #[async_trait]
 pub trait RouterToolSelector: Send + Sync {
     async fn select_tools(&self, params: Value) -> Result<Vec<Content>, ErrorData>;
+    async fn select_tool_names(&self, params: Value) -> Result<Vec<String>, ErrorData>;
     async fn index_tools(&self, tools: &[Tool], extension_name: &str) -> Result<(), ErrorData>;
     async fn remove_tool(&self, tool_name: &str) -> Result<(), ErrorData>;
     async fn record_tool_call(&self, tool_name: &str) -> Result<(), ErrorData>;
@@ -115,6 +116,84 @@ impl RouterToolSelector for LLMToolSelector {
                 .collect();
 
             Ok(tool_entries)
+        } else {
+            Ok(vec![])
+        }
+    }
+
+    async fn select_tool_names(&self, params: Value) -> Result<Vec<String>, ErrorData> {
+        let query = params
+            .get("query")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| ErrorData {
+                code: ErrorCode::INVALID_PARAMS,
+                message: Cow::from("Missing 'query' parameter"),
+                data: None,
+            })?;
+
+        let extension_name = params
+            .get("extension_name")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+
+        // Get relevant tool strings based on extension_name
+        let tool_strings = self.tool_strings.read().await;
+        let relevant_tools = if let Some(ext) = &extension_name {
+            tool_strings.get(ext).cloned()
+        } else {
+            // If no extension specified, use all tools
+            Some(
+                tool_strings
+                    .values()
+                    .cloned()
+                    .collect::<Vec<String>>()
+                    .join("\n"),
+            )
+        };
+
+        if let Some(tools) = relevant_tools {
+            // Use template to generate the prompt for tool names
+            let context = ToolSelectorContext {
+                tools: tools.clone(),
+                query: query.to_string(),
+            };
+
+            let user_prompt =
+                render_global_file("router_tool_selector_names.md", &context).map_err(|e| ErrorData {
+                    code: ErrorCode::INTERNAL_ERROR,
+                    message: Cow::from(format!("Failed to render prompt template: {}", e)),
+                    data: None,
+                })?;
+
+            let user_message = Message::user().with_text(&user_prompt);
+            let response = self
+                .llm_provider
+                .complete("system", &[user_message], &[])
+                .await
+                .map_err(|e| ErrorData {
+                    code: ErrorCode::INTERNAL_ERROR,
+                    message: Cow::from(format!("Failed to search tools: {}", e)),
+                    data: None,
+                })?;
+
+            // Extract just the message content from the response
+            let (message, _usage) = response;
+            let text = message.content[0].as_text().unwrap_or_default();
+
+            // Parse tool names from the response
+            let tool_names: Vec<String> = text
+                .lines()
+                .filter_map(|line| {
+                    let line = line.trim();
+                    if line.starts_with("Tool:") {
+                        line.strip_prefix("Tool:").map(|s| s.trim().to_string())
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+
+            Ok(tool_names)
         } else {
             Ok(vec![])
         }

@@ -37,11 +37,26 @@ impl Agent {
         let router_enabled = self.tool_route_manager.is_router_enabled().await;
 
         // Get tools from extension manager
-        let mut tools = self.list_tools_for_router().await;
+        let mut tools = if router_enabled {
+            // Start with just the search tools when router is enabled
+            vec![
+                router_tools::llm_search_tool(),
+                router_tools::llm_search_tool_names(),
+            ]
+        } else {
+            // Fall back to regular tools when router is disabled
+            self.list_tools(None).await
+        };
 
-        // If router is disabled and no tools were returned, fall back to regular tools
-        if !router_enabled && tools.is_empty() {
-            tools = self.list_tools(None).await;
+        // If router is enabled, add dynamically selected tools
+        if router_enabled {
+            let dynamically_selected_tools = self.tool_route_manager.get_dynamically_selected_tools().await;
+            for tool in dynamically_selected_tools {
+                // Dedupe check - only add if not already in tools
+                if !tools.iter().any(|t| t.name == tool.name) {
+                    tools.push(tool);
+                }
+            }
         }
 
         // Add frontend tools
