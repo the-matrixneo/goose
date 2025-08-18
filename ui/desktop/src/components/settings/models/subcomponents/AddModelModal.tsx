@@ -142,12 +142,12 @@ export const AddModelModal = ({ onClose, setView }: AddModelModalProps) => {
           },
         ]);
 
-        // Dynamically fetch models per provider via server
+        // Dynamically fetch models per provider via server (parallel fetching)
         setLoadingModels(true);
         setModelsError(null);
-        const groupedOptions: { options: { value: string; label: string; provider: string }[] }[] =
-          [];
-        for (const p of activeProviders) {
+
+        // Create parallel promises for all providers
+        const modelPromises = activeProviders.map(async (p) => {
           const providerName = p.name;
           try {
             let models = await getProviderModels(providerName);
@@ -155,27 +155,47 @@ export const AddModelModal = ({ onClose, setView }: AddModelModalProps) => {
             if ((!models || models.length === 0) && p.metadata.known_models?.length) {
               models = p.metadata.known_models.map((m) => m.name);
             }
-            if (models && models.length > 0) {
-              groupedOptions.push({
-                options: models.map((m) => ({ value: m, label: m, provider: providerName })),
-              });
-            }
+            return { provider: p, models, error: null };
           } catch (e: unknown) {
-            // Fallback to metadata known_models on error
-            setModelsError(
-              `Failed to fetch models for ${providerName}${e instanceof Error ? `: ${e.message}` : ''}`
-            );
+            return {
+              provider: p,
+              models: null,
+              error: `Failed to fetch models for ${providerName}${e instanceof Error ? `: ${e.message}` : ''}`,
+            };
+          }
+        });
 
+        // Wait for all provider requests to complete
+        const results = await Promise.all(modelPromises);
+
+        // Process results and build grouped options
+        const groupedOptions: { options: { value: string; label: string; provider: string }[] }[] =
+          [];
+        const errors: string[] = [];
+
+        results.forEach(({ provider: p, models, error }) => {
+          if (error) {
+            errors.push(error);
+            // Fallback to metadata known_models on error
             if (p.metadata.known_models && p.metadata.known_models.length > 0) {
               groupedOptions.push({
                 options: p.metadata.known_models.map(({ name }) => ({
                   value: name,
                   label: name,
-                  provider: providerName,
+                  provider: p.name,
                 })),
               });
             }
+          } else if (models && models.length > 0) {
+            groupedOptions.push({
+              options: models.map((m) => ({ value: m, label: m, provider: p.name })),
+            });
           }
+        });
+
+        // Set error message if any providers failed
+        if (errors.length > 0) {
+          setModelsError(errors.join('; '));
         }
 
         // Add the "Custom model" option to each provider group

@@ -469,7 +469,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Supported models fetched successfully",
+            "description": "Models fetched successfully",
             "content": {
               "application/json": {
                 "schema": {
