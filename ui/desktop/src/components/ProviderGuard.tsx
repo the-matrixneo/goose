@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useConfig } from './ConfigContext';
 import { SetupModal } from './SetupModal';
 import { startOpenRouterSetup } from '../utils/openRouterSetup';
+import { startTetrateSetup } from '../utils/tetrateSetup';
 import WelcomeGooseLogo from './WelcomeGooseLogo';
 import { initializeSystem } from '../utils/providerUtils';
 import { toastService } from '../toasts';
@@ -29,6 +30,80 @@ export default function ProviderGuard({ children }: ProviderGuardProps) {
     showRetry: boolean;
     autoClose?: number;
   } | null>(null);
+  const [tetrateSetupState, setTetrateSetupState] = useState<{
+    show: boolean;
+    title: string;
+    message: string;
+    showProgress: boolean;
+    showRetry: boolean;
+    autoClose?: number;
+  } | null>(null);
+
+  const handleTetrateSetup = async () => {
+    setTetrateSetupState({
+      show: true,
+      title: 'Setting up Tetrate Agent Router Service',
+      message: 'A browser window will open for authentication...',
+      showProgress: true,
+      showRetry: false,
+    });
+
+    const result = await startTetrateSetup();
+    if (result.success) {
+      setTetrateSetupState({
+        show: true,
+        title: 'Setup Complete!',
+        message: 'Tetrate Agent Router has been configured successfully. Initializing Goose...',
+        showProgress: true,
+        showRetry: false,
+      });
+
+      // After successful Tetrate setup, force reload config and initialize system
+      try {
+        // Get the latest config from disk
+        const config = window.electron.getConfig();
+        const provider = (await read('GOOSE_PROVIDER', false)) ?? config.GOOSE_DEFAULT_PROVIDER;
+        const model = (await read('GOOSE_MODEL', false)) ?? config.GOOSE_DEFAULT_MODEL;
+
+        if (provider && model) {
+          // Initialize the system with the new provider/model
+          await initializeSystem(provider as string, model as string, {
+            getExtensions,
+            addExtension,
+          });
+
+          toastService.configure({ silent: false });
+          toastService.success({
+            title: 'Success!',
+            msg: `Started goose with ${model} by Tetrate Agent Router Service. You can change the model via the lower right corner.`,
+          });
+
+          // Close the modal and mark as having provider
+          setTetrateSetupState(null);
+          setShowFirstTimeSetup(false);
+          setHasProvider(true);
+        } else {
+          throw new Error('Provider or model not found after Tetrate setup');
+        }
+      } catch (error) {
+        console.error('Failed to initialize after Tetrate setup:', error);
+        toastService.configure({ silent: false });
+        toastService.error({
+          title: 'Initialization Failed',
+          msg: `Failed to initialize with Tetrate: ${error instanceof Error ? error.message : String(error)}`,
+          traceback: error instanceof Error ? error.stack || '' : '',
+        });
+      }
+    } else {
+      setTetrateSetupState({
+        show: true,
+        title: 'Tetrate setup pending',
+        message: result.message,
+        showProgress: false,
+        showRetry: true,
+      });
+    }
+  };
 
   const handleOpenRouterSetup = async () => {
     setOpenRouterSetupState({
@@ -146,7 +221,13 @@ export default function ProviderGuard({ children }: ProviderGuardProps) {
     };
   }, [showFirstTimeSetup]);
 
-  if (isChecking && !openRouterSetupState?.show && !showFirstTimeSetup && !showOllamaSetup) {
+  if (
+    isChecking &&
+    !openRouterSetupState?.show &&
+    !tetrateSetupState?.show &&
+    !showFirstTimeSetup &&
+    !showOllamaSetup
+  ) {
     return (
       <div className="flex justify-center items-center py-12">
         <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-textStandard"></div>
@@ -164,6 +245,20 @@ export default function ProviderGuard({ children }: ProviderGuardProps) {
         onRetry={handleOpenRouterSetup}
         autoClose={openRouterSetupState.autoClose}
         onClose={() => setOpenRouterSetupState(null)}
+      />
+    );
+  }
+
+  if (tetrateSetupState?.show) {
+    return (
+      <SetupModal
+        title={tetrateSetupState.title}
+        message={tetrateSetupState.message}
+        showProgress={tetrateSetupState.showProgress}
+        showRetry={tetrateSetupState.showRetry}
+        onRetry={handleTetrateSetup}
+        autoClose={tetrateSetupState.autoClose}
+        onClose={() => setTetrateSetupState(null)}
       />
     );
   }
@@ -202,6 +297,13 @@ export default function ProviderGuard({ children }: ProviderGuardProps) {
 
           <div className="space-y-4">
             <button
+              onClick={handleTetrateSetup}
+              className="w-full px-6 py-3 bg-background-muted text-text-standard rounded-lg hover:bg-background-hover transition-colors font-medium flex items-center justify-center gap-2"
+            >
+              Automatic setup with Tetrate Agent Router Service
+            </button>
+
+            <button
               onClick={handleOpenRouterSetup}
               className="w-full px-6 py-3 bg-background-muted text-text-standard rounded-lg hover:bg-background-hover transition-colors font-medium flex items-center justify-center gap-2"
             >
@@ -234,7 +336,8 @@ export default function ProviderGuard({ children }: ProviderGuardProps) {
           </div>
 
           <p className="text-sm text-text-muted mt-6">
-            OpenRouter provides instant access to multiple AI models with a simple setup.
+            Tetrate provides enterprise-grade AI routing. OpenRouter provides instant access to
+            multiple AI models.
             {ollamaDetected
               ? ' Ollama is also detected on your system for running models locally.'
               : ' You can also install Ollama to run free AI models locally on your computer.'}
