@@ -107,20 +107,20 @@ export function DashboardCanvas({ widgets, onWidgetMove, onWidgetResize }: Dashb
       ref={canvasRef}
       className="relative w-full h-full overflow-hidden"
     >
-      {/* Animated gradient background */}
+      {/* Enhanced monochromatic gradient with better light mode contrast */}
       <div 
         className="absolute inset-0 animate-gradient-slow"
         style={{
           background: `
-            radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
-            radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.3) 0%, transparent 50%),
-            radial-gradient(circle at 40% 40%, rgba(120, 200, 255, 0.2) 0%, transparent 50%),
+            radial-gradient(circle at 20% 80%, rgba(100, 100, 110, 0.25) 0%, transparent 50%),
+            radial-gradient(circle at 80% 20%, rgba(120, 120, 125, 0.22) 0%, transparent 50%),
+            radial-gradient(circle at 40% 40%, rgba(90, 95, 100, 0.18) 0%, transparent 50%),
             linear-gradient(135deg, 
-              rgba(255, 255, 255, 0.02) 0%, 
-              rgba(255, 255, 255, 0.05) 25%, 
-              rgba(255, 255, 255, 0.02) 50%, 
-              rgba(255, 255, 255, 0.08) 75%, 
-              rgba(255, 255, 255, 0.03) 100%
+              rgba(0, 0, 0, 0.02) 0%, 
+              rgba(0, 0, 0, 0.04) 25%, 
+              rgba(0, 0, 0, 0.02) 50%, 
+              rgba(0, 0, 0, 0.06) 75%, 
+              rgba(0, 0, 0, 0.03) 100%
             )
           `,
           backgroundSize: '400% 400%',
