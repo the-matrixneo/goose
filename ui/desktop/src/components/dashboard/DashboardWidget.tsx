@@ -18,10 +18,10 @@ export function DashboardWidget({ widget, onMouseDown, isDragging }: DashboardWi
         return (
           <CardContent className="flex flex-col justify-end h-full p-0">
             <div className="flex flex-col justify-end">
-              <p className="text-3xl font-mono font-light flex items-end text-white/90">
+              <p className="text-3xl font-mono font-light flex items-end text-text-default">
                 {widget.data?.totalSessions ?? 0}
               </p>
-              <span className="text-xs text-white/60">Total sessions</span>
+              <span className="text-xs text-text-muted">Total sessions</span>
             </div>
           </CardContent>
         );
@@ -30,12 +30,12 @@ export function DashboardWidget({ widget, onMouseDown, isDragging }: DashboardWi
         return (
           <CardContent className="flex flex-col justify-end h-full p-0">
             <div className="flex flex-col justify-end">
-              <p className="text-3xl font-mono font-light flex items-end text-white/90">
+              <p className="text-3xl font-mono font-light flex items-end text-text-default">
                 {widget.data?.totalTokens && widget.data.totalTokens > 0
                   ? `${(widget.data.totalTokens / 1000000).toFixed(2)}M`
                   : '0.00M'}
               </p>
-              <span className="text-xs text-white/60">Total tokens</span>
+              <span className="text-xs text-text-muted">Total tokens</span>
             </div>
           </CardContent>
         );
@@ -45,12 +45,12 @@ export function DashboardWidget({ widget, onMouseDown, isDragging }: DashboardWi
           <CardContent className="p-0">
             <div className="flex justify-between items-center mb-3">
               <CardDescription className="mb-0">
-                <span className="text-sm text-white/90">Recent chats</span>
+                <span className="text-sm text-text-default">Recent chats</span>
               </CardDescription>
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-xs text-white/60 flex items-center gap-1 !px-0 hover:bg-transparent hover:underline hover:text-white/80"
+                className="text-xs text-text-muted flex items-center gap-1 !px-0 hover:bg-transparent hover:underline hover:text-text-default"
               >
                 See all
               </Button>
@@ -59,15 +59,15 @@ export function DashboardWidget({ widget, onMouseDown, isDragging }: DashboardWi
               {widget.data?.recentSessions?.slice(0, 3).map((session: any, index: number) => (
                 <div
                   key={session.id}
-                  className="flex items-center justify-between text-xs py-1 px-1 rounded-md hover:bg-white/10 cursor-pointer transition-colors"
+                  className="flex items-center justify-between text-xs py-1 px-1 rounded-md hover:bg-background-muted/50 cursor-pointer transition-colors"
                 >
                   <div className="flex items-center space-x-2">
-                    <ChatSmart className="h-3 w-3 text-white/60" />
-                    <span className="truncate max-w-[150px] text-white/80">
+                    <ChatSmart className="h-3 w-3 text-text-muted" />
+                    <span className="truncate max-w-[150px] text-text-default">
                       {session.metadata?.description || session.id}
                     </span>
                   </div>
-                  <span className="text-white/50 font-mono font-light">
+                  <span className="text-text-muted font-mono font-light">
                     {new Date(session.modified).toLocaleDateString('en-US', { 
                       month: '2-digit', 
                       day: '2-digit' 
@@ -75,7 +75,7 @@ export function DashboardWidget({ widget, onMouseDown, isDragging }: DashboardWi
                   </span>
                 </div>
               )) || (
-                <div className="text-white/60 text-xs py-2">No recent chats</div>
+                <div className="text-text-muted text-xs py-2">No recent chats</div>
               )}
             </div>
           </CardContent>
@@ -85,10 +85,10 @@ export function DashboardWidget({ widget, onMouseDown, isDragging }: DashboardWi
         return (
           <CardContent className="flex flex-col justify-center h-full p-0">
             <div className="text-center">
-              <h2 className="text-lg font-medium text-white/90 mb-2">
+              <h2 className="text-lg font-medium text-text-default mb-2">
                 {widget.data?.greeting || 'Welcome back!'}
               </h2>
-              <p className="text-sm text-white/60">
+              <p className="text-sm text-text-muted">
                 {widget.data?.subtitle || 'Ready to start a new conversation?'}
               </p>
             </div>
@@ -99,7 +99,7 @@ export function DashboardWidget({ widget, onMouseDown, isDragging }: DashboardWi
         return (
           <CardContent className="flex items-center justify-center h-full p-0">
             <div className="text-center">
-              <p className="text-sm text-white/60">Unknown widget type</p>
+              <p className="text-sm text-text-muted">Unknown widget type</p>
             </div>
           </CardContent>
         );
@@ -126,8 +126,8 @@ export function DashboardWidget({ widget, onMouseDown, isDragging }: DashboardWi
       <div
         className={`absolute inset-0 rounded-xl border transition-all duration-200 ${
           isDragging 
-            ? 'border-white/40 shadow-3xl' 
-            : 'border-white/20 shadow-2xl hover:border-white/30 hover:shadow-3xl'
+            ? 'border-border/60 shadow-3xl' 
+            : 'border-border/30 shadow-2xl hover:border-border/50 hover:shadow-3xl'
         }`}
         style={{
           background: `
@@ -148,7 +148,7 @@ export function DashboardWidget({ widget, onMouseDown, isDragging }: DashboardWi
       
       {/* Resize handle */}
       <div className="absolute bottom-0 right-0 w-3 h-3 cursor-se-resize opacity-0 hover:opacity-100 transition-opacity z-20 pointer-events-auto">
-        <div className="w-full h-full bg-white/30 rounded-tl-sm" />
+        <div className="w-full h-full bg-text-muted/30 rounded-tl-sm" />
       </div>
     </div>
   );
