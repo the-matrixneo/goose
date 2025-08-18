@@ -159,6 +159,7 @@ export type ExtendPromptResponse = {
  * Represents the different types of MCP extensions that can be added to the manager
  */
 export type ExtensionConfig = {
+    available_tools?: Array<string>;
     /**
      * Whether this extension is bundled with Goose
      */
@@ -175,6 +176,7 @@ export type ExtensionConfig = {
     uri: string;
 } | {
     args: Array<string>;
+    available_tools?: Array<string>;
     /**
      * Whether this extension is bundled with Goose
      */
@@ -190,6 +192,7 @@ export type ExtensionConfig = {
     timeout?: number | null;
     type: 'stdio';
 } | {
+    available_tools?: Array<string>;
     /**
      * Whether this extension is bundled with Goose
      */
@@ -203,6 +206,7 @@ export type ExtensionConfig = {
     timeout?: number | null;
     type: 'builtin';
 } | {
+    available_tools?: Array<string>;
     /**
      * Whether this extension is bundled with Goose
      */
@@ -221,6 +225,7 @@ export type ExtensionConfig = {
     type: 'streamable_http';
     uri: string;
 } | {
+    available_tools?: Array<string>;
     /**
      * Whether this extension is bundled with Goose
      */
@@ -239,6 +244,7 @@ export type ExtensionConfig = {
     tools: Array<Tool>;
     type: 'frontend';
 } | {
+    available_tools?: Array<string>;
     /**
      * The Python code to execute
      */
@@ -673,10 +679,6 @@ export type SessionMetadata = {
      * The number of output tokens used in the session. Retrieved from the provider's last usage.
      */
     output_tokens?: number | null;
-    /**
-     * ID of the project this session belongs to, if any
-     */
-    project_id?: string | null;
     /**
      * ID of the schedule that triggered this session, if any
      */

@@ -10,7 +10,7 @@
     "license": {
       "name": "Apache-2.0"
     },
-    "version": "1.3.0"
+    "version": "1.4.0"
   },
   "paths": {
     "/agent/add_sub_recipes": {
@@ -1632,6 +1632,12 @@
               "type"
             ],
             "properties": {
+              "available_tools": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
               "bundled": {
                 "type": "boolean",
                 "description": "Whether this extension is bundled with Goose",
@@ -1687,6 +1693,12 @@
                   "type": "string"
                 }
               },
+              "available_tools": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
               "bundled": {
                 "type": "boolean",
                 "description": "Whether this extension is bundled with Goose",
@@ -1734,6 +1746,12 @@
               "type"
             ],
             "properties": {
+              "available_tools": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
               "bundled": {
                 "type": "boolean",
                 "description": "Whether this extension is bundled with Goose",
@@ -1774,6 +1792,12 @@
               "type"
             ],
             "properties": {
+              "available_tools": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
               "bundled": {
                 "type": "boolean",
                 "description": "Whether this extension is bundled with Goose",
@@ -1828,6 +1852,12 @@
               "type"
             ],
             "properties": {
+              "available_tools": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
               "bundled": {
                 "type": "boolean",
                 "description": "Whether this extension is bundled with Goose",
@@ -1866,6 +1896,12 @@
               "type"
             ],
             "properties": {
+              "available_tools": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
               "code": {
                 "type": "string",
                 "description": "The Python code to execute"
@@ -2990,11 +3026,6 @@
             "type": "integer",
             "format": "int32",
             "description": "The number of output tokens used in the session. Retrieved from the provider's last usage.",
-            "nullable": true
-          },
-          "project_id": {
-            "type": "string",
-            "description": "ID of the project this session belongs to, if any",
             "nullable": true
           },
           "schedule_id": {
