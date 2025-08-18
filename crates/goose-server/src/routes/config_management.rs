@@ -349,8 +349,8 @@ pub async fn get_provider_models(
         return Err(StatusCode::BAD_REQUEST);
     }
 
-    let model_config = ModelConfig::new(&metadata.default_model)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let model_config =
+        ModelConfig::new(&metadata.default_model).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     let provider = goose::providers::create(&name, model_config)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
