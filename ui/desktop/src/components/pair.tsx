@@ -59,6 +59,37 @@ export default function Pair({
   // Get recipe configuration and parameter handling
   const { initialPrompt: recipeInitialPrompt } = useRecipeManager(chat.messages, location.state);
 
+  // Override backgrounds to allow our gradient to show through
+  useEffect(() => {
+    // Override SidebarInset background
+    const sidebarInset = document.querySelector('[data-slot="sidebar-inset"]') as HTMLElement;
+    if (sidebarInset) {
+      sidebarInset.style.background = 'transparent';
+    }
+
+    // Make ChatInput completely transparent (no glass effect in chat mode)
+    const chatInputContainer = document.querySelector('[data-drop-zone="true"]') as HTMLElement;
+    if (chatInputContainer) {
+      chatInputContainer.style.background = 'transparent';
+      chatInputContainer.style.backdropFilter = 'none';
+      chatInputContainer.style.webkitBackdropFilter = 'none';
+      chatInputContainer.style.border = 'none';
+    }
+    
+    // Cleanup on unmount
+    return () => {
+      if (sidebarInset) {
+        sidebarInset.style.background = '';
+      }
+      if (chatInputContainer) {
+        chatInputContainer.style.background = '';
+        chatInputContainer.style.backdropFilter = '';
+        chatInputContainer.style.webkitBackdropFilter = '';
+        chatInputContainer.style.border = '';
+      }
+    };
+  });
+
   // Handle recipe loading from recipes view - reset chat if needed
   useEffect(() => {
     if (location.state?.resetChat && location.state?.recipeConfig) {
@@ -185,27 +216,68 @@ export default function Pair({
     initialValue,
   };
 
+  // Custom main layout props to override background
+  const customMainLayoutProps = {
+    backgroundColor: '', // Remove background completely
+  };
+
   // Custom content before messages
   const renderBeforeMessages = () => {
     return <div>{/* Any Pair-specific content before messages can go here */}</div>;
   };
 
   return (
-    <>
-      <BaseChat
-        chat={chat}
-        setChat={setChat}
-        setView={setView}
-        setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
-        enableLocalStorage={true} // Enable local storage for Pair mode
-        onMessageSubmit={handleMessageSubmit}
-        onMessageStreamFinish={handleMessageStreamFinish}
-        renderBeforeMessages={renderBeforeMessages}
-        customChatInputProps={customChatInputProps}
-        contentClassName={cn('pr-1 pb-10', (isMobile || sidebarState === 'collapsed') && 'pt-11')} // Use dynamic content class with mobile margin and sidebar state
-        showPopularTopics={!isTransitioningFromHub} // Don't show popular topics while transitioning from Hub
-        suppressEmptyState={isTransitioningFromHub} // Suppress all empty state content while transitioning from Hub
+    <div className="flex flex-col h-full relative">
+      {/* Animated gradient background - same as Hub */}
+      <div 
+        className="absolute inset-0 animate-gradient-slow z-0"
+        style={{
+          background: `
+            radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
+            radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.3) 0%, transparent 50%),
+            radial-gradient(circle at 40% 40%, rgba(120, 200, 255, 0.2) 0%, transparent 50%),
+            linear-gradient(135deg, 
+              rgba(255, 255, 255, 0.02) 0%, 
+              rgba(255, 255, 255, 0.05) 25%, 
+              rgba(255, 255, 255, 0.02) 50%, 
+              rgba(255, 255, 255, 0.08) 75%, 
+              rgba(255, 255, 255, 0.03) 100%
+            )
+          `,
+          backgroundSize: '400% 400%',
+        }}
       />
-    </>
+      
+      {/* Dot pattern overlay - same as Hub */}
+      <div 
+        className="absolute inset-0 opacity-20 z-0"
+        style={{
+          backgroundImage: `radial-gradient(circle, rgba(255, 255, 255, 0.3) 1px, transparent 1px)`,
+          backgroundSize: '24px 24px',
+          backgroundPosition: '12px 12px',
+        }}
+      />
+
+      {/* Centered chat content */}
+      <div className="relative z-10 flex justify-center h-full">
+        <div className="w-full max-w-[1000px] h-full">
+          <BaseChat
+            chat={chat}
+            setChat={setChat}
+            setView={setView}
+            setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
+            enableLocalStorage={true} // Enable local storage for Pair mode
+            onMessageSubmit={handleMessageSubmit}
+            onMessageStreamFinish={handleMessageStreamFinish}
+            renderBeforeMessages={renderBeforeMessages}
+            customChatInputProps={customChatInputProps}
+            customMainLayoutProps={customMainLayoutProps} // Override background
+            contentClassName={cn('pr-1 pb-10', (isMobile || sidebarState === 'collapsed') && 'pt-11')} // Use dynamic content class with mobile margin and sidebar state
+            showPopularTopics={!isTransitioningFromHub} // Don't show popular topics while transitioning from Hub
+            suppressEmptyState={isTransitioningFromHub} // Suppress all empty state content while transitioning from Hub
+          />
+        </div>
+      </div>
+    </div>
   );
 }
