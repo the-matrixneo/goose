@@ -8,7 +8,7 @@
  * - Canvas-based layout with draggable widgets
  * - Metric cards (sessions, tokens) as moveable widgets
  * - Recent chats widget
- * - Centered greeting element (not on canvas) using original Greeting component
+ * - Greeting widget with time-based messages
  * - Grid-based background for visual organization
  * - Floating chat input at the bottom
  *
@@ -26,7 +26,6 @@ import { ChatContextManagerProvider } from './context_management/ChatContextMana
 import { DashboardCanvas } from './dashboard/DashboardCanvas';
 import { useDashboard } from '../hooks/useDashboard';
 import { Goose } from './icons/Goose';
-import { Greeting } from './common/Greeting';
 import 'react-toastify/dist/ReactToastify.css';
 
 import { ChatType } from '../types/chat';
@@ -118,26 +117,13 @@ export default function Hub({
     );
   }
 
-  // Filter out the greeting widget from the canvas widgets
-  const canvasWidgets = dashboardState.widgets.filter(widget => widget.type !== 'greeting');
-
   return (
     <ChatContextManagerProvider>
       <div className="flex flex-col h-full bg-background-muted relative">
-        {/* Centered Greeting Section - using original Greeting component */}
-        <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
-          <div className="text-center space-y-4 pointer-events-auto">
-            <div className="origin-center">
-              <Goose className="size-8 mx-auto text-text-muted mb-4" />
-            </div>
-            <Greeting className="text-4xl font-light animate-in fade-in duration-300" />
-          </div>
-        </div>
-
         {/* Dashboard Canvas - takes up most of the space */}
         <div className="flex-1 relative overflow-hidden">
           <DashboardCanvas
-            widgets={canvasWidgets}
+            widgets={dashboardState.widgets}
             onWidgetMove={moveWidget}
             onWidgetResize={resizeWidget}
           />

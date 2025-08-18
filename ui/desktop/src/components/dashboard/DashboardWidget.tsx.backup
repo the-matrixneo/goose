@@ -1,0 +1,132 @@
+import React from 'react';
+import { Card, CardContent, CardDescription } from '../ui/card';
+import { WidgetData, WidgetType } from '../../types/dashboard';
+import { Button } from '../ui/button';
+import { ChatSmart } from '../icons/';
+import { Skeleton } from '../ui/skeleton';
+
+interface DashboardWidgetProps {
+  widget: WidgetData;
+  onMouseDown: (e: React.MouseEvent) => void;
+  isDragging: boolean;
+}
+
+export function DashboardWidget({ widget, onMouseDown, isDragging }: DashboardWidgetProps) {
+  const renderWidgetContent = () => {
+    switch (widget.type) {
+      case WidgetType.TOTAL_SESSIONS:
+        return (
+          <CardContent className="flex flex-col justify-end h-full p-0">
+            <div className="flex flex-col justify-end">
+              <p className="text-3xl font-mono font-light flex items-end">
+                {widget.data?.totalSessions ?? 0}
+              </p>
+              <span className="text-xs text-text-muted">Total sessions</span>
+            </div>
+          </CardContent>
+        );
+
+      case WidgetType.TOTAL_TOKENS:
+        return (
+          <CardContent className="flex flex-col justify-end h-full p-0">
+            <div className="flex flex-col justify-end">
+              <p className="text-3xl font-mono font-light flex items-end">
+                {widget.data?.totalTokens && widget.data.totalTokens > 0
+                  ? `${(widget.data.totalTokens / 1000000).toFixed(2)}M`
+                  : '0.00M'}
+              </p>
+              <span className="text-xs text-text-muted">Total tokens</span>
+            </div>
+          </CardContent>
+        );
+
+      case WidgetType.RECENT_CHATS:
+        return (
+          <CardContent className="p-0">
+            <div className="flex justify-between items-center mb-3">
+              <CardDescription className="mb-0">
+                <span className="text-sm text-text-default">Recent chats</span>
+              </CardDescription>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs text-text-muted flex items-center gap-1 !px-0 hover:bg-transparent hover:underline hover:text-text-default"
+              >
+                See all
+              </Button>
+            </div>
+            <div className="space-y-1 max-h-32 overflow-y-auto">
+              {widget.data?.recentSessions?.slice(0, 3).map((session: any, index: number) => (
+                <div
+                  key={session.id}
+                  className="flex items-center justify-between text-xs py-1 px-1 rounded-md hover:bg-background-muted cursor-pointer transition-colors"
+                >
+                  <div className="flex items-center space-x-2">
+                    <ChatSmart className="h-3 w-3 text-text-muted" />
+                    <span className="truncate max-w-[150px]">
+                      {session.metadata?.description || session.id}
+                    </span>
+                  </div>
+                  <span className="text-text-muted font-mono font-light">
+                    {new Date(session.modified).toLocaleDateString('en-US', { 
+                      month: '2-digit', 
+                      day: '2-digit' 
+                    })}
+                  </span>
+                </div>
+              )) || (
+                <div className="text-text-muted text-xs py-2">No recent chats</div>
+              )}
+            </div>
+          </CardContent>
+        );
+
+      case WidgetType.GREETING:
+        return (
+          <CardContent className="flex flex-col justify-center h-full p-0">
+            <div className="text-center">
+              <h2 className="text-lg font-medium text-text-default mb-2">
+                {widget.data?.greeting || 'Welcome back!'}
+              </h2>
+              <p className="text-sm text-text-muted">
+                {widget.data?.subtitle || 'Ready to start a new conversation?'}
+              </p>
+            </div>
+          </CardContent>
+        );
+
+      default:
+        return (
+          <CardContent className="flex items-center justify-center h-full p-0">
+            <div className="text-center">
+              <p className="text-sm text-text-muted">Unknown widget type</p>
+            </div>
+          </CardContent>
+        );
+    }
+  };
+
+  return (
+    <Card
+      className={`absolute border-none bg-background-default/90 backdrop-blur-sm transition-all duration-200 cursor-move select-none ${
+        isDragging ? 'shadow-lg scale-105 z-50' : 'hover:shadow-md hover:bg-background-default'
+      }`}
+      style={{
+        left: widget.position.x,
+        top: widget.position.y,
+        width: widget.size.width,
+        height: widget.size.height,
+      }}
+      onMouseDown={onMouseDown}
+    >
+      <div className="p-4 h-full">
+        {renderWidgetContent()}
+      </div>
+      
+      {/* Resize handle */}
+      <div className="absolute bottom-0 right-0 w-3 h-3 cursor-se-resize opacity-0 hover:opacity-100 transition-opacity">
+        <div className="w-full h-full bg-text-muted/30 rounded-tl-sm" />
+      </div>
+    </Card>
+  );
+}

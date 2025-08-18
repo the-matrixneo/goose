@@ -1,0 +1,91 @@
+import React, { useState, useRef, useCallback } from 'react';
+import { Card } from '../ui/card';
+import { DashboardWidget } from './DashboardWidget';
+import { WidgetType, WidgetPosition, WidgetData } from '../../types/dashboard';
+
+interface DashboardCanvasProps {
+  widgets: WidgetData[];
+  onWidgetMove: (id: string, position: WidgetPosition) => void;
+  onWidgetResize: (id: string, size: { width: number; height: number }) => void;
+}
+
+export function DashboardCanvas({ widgets, onWidgetMove, onWidgetResize }: DashboardCanvasProps) {
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const [draggedWidget, setDraggedWidget] = useState<string | null>(null);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+
+  const handleMouseDown = useCallback((e: React.MouseEvent, widgetId: string) => {
+    if (!canvasRef.current) return;
+    
+    const rect = canvasRef.current.getBoundingClientRect();
+    const widget = widgets.find(w => w.id === widgetId);
+    if (!widget) return;
+
+    setDraggedWidget(widgetId);
+    setDragOffset({
+      x: e.clientX - rect.left - widget.position.x,
+      y: e.clientY - rect.top - widget.position.y,
+    });
+  }, [widgets]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!draggedWidget || !canvasRef.current) return;
+    
+    const rect = canvasRef.current.getBoundingClientRect();
+    const widget = widgets.find(w => w.id === draggedWidget);
+    if (!widget) return;
+
+    const newPosition = {
+      x: Math.max(0, Math.min(rect.width - widget.size.width, e.clientX - rect.left - dragOffset.x)),
+      y: Math.max(0, Math.min(rect.height - widget.size.height, e.clientY - rect.top - dragOffset.y)),
+    };
+    
+    onWidgetMove(draggedWidget, newPosition);
+  }, [draggedWidget, dragOffset, onWidgetMove, widgets]);
+
+  const handleMouseUp = useCallback(() => {
+    setDraggedWidget(null);
+    setDragOffset({ x: 0, y: 0 });
+  }, []);
+
+  return (
+    <div 
+      ref={canvasRef}
+      className="relative w-full h-full bg-gradient-to-br from-background-muted to-background-default overflow-hidden"
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
+    >
+      {/* Grid pattern overlay */}
+      <div 
+        className="absolute inset-0 opacity-5"
+        style={{
+          backgroundImage: `
+            linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)
+          `,
+          backgroundSize: '20px 20px'
+        }}
+      />
+      
+      {/* Widgets */}
+      {widgets.map((widget) => (
+        <DashboardWidget
+          key={widget.id}
+          widget={widget}
+          onMouseDown={(e) => handleMouseDown(e, widget.id)}
+          isDragging={draggedWidget === widget.id}
+        />
+      ))}
+      
+      {/* Floating action area for new widgets */}
+      <div className="absolute bottom-6 right-6">
+        <Card className="p-3 bg-background-default/80 backdrop-blur-sm border-border/50">
+          <div className="text-xs text-text-muted">
+            Dashboard Canvas
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+}
