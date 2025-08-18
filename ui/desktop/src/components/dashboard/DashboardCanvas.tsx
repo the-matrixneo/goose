@@ -151,22 +151,6 @@ export function DashboardCanvas({ widgets, onWidgetMove, onWidgetResize }: Dashb
           />
         );
       })}
-      
-      {/* Floating action area for new widgets */}
-      <div className="absolute bottom-6 right-6">
-        <Card 
-          className="p-3 border border-white/10 shadow-xl"
-          style={{
-            background: 'rgba(255, 255, 255, 0.05)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-          }}
-        >
-          <div className="text-xs text-text-muted">
-            Dashboard Canvas
-          </div>
-        </Card>
-      </div>
     </div>
   );
 }

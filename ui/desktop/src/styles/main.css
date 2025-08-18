@@ -762,14 +762,14 @@ p > code.bg-inline-code {
 }
 
 .animate-gradient-slow {
-  animation: gradient-shift 20s ease-in-out infinite;
+  animation: gradient-shift 120s ease-in-out infinite;
 }
 
 /* Alternative faster animation for more dynamic effect */
 .animate-gradient-medium {
-  animation: gradient-shift 12s ease-in-out infinite;
+  animation: gradient-shift 60s ease-in-out infinite;
 }
 
 .animate-gradient-fast {
-  animation: gradient-shift 8s ease-in-out infinite;
+  animation: gradient-shift 30s ease-in-out infinite;
 }
