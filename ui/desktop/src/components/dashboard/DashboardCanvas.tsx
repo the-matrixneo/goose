@@ -106,21 +106,27 @@ export function DashboardCanvas({ widgets, onWidgetMove, onWidgetResize }: Dashb
     <div 
       ref={canvasRef}
       className="relative w-full h-full overflow-hidden"
-      style={{
-        background: `
-          radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
-          radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.3) 0%, transparent 50%),
-          radial-gradient(circle at 40% 40%, rgba(120, 200, 255, 0.2) 0%, transparent 50%),
-          linear-gradient(135deg, 
-            rgba(255, 255, 255, 0.02) 0%, 
-            rgba(255, 255, 255, 0.05) 25%, 
-            rgba(255, 255, 255, 0.02) 50%, 
-            rgba(255, 255, 255, 0.08) 75%, 
-            rgba(255, 255, 255, 0.03) 100%
-          )
-        `,
-      }}
     >
+      {/* Animated gradient background */}
+      <div 
+        className="absolute inset-0 animate-gradient-slow"
+        style={{
+          background: `
+            radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
+            radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.3) 0%, transparent 50%),
+            radial-gradient(circle at 40% 40%, rgba(120, 200, 255, 0.2) 0%, transparent 50%),
+            linear-gradient(135deg, 
+              rgba(255, 255, 255, 0.02) 0%, 
+              rgba(255, 255, 255, 0.05) 25%, 
+              rgba(255, 255, 255, 0.02) 50%, 
+              rgba(255, 255, 255, 0.08) 75%, 
+              rgba(255, 255, 255, 0.03) 100%
+            )
+          `,
+          backgroundSize: '400% 400%',
+        }}
+      />
+      
       {/* Dot pattern overlay */}
       <div 
         className="absolute inset-0 opacity-20"
