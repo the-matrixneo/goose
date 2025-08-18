@@ -1201,7 +1201,7 @@ export type GetProviderModelsErrors = {
 
 export type GetProviderModelsResponses = {
     /**
-     * Supported models fetched successfully
+     * Models fetched successfully
      */
     200: Array<string>;
 };
