@@ -19,6 +19,7 @@ use super::{
     openrouter::OpenRouterProvider,
     sagemaker_tgi::SageMakerTgiProvider,
     snowflake::SnowflakeProvider,
+    tetrate::TetrateProvider,
     venice::VeniceProvider,
     xai::XaiProvider,
 };
@@ -58,8 +59,9 @@ pub fn providers() -> Vec<ProviderMetadata> {
         OpenAiProvider::metadata(),
         OpenRouterProvider::metadata(),
         SageMakerTgiProvider::metadata(),
-        VeniceProvider::metadata(),
         SnowflakeProvider::metadata(),
+        TetrateProvider::metadata(),
+        VeniceProvider::metadata(),
         XaiProvider::metadata(),
     ]
 }
@@ -168,6 +170,7 @@ fn create_provider(name: &str, model: ModelConfig) -> Result<Arc<dyn Provider>> 
         "openrouter" => Ok(Arc::new(OpenRouterProvider::from_env(model)?)),
         "sagemaker_tgi" => Ok(Arc::new(SageMakerTgiProvider::from_env(model)?)),
         "snowflake" => Ok(Arc::new(SnowflakeProvider::from_env(model)?)),
+        "tetrate" => Ok(Arc::new(TetrateProvider::from_env(model)?)),
         "venice" => Ok(Arc::new(VeniceProvider::from_env(model)?)),
         "xai" => Ok(Arc::new(XaiProvider::from_env(model)?)),
         _ => Err(anyhow::anyhow!("Unknown provider: {}", name)),
