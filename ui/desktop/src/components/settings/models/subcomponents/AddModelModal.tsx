@@ -42,7 +42,6 @@ export const AddModelModal = ({ onClose, setView }: AddModelModalProps) => {
   const [selectedPredefinedModel, setSelectedPredefinedModel] = useState<Model | null>(null);
   const [predefinedModels, setPredefinedModels] = useState<Model[]>([]);
   const [loadingModels, setLoadingModels] = useState<boolean>(false);
-  const [modelsError, setModelsError] = useState<string | null>(null);
 
   // Validate form data
   const validateForm = useCallback(() => {
@@ -142,11 +141,9 @@ export const AddModelModal = ({ onClose, setView }: AddModelModalProps) => {
           },
         ]);
 
-        // Dynamically fetch models per provider via server (parallel fetching)
         setLoadingModels(true);
-        setModelsError(null);
 
-        // Create parallel promises for all providers
+        // Fetching models for all providers
         const modelPromises = activeProviders.map(async (p) => {
           const providerName = p.name;
           try {
@@ -164,8 +161,6 @@ export const AddModelModal = ({ onClose, setView }: AddModelModalProps) => {
             };
           }
         });
-
-        // Wait for all provider requests to complete
         const results = await Promise.all(modelPromises);
 
         // Process results and build grouped options
@@ -193,9 +188,9 @@ export const AddModelModal = ({ onClose, setView }: AddModelModalProps) => {
           }
         });
 
-        // Set error message if any providers failed
+        // Log errors if any providers failed (don't show to user)
         if (errors.length > 0) {
-          setModelsError(errors.join('; '));
+          console.error('Provider model fetch errors:', errors);
         }
 
         // Add the "Custom model" option to each provider group
@@ -210,10 +205,7 @@ export const AddModelModal = ({ onClose, setView }: AddModelModalProps) => {
         setModelOptions(groupedOptions);
         setOriginalModelOptions(groupedOptions);
       } catch (error: unknown) {
-        console.error('Failed to load providers:', error);
-        setModelsError(
-          `Failed to load providers, showing default models${error instanceof Error ? `: ${error.message}` : ''}`
-        );
+        console.error('Failed to query providers:', error);
       } finally {
         setLoadingModels(false);
       }
@@ -419,29 +411,14 @@ export const AddModelModal = ({ onClose, setView }: AddModelModalProps) => {
                               ]
                             : filteredModelOptions.length > 0
                               ? filteredModelOptions
-                              : modelsError
-                                ? [
-                                    {
-                                      options: [
-                                        {
-                                          value: '__error__',
-                                          label: 'Error loading models',
-                                          provider: provider || '',
-                                          isDisabled: true,
-                                        },
-                                      ],
-                                    },
-                                  ]
-                                : []
+                              : []
                         }
                         onChange={handleModelChange}
                         onInputChange={handleInputChange} // Added for input handling
                         value={model ? { value: model, label: model } : null}
                         placeholder="Select a model, type to search"
                       />
-                      {modelsError && (
-                        <div className="text-red-500 text-sm mt-1">{modelsError}</div>
-                      )}
+
                       {attemptedSubmit && validationErrors.model && (
                         <div className="text-red-500 text-sm mt-1">{validationErrors.model}</div>
                       )}
