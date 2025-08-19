@@ -24,6 +24,7 @@ export function DashboardWidget({ widget, onMouseDown, isDragging }: DashboardWi
       }, 1000);
       return () => clearTimeout(timer);
     }
+    return () => {}; // Return empty cleanup function when dragging
   }, [widget.position.x, widget.position.y, isDragging]);
 
   const handleSessionClick = (sessionId: string) => {
