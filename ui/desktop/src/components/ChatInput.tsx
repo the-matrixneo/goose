@@ -123,7 +123,7 @@ export default function ChatInput({
   const queuePausedRef = useRef((() => {
     // Load pause state from storage
     try {
-      const stored = localStorage.getItem('goose-queue-paused');
+      const stored = sessionStorage.getItem('goose-queue-paused');
       return stored ? JSON.parse(stored) : false;
     } catch {
       return false;
@@ -133,7 +133,7 @@ export default function ChatInput({
   const [lastInterruption, setLastInterruption] = useState<string | null>(() => {
     // Load interruption state from storage
     try {
-      const stored = localStorage.getItem('goose-queue-interruption');
+      const stored = sessionStorage.getItem('goose-queue-interruption');
       return stored ? JSON.parse(stored) : null;
     } catch {
       return null;
@@ -167,7 +167,7 @@ export default function ChatInput({
   // Save queue state (paused/interrupted) to storage
   useEffect(() => {
     try {
-      localStorage.setItem('goose-queue-paused', JSON.stringify(queuePausedRef.current));
+      sessionStorage.setItem('goose-queue-paused', JSON.stringify(queuePausedRef.current));
     } catch (error) {
       console.error('Error saving queue pause state:', error);
     }
@@ -175,7 +175,7 @@ export default function ChatInput({
 
   useEffect(() => {
     try {
-      localStorage.setItem('goose-queue-interruption', JSON.stringify(lastInterruption));
+      sessionStorage.setItem('goose-queue-interruption', JSON.stringify(lastInterruption));
     } catch (error) {
       console.error('Error saving queue interruption state:', error);
     }
@@ -186,8 +186,8 @@ export default function ChatInput({
     return () => {
       // Save final queue state when component unmounts
       try {
-        localStorage.setItem('goose-queue-paused', JSON.stringify(queuePausedRef.current));
-        localStorage.setItem('goose-queue-interruption', JSON.stringify(lastInterruption));
+        sessionStorage.setItem('goose-queue-paused', JSON.stringify(queuePausedRef.current));
+        sessionStorage.setItem('goose-queue-interruption', JSON.stringify(lastInterruption));
       } catch (error) {
         console.error('Error saving queue state on unmount:', error);
       }
