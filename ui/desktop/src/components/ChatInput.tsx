@@ -123,7 +123,7 @@ export default function ChatInput({
   const queuePausedRef = useRef((() => {
     // Load pause state from storage
     try {
-      const stored = sessionStorage.getItem('goose-queue-paused');
+      const stored = window.sessionStorage.getItem('goose-queue-paused');
       return stored ? JSON.parse(stored) : false;
     } catch {
       return false;
