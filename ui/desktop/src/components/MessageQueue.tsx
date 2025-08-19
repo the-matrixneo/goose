@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Clock, Send, GripVertical, Zap, Sparkles, ChevronDown, ChevronUp, MoreHorizontal } from 'lucide-react';
+import { X, Clock, Send, GripVertical, Zap, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from './ui/button';
 
 interface QueuedMessage {
