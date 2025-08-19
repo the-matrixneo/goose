@@ -29,7 +29,7 @@ import { DroppedFile, useFileDrop } from '../hooks/useFileDrop';
 import { Recipe } from '../recipe';
 import { QueueStorage } from '../utils/queueStorage';
 import MessageQueue from './MessageQueue';
-import { detectInterruption, isInterruptionCommand } from '../utils/interruptionDetector';
+import { detectInterruption } from '../utils/interruptionDetector';
 
 interface QueuedMessage {
   id: string;
