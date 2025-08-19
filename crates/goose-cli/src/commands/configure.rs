@@ -1794,7 +1794,6 @@ pub async fn handle_openrouter_auth() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-
 /// Handle Tetrate Agent Router Service authentication
 pub async fn handle_tetrate_auth() -> Result<(), Box<dyn Error>> {
     use goose::config::{configure_tetrate, signup_tetrate::TetrateAuth};
@@ -1805,13 +1804,17 @@ pub async fn handle_tetrate_auth() -> Result<(), Box<dyn Error>> {
     let mut auth_flow = TetrateAuth::new()?;
     match auth_flow.complete_flow().await {
         Ok(api_key) => {
-            println!("
-Authentication complete!");
+            println!(
+                "
+Authentication complete!"
+            );
 
             let config = Config::global();
 
-            println!("
-Configuring Tetrate Agent Router Service...");
+            println!(
+                "
+Configuring Tetrate Agent Router Service..."
+            );
             if let Err(e) = configure_tetrate(config, api_key) {
                 eprintln!("Failed to configure Tetrate Agent Router Service: {}", e);
                 return Err(e.into());
@@ -1821,8 +1824,10 @@ Configuring Tetrate Agent Router Service...");
             println!("✓ Models configured successfully");
 
             // Test configuration - get the model that was configured
-            println!("
-Testing configuration...");
+            println!(
+                "
+Testing configuration..."
+            );
             let configured_model: String = config.get_param("GOOSE_MODEL")?;
             let model_config = match goose::model::ModelConfig::new(&configured_model) {
                 Ok(config) => config,
