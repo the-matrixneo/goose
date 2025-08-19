@@ -106,6 +106,8 @@ export default function GlobalBackground({ blur = false, opacity = 1 }: GlobalBa
     const savedCustomImage = localStorage.getItem('dashboard-custom-image');
     const savedDotOverlay = localStorage.getItem('dashboard-dot-overlay');
 
+    console.log('GlobalBackground - Loading settings:', { savedBackground, savedCustomImage, savedDotOverlay });
+
     setCurrentBackground(savedBackground);
     setCustomImage(savedCustomImage);
     setShowDotOverlay(savedDotOverlay !== 'false');
@@ -115,6 +117,7 @@ export default function GlobalBackground({ blur = false, opacity = 1 }: GlobalBa
   useEffect(() => {
     const handleBackgroundChange = (event: CustomEvent) => {
       const { backgroundId, customImage: newCustomImage } = event.detail;
+      console.log('GlobalBackground - Background changed:', { backgroundId, newCustomImage });
       setCurrentBackground(backgroundId);
       setCustomImage(newCustomImage);
     };
@@ -145,38 +148,48 @@ export default function GlobalBackground({ blur = false, opacity = 1 }: GlobalBa
     }
 
     if (currentBackground === 'custom-image' && customImage) {
-      return {
+      const style = {
         ...baseStyle,
         backgroundImage: `url(${customImage})`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat',
       };
+      console.log('GlobalBackground - Using custom image style:', style);
+      return style;
     }
 
     const backgroundOption = DEFAULT_BACKGROUNDS.find(bg => bg.id === currentBackground);
     if (backgroundOption) {
       if (backgroundOption.type === 'gradient') {
-        return {
+        const style = {
           ...baseStyle,
           background: backgroundOption.value,
           backgroundSize: '400% 400%',
         };
+        console.log('GlobalBackground - Using gradient style:', style);
+        return style;
       } else {
-        return {
+        const style = {
           ...baseStyle,
           background: backgroundOption.value,
         };
+        console.log('GlobalBackground - Using solid style:', style);
+        return style;
       }
     }
 
     // Fallback to default
-    return {
+    const style = {
       ...baseStyle,
       background: DEFAULT_BACKGROUNDS[0].value,
       backgroundSize: '400% 400%',
     };
+    console.log('GlobalBackground - Using fallback style:', style);
+    return style;
   };
+
+  console.log('GlobalBackground - Rendering with:', { currentBackground, customImage, showDotOverlay });
 
   return (
     <>

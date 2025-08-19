@@ -333,7 +333,7 @@ function BaseChatContent({
   return (
     <div className="h-full flex flex-col min-h-0">
       <MainPanelLayout
-        backgroundColor={'bg-background-muted'}
+        backgroundColor={customMainLayoutProps.backgroundColor || 'bg-background-muted'}
         removeTopPadding={true}
         {...customMainLayoutProps}
       >
@@ -345,83 +345,79 @@ function BaseChatContent({
 
         {/* Chat container with sticky recipe header */}
         <div className="flex flex-col flex-1 mb-0.5 min-h-0 relative">
-          <ScrollArea
-            ref={scrollRef}
-            className={`flex-1 bg-background-default rounded-b-2xl min-h-0 relative ${contentClassName}`}
-            autoScroll
-            onDrop={handleDrop}
-            onDragOver={handleDragOver}
-            data-drop-zone="true"
-            paddingX={6}
-            paddingY={0}
-          >
-            {/* Recipe agent header - sticky at top of chat container */}
-            {recipeConfig?.title && (
-              <div className="sticky top-0 z-10 bg-background-default px-0 -mx-6 mb-6 pt-6">
-                <AgentHeader
-                  title={recipeConfig.title}
-                  profileInfo={
-                    recipeConfig.profile
-                      ? `${recipeConfig.profile} - ${recipeConfig.mcps || 12} MCPs`
-                      : undefined
-                  }
-                  onChangeProfile={() => {
-                    console.log('Change profile clicked');
-                  }}
-                  showBorder={true}
-                />
-              </div>
-            )}
+          {/* Only show ScrollArea with glassmorphism when there are messages or recipes */}
+          {(filteredMessages.length > 0 || 
+            (recipeConfig && recipeAccepted && hasStartedUsingRecipe) ||
+            (recipeConfig && recipeAccepted && !hasStartedUsingRecipe && !suppressEmptyState)) ? (
+            <ScrollArea
+              ref={scrollRef}
+              className={`flex-1 rounded-b-2xl min-h-0 relative ${contentClassName}`}
+              style={{
+                background: `
+                  linear-gradient(135deg, 
+                    rgba(255, 255, 255, 0.1) 0%, 
+                    rgba(255, 255, 255, 0.05) 100%
+                  )
+                `,
+                backdropFilter: 'blur(20px) saturate(180%)',
+                WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)',
+              }}
+              autoScroll
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+              data-drop-zone="true"
+              paddingX={6}
+              paddingY={0}
+            >
+              {/* Recipe agent header - sticky at top of chat container */}
+              {recipeConfig?.title && (
+                <div className="sticky top-0 z-10 bg-transparent px-0 -mx-6 mb-6 pt-6">
+                  <AgentHeader
+                    title={recipeConfig.title}
+                    profileInfo={
+                      recipeConfig.profile
+                        ? `${recipeConfig.profile} - ${recipeConfig.mcps || 12} MCPs`
+                        : undefined
+                    }
+                    onChangeProfile={() => {
+                      console.log('Change profile clicked');
+                    }}
+                    showBorder={true}
+                  />
+                </div>
+              )}
 
-            {/* Custom content before messages */}
-            {renderBeforeMessages && renderBeforeMessages()}
+              {/* Custom content before messages */}
+              {renderBeforeMessages && renderBeforeMessages()}
 
-            {/* Messages or RecipeActivities or Popular Topics */}
-            {
-              // Check if we should show splash instead of messages
-              (() => {
-                // Show splash if we have a recipe and user hasn't started using it yet, and recipe has been accepted
-                const shouldShowSplash =
-                  recipeConfig && recipeAccepted && !hasStartedUsingRecipe && !suppressEmptyState;
+              {/* Messages or RecipeActivities */}
+              {
+                // Check if we should show splash instead of messages
+                (() => {
+                  // Show splash if we have a recipe and user hasn't started using it yet, and recipe has been accepted
+                  const shouldShowSplash =
+                    recipeConfig && recipeAccepted && !hasStartedUsingRecipe && !suppressEmptyState;
 
-                return shouldShowSplash;
-              })() ? (
-                <>
-                  {/* Show RecipeActivities when we have a recipe config and user hasn't started using it */}
-                  {recipeConfig ? (
-                    <RecipeActivities
-                      append={(text: string) => appendWithTracking(text)}
-                      activities={
-                        Array.isArray(recipeConfig.activities) ? recipeConfig.activities : null
-                      }
-                      title={recipeConfig.title}
-                    />
-                  ) : showPopularTopics ? (
-                    /* Show PopularChatTopics when no real messages, no recipe, and showPopularTopics is true (Pair view) */
-                    <PopularChatTopics append={(text: string) => appendWithTracking(text)} />
-                  ) : null}
-                </>
-              ) : filteredMessages.length > 0 ||
-                (recipeConfig && recipeAccepted && hasStartedUsingRecipe) ? (
-                <>
-                  {disableSearch ? (
-                    // Render messages without SearchView wrapper when search is disabled
-                    <ProgressiveMessageList
-                      messages={filteredMessages}
-                      chat={chat}
-                      toolCallNotifications={toolCallNotifications}
-                      append={append}
-                      appendMessage={(newMessage) => {
-                        const updatedMessages = [...messages, newMessage];
-                        setMessages(updatedMessages);
-                      }}
-                      isUserMessage={isUserMessage}
-                      onScrollToBottom={handleScrollToBottom}
-                      isStreamingMessage={chatState !== ChatState.Idle}
-                    />
-                  ) : (
-                    // Render messages with SearchView wrapper when search is enabled
-                    <SearchView>
+                  return shouldShowSplash;
+                })() ? (
+                  <>
+                    {/* Show RecipeActivities when we have a recipe config and user hasn't started using it */}
+                    {recipeConfig && (
+                      <RecipeActivities
+                        append={(text: string) => appendWithTracking(text)}
+                        activities={
+                          Array.isArray(recipeConfig.activities) ? recipeConfig.activities : null
+                        }
+                        title={recipeConfig.title}
+                      />
+                    )}
+                  </>
+                ) : (
+                  <>
+                    {disableSearch ? (
+                      // Render messages without SearchView wrapper when search is disabled
                       <ProgressiveMessageList
                         messages={filteredMessages}
                         chat={chat}
@@ -435,81 +431,101 @@ function BaseChatContent({
                         onScrollToBottom={handleScrollToBottom}
                         isStreamingMessage={chatState !== ChatState.Idle}
                       />
-                    </SearchView>
-                  )}
-
-                  {error &&
-                    !(error as Error & { isTokenLimitError?: boolean }).isTokenLimitError && (
-                      <>
-                        <div className="flex flex-col items-center justify-center p-4">
-                          <div className="text-red-700 dark:text-red-300 bg-red-400/50 p-3 rounded-lg mb-2">
-                            {error.message || 'Honk! Goose experienced an error while responding'}
-                          </div>
-
-                          {/* Action buttons for non-token-limit errors */}
-                          <div className="flex gap-2 mt-2">
-                            <div
-                              className="px-3 py-2 text-center whitespace-nowrap cursor-pointer text-textStandard border border-borderSubtle hover:bg-bgSubtle rounded-full inline-block transition-all duration-150"
-                              onClick={async () => {
-                                // Create a contextLengthExceeded message similar to token limit errors
-                                const contextMessage: Message = {
-                                  id: `context-${Date.now()}`,
-                                  role: 'assistant',
-                                  created: Math.floor(Date.now() / 1000),
-                                  content: [
-                                    {
-                                      type: 'contextLengthExceeded',
-                                      msg: 'Summarization requested due to error. Creating summary to help resolve the issue.',
-                                    },
-                                  ],
-                                  display: true,
-                                  sendToLLM: false,
-                                };
-
-                                // Add the context message to trigger ContextHandler
-                                const updatedMessages = [...messages, contextMessage];
-                                setMessages(updatedMessages);
-
-                                // Clear the error state since we're handling it with summarization
-                                clearError();
-                              }}
-                            >
-                              Summarize Conversation
-                            </div>
-                            <div
-                              className="px-3 py-2 text-center whitespace-nowrap cursor-pointer text-textStandard border border-borderSubtle hover:bg-bgSubtle rounded-full inline-block transition-all duration-150"
-                              onClick={async () => {
-                                // Find the last user message
-                                const lastUserMessage = messages.reduceRight(
-                                  (found, m) => found || (m.role === 'user' ? m : null),
-                                  null as Message | null
-                                );
-                                if (lastUserMessage) {
-                                  append(lastUserMessage);
-                                }
-                              }}
-                            >
-                              Retry Last Message
-                            </div>
-                          </div>
-                        </div>
-                      </>
+                    ) : (
+                      // Render messages with SearchView wrapper when search is enabled
+                      <SearchView>
+                        <ProgressiveMessageList
+                          messages={filteredMessages}
+                          chat={chat}
+                          toolCallNotifications={toolCallNotifications}
+                          append={append}
+                          appendMessage={(newMessage) => {
+                            const updatedMessages = [...messages, newMessage];
+                            setMessages(updatedMessages);
+                          }}
+                          isUserMessage={isUserMessage}
+                          onScrollToBottom={handleScrollToBottom}
+                          isStreamingMessage={chatState !== ChatState.Idle}
+                        />
+                      </SearchView>
                     )}
 
-                  {/* Token limit errors should be handled by ContextHandler, not shown here */}
-                  {error &&
-                    (error as Error & { isTokenLimitError?: boolean }).isTokenLimitError && <></>}
-                  <div className="block h-8" />
-                </>
-              ) : showPopularTopics ? (
-                /* Show PopularChatTopics when no messages, no recipe, and showPopularTopics is true (Pair view) */
-                <PopularChatTopics append={(text: string) => append(text)} />
-              ) : null /* Show nothing when messages.length === 0 && suppressEmptyState === true */
-            }
+                    {error &&
+                      !(error as Error & { isTokenLimitError?: boolean }).isTokenLimitError && (
+                        <>
+                          <div className="flex flex-col items-center justify-center p-4">
+                            <div className="text-red-700 dark:text-red-300 bg-red-400/50 p-3 rounded-lg mb-2">
+                              {error.message || 'Honk! Goose experienced an error while responding'}
+                            </div>
 
-            {/* Custom content after messages */}
-            {renderAfterMessages && renderAfterMessages()}
-          </ScrollArea>
+                            {/* Action buttons for non-token-limit errors */}
+                            <div className="flex gap-2 mt-2">
+                              <div
+                                className="px-3 py-2 text-center whitespace-nowrap cursor-pointer text-textStandard border border-borderSubtle hover:bg-bgSubtle rounded-full inline-block transition-all duration-150"
+                                onClick={async () => {
+                                  // Create a contextLengthExceeded message similar to token limit errors
+                                  const contextMessage: Message = {
+                                    id: `context-${Date.now()}`,
+                                    role: 'assistant',
+                                    created: Math.floor(Date.now() / 1000),
+                                    content: [
+                                      {
+                                        type: 'contextLengthExceeded',
+                                        msg: 'Summarization requested due to error. Creating summary to help resolve the issue.',
+                                      },
+                                    ],
+                                    display: true,
+                                    sendToLLM: false,
+                                  };
+
+                                  // Add the context message to trigger ContextHandler
+                                  const updatedMessages = [...messages, contextMessage];
+                                  setMessages(updatedMessages);
+
+                                  // Clear the error state since we're handling it with summarization
+                                  clearError();
+                                }}
+                              >
+                                Summarize Conversation
+                              </div>
+                              <div
+                                className="px-3 py-2 text-center whitespace-nowrap cursor-pointer text-textStandard border border-borderSubtle hover:bg-bgSubtle rounded-full inline-block transition-all duration-150"
+                                onClick={async () => {
+                                  // Find the last user message
+                                  const lastUserMessage = messages.reduceRight(
+                                    (found, m) => found || (m.role === 'user' ? m : null),
+                                    null as Message | null
+                                  );
+                                  if (lastUserMessage) {
+                                    append(lastUserMessage);
+                                  }
+                                }}
+                              >
+                                Retry Last Message
+                              </div>
+                            </div>
+                          </div>
+                        </>
+                      )}
+
+                    {/* Token limit errors should be handled by ContextHandler, not shown here */}
+                    {error &&
+                      (error as Error & { isTokenLimitError?: boolean }).isTokenLimitError && <></>}
+                    <div className="block h-8" />
+                  </>
+                )}
+
+              {/* Custom content after messages */}
+              {renderAfterMessages && renderAfterMessages()}
+            </ScrollArea>
+          ) : null}
+
+          {/* PopularChatTopics - rendered outside container when no messages/recipes */}
+          {showPopularTopics && filteredMessages.length === 0 && !recipeConfig && !suppressEmptyState && (
+            <div className="absolute inset-0 flex items-end justify-start p-6">
+              <PopularChatTopics append={(text: string) => append(text)} />
+            </div>
+          )}
 
           {/* Fixed loading indicator at bottom left of chat container */}
           {chatState !== ChatState.Idle && (

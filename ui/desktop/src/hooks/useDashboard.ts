@@ -35,8 +35,15 @@ const DEFAULT_DASHBOARD_STATE: DashboardState = {
       size: { width: 280, height: 180 },
       title: 'Recent Chats',
     },
+    {
+      id: 'analog-clock',
+      type: WidgetType.ANALOG_CLOCK,
+      position: { x: 750, y: 50 },
+      size: { width: 200, height: 200 },
+      title: 'Clock',
+    },
   ],
-  canvasSize: { width: 800, height: 600 },
+  canvasSize: { width: 1000, height: 600 },
 };
 
 // Load saved dashboard layout from localStorage

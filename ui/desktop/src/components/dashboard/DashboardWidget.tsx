@@ -4,6 +4,7 @@ import { WidgetData, WidgetType } from '../../types/dashboard';
 import { Button } from '../ui/button';
 import { ChatSmart } from '../icons/';
 import { useNavigate } from 'react-router-dom';
+import AnalogClock from '../AnalogClock';
 
 interface DashboardWidgetProps {
   widget: WidgetData;
@@ -122,6 +123,18 @@ export function DashboardWidget({ widget, onMouseDown, isDragging }: DashboardWi
           </CardContent>
         );
 
+      case WidgetType.ANALOG_CLOCK:
+        const clockSize = isClockWidget ? containerSize - 8 : Math.min(widget.size.width - 16, widget.size.height - 16);
+        return (
+          <CardContent className="flex items-center justify-center h-full p-0">
+            <AnalogClock 
+              size={clockSize}
+              showNumbers={true}
+              showMinuteMarks={true}
+            />
+          </CardContent>
+        );
+
       default:
         return (
           <CardContent className="flex items-center justify-center h-full p-0">
@@ -133,6 +146,10 @@ export function DashboardWidget({ widget, onMouseDown, isDragging }: DashboardWi
     }
   };
 
+  // Determine if this is a clock widget to apply circular styling
+  const isClockWidget = widget.type === WidgetType.ANALOG_CLOCK;
+  const containerSize = isClockWidget ? Math.min(widget.size.width, widget.size.height) : null;
+
   return (
     <div
       className={`absolute cursor-grab select-none ${
@@ -141,8 +158,8 @@ export function DashboardWidget({ widget, onMouseDown, isDragging }: DashboardWi
       style={{
         left: widget.position.x,
         top: widget.position.y,
-        width: widget.size.width,
-        height: widget.size.height,
+        width: isClockWidget ? containerSize : widget.size.width,
+        height: isClockWidget ? containerSize : widget.size.height,
         transform: isDragging ? 'scale(1.05)' : 'scale(1)',
         transition: isDragging ? 'none' : 'transform 0.2s ease-out',
         willChange: isDragging ? 'transform' : 'auto',
@@ -151,7 +168,7 @@ export function DashboardWidget({ widget, onMouseDown, isDragging }: DashboardWi
     >
       {/* Glass effect background */}
       <div
-        className={`absolute inset-0 rounded-xl border transition-all duration-200 ${
+        className={`absolute inset-0 ${isClockWidget ? 'rounded-full' : 'rounded-xl'} border transition-all duration-200 ${
           isDragging 
             ? 'border-border/60 shadow-3xl' 
             : 'border-border/30 shadow-2xl hover:border-border/50 hover:shadow-3xl'
@@ -170,19 +187,19 @@ export function DashboardWidget({ widget, onMouseDown, isDragging }: DashboardWi
       
       {/* Saved indicator */}
       {showSavedIndicator && !isDragging && (
-        <div className="absolute top-2 right-2 z-30 pointer-events-none">
+        <div className={`absolute ${isClockWidget ? 'top-4 right-4' : 'top-2 right-2'} z-30 pointer-events-none`}>
           <div className="w-1 h-1 bg-green-500 rounded-full animate-in fade-in duration-200"></div>
         </div>
       )}
       
       {/* Content */}
-      <div className="relative z-10 p-4 h-full pointer-events-none">
+      <div className={`relative z-10 ${isClockWidget ? 'p-2' : 'p-4'} h-full pointer-events-none`}>
         {renderWidgetContent()}
       </div>
       
-      {/* Resize handle */}
-      <div className="absolute bottom-0 right-0 w-3 h-3 cursor-se-resize opacity-0 hover:opacity-100 transition-opacity z-20 pointer-events-auto">
-        <div className="w-full h-full bg-text-muted/30 rounded-tl-sm" />
+      {/* Resize handle - positioned differently for circular widgets */}
+      <div className={`absolute ${isClockWidget ? 'bottom-2 right-2' : 'bottom-0 right-0'} w-3 h-3 cursor-se-resize opacity-0 hover:opacity-100 transition-opacity z-20 pointer-events-auto`}>
+        <div className={`w-full h-full bg-text-muted/30 ${isClockWidget ? 'rounded-full' : 'rounded-tl-sm'}`} />
       </div>
     </div>
   );

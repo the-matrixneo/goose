@@ -28,6 +28,7 @@ import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { type View, ViewOptions } from '../App';
 import BaseChat from './BaseChat';
+import GlobalBackground from './GlobalBackground';
 import { useRecipeManager } from '../hooks/useRecipeManager';
 import { useIsMobile } from '../hooks/use-mobile';
 import { useSidebar } from './ui/sidebar';
@@ -67,14 +68,14 @@ export default function Pair({
       sidebarInset.style.background = 'transparent';
     }
 
-    // Make ChatInput completely transparent (no glass effect in chat mode)
+    // Apply reduced blur effect to ChatInput (same as Hub but less aggressive)
     const chatInputContainer = document.querySelector('[data-drop-zone="true"]') as HTMLElement;
     if (chatInputContainer) {
-      chatInputContainer.style.background = 'transparent';
-      chatInputContainer.style.backdropFilter = 'none';
+      chatInputContainer.style.background = 'rgba(255, 255, 255, 0.05)';
+      chatInputContainer.style.backdropFilter = 'blur(10px)';
       // @ts-expect-error - webkitBackdropFilter is a valid CSS property
-      chatInputContainer.style.webkitBackdropFilter = 'none';
-      chatInputContainer.style.border = 'none';
+      chatInputContainer.style.webkitBackdropFilter = 'blur(10px)';
+      chatInputContainer.style.border = '1px solid rgba(255, 255, 255, 0.1)';
     }
     
     // Cleanup on unmount
@@ -219,9 +220,10 @@ export default function Pair({
     initialValue,
   };
 
-  // Custom main layout props to override background
+  // Custom main layout props to override background completely
   const customMainLayoutProps = {
-    backgroundColor: '', // Remove background completely
+    backgroundColor: '', // Remove any background class
+    style: { backgroundColor: 'transparent' }, // Force transparent background with inline style
   };
 
   // Custom content before messages
@@ -230,40 +232,13 @@ export default function Pair({
   };
 
   return (
-    <div className="flex flex-col h-full relative">
-      {/* Enhanced monochromatic gradient with better light mode contrast - same as Hub */}
-      <div 
-        className="absolute inset-0 animate-gradient-slow z-0"
-        style={{
-          background: `
-            radial-gradient(circle at 20% 80%, rgba(100, 100, 110, 0.25) 0%, transparent 50%),
-            radial-gradient(circle at 80% 20%, rgba(120, 120, 125, 0.22) 0%, transparent 50%),
-            radial-gradient(circle at 40% 40%, rgba(90, 95, 100, 0.18) 0%, transparent 50%),
-            linear-gradient(135deg, 
-              rgba(0, 0, 0, 0.02) 0%, 
-              rgba(0, 0, 0, 0.04) 25%, 
-              rgba(0, 0, 0, 0.02) 50%, 
-              rgba(0, 0, 0, 0.06) 75%, 
-              rgba(0, 0, 0, 0.03) 100%
-            )
-          `,
-          backgroundSize: '400% 400%',
-        }}
-      />
-      
-      {/* Dot pattern overlay - same as Hub */}
-      <div 
-        className="absolute inset-0 opacity-10 z-0"
-        style={{
-          backgroundImage: `radial-gradient(circle, rgba(0, 0, 0, 0.4) 1px, transparent 1px)`,
-          backgroundSize: '24px 24px',
-          backgroundPosition: '12px 12px',
-        }}
-      />
+    <div className="flex flex-col h-full relative" style={{ backgroundColor: 'transparent' }}>
+      {/* Use GlobalBackground to respect user's selected background */}
+      <GlobalBackground blur={false} opacity={1} />
 
       {/* Centered chat content */}
-      <div className="relative z-10 flex justify-center h-full">
-        <div className="w-full max-w-[1000px] h-full">
+      <div className="relative z-10 flex justify-center h-full" style={{ backgroundColor: 'transparent' }}>
+        <div className="w-full max-w-[1000px] h-full" style={{ backgroundColor: 'transparent' }}>
           <BaseChat
             chat={chat}
             setChat={setChat}

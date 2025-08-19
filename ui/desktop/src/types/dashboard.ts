@@ -14,6 +14,7 @@ export enum WidgetType {
   RECENT_CHATS = 'recent_chats',
   ACTIVE_DIRECTORIES = 'active_directories',
   GREETING = 'greeting',
+  ANALOG_CLOCK = 'analog_clock',
 }
 
 export interface WidgetData {
