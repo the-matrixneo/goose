@@ -3,6 +3,7 @@ import { ChatType } from '../types/chat';
 import { fetchSessionDetails, generateSessionId } from '../sessions';
 import { View, ViewOptions } from '../App';
 import { DEFAULT_CHAT_TITLE } from '../contexts/ChatContext';
+import { startAgent } from '../api';
 
 type UseChatArgs = {
   setIsLoadingSession: (isLoading: boolean) => void;
@@ -18,15 +19,22 @@ export const useChat = ({ setIsLoadingSession, setView, setPairChat }: UseChatAr
     recipeConfig: null, // Initialize with no recipe
   });
 
-  // Check for resumeSessionId in URL parameters
+  // Initialize session with server
   useEffect(() => {
-    const checkForResumeSession = async () => {
+    const initializeSession = async () => {
       const urlParams = new URLSearchParams(window.location.search);
       const resumeSessionId = urlParams.get('resumeSessionId');
 
-      if (!resumeSessionId) {
-        return;
+      if (resumeSessionId) {
+        // Resuming existing session
+        await handleResumeSession(resumeSessionId);
+      } else {
+        // Starting new session
+        await handleNewSession();
       }
+    };
+
+    const handleResumeSession = async (resumeSessionId: string) => {
 
       setIsLoadingSession(true);
       try {

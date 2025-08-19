@@ -373,6 +373,7 @@ impl<'__s> ToSchema<'__s> for AnnotatedSchema {
         super::routes::agent::update_agent_provider,
         super::routes::agent::update_router_tool_selector,
         super::routes::agent::update_session_config,
+        super::routes::agent::start_agent,
         super::routes::reply::confirm_permission,
         super::routes::context::manage_context,
         super::routes::session::list_sessions,
@@ -473,6 +474,9 @@ impl<'__s> ToSchema<'__s> for AnnotatedSchema {
         super::routes::agent::UpdateProviderRequest,
         super::routes::agent::SessionConfigRequest,
         super::routes::agent::GetToolsQuery,
+        super::routes::agent::UpdateRouterToolSelectorRequest,
+        super::routes::agent::StartAgentRequest,
+        super::routes::agent::StartAgentResponse,
         super::routes::agent::ErrorResponse,
     ))
 )]

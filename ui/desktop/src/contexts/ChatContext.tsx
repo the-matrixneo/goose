@@ -3,6 +3,7 @@ import { ChatType } from '../types/chat';
 import { generateSessionId } from '../sessions';
 import { Recipe } from '../recipe';
 import { useDraftContext } from './DraftContext';
+import { startAgent } from '../api';
 
 export const DEFAULT_CHAT_TITLE = 'New Chat';
 
@@ -10,6 +11,7 @@ interface ChatContextType {
   chat: ChatType;
   setChat: (chat: ChatType) => void;
   resetChat: () => void;
+  startNewSession: (workingDir?: string) => Promise<void>;
   hasActiveSession: boolean;
   setRecipeConfig: (recipe: Recipe | null) => void;
   clearRecipeConfig: () => void;
