@@ -536,19 +536,15 @@ export default function ChatInput({
     const messageToSend = queuedMessages.find(msg => msg.id === messageId);
     if (!messageToSend) return;
     
+    // Stop current processing but don't pause the queue - this is a priority send
     if (onStop) onStop();
-    queuePausedRef.current = true;
-    setLastInterruption("manual");
     
+    // Remove the message from queue and send it immediately
     setQueuedMessages(prev => prev.filter(msg => msg.id !== messageId));
     LocalMessageStorage.addMessage(messageToSend.content);
     handleSubmit(new CustomEvent("submit", { detail: { value: messageToSend.content } }) as unknown as React.FormEvent);
     
-    // Auto-resume queue after sending message from queue (if it was paused due to interruption and message is not an interruption)
-    if (lastInterruption && !detectInterruption(messageToSend.content)) {
-      queuePausedRef.current = false;
-      setLastInterruption(null);
-    }
+    // Queue will automatically continue processing remaining messages when this completes
   };
 
   const handleResumeQueue = () => {
@@ -821,19 +817,15 @@ export default function ChatInput({
     const messageToSend = queuedMessages.find(msg => msg.id === messageId);
     if (!messageToSend) return;
     
+    // Stop current processing but don't pause the queue - this is a priority send
     if (onStop) onStop();
-    queuePausedRef.current = true;
-    setLastInterruption("manual");
     
+    // Remove the message from queue and send it immediately
     setQueuedMessages(prev => prev.filter(msg => msg.id !== messageId));
     LocalMessageStorage.addMessage(messageToSend.content);
     handleSubmit(new CustomEvent("submit", { detail: { value: messageToSend.content } }) as unknown as React.FormEvent);
     
-    // Auto-resume queue after sending message from queue (if it was paused due to interruption and message is not an interruption)
-    if (lastInterruption && !detectInterruption(messageToSend.content)) {
-      queuePausedRef.current = false;
-      setLastInterruption(null);
-    }
+    // Queue will automatically continue processing remaining messages when this completes
   };
 
   const handleResumeQueue = () => {
@@ -1327,19 +1319,15 @@ export default function ChatInput({
     const messageToSend = queuedMessages.find(msg => msg.id === messageId);
     if (!messageToSend) return;
     
+    // Stop current processing but don't pause the queue - this is a priority send
     if (onStop) onStop();
-    queuePausedRef.current = true;
-    setLastInterruption("manual");
     
+    // Remove the message from queue and send it immediately
     setQueuedMessages(prev => prev.filter(msg => msg.id !== messageId));
     LocalMessageStorage.addMessage(messageToSend.content);
     handleSubmit(new CustomEvent("submit", { detail: { value: messageToSend.content } }) as unknown as React.FormEvent);
     
-    // Auto-resume queue after sending message from queue (if it was paused due to interruption and message is not an interruption)
-    if (lastInterruption && !detectInterruption(messageToSend.content)) {
-      queuePausedRef.current = false;
-      setLastInterruption(null);
-    }
+    // Queue will automatically continue processing remaining messages when this completes
   };
 
   const handleResumeQueue = () => {
