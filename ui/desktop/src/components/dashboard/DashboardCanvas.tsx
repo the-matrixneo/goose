@@ -8,7 +8,7 @@ interface DashboardCanvasProps {
   onWidgetResize: (id: string, size: { width: number; height: number }) => void;
 }
 
-export function DashboardCanvas({ widgets, onWidgetMove, onWidgetResize }: DashboardCanvasProps) {
+export function DashboardCanvas({ widgets, onWidgetMove }: DashboardCanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [draggedWidget, setDraggedWidget] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });

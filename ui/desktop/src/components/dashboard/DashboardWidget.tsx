@@ -9,10 +9,9 @@ interface DashboardWidgetProps {
   widget: WidgetData;
   onMouseDown: (e: React.MouseEvent) => void;
   isDragging: boolean;
-  onReset?: () => void; // Optional reset callback
 }
 
-export function DashboardWidget({ widget, onMouseDown, isDragging, onReset }: DashboardWidgetProps) {
+export function DashboardWidget({ widget, onMouseDown, isDragging }: DashboardWidgetProps) {
   const [showSavedIndicator, setShowSavedIndicator] = useState(false);
   const navigate = useNavigate();
 
