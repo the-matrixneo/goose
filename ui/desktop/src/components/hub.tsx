@@ -20,6 +20,7 @@ import { useState, useEffect } from 'react';
 import FlappyGoose from './FlappyGoose';
 import { type View, ViewOptions } from '../App';
 import ChatInput from './ChatInput';
+import GlobalBackground from './GlobalBackground';
 import { generateSessionId } from '../sessions';
 import { ChatState } from '../types/chatState';
 import { ChatContextManagerProvider } from './context_management/ChatContextManager';
@@ -118,25 +119,8 @@ export default function Hub({
     return (
       <ChatContextManagerProvider>
         <div className="flex flex-col h-full relative">
-          {/* Enhanced monochromatic gradient with better light mode contrast */}
-          <div 
-            className="absolute inset-0 animate-gradient-slow"
-            style={{
-              background: `
-                radial-gradient(circle at 20% 80%, rgba(100, 100, 110, 0.25) 0%, transparent 50%),
-                radial-gradient(circle at 80% 20%, rgba(120, 120, 125, 0.22) 0%, transparent 50%),
-                radial-gradient(circle at 40% 40%, rgba(90, 95, 100, 0.18) 0%, transparent 50%),
-                linear-gradient(135deg, 
-                  rgba(0, 0, 0, 0.02) 0%, 
-                  rgba(0, 0, 0, 0.04) 25%, 
-                  rgba(0, 0, 0, 0.02) 50%, 
-                  rgba(0, 0, 0, 0.06) 75%, 
-                  rgba(0, 0, 0, 0.03) 100%
-                )
-              `,
-              backgroundSize: '400% 400%',
-            }}
-          />
+          {/* Global background - no blur for dashboard */}
+          <GlobalBackground blur={false} opacity={1} />
           
           {/* Loading state with Goose icon */}
           <div className="flex-1 flex items-center justify-center relative z-10">
@@ -184,7 +168,10 @@ export default function Hub({
   return (
     <ChatContextManagerProvider>
       <div className="flex flex-col h-full relative">
-        {/* Dashboard Canvas with enhanced monochromatic gradient - now takes full height */}
+        {/* Global background - no blur for dashboard */}
+        <GlobalBackground blur={false} opacity={1} />
+        
+        {/* Dashboard Canvas - now takes full height */}
         <div className="absolute inset-0">
           <DashboardCanvas
             widgets={canvasWidgets}

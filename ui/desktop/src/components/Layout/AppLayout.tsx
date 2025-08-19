@@ -1,6 +1,7 @@
 import React from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import AppSidebar from '../GooseSidebar/AppSidebar';
+import GlobalBackground from '../GlobalBackground';
 import { View, ViewOptions } from '../../App';
 import { AppWindowMac, AppWindow } from 'lucide-react';
 import { Button } from '../ui/button';
@@ -82,6 +83,9 @@ const AppLayoutContent: React.FC<AppLayoutProps> = ({ setIsGoosehintsModalOpen }
 
   return (
     <div className="flex flex-1 w-full relative animate-fade-in">
+      {/* Global background with aggressive blur for chat sections */}
+      <GlobalBackground blur={true} opacity={0.3} />
+      
       {!shouldHideButtons && (
         <div className={`${headerPadding} absolute top-3 z-100 flex items-center`}>
           <SidebarTrigger
