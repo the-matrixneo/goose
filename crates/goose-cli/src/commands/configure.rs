@@ -1872,6 +1872,7 @@ Testing configuration..."
                                         timeout: Some(goose::config::DEFAULT_EXTENSION_TIMEOUT),
                                         bundled: Some(true),
                                         description: None,
+                                        available_tools: Vec::new(),
                                     },
                                 }) {
                                     Ok(_) => println!("✓ Developer extension enabled"),
