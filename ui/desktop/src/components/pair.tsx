@@ -68,12 +68,14 @@ export default function Pair({
       sidebarInset.style.background = 'transparent';
     }
 
-    // Override MainPanelLayout background
-    const mainPanel = document.querySelector('.bg-background-muted') as HTMLElement;
-    if (mainPanel) {
-      mainPanel.style.background = 'transparent';
-      mainPanel.style.backgroundColor = 'transparent';
-    }
+    // Override MainPanelLayout background - this is crucial
+    const mainPanelElements = document.querySelectorAll('.bg-background-muted, .bg-background-default') as NodeListOf<HTMLElement>;
+    mainPanelElements.forEach(element => {
+      if (element) {
+        element.style.background = 'transparent';
+        element.style.backgroundColor = 'transparent';
+      }
+    });
 
     // Apply glassmorphic effect to ChatInput (same as Hub)
     const chatInputContainer = document.querySelector('[data-drop-zone="true"]') as HTMLElement;
@@ -87,7 +89,7 @@ export default function Pair({
     }
     
     // Override any ScrollArea background to ensure transparency
-    const scrollAreas = document.querySelectorAll('.ScrollAreaRoot') as NodeListOf<HTMLElement>;
+    const scrollAreas = document.querySelectorAll('.ScrollAreaRoot, .ScrollAreaViewport') as NodeListOf<HTMLElement>;
     scrollAreas.forEach(scrollArea => {
       if (scrollArea) {
         scrollArea.style.background = `
@@ -103,16 +105,27 @@ export default function Pair({
         scrollArea.style.boxShadow = '0 8px 16px 0 rgba(0, 0, 0, 0.1)';
       }
     });
+
+    // Make sure the parent containers are transparent too
+    const parentContainers = document.querySelectorAll('.h-dvh, .h-full') as NodeListOf<HTMLElement>;
+    parentContainers.forEach(container => {
+      if (container) {
+        container.style.backgroundColor = 'transparent';
+        container.style.background = 'transparent';
+      }
+    });
     
     // Cleanup on unmount
     return () => {
       if (sidebarInset) {
         sidebarInset.style.background = '';
       }
-      if (mainPanel) {
-        mainPanel.style.background = '';
-        mainPanel.style.backgroundColor = '';
-      }
+      mainPanelElements.forEach(element => {
+        if (element) {
+          element.style.background = '';
+          element.style.backgroundColor = '';
+        }
+      });
       if (chatInputContainer) {
         chatInputContainer.style.background = '';
         chatInputContainer.style.backdropFilter = '';
@@ -131,8 +144,14 @@ export default function Pair({
           scrollArea.style.boxShadow = '';
         }
       });
+      parentContainers.forEach(container => {
+        if (container) {
+          container.style.backgroundColor = '';
+          container.style.background = '';
+        }
+      });
     };
-  });
+  }, []);
 
   // Handle recipe loading from recipes view - reset chat if needed
   useEffect(() => {
