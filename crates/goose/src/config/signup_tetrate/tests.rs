@@ -78,10 +78,10 @@ fn test_configure_tetrate() {
     // Verify the configuration was set correctly
     let retrieved_key: String = config.get_secret("TETRATE_API_KEY").unwrap();
     assert_eq!(retrieved_key, test_key);
-    
+
     let provider: String = config.get_param("GOOSE_PROVIDER").unwrap();
     assert_eq!(provider, "tetrate");
-    
+
     let model: String = config.get_param("GOOSE_MODEL").unwrap();
     assert_eq!(model, TETRATE_DEFAULT_MODEL);
 }
