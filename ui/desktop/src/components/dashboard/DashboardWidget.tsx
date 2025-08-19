@@ -82,7 +82,7 @@ export function DashboardWidget({ widget, onMouseDown, isDragging }: DashboardWi
               </Button>
             </div>
             <div className="space-y-1 flex-1 overflow-y-auto min-h-0">
-              {widget.data?.recentSessions?.slice(0, 5).map((session: any) => (
+              {widget.data?.recentSessions?.slice(0, 5).map((session: { id: string; metadata?: { description?: string }; modified: string }) => (
                 <div
                   key={session.id}
                   onClick={() => handleSessionClick(session.id)}
