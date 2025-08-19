@@ -146,7 +146,15 @@ export default function ChatInput({
       const nextMessage = queuedMessages[0];
       LocalMessageStorage.addMessage(nextMessage.content);
       handleSubmit(new CustomEvent("submit", { detail: { value: nextMessage.content } }) as unknown as React.FormEvent);
-      setQueuedMessages(prev => prev.slice(1));
+      setQueuedMessages(prev => {
+        const newQueue = prev.slice(1);
+        // If queue becomes empty after processing, clear the paused state
+        if (newQueue.length === 0) {
+          queuePausedRef.current = false;
+          setLastInterruption(null);
+        }
+        return newQueue;
+      });
     }
     wasLoadingRef.current = isLoading;
   }, [isLoading, queuedMessages, handleSubmit]);
@@ -550,7 +558,15 @@ export default function ChatInput({
       const nextMessage = queuedMessages[0];
       LocalMessageStorage.addMessage(nextMessage.content);
       handleSubmit(new CustomEvent("submit", { detail: { value: nextMessage.content } }) as unknown as React.FormEvent);
-      setQueuedMessages(prev => prev.slice(1));
+      setQueuedMessages(prev => {
+        const newQueue = prev.slice(1);
+        // If queue becomes empty after processing, clear the paused state
+        if (newQueue.length === 0) {
+          queuePausedRef.current = false;
+          setLastInterruption(null);
+        }
+        return newQueue;
+      });
     }
   };
 
@@ -827,7 +843,15 @@ export default function ChatInput({
       const nextMessage = queuedMessages[0];
       LocalMessageStorage.addMessage(nextMessage.content);
       handleSubmit(new CustomEvent("submit", { detail: { value: nextMessage.content } }) as unknown as React.FormEvent);
-      setQueuedMessages(prev => prev.slice(1));
+      setQueuedMessages(prev => {
+        const newQueue = prev.slice(1);
+        // If queue becomes empty after processing, clear the paused state
+        if (newQueue.length === 0) {
+          queuePausedRef.current = false;
+          setLastInterruption(null);
+        }
+        return newQueue;
+      });
     }
   };
 
@@ -1010,7 +1034,15 @@ export default function ChatInput({
           content: displayValue.trim(),
           timestamp: Date.now()
         };
-        setQueuedMessages(prev => [...prev, newMessage]);
+        setQueuedMessages(prev => {
+        const newQueue = [...prev, newMessage];
+        // If adding to an empty queue, reset the paused state
+        if (prev.length === 0) {
+          queuePausedRef.current = false;
+          setLastInterruption(null);
+        }
+        return newQueue;
+      });
         setDisplayValue("");
         setValue("");
         return;
@@ -1047,7 +1079,15 @@ export default function ChatInput({
           content: displayValue.trim(),
           timestamp: Date.now()
         };
-        setQueuedMessages(prev => [...prev, newMessage]);
+        setQueuedMessages(prev => {
+        const newQueue = [...prev, newMessage];
+        // If adding to an empty queue, reset the paused state
+        if (prev.length === 0) {
+          queuePausedRef.current = false;
+          setLastInterruption(null);
+        }
+        return newQueue;
+      });
         setDisplayValue("");
         setValue("");
         return;
@@ -1082,7 +1122,15 @@ export default function ChatInput({
           content: displayValue.trim(),
           timestamp: Date.now()
         };
-        setQueuedMessages(prev => [...prev, newMessage]);
+        setQueuedMessages(prev => {
+        const newQueue = [...prev, newMessage];
+        // If adding to an empty queue, reset the paused state
+        if (prev.length === 0) {
+          queuePausedRef.current = false;
+          setLastInterruption(null);
+        }
+        return newQueue;
+      });
         setDisplayValue("");
         setValue("");
         return;
@@ -1114,7 +1162,15 @@ export default function ChatInput({
           content: displayValue.trim(),
           timestamp: Date.now()
         };
-        setQueuedMessages(prev => [...prev, newMessage]);
+        setQueuedMessages(prev => {
+        const newQueue = [...prev, newMessage];
+        // If adding to an empty queue, reset the paused state
+        if (prev.length === 0) {
+          queuePausedRef.current = false;
+          setLastInterruption(null);
+        }
+        return newQueue;
+      });
         setDisplayValue("");
         setValue("");
         return;
@@ -1164,7 +1220,15 @@ export default function ChatInput({
           content: displayValue.trim(),
           timestamp: Date.now()
         };
-        setQueuedMessages(prev => [...prev, newMessage]);
+        setQueuedMessages(prev => {
+        const newQueue = [...prev, newMessage];
+        // If adding to an empty queue, reset the paused state
+        if (prev.length === 0) {
+          queuePausedRef.current = false;
+          setLastInterruption(null);
+        }
+        return newQueue;
+      });
         setDisplayValue("");
         setValue("");
         return;
@@ -1285,7 +1349,15 @@ export default function ChatInput({
       const nextMessage = queuedMessages[0];
       LocalMessageStorage.addMessage(nextMessage.content);
       handleSubmit(new CustomEvent("submit", { detail: { value: nextMessage.content } }) as unknown as React.FormEvent);
-      setQueuedMessages(prev => prev.slice(1));
+      setQueuedMessages(prev => {
+        const newQueue = prev.slice(1);
+        // If queue becomes empty after processing, clear the paused state
+        if (newQueue.length === 0) {
+          queuePausedRef.current = false;
+          setLastInterruption(null);
+        }
+        return newQueue;
+      });
     }
   };
 
