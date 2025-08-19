@@ -560,76 +560,7 @@ export default function ChatInput({
 
   // Cleanup effect for component unmount - prevent memory leaks
   useEffect(() => {
-  
-  // Queue management functions
-  const handleRemoveQueuedMessage = (messageId: string) => {
-    setQueuedMessages(prev => prev.filter(msg => msg.id !== messageId));
-    QueueStorage.removeMessage(messageId);
-  };
-
-  const handleClearQueue = () => {
-    setQueuedMessages([]);
-    queuePausedRef.current = false;
-    setLastInterruption(null);
-    QueueStorage.clearQueue();
-  };
-
-  const handleReorderMessages = (reorderedMessages: QueuedMessage[]) => {
-    setQueuedMessages(reorderedMessages);
-    QueueStorage.reorderQueue(reorderedMessages);
-  };
-
-  const handleEditMessage = (messageId: string, newContent: string) => {
-    setQueuedMessages(prev => 
-      prev.map(msg => 
-        msg.id === messageId 
-          ? { ...msg, content: newContent }
-          : msg
-      )
-    );
-    QueueStorage.updateMessage(messageId, newContent);
-  };
-
-  const handleStopAndSend = (messageId: string) => {
-    const messageToSend = queuedMessages.find(msg => msg.id === messageId);
-    if (!messageToSend) return;
-    
-    // Stop current processing and temporarily pause queue to prevent double-send
-    if (onStop) onStop();
-    const wasPaused = queuePausedRef.current;
-    queuePausedRef.current = true;
-    
-    // Remove the message from queue and send it immediately
-    setQueuedMessages(prev => prev.filter(msg => msg.id !== messageId));
-    LocalMessageStorage.addMessage(messageToSend.content);
-    handleSubmit(new CustomEvent("submit", { detail: { value: messageToSend.content } }) as unknown as React.FormEvent);
-    
-    // Restore previous pause state after a brief delay to prevent race condition
-    setTimeout(() => {
-      queuePausedRef.current = wasPaused;
-    }, 100);
-  };
-
-  const handleResumeQueue = () => {
-    queuePausedRef.current = false;
-    setLastInterruption(null);
-    if (!isLoading && queuedMessages.length > 0) {
-      const nextMessage = queuedMessages[0];
-      LocalMessageStorage.addMessage(nextMessage.content);
-      handleSubmit(new CustomEvent("submit", { detail: { value: nextMessage.content } }) as unknown as React.FormEvent);
-      setQueuedMessages(prev => {
-        const newQueue = prev.slice(1);
-        // If queue becomes empty after processing, clear the paused state
-        if (newQueue.length === 0) {
-          queuePausedRef.current = false;
-          setLastInterruption(null);
-        }
-        return newQueue;
-      });
-    }
-  };
-
-  return () => {
+    return () => {
       // Clear any pending timeouts from image processing
       setPastedImages((currentImages) => {
         currentImages.forEach((img) => {
@@ -850,76 +781,7 @@ export default function ChatInput({
 
   // Cleanup debounced functions on unmount
   useEffect(() => {
-  
-  // Queue management functions
-  const handleRemoveQueuedMessage = (messageId: string) => {
-    setQueuedMessages(prev => prev.filter(msg => msg.id !== messageId));
-    QueueStorage.removeMessage(messageId);
-  };
-
-  const handleClearQueue = () => {
-    setQueuedMessages([]);
-    queuePausedRef.current = false;
-    setLastInterruption(null);
-    QueueStorage.clearQueue();
-  };
-
-  const handleReorderMessages = (reorderedMessages: QueuedMessage[]) => {
-    setQueuedMessages(reorderedMessages);
-    QueueStorage.reorderQueue(reorderedMessages);
-  };
-
-  const handleEditMessage = (messageId: string, newContent: string) => {
-    setQueuedMessages(prev => 
-      prev.map(msg => 
-        msg.id === messageId 
-          ? { ...msg, content: newContent }
-          : msg
-      )
-    );
-    QueueStorage.updateMessage(messageId, newContent);
-  };
-
-  const handleStopAndSend = (messageId: string) => {
-    const messageToSend = queuedMessages.find(msg => msg.id === messageId);
-    if (!messageToSend) return;
-    
-    // Stop current processing and temporarily pause queue to prevent double-send
-    if (onStop) onStop();
-    const wasPaused = queuePausedRef.current;
-    queuePausedRef.current = true;
-    
-    // Remove the message from queue and send it immediately
-    setQueuedMessages(prev => prev.filter(msg => msg.id !== messageId));
-    LocalMessageStorage.addMessage(messageToSend.content);
-    handleSubmit(new CustomEvent("submit", { detail: { value: messageToSend.content } }) as unknown as React.FormEvent);
-    
-    // Restore previous pause state after a brief delay to prevent race condition
-    setTimeout(() => {
-      queuePausedRef.current = wasPaused;
-    }, 100);
-  };
-
-  const handleResumeQueue = () => {
-    queuePausedRef.current = false;
-    setLastInterruption(null);
-    if (!isLoading && queuedMessages.length > 0) {
-      const nextMessage = queuedMessages[0];
-      LocalMessageStorage.addMessage(nextMessage.content);
-      handleSubmit(new CustomEvent("submit", { detail: { value: nextMessage.content } }) as unknown as React.FormEvent);
-      setQueuedMessages(prev => {
-        const newQueue = prev.slice(1);
-        // If queue becomes empty after processing, clear the paused state
-        if (newQueue.length === 0) {
-          queuePausedRef.current = false;
-          setLastInterruption(null);
-        }
-        return newQueue;
-      });
-    }
-  };
-
-  return () => {
+    return () => {
       debouncedAutosize.cancel?.();
       debouncedSaveDraft.cancel?.();
     };
@@ -1076,41 +938,6 @@ export default function ChatInput({
     if (mentionPopover.isOpen && mentionPopoverRef.current) {
       if (evt.key === 'ArrowDown') {
         evt.preventDefault();
-      
-      // Handle interruption and queue logic
-      if (isLoading && displayValue.trim()) {
-        const interruptionMatch = detectInterruption(displayValue.trim());
-        
-        if (interruptionMatch && interruptionMatch.shouldInterrupt) {
-          setLastInterruption(interruptionMatch.matchedText);
-          if (onStop) onStop();
-          queuePausedRef.current = true;
-          
-          LocalMessageStorage.addMessage(displayValue.trim());
-          handleSubmit(new CustomEvent("submit", { detail: { value: displayValue.trim() } }) as unknown as React.FormEvent);
-          setDisplayValue("");
-          setValue("");
-          return;
-        }
-        
-        const newMessage = {
-          id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-          content: displayValue.trim(),
-          timestamp: Date.now()
-        };
-        setQueuedMessages(prev => {
-        const newQueue = [...prev, newMessage];
-        // If adding to an empty queue, reset the paused state
-        if (prev.length === 0) {
-          queuePausedRef.current = false;
-          setLastInterruption(null);
-        }
-        return newQueue;
-      });
-        setDisplayValue("");
-        setValue("");
-        return;
-      }
         const displayFiles = mentionPopoverRef.current.getDisplayFiles();
         const maxIndex = Math.max(0, displayFiles.length - 1);
         setMentionPopover((prev) => ({
@@ -1121,41 +948,6 @@ export default function ChatInput({
       }
       if (evt.key === 'ArrowUp') {
         evt.preventDefault();
-      
-      // Handle interruption and queue logic
-      if (isLoading && displayValue.trim()) {
-        const interruptionMatch = detectInterruption(displayValue.trim());
-        
-        if (interruptionMatch && interruptionMatch.shouldInterrupt) {
-          setLastInterruption(interruptionMatch.matchedText);
-          if (onStop) onStop();
-          queuePausedRef.current = true;
-          
-          LocalMessageStorage.addMessage(displayValue.trim());
-          handleSubmit(new CustomEvent("submit", { detail: { value: displayValue.trim() } }) as unknown as React.FormEvent);
-          setDisplayValue("");
-          setValue("");
-          return;
-        }
-        
-        const newMessage = {
-          id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-          content: displayValue.trim(),
-          timestamp: Date.now()
-        };
-        setQueuedMessages(prev => {
-        const newQueue = [...prev, newMessage];
-        // If adding to an empty queue, reset the paused state
-        if (prev.length === 0) {
-          queuePausedRef.current = false;
-          setLastInterruption(null);
-        }
-        return newQueue;
-      });
-        setDisplayValue("");
-        setValue("");
-        return;
-      }
         setMentionPopover((prev) => ({
           ...prev,
           selectedIndex: Math.max(prev.selectedIndex - 1, 0),
@@ -1164,81 +956,11 @@ export default function ChatInput({
       }
       if (evt.key === 'Enter') {
         evt.preventDefault();
-      
-      // Handle interruption and queue logic
-      if (isLoading && displayValue.trim()) {
-        const interruptionMatch = detectInterruption(displayValue.trim());
-        
-        if (interruptionMatch && interruptionMatch.shouldInterrupt) {
-          setLastInterruption(interruptionMatch.matchedText);
-          if (onStop) onStop();
-          queuePausedRef.current = true;
-          
-          LocalMessageStorage.addMessage(displayValue.trim());
-          handleSubmit(new CustomEvent("submit", { detail: { value: displayValue.trim() } }) as unknown as React.FormEvent);
-          setDisplayValue("");
-          setValue("");
-          return;
-        }
-        
-        const newMessage = {
-          id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-          content: displayValue.trim(),
-          timestamp: Date.now()
-        };
-        setQueuedMessages(prev => {
-        const newQueue = [...prev, newMessage];
-        // If adding to an empty queue, reset the paused state
-        if (prev.length === 0) {
-          queuePausedRef.current = false;
-          setLastInterruption(null);
-        }
-        return newQueue;
-      });
-        setDisplayValue("");
-        setValue("");
-        return;
-      }
         mentionPopoverRef.current.selectFile(mentionPopover.selectedIndex);
         return;
       }
       if (evt.key === 'Escape') {
         evt.preventDefault();
-      
-      // Handle interruption and queue logic
-      if (isLoading && displayValue.trim()) {
-        const interruptionMatch = detectInterruption(displayValue.trim());
-        
-        if (interruptionMatch && interruptionMatch.shouldInterrupt) {
-          setLastInterruption(interruptionMatch.matchedText);
-          if (onStop) onStop();
-          queuePausedRef.current = true;
-          
-          LocalMessageStorage.addMessage(displayValue.trim());
-          handleSubmit(new CustomEvent("submit", { detail: { value: displayValue.trim() } }) as unknown as React.FormEvent);
-          setDisplayValue("");
-          setValue("");
-          return;
-        }
-        
-        const newMessage = {
-          id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-          content: displayValue.trim(),
-          timestamp: Date.now()
-        };
-        setQueuedMessages(prev => {
-        const newQueue = [...prev, newMessage];
-        // If adding to an empty queue, reset the paused state
-        if (prev.length === 0) {
-          queuePausedRef.current = false;
-          setLastInterruption(null);
-        }
-        return newQueue;
-      });
-        setDisplayValue("");
-        setValue("");
-        return;
-      }
         setMentionPopover((prev) => ({ ...prev, isOpen: false }));
         return;
       }
@@ -1285,18 +1007,19 @@ export default function ChatInput({
           timestamp: Date.now()
         };
         setQueuedMessages(prev => {
-        const newQueue = [...prev, newMessage];
-        // If adding to an empty queue, reset the paused state
-        if (prev.length === 0) {
-          queuePausedRef.current = false;
-          setLastInterruption(null);
-        }
-        return newQueue;
-      });
+          const newQueue = [...prev, newMessage];
+          // If adding to an empty queue, reset the paused state
+          if (prev.length === 0) {
+            queuePausedRef.current = false;
+            setLastInterruption(null);
+          }
+          return newQueue;
+        });
         setDisplayValue("");
         setValue("");
         return;
       }
+      
       const canSubmit =
         !isLoading &&
         !isLoadingCompaction &&
