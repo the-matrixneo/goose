@@ -83,7 +83,7 @@ export default function Pair({
       // @ts-expect-error - webkitBackdropFilter is a valid CSS property
       chatInputContainer.style.webkitBackdropFilter = 'blur(20px)';
       chatInputContainer.style.border = '1px solid rgba(255, 255, 255, 0.1)';
-      chatInputContainer.style.boxShadow = '0 8px 32px 0 rgba(31, 38, 135, 0.37)';
+      chatInputContainer.style.boxShadow = '0 8px 16px 0 rgba(0, 0, 0, 0.1)';
     }
     
     // Override any ScrollArea background to ensure transparency
@@ -100,7 +100,7 @@ export default function Pair({
         // @ts-expect-error - webkitBackdropFilter is a valid CSS property
         scrollArea.style.webkitBackdropFilter = 'blur(20px) saturate(180%)';
         scrollArea.style.border = '1px solid rgba(255, 255, 255, 0.1)';
-        scrollArea.style.boxShadow = '0 8px 32px 0 rgba(31, 38, 135, 0.37)';
+        scrollArea.style.boxShadow = '0 8px 16px 0 rgba(0, 0, 0, 0.1)';
       }
     });
     
