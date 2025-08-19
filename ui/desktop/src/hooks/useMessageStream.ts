@@ -583,7 +583,7 @@ export function useMessageStream({
         }
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
     [api, processMessageStream, mutateChatState, setError, onResponse, onError, maxSteps]
   );
 

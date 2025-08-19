@@ -108,25 +108,25 @@ export default function MarkdownContent({ content, className = '' }: MarkdownCon
   }, [content]);
 
   return (
-    <div className="w-full overflow-x-hidden">
+    <div
+      className={`w-full overflow-x-hidden prose prose-sm text-text-default dark:prose-invert max-w-full word-breakfont-sans
+      prose-pre:p-0 prose-pre:m-0 !p-0
+      prose-code:break-all prose-code:whitespace-pre-wrapprose-code:font-sans
+      prose-table:table prose-table:w-full
+      prose-blockquote:text-inherit
+      prose-td:border prose-td:border-border-default prose-td:p-2
+      prose-th:border prose-th:border-border-default prose-th:p-2
+      prose-thead:bg-background-default
+      prose-h1:text-2xl prose-h1:font-normal prose-h1:mb-5 prose-h1:mt-0prose-h1:font-sans
+      prose-h2:text-xl prose-h2:font-normal prose-h2:mb-4 prose-h2:mt-4prose-h2:font-sans
+      prose-h3:text-lg prose-h3:font-normal prose-h3:mb-3 prose-h3:mt-3prose-h3:font-sans
+      prose-p:mt-0 prose-p:mb-2prose-p:font-sans
+      prose-ol:my-2prose-ol:font-sans
+      prose-ul:mt-0 prose-ul:mb-3prose-ul:font-sans
+      prose-li:m-0prose-li:font-sans ${className}`}
+    >
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
-        className={`prose prose-sm text-text-default dark:prose-invert w-full max-w-full word-break font-sans
-          prose-pre:p-0 prose-pre:m-0 !p-0
-          prose-code:break-all prose-code:whitespace-pre-wrap prose-code:font-sans
-          prose-table:table prose-table:w-full
-          prose-blockquote:text-inherit
-          prose-td:border prose-td:border-border-default prose-td:p-2
-          prose-th:border prose-th:border-border-default prose-th:p-2
-          prose-thead:bg-background-default
-          prose-h1:text-2xl prose-h1:font-normal prose-h1:mb-5 prose-h1:mt-0 prose-h1:font-sans
-          prose-h2:text-xl prose-h2:font-normal prose-h2:mb-4 prose-h2:mt-4 prose-h2:font-sans
-          prose-h3:text-lg prose-h3:font-normal prose-h3:mb-3 prose-h3:mt-3 prose-h3:font-sans
-          prose-p:mt-0 prose-p:mb-2 prose-p:font-sans
-          prose-ol:my-2 prose-ol:font-sans
-          prose-ul:mt-0 prose-ul:mb-3 prose-ul:font-sans
-          prose-li:m-0 prose-li:font-sans
-          ${className}`}
         components={{
           a: ({ ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" />,
           code: MarkdownCode,
