@@ -42,7 +42,7 @@ fn test_auth_url_generation() {
     assert!(auth_url.starts_with(TETRATE_AUTH_URL));
 
     // Verify callback URL is properly encoded
-    assert!(auth_url.contains(&urlencoding::encode(CALLBACK_URL)));
+    assert!(auth_url.contains(&*urlencoding::encode(CALLBACK_URL)));
 }
 
 #[test]
@@ -60,22 +60,28 @@ fn test_different_verifiers_produce_different_challenges() {
 #[test]
 fn test_configure_tetrate() {
     use crate::config::Config;
-    use std::collections::HashMap;
+    use tempfile::NamedTempFile;
 
-    // Create a test config
-    let mut params = HashMap::new();
-    let mut secrets = HashMap::new();
-    let config = Config::new(params.clone(), secrets.clone()).unwrap();
+    // Unset environment variables that might interfere with the test
+    std::env::remove_var("GOOSE_PROVIDER");
+    std::env::remove_var("GOOSE_MODEL");
+
+    // Create a test config with a temp file and file-based secrets
+    let config_file = NamedTempFile::new().unwrap();
+    let secrets_file = NamedTempFile::new().unwrap();
+    let config = Config::new_with_file_secrets(config_file.path(), secrets_file.path()).unwrap();
 
     // Configure with a test API key
     let test_key = "test-api-key-123".to_string();
     configure_tetrate(&config, test_key.clone()).unwrap();
 
     // Verify the configuration was set correctly
-    assert_eq!(config.get_secret("TETRATE_API_KEY").unwrap(), test_key);
-    assert_eq!(config.get_param("GOOSE_PROVIDER").unwrap(), "tetrate");
-    assert_eq!(
-        config.get_param("GOOSE_MODEL").unwrap(),
-        TETRATE_DEFAULT_MODEL
-    );
+    let retrieved_key: String = config.get_secret("TETRATE_API_KEY").unwrap();
+    assert_eq!(retrieved_key, test_key);
+    
+    let provider: String = config.get_param("GOOSE_PROVIDER").unwrap();
+    assert_eq!(provider, "tetrate");
+    
+    let model: String = config.get_param("GOOSE_MODEL").unwrap();
+    assert_eq!(model, TETRATE_DEFAULT_MODEL);
 }
