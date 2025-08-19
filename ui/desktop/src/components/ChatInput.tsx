@@ -113,13 +113,32 @@ export default function ChatInput({
   const [isFocused, setIsFocused] = useState(false);
   const [pastedImages, setPastedImages] = useState<PastedImage[]>([]);
 
-  // Queue functionality
-  const [queuedMessages, setQueuedMessages] = useState<QueuedMessage[]>([]);
+  // Queue functionality - initialize from storage
+  const [queuedMessages, setQueuedMessages] = useState<QueuedMessage[]>(() => {
+    // Load queue from storage on component mount
+    return QueueStorage.loadQueue();
+  });
   const isLoading = chatState !== ChatState.Idle;
   const wasLoadingRef = useRef(isLoading);
-  const queuePausedRef = useRef(false);
+  const queuePausedRef = useRef((() => {
+    // Load pause state from storage
+    try {
+      const stored = localStorage.getItem('goose-queue-paused');
+      return stored ? JSON.parse(stored) : false;
+    } catch {
+      return false;
+    }
+  })());
   const editingMessageIdRef = useRef<string | null>(null);
-  const [lastInterruption, setLastInterruption] = useState<string | null>(null);
+  const [lastInterruption, setLastInterruption] = useState<string | null>(() => {
+    // Load interruption state from storage
+    try {
+      const stored = localStorage.getItem('goose-queue-interruption');
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
 
   const { alerts, addAlert, clearAlerts } = useAlerts();
   const dropdownRef = useRef<HTMLDivElement | null>(null);
@@ -139,6 +158,41 @@ export default function ChatInput({
   useEffect(() => {
     // Debug logging removed - draft functionality is working correctly
   }, [chatContext?.contextKey, chatContext?.draft, chatContext]);
+
+  // Save queue to storage whenever it changes
+  useEffect(() => {
+    QueueStorage.saveQueue(queuedMessages);
+  }, [queuedMessages]);
+
+  // Save queue state (paused/interrupted) to storage
+  useEffect(() => {
+    try {
+      localStorage.setItem('goose-queue-paused', JSON.stringify(queuePausedRef.current));
+    } catch (error) {
+      console.error('Error saving queue pause state:', error);
+    }
+  }, [queuedMessages]); // Save when queue changes
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('goose-queue-interruption', JSON.stringify(lastInterruption));
+    } catch (error) {
+      console.error('Error saving queue interruption state:', error);
+    }
+  }, [lastInterruption]);
+
+  // Cleanup effect - save final state on component unmount
+  useEffect(() => {
+    return () => {
+      // Save final queue state when component unmounts
+      try {
+        localStorage.setItem('goose-queue-paused', JSON.stringify(queuePausedRef.current));
+        localStorage.setItem('goose-queue-interruption', JSON.stringify(lastInterruption));
+      } catch (error) {
+        console.error('Error saving queue state on unmount:', error);
+      }
+    };
+  }, []); // Empty dependency array - only run on mount/unmount
 
   // Queue processing
   useEffect(() => {
@@ -510,16 +564,19 @@ export default function ChatInput({
   // Queue management functions
   const handleRemoveQueuedMessage = (messageId: string) => {
     setQueuedMessages(prev => prev.filter(msg => msg.id !== messageId));
+    QueueStorage.removeMessage(messageId);
   };
 
   const handleClearQueue = () => {
     setQueuedMessages([]);
     queuePausedRef.current = false;
     setLastInterruption(null);
+    QueueStorage.clearQueue();
   };
 
   const handleReorderMessages = (reorderedMessages: QueuedMessage[]) => {
     setQueuedMessages(reorderedMessages);
+    QueueStorage.reorderQueue(reorderedMessages);
   };
 
   const handleEditMessage = (messageId: string, newContent: string) => {
@@ -530,6 +587,7 @@ export default function ChatInput({
           : msg
       )
     );
+    QueueStorage.updateMessage(messageId, newContent);
   };
 
   const handleStopAndSend = (messageId: string) => {
@@ -796,16 +854,19 @@ export default function ChatInput({
   // Queue management functions
   const handleRemoveQueuedMessage = (messageId: string) => {
     setQueuedMessages(prev => prev.filter(msg => msg.id !== messageId));
+    QueueStorage.removeMessage(messageId);
   };
 
   const handleClearQueue = () => {
     setQueuedMessages([]);
     queuePausedRef.current = false;
     setLastInterruption(null);
+    QueueStorage.clearQueue();
   };
 
   const handleReorderMessages = (reorderedMessages: QueuedMessage[]) => {
     setQueuedMessages(reorderedMessages);
+    QueueStorage.reorderQueue(reorderedMessages);
   };
 
   const handleEditMessage = (messageId: string, newContent: string) => {
@@ -816,6 +877,7 @@ export default function ChatInput({
           : msg
       )
     );
+    QueueStorage.updateMessage(messageId, newContent);
   };
 
   const handleStopAndSend = (messageId: string) => {
@@ -1303,16 +1365,19 @@ export default function ChatInput({
   // Queue management functions
   const handleRemoveQueuedMessage = (messageId: string) => {
     setQueuedMessages(prev => prev.filter(msg => msg.id !== messageId));
+    QueueStorage.removeMessage(messageId);
   };
 
   const handleClearQueue = () => {
     setQueuedMessages([]);
     queuePausedRef.current = false;
     setLastInterruption(null);
+    QueueStorage.clearQueue();
   };
 
   const handleReorderMessages = (reorderedMessages: QueuedMessage[]) => {
     setQueuedMessages(reorderedMessages);
+    QueueStorage.reorderQueue(reorderedMessages);
   };
 
   const handleEditMessage = (messageId: string, newContent: string) => {
@@ -1323,6 +1388,7 @@ export default function ChatInput({
           : msg
       )
     );
+    QueueStorage.updateMessage(messageId, newContent);
   };
 
   const handleStopAndSend = (messageId: string) => {
