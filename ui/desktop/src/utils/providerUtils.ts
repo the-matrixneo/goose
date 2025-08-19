@@ -219,21 +219,12 @@ export const initializeSystem = async (
       prompt = `${desktopPromptBot}\nIMPORTANT instructions for you to operate as agent:\n${recipe_instructions}`;
     }
     // Extend the system prompt with desktop-specific information
-    const response = await fetch(getApiUrl('/agent/prompt'), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Secret-Key': await window.electron.getSecretKey(),
-      },
-      body: JSON.stringify({
+    await extendPrompt({
+      body: {
         extension: prompt,
-      }),
+      },
     });
-    if (!response.ok) {
-      console.warn(`Failed to extend system prompt: ${response.statusText}`);
-    } else {
-      console.log('Extended system prompt with desktop-specific information');
-    }
+
     if (!hasParameters && hasSubRecipes) {
       await addSubRecipesToAgent(subRecipes);
     }
