@@ -68,20 +68,50 @@ export default function Pair({
       sidebarInset.style.background = 'transparent';
     }
 
-    // Apply reduced blur effect to ChatInput (same as Hub but less aggressive)
+    // Override MainPanelLayout background
+    const mainPanel = document.querySelector('.bg-background-muted') as HTMLElement;
+    if (mainPanel) {
+      mainPanel.style.background = 'transparent';
+      mainPanel.style.backgroundColor = 'transparent';
+    }
+
+    // Apply glassmorphic effect to ChatInput (same as Hub)
     const chatInputContainer = document.querySelector('[data-drop-zone="true"]') as HTMLElement;
     if (chatInputContainer) {
       chatInputContainer.style.background = 'rgba(255, 255, 255, 0.05)';
-      chatInputContainer.style.backdropFilter = 'blur(10px)';
+      chatInputContainer.style.backdropFilter = 'blur(20px)';
       // @ts-expect-error - webkitBackdropFilter is a valid CSS property
-      chatInputContainer.style.webkitBackdropFilter = 'blur(10px)';
+      chatInputContainer.style.webkitBackdropFilter = 'blur(20px)';
       chatInputContainer.style.border = '1px solid rgba(255, 255, 255, 0.1)';
+      chatInputContainer.style.boxShadow = '0 8px 32px 0 rgba(31, 38, 135, 0.37)';
     }
+    
+    // Override any ScrollArea background to ensure transparency
+    const scrollAreas = document.querySelectorAll('.ScrollAreaRoot') as NodeListOf<HTMLElement>;
+    scrollAreas.forEach(scrollArea => {
+      if (scrollArea) {
+        scrollArea.style.background = `
+          linear-gradient(135deg, 
+            rgba(255, 255, 255, 0.1) 0%, 
+            rgba(255, 255, 255, 0.05) 100%
+          )
+        `;
+        scrollArea.style.backdropFilter = 'blur(20px) saturate(180%)';
+        // @ts-expect-error - webkitBackdropFilter is a valid CSS property
+        scrollArea.style.webkitBackdropFilter = 'blur(20px) saturate(180%)';
+        scrollArea.style.border = '1px solid rgba(255, 255, 255, 0.1)';
+        scrollArea.style.boxShadow = '0 8px 32px 0 rgba(31, 38, 135, 0.37)';
+      }
+    });
     
     // Cleanup on unmount
     return () => {
       if (sidebarInset) {
         sidebarInset.style.background = '';
+      }
+      if (mainPanel) {
+        mainPanel.style.background = '';
+        mainPanel.style.backgroundColor = '';
       }
       if (chatInputContainer) {
         chatInputContainer.style.background = '';
@@ -89,7 +119,18 @@ export default function Pair({
         // @ts-expect-error - webkitBackdropFilter is a valid CSS property
         chatInputContainer.style.webkitBackdropFilter = '';
         chatInputContainer.style.border = '';
+        chatInputContainer.style.boxShadow = '';
       }
+      scrollAreas.forEach(scrollArea => {
+        if (scrollArea) {
+          scrollArea.style.background = '';
+          scrollArea.style.backdropFilter = '';
+          // @ts-expect-error - webkitBackdropFilter is a valid CSS property
+          scrollArea.style.webkitBackdropFilter = '';
+          scrollArea.style.border = '';
+          scrollArea.style.boxShadow = '';
+        }
+      });
     };
   });
 
