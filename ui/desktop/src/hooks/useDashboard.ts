@@ -32,7 +32,7 @@ const DEFAULT_DASHBOARD_STATE: DashboardState = {
       id: 'recent-chats',
       type: WidgetType.RECENT_CHATS,
       position: { x: 450, y: 50 },
-      size: { width: 280, height: 270 },
+      size: { width: 280, height: 180 },
       title: 'Recent Chats',
     },
   ],

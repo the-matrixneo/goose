@@ -55,8 +55,8 @@ export function DashboardWidget({ widget, onMouseDown, isDragging, onReset }: Da
 
       case WidgetType.RECENT_CHATS:
         return (
-          <CardContent className="p-0">
-            <div className="flex justify-between items-center mb-3">
+          <CardContent className="p-0 h-full flex flex-col">
+            <div className="flex justify-between items-center mb-2 flex-shrink-0">
               <CardDescription className="mb-0">
                 <span className="text-sm text-text-default">Recent chats</span>
               </CardDescription>
@@ -68,19 +68,19 @@ export function DashboardWidget({ widget, onMouseDown, isDragging, onReset }: Da
                 See all
               </Button>
             </div>
-            <div className="space-y-1 max-h-32 overflow-y-auto">
-              {widget.data?.recentSessions?.slice(0, 3).map((session: any) => (
+            <div className="space-y-1 flex-1 overflow-y-auto min-h-0">
+              {widget.data?.recentSessions?.slice(0, 5).map((session: any) => (
                 <div
                   key={session.id}
                   className="flex items-center justify-between text-xs py-1 px-1 rounded-md hover:bg-background-muted/50 cursor-pointer transition-colors"
                 >
-                  <div className="flex items-center space-x-2">
-                    <ChatSmart className="h-3 w-3 text-text-muted" />
-                    <span className="truncate max-w-[150px] text-text-default">
+                  <div className="flex items-center space-x-2 min-w-0">
+                    <ChatSmart className="h-3 w-3 text-text-muted flex-shrink-0" />
+                    <span className="truncate text-text-default">
                       {session.metadata?.description || session.id}
                     </span>
                   </div>
-                  <span className="text-text-muted font-mono font-light">
+                  <span className="text-text-muted font-mono font-light text-xs flex-shrink-0 ml-2">
                     {new Date(session.modified).toLocaleDateString('en-US', { 
                       month: '2-digit', 
                       day: '2-digit' 
@@ -88,7 +88,7 @@ export function DashboardWidget({ widget, onMouseDown, isDragging, onReset }: Da
                   </span>
                 </div>
               )) || (
-                <div className="text-text-muted text-xs py-2">No recent chats</div>
+                <div className="text-text-muted text-xs py-2 text-center">No recent chats</div>
               )}
             </div>
           </CardContent>
