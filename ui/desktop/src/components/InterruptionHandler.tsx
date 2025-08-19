@@ -87,7 +87,6 @@ export const InterruptionHandler: React.FC<InterruptionHandlerProps> = ({
   };
 
   const colors = getActionColor();
-  const message = getInterruptionMessage(match);
 
   const handleConfirm = () => {
     if (showRedirectInput && onRedirect && redirectMessage.trim()) {
