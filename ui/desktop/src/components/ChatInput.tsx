@@ -535,6 +535,12 @@ export default function ChatInput({
     setQueuedMessages(prev => prev.filter(msg => msg.id !== messageId));
     LocalMessageStorage.addMessage(messageToSend.content);
     handleSubmit(new CustomEvent("submit", { detail: { value: messageToSend.content } }) as unknown as React.FormEvent);
+    
+    // Auto-resume queue after sending message from queue (if it was paused due to interruption and message is not an interruption)
+    if (lastInterruption && !detectInterruption(messageToSend.content)) {
+      queuePausedRef.current = false;
+      setLastInterruption(null);
+    }
   };
 
   const handleResumeQueue = () => {
@@ -806,6 +812,12 @@ export default function ChatInput({
     setQueuedMessages(prev => prev.filter(msg => msg.id !== messageId));
     LocalMessageStorage.addMessage(messageToSend.content);
     handleSubmit(new CustomEvent("submit", { detail: { value: messageToSend.content } }) as unknown as React.FormEvent);
+    
+    // Auto-resume queue after sending message from queue (if it was paused due to interruption and message is not an interruption)
+    if (lastInterruption && !detectInterruption(messageToSend.content)) {
+      queuePausedRef.current = false;
+      setLastInterruption(null);
+    }
   };
 
   const handleResumeQueue = () => {
@@ -941,6 +953,12 @@ export default function ChatInput({
       handleSubmit(
         new CustomEvent('submit', { detail: { value: textToSend } }) as unknown as React.FormEvent
       );
+
+      // Auto-resume queue after sending a NON-interruption message (if it was paused due to interruption)
+      if (queuePausedRef.current && lastInterruption && textToSend && !detectInterruption(textToSend)) {
+        queuePausedRef.current = false;
+        setLastInterruption(null);
+      }
 
       setDisplayValue('');
       setValue('');
@@ -1252,6 +1270,12 @@ export default function ChatInput({
     setQueuedMessages(prev => prev.filter(msg => msg.id !== messageId));
     LocalMessageStorage.addMessage(messageToSend.content);
     handleSubmit(new CustomEvent("submit", { detail: { value: messageToSend.content } }) as unknown as React.FormEvent);
+    
+    // Auto-resume queue after sending message from queue (if it was paused due to interruption and message is not an interruption)
+    if (lastInterruption && !detectInterruption(messageToSend.content)) {
+      queuePausedRef.current = false;
+      setLastInterruption(null);
+    }
   };
 
   const handleResumeQueue = () => {
