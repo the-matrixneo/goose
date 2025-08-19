@@ -1,7 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Card } from '../ui/card';
 import { DashboardWidget } from './DashboardWidget';
-import { WidgetType, WidgetPosition, WidgetData } from '../../types/dashboard';
+import { WidgetPosition, WidgetData } from '../../types/dashboard';
 
 interface DashboardCanvasProps {
   widgets: WidgetData[];

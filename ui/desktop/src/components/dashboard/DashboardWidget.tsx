@@ -1,17 +1,30 @@
-import React from 'react';
-import { Card, CardContent, CardDescription } from '../ui/card';
+import React, { useState, useEffect } from 'react';
+import { CardContent, CardDescription } from '../ui/card';
 import { WidgetData, WidgetType } from '../../types/dashboard';
 import { Button } from '../ui/button';
 import { ChatSmart } from '../icons/';
-import { Skeleton } from '../ui/skeleton';
 
 interface DashboardWidgetProps {
   widget: WidgetData;
   onMouseDown: (e: React.MouseEvent) => void;
   isDragging: boolean;
+  onReset?: () => void; // Optional reset callback
 }
 
-export function DashboardWidget({ widget, onMouseDown, isDragging }: DashboardWidgetProps) {
+export function DashboardWidget({ widget, onMouseDown, isDragging, onReset }: DashboardWidgetProps) {
+  const [showSavedIndicator, setShowSavedIndicator] = useState(false);
+
+  // Show saved indicator when position changes (but not during dragging)
+  useEffect(() => {
+    if (!isDragging) {
+      setShowSavedIndicator(true);
+      const timer = setTimeout(() => {
+        setShowSavedIndicator(false);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [widget.position.x, widget.position.y, isDragging]);
+
   const renderWidgetContent = () => {
     switch (widget.type) {
       case WidgetType.TOTAL_SESSIONS:
@@ -56,7 +69,7 @@ export function DashboardWidget({ widget, onMouseDown, isDragging }: DashboardWi
               </Button>
             </div>
             <div className="space-y-1 max-h-32 overflow-y-auto">
-              {widget.data?.recentSessions?.slice(0, 3).map((session: any, index: number) => (
+              {widget.data?.recentSessions?.slice(0, 3).map((session: any) => (
                 <div
                   key={session.id}
                   className="flex items-center justify-between text-xs py-1 px-1 rounded-md hover:bg-background-muted/50 cursor-pointer transition-colors"
@@ -140,6 +153,16 @@ export function DashboardWidget({ widget, onMouseDown, isDragging }: DashboardWi
           WebkitBackdropFilter: `blur(20px) saturate(${isDragging ? '200%' : '180%'})`,
         }}
       />
+      
+      {/* Saved indicator */}
+      {showSavedIndicator && !isDragging && (
+        <div className="absolute top-2 right-2 z-30 pointer-events-none">
+          <div className="flex items-center gap-1 px-2 py-1 bg-green-500/90 text-white text-xs rounded-md animate-in fade-in duration-200">
+            <div className="w-2 h-2 bg-white rounded-full" />
+            Saved
+          </div>
+        </div>
+      )}
       
       {/* Content */}
       <div className="relative z-10 p-4 h-full pointer-events-none">

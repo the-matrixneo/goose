@@ -47,7 +47,7 @@ export default function Hub({
   setIsGoosehintsModalOpen: (isOpen: boolean) => void;
 }) {
   const [showGame, setShowGame] = useState(false);
-  const { dashboardState, isLoading, error, moveWidget, resizeWidget } = useDashboard();
+  const { dashboardState, isLoading, error, moveWidget, resizeWidget, resetDashboardLayout } = useDashboard();
 
   // Override backgrounds to allow our gradient to show through (same as Hub)
   useEffect(() => {
@@ -62,6 +62,7 @@ export default function Hub({
     if (chatInputContainer) {
       chatInputContainer.style.background = 'rgba(255, 255, 255, 0.05)';
       chatInputContainer.style.backdropFilter = 'blur(20px)';
+      // @ts-ignore - webkitBackdropFilter is a valid CSS property
       chatInputContainer.style.webkitBackdropFilter = 'blur(20px)';
       chatInputContainer.style.border = '1px solid rgba(255, 255, 255, 0.1)';
     }
@@ -74,6 +75,7 @@ export default function Hub({
       if (chatInputContainer) {
         chatInputContainer.style.background = '';
         chatInputContainer.style.backdropFilter = '';
+        // @ts-ignore - webkitBackdropFilter is a valid CSS property
         chatInputContainer.style.webkitBackdropFilter = '';
         chatInputContainer.style.border = '';
       }
@@ -214,6 +216,19 @@ export default function Hub({
             </div>
           </div>
         )}
+
+        {/* Dashboard controls - positioned at top right */}
+        <div className="absolute top-4 right-4 z-10">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={resetDashboardLayout}
+              className="px-3 py-1 text-xs bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20 rounded-md text-text-muted hover:text-text-default transition-all duration-200"
+              title="Reset widget positions to default"
+            >
+              Reset Layout
+            </button>
+          </div>
+        </div>
 
         {/* Floating Chat Input - positioned absolutely at bottom */}
         <div className="absolute bottom-0 left-0 right-0 z-20">
