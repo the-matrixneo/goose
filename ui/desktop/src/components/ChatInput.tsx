@@ -27,6 +27,15 @@ import { COST_TRACKING_ENABLED } from '../updates';
 import { CostTracker } from './bottom_menu/CostTracker';
 import { DroppedFile, useFileDrop } from '../hooks/useFileDrop';
 import { Recipe } from '../recipe';
+import { QueueStorage } from '../utils/queueStorage';
+import MessageQueue from './MessageQueue';
+import { detectInterruption, isInterruptionCommand } from '../utils/interruptionDetector';
+
+interface QueuedMessage {
+  id: string;
+  content: string;
+  timestamp: number;
+}
 
 interface PastedImage {
   id: string;
@@ -104,8 +113,14 @@ export default function ChatInput({
   const [isFocused, setIsFocused] = useState(false);
   const [pastedImages, setPastedImages] = useState<PastedImage[]>([]);
 
-  // Derived state - chatState != Idle means we're in some form of loading state
+  // Queue functionality
+  const [queuedMessages, setQueuedMessages] = useState<QueuedMessage[]>([]);
   const isLoading = chatState !== ChatState.Idle;
+  const wasLoadingRef = useRef(isLoading);
+  const queuePausedRef = useRef(false);
+  const editingMessageIdRef = useRef<string | null>(null);
+  const [lastInterruption, setLastInterruption] = useState<string | null>(null);
+
   const { alerts, addAlert, clearAlerts } = useAlerts();
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const toolCount = useToolCount();
@@ -124,6 +139,17 @@ export default function ChatInput({
   useEffect(() => {
     // Debug logging removed - draft functionality is working correctly
   }, [chatContext?.contextKey, chatContext?.draft, chatContext]);
+
+  // Queue processing
+  useEffect(() => {
+    if (wasLoadingRef.current && !isLoading && queuedMessages.length > 0 && !queuePausedRef.current) {
+      const nextMessage = queuedMessages[0];
+      LocalMessageStorage.addMessage(nextMessage.content);
+      handleSubmit(new CustomEvent("submit", { detail: { value: nextMessage.content } }) as unknown as React.FormEvent);
+      setQueuedMessages(prev => prev.slice(1));
+    }
+    wasLoadingRef.current = isLoading;
+  }, [isLoading, queuedMessages, handleSubmit]);
   const [mentionPopover, setMentionPopover] = useState<{
     isOpen: boolean;
     position: { x: number; y: number };
@@ -472,7 +498,57 @@ export default function ChatInput({
 
   // Cleanup effect for component unmount - prevent memory leaks
   useEffect(() => {
-    return () => {
+  
+  // Queue management functions
+  const handleRemoveQueuedMessage = (messageId: string) => {
+    setQueuedMessages(prev => prev.filter(msg => msg.id !== messageId));
+  };
+
+  const handleClearQueue = () => {
+    setQueuedMessages([]);
+    queuePausedRef.current = false;
+    setLastInterruption(null);
+  };
+
+  const handleReorderMessages = (reorderedMessages: QueuedMessage[]) => {
+    setQueuedMessages(reorderedMessages);
+  };
+
+  const handleEditMessage = (messageId: string, newContent: string) => {
+    setQueuedMessages(prev => 
+      prev.map(msg => 
+        msg.id === messageId 
+          ? { ...msg, content: newContent }
+          : msg
+      )
+    );
+  };
+
+  const handleStopAndSend = (messageId: string) => {
+    const messageToSend = queuedMessages.find(msg => msg.id === messageId);
+    if (!messageToSend) return;
+    
+    if (onStop) onStop();
+    queuePausedRef.current = true;
+    setLastInterruption("manual");
+    
+    setQueuedMessages(prev => prev.filter(msg => msg.id !== messageId));
+    LocalMessageStorage.addMessage(messageToSend.content);
+    handleSubmit(new CustomEvent("submit", { detail: { value: messageToSend.content } }) as unknown as React.FormEvent);
+  };
+
+  const handleResumeQueue = () => {
+    queuePausedRef.current = false;
+    setLastInterruption(null);
+    if (!isLoading && queuedMessages.length > 0) {
+      const nextMessage = queuedMessages[0];
+      LocalMessageStorage.addMessage(nextMessage.content);
+      handleSubmit(new CustomEvent("submit", { detail: { value: nextMessage.content } }) as unknown as React.FormEvent);
+      setQueuedMessages(prev => prev.slice(1));
+    }
+  };
+
+  return () => {
       // Clear any pending timeouts from image processing
       setPastedImages((currentImages) => {
         currentImages.forEach((img) => {
@@ -693,7 +769,57 @@ export default function ChatInput({
 
   // Cleanup debounced functions on unmount
   useEffect(() => {
-    return () => {
+  
+  // Queue management functions
+  const handleRemoveQueuedMessage = (messageId: string) => {
+    setQueuedMessages(prev => prev.filter(msg => msg.id !== messageId));
+  };
+
+  const handleClearQueue = () => {
+    setQueuedMessages([]);
+    queuePausedRef.current = false;
+    setLastInterruption(null);
+  };
+
+  const handleReorderMessages = (reorderedMessages: QueuedMessage[]) => {
+    setQueuedMessages(reorderedMessages);
+  };
+
+  const handleEditMessage = (messageId: string, newContent: string) => {
+    setQueuedMessages(prev => 
+      prev.map(msg => 
+        msg.id === messageId 
+          ? { ...msg, content: newContent }
+          : msg
+      )
+    );
+  };
+
+  const handleStopAndSend = (messageId: string) => {
+    const messageToSend = queuedMessages.find(msg => msg.id === messageId);
+    if (!messageToSend) return;
+    
+    if (onStop) onStop();
+    queuePausedRef.current = true;
+    setLastInterruption("manual");
+    
+    setQueuedMessages(prev => prev.filter(msg => msg.id !== messageId));
+    LocalMessageStorage.addMessage(messageToSend.content);
+    handleSubmit(new CustomEvent("submit", { detail: { value: messageToSend.content } }) as unknown as React.FormEvent);
+  };
+
+  const handleResumeQueue = () => {
+    queuePausedRef.current = false;
+    setLastInterruption(null);
+    if (!isLoading && queuedMessages.length > 0) {
+      const nextMessage = queuedMessages[0];
+      LocalMessageStorage.addMessage(nextMessage.content);
+      handleSubmit(new CustomEvent("submit", { detail: { value: nextMessage.content } }) as unknown as React.FormEvent);
+      setQueuedMessages(prev => prev.slice(1));
+    }
+  };
+
+  return () => {
       debouncedAutosize.cancel?.();
       debouncedSaveDraft.cancel?.();
     };
@@ -844,6 +970,33 @@ export default function ChatInput({
     if (mentionPopover.isOpen && mentionPopoverRef.current) {
       if (evt.key === 'ArrowDown') {
         evt.preventDefault();
+      
+      // Handle interruption and queue logic
+      if (isLoading && displayValue.trim()) {
+        const interruptionMatch = detectInterruption(displayValue.trim());
+        
+        if (interruptionMatch && interruptionMatch.shouldInterrupt) {
+          setLastInterruption(interruptionMatch.matchedText);
+          if (onStop) onStop();
+          queuePausedRef.current = true;
+          
+          LocalMessageStorage.addMessage(displayValue.trim());
+          handleSubmit(new CustomEvent("submit", { detail: { value: displayValue.trim() } }) as unknown as React.FormEvent);
+          setDisplayValue("");
+          setValue("");
+          return;
+        }
+        
+        const newMessage = {
+          id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+          content: displayValue.trim(),
+          timestamp: Date.now()
+        };
+        setQueuedMessages(prev => [...prev, newMessage]);
+        setDisplayValue("");
+        setValue("");
+        return;
+      }
         const displayFiles = mentionPopoverRef.current.getDisplayFiles();
         const maxIndex = Math.max(0, displayFiles.length - 1);
         setMentionPopover((prev) => ({
@@ -854,6 +1007,33 @@ export default function ChatInput({
       }
       if (evt.key === 'ArrowUp') {
         evt.preventDefault();
+      
+      // Handle interruption and queue logic
+      if (isLoading && displayValue.trim()) {
+        const interruptionMatch = detectInterruption(displayValue.trim());
+        
+        if (interruptionMatch && interruptionMatch.shouldInterrupt) {
+          setLastInterruption(interruptionMatch.matchedText);
+          if (onStop) onStop();
+          queuePausedRef.current = true;
+          
+          LocalMessageStorage.addMessage(displayValue.trim());
+          handleSubmit(new CustomEvent("submit", { detail: { value: displayValue.trim() } }) as unknown as React.FormEvent);
+          setDisplayValue("");
+          setValue("");
+          return;
+        }
+        
+        const newMessage = {
+          id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+          content: displayValue.trim(),
+          timestamp: Date.now()
+        };
+        setQueuedMessages(prev => [...prev, newMessage]);
+        setDisplayValue("");
+        setValue("");
+        return;
+      }
         setMentionPopover((prev) => ({
           ...prev,
           selectedIndex: Math.max(prev.selectedIndex - 1, 0),
@@ -862,11 +1042,65 @@ export default function ChatInput({
       }
       if (evt.key === 'Enter') {
         evt.preventDefault();
+      
+      // Handle interruption and queue logic
+      if (isLoading && displayValue.trim()) {
+        const interruptionMatch = detectInterruption(displayValue.trim());
+        
+        if (interruptionMatch && interruptionMatch.shouldInterrupt) {
+          setLastInterruption(interruptionMatch.matchedText);
+          if (onStop) onStop();
+          queuePausedRef.current = true;
+          
+          LocalMessageStorage.addMessage(displayValue.trim());
+          handleSubmit(new CustomEvent("submit", { detail: { value: displayValue.trim() } }) as unknown as React.FormEvent);
+          setDisplayValue("");
+          setValue("");
+          return;
+        }
+        
+        const newMessage = {
+          id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+          content: displayValue.trim(),
+          timestamp: Date.now()
+        };
+        setQueuedMessages(prev => [...prev, newMessage]);
+        setDisplayValue("");
+        setValue("");
+        return;
+      }
         mentionPopoverRef.current.selectFile(mentionPopover.selectedIndex);
         return;
       }
       if (evt.key === 'Escape') {
         evt.preventDefault();
+      
+      // Handle interruption and queue logic
+      if (isLoading && displayValue.trim()) {
+        const interruptionMatch = detectInterruption(displayValue.trim());
+        
+        if (interruptionMatch && interruptionMatch.shouldInterrupt) {
+          setLastInterruption(interruptionMatch.matchedText);
+          if (onStop) onStop();
+          queuePausedRef.current = true;
+          
+          LocalMessageStorage.addMessage(displayValue.trim());
+          handleSubmit(new CustomEvent("submit", { detail: { value: displayValue.trim() } }) as unknown as React.FormEvent);
+          setDisplayValue("");
+          setValue("");
+          return;
+        }
+        
+        const newMessage = {
+          id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+          content: displayValue.trim(),
+          timestamp: Date.now()
+        };
+        setQueuedMessages(prev => [...prev, newMessage]);
+        setDisplayValue("");
+        setValue("");
+        return;
+      }
         setMentionPopover((prev) => ({ ...prev, isOpen: false }));
         return;
       }
@@ -890,6 +1124,33 @@ export default function ChatInput({
       }
 
       evt.preventDefault();
+      
+      // Handle interruption and queue logic
+      if (isLoading && displayValue.trim()) {
+        const interruptionMatch = detectInterruption(displayValue.trim());
+        
+        if (interruptionMatch && interruptionMatch.shouldInterrupt) {
+          setLastInterruption(interruptionMatch.matchedText);
+          if (onStop) onStop();
+          queuePausedRef.current = true;
+          
+          LocalMessageStorage.addMessage(displayValue.trim());
+          handleSubmit(new CustomEvent("submit", { detail: { value: displayValue.trim() } }) as unknown as React.FormEvent);
+          setDisplayValue("");
+          setValue("");
+          return;
+        }
+        
+        const newMessage = {
+          id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+          content: displayValue.trim(),
+          timestamp: Date.now()
+        };
+        setQueuedMessages(prev => [...prev, newMessage]);
+        setDisplayValue("");
+        setValue("");
+        return;
+      }
       const canSubmit =
         !isLoading &&
         !isLoadingCompaction &&
@@ -954,6 +1215,56 @@ export default function ChatInput({
   const isAnyImageLoading = pastedImages.some((img) => img.isLoading);
   const isAnyDroppedFileLoading = allDroppedFiles.some((file) => file.isLoading);
 
+
+  // Queue management functions
+  const handleRemoveQueuedMessage = (messageId: string) => {
+    setQueuedMessages(prev => prev.filter(msg => msg.id !== messageId));
+  };
+
+  const handleClearQueue = () => {
+    setQueuedMessages([]);
+    queuePausedRef.current = false;
+    setLastInterruption(null);
+  };
+
+  const handleReorderMessages = (reorderedMessages: QueuedMessage[]) => {
+    setQueuedMessages(reorderedMessages);
+  };
+
+  const handleEditMessage = (messageId: string, newContent: string) => {
+    setQueuedMessages(prev => 
+      prev.map(msg => 
+        msg.id === messageId 
+          ? { ...msg, content: newContent }
+          : msg
+      )
+    );
+  };
+
+  const handleStopAndSend = (messageId: string) => {
+    const messageToSend = queuedMessages.find(msg => msg.id === messageId);
+    if (!messageToSend) return;
+    
+    if (onStop) onStop();
+    queuePausedRef.current = true;
+    setLastInterruption("manual");
+    
+    setQueuedMessages(prev => prev.filter(msg => msg.id !== messageId));
+    LocalMessageStorage.addMessage(messageToSend.content);
+    handleSubmit(new CustomEvent("submit", { detail: { value: messageToSend.content } }) as unknown as React.FormEvent);
+  };
+
+  const handleResumeQueue = () => {
+    queuePausedRef.current = false;
+    setLastInterruption(null);
+    if (!isLoading && queuedMessages.length > 0) {
+      const nextMessage = queuedMessages[0];
+      LocalMessageStorage.addMessage(nextMessage.content);
+      handleSubmit(new CustomEvent("submit", { detail: { value: nextMessage.content } }) as unknown as React.FormEvent);
+      setQueuedMessages(prev => prev.slice(1));
+    }
+  };
+
   return (
     <div
       className={`flex flex-col relative h-auto p-4 transition-colors ${
@@ -967,6 +1278,21 @@ export default function ChatInput({
       onDrop={handleLocalDrop}
       onDragOver={handleLocalDragOver}
     >
+      {/* Message Queue Display */}
+      {queuedMessages.length > 0 && (
+        <MessageQueue
+          queuedMessages={queuedMessages}
+          onRemoveMessage={handleRemoveQueuedMessage}
+          onClearQueue={handleClearQueue}
+          onStopAndSend={handleStopAndSend}
+          onReorderMessages={handleReorderMessages}
+          onEditMessage={handleEditMessage}
+          onTriggerQueueProcessing={handleResumeQueue}
+          editingMessageIdRef={editingMessageIdRef}
+          isPaused={queuePausedRef.current}
+          className="border-b border-borderSubtle"
+        />
+      )}
       {/* Input row with inline action buttons wrapped in form */}
       <form onSubmit={onFormSubmit} className="relative flex items-end">
         <div className="relative flex-1">
