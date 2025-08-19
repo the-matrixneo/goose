@@ -536,15 +536,20 @@ export default function ChatInput({
     const messageToSend = queuedMessages.find(msg => msg.id === messageId);
     if (!messageToSend) return;
     
-    // Stop current processing but don't pause the queue - this is a priority send
+    // Stop current processing and temporarily pause queue to prevent double-send
     if (onStop) onStop();
+    const wasPaused = queuePausedRef.current;
+    queuePausedRef.current = true;
     
     // Remove the message from queue and send it immediately
     setQueuedMessages(prev => prev.filter(msg => msg.id !== messageId));
     LocalMessageStorage.addMessage(messageToSend.content);
     handleSubmit(new CustomEvent("submit", { detail: { value: messageToSend.content } }) as unknown as React.FormEvent);
     
-    // Queue will automatically continue processing remaining messages when this completes
+    // Restore previous pause state after a brief delay to prevent race condition
+    setTimeout(() => {
+      queuePausedRef.current = wasPaused;
+    }, 100);
   };
 
   const handleResumeQueue = () => {
@@ -817,15 +822,20 @@ export default function ChatInput({
     const messageToSend = queuedMessages.find(msg => msg.id === messageId);
     if (!messageToSend) return;
     
-    // Stop current processing but don't pause the queue - this is a priority send
+    // Stop current processing and temporarily pause queue to prevent double-send
     if (onStop) onStop();
+    const wasPaused = queuePausedRef.current;
+    queuePausedRef.current = true;
     
     // Remove the message from queue and send it immediately
     setQueuedMessages(prev => prev.filter(msg => msg.id !== messageId));
     LocalMessageStorage.addMessage(messageToSend.content);
     handleSubmit(new CustomEvent("submit", { detail: { value: messageToSend.content } }) as unknown as React.FormEvent);
     
-    // Queue will automatically continue processing remaining messages when this completes
+    // Restore previous pause state after a brief delay to prevent race condition
+    setTimeout(() => {
+      queuePausedRef.current = wasPaused;
+    }, 100);
   };
 
   const handleResumeQueue = () => {
@@ -1319,15 +1329,20 @@ export default function ChatInput({
     const messageToSend = queuedMessages.find(msg => msg.id === messageId);
     if (!messageToSend) return;
     
-    // Stop current processing but don't pause the queue - this is a priority send
+    // Stop current processing and temporarily pause queue to prevent double-send
     if (onStop) onStop();
+    const wasPaused = queuePausedRef.current;
+    queuePausedRef.current = true;
     
     // Remove the message from queue and send it immediately
     setQueuedMessages(prev => prev.filter(msg => msg.id !== messageId));
     LocalMessageStorage.addMessage(messageToSend.content);
     handleSubmit(new CustomEvent("submit", { detail: { value: messageToSend.content } }) as unknown as React.FormEvent);
     
-    // Queue will automatically continue processing remaining messages when this completes
+    // Restore previous pause state after a brief delay to prevent race condition
+    setTimeout(() => {
+      queuePausedRef.current = wasPaused;
+    }, 100);
   };
 
   const handleResumeQueue = () => {
