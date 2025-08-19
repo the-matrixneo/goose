@@ -237,6 +237,9 @@ fn format_messages(messages: &[Message], image_format: &ImageFormat) -> Vec<Data
                         }));
                     }
                 }
+                MessageContent::Metadata(_) => {
+                    // Skip metadata - it's for internal use only
+                }
             }
         }
 

@@ -120,6 +120,9 @@ pub fn format_messages(messages: &[Message]) -> Vec<Value> {
                         }));
                     }
                 }
+                MessageContent::Metadata(_) => {
+                    // Skip metadata - it's for internal use only
+                }
             }
         }
 

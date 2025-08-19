@@ -176,13 +176,19 @@ pub async fn check_and_compact_messages(
         (messages, None)
     };
 
+    // Mark old messages as not visible to users before compaction
+    let marked_messages: Vec<Message> = messages_to_compact
+        .iter()
+        .map(|m| m.clone().with_metadata(true, false))
+        .collect();
+
     // Perform the compaction on messages excluding the preserved user message
     let (mut compacted_messages, _, summarization_usage) =
-        agent.summarize_context(messages_to_compact).await?;
+        agent.summarize_context(&marked_messages).await?;
 
-    // Add back the preserved user message if it exists
+    // Add back the preserved user message if it exists (visible to both)
     if let Some(user_message) = preserved_user_message {
-        compacted_messages.push(user_message);
+        compacted_messages.push(user_message.with_metadata(true, true));
     }
 
     Ok(AutoCompactResult {

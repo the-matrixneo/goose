@@ -69,6 +69,9 @@ pub fn format_messages(messages: &[Message]) -> Vec<Value> {
                 MessageContent::FrontendToolRequest(_tool_request) => {
                     // Skip frontend tool requests
                 }
+                MessageContent::Metadata(_) => {
+                    // Skip metadata - it's for internal use only
+                }
             }
         }
 

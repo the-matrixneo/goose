@@ -65,7 +65,10 @@ impl Agent {
         let summary_result = summarize_messages(provider.clone(), messages).await?;
 
         let (mut new_messages, mut new_token_counts, summarization_usage) = match summary_result {
-            Some((summary_message, provider_usage)) => {
+            Some((mut summary_message, provider_usage)) => {
+                // Mark the summary message with metadata: visible to agent, not to user
+                summary_message = summary_message.with_metadata(false, true);
+
                 // For token counting purposes, we use the output tokens (the actual summary content)
                 // since that's what will be in the context going forward
                 let total_tokens = provider_usage.usage.output_tokens.unwrap_or(0) as usize;
@@ -84,9 +87,11 @@ impl Agent {
 
         // Add an assistant message to the summarized messages to ensure the assistant's response is included in the context.
         if new_messages.len() == 1 {
-            let assistant_message = Message::assistant().with_text(
-                "I ran into a context length exceeded error so I summarized our conversation.",
-            );
+            let assistant_message = Message::assistant()
+                .with_text(
+                    "I ran into a context length exceeded error so I summarized our conversation.",
+                )
+                .with_metadata(true, true); // This message is visible to both user and agent
             let assistant_message_tokens: usize = 14;
             new_messages.push(assistant_message);
             new_token_counts.push(assistant_message_tokens);

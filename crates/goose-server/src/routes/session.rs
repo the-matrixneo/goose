@@ -134,10 +134,18 @@ async fn get_session_history(
         }
     };
 
+    // Filter messages for user visibility
+    let user_visible_messages: Vec<Message> = messages
+        .messages()
+        .iter()
+        .filter(|m| m.is_user_visible())
+        .cloned()
+        .collect();
+
     Ok(Json(SessionHistoryResponse {
         session_id,
         metadata,
-        messages: messages.messages().clone(),
+        messages: user_visible_messages,
     }))
 }
 

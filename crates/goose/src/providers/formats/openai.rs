@@ -232,6 +232,9 @@ pub fn format_messages(messages: &[Message], image_format: &ImageFormat) -> Vec<
                         }));
                     }
                 },
+                MessageContent::Metadata(_) => {
+                    // Skip metadata - it's for internal use only
+                }
             }
         }
 

@@ -116,11 +116,18 @@ impl Agent {
     ) -> Result<(Message, ProviderUsage), ProviderError> {
         let config = provider.get_model_config();
 
+        // Filter messages for agent visibility before sending to provider
+        let agent_visible_messages: Vec<Message> = messages
+            .iter()
+            .filter(|m| m.is_agent_visible())
+            .cloned()
+            .collect();
+
         // Convert tool messages to text if toolshim is enabled
         let messages_for_provider = if config.toolshim {
-            convert_tool_messages_to_text(messages)
+            convert_tool_messages_to_text(&agent_visible_messages)
         } else {
-            Conversation::new_unvalidated(messages.to_vec())
+            Conversation::new_unvalidated(agent_visible_messages)
         };
 
         // Call the provider to get a response
@@ -158,11 +165,18 @@ impl Agent {
     ) -> Result<MessageStream, ProviderError> {
         let config = provider.get_model_config();
 
+        // Filter messages for agent visibility before sending to provider
+        let agent_visible_messages: Vec<Message> = messages
+            .iter()
+            .filter(|m| m.is_agent_visible())
+            .cloned()
+            .collect();
+
         // Convert tool messages to text if toolshim is enabled
         let messages_for_provider = if config.toolshim {
-            convert_tool_messages_to_text(messages)
+            convert_tool_messages_to_text(&agent_visible_messages)
         } else {
-            Conversation::new_unvalidated(messages.to_vec())
+            Conversation::new_unvalidated(agent_visible_messages)
         };
 
         // Clone owned data to move into the async stream

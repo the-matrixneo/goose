@@ -116,6 +116,17 @@ pub struct SummarizationRequested {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct MessageMetadata {
+    /// Whether this message should be visible to the user
+    pub user_visible: bool,
+    /// Whether this message should be visible to the agent
+    pub agent_visible: bool,
+    /// Optional timestamp when this metadata was set
+    pub marked_at: Option<i64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 /// Content passed inside a message, which can be both simple content and tool content
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum MessageContent {
@@ -129,6 +140,7 @@ pub enum MessageContent {
     RedactedThinking(RedactedThinkingContent),
     ContextLengthExceeded(ContextLengthExceeded),
     SummarizationRequested(SummarizationRequested),
+    Metadata(MessageMetadata),
 }
 
 impl fmt::Display for MessageContent {
@@ -161,6 +173,13 @@ impl fmt::Display for MessageContent {
             }
             MessageContent::SummarizationRequested(r) => {
                 write!(f, "[SummarizationRequested: {}]", r.msg)
+            }
+            MessageContent::Metadata(m) => {
+                write!(
+                    f,
+                    "[Metadata: user_visible={}, agent_visible={}]",
+                    m.user_visible, m.agent_visible
+                )
             }
         }
     }
@@ -233,6 +252,14 @@ impl MessageContent {
 
     pub fn summarization_requested<S: Into<String>>(msg: S) -> Self {
         MessageContent::SummarizationRequested(SummarizationRequested { msg: msg.into() })
+    }
+
+    pub fn metadata(user_visible: bool, agent_visible: bool) -> Self {
+        MessageContent::Metadata(MessageMetadata {
+            user_visible,
+            agent_visible,
+            marked_at: Some(Utc::now().timestamp()),
+        })
     }
 
     // Add this new method to check for summarization requested content
@@ -587,6 +614,33 @@ impl Message {
     pub fn with_summarization_requested<S: Into<String>>(self, msg: S) -> Self {
         self.with_content(MessageContent::summarization_requested(msg))
     }
+
+    /// Add metadata to the message
+    pub fn with_metadata(self, user_visible: bool, agent_visible: bool) -> Self {
+        self.with_content(MessageContent::metadata(user_visible, agent_visible))
+    }
+
+    /// Get the visibility metadata for this message
+    pub fn get_visibility(&self) -> Option<&MessageMetadata> {
+        self.content.iter().find_map(|c| match c {
+            MessageContent::Metadata(m) => Some(m),
+            _ => None,
+        })
+    }
+
+    /// Check if message should be visible to user
+    pub fn is_user_visible(&self) -> bool {
+        self.get_visibility()
+            .map(|m| m.user_visible)
+            .unwrap_or(true) // Default to visible if no metadata
+    }
+
+    /// Check if message should be visible to agent
+    pub fn is_agent_visible(&self) -> bool {
+        self.get_visibility()
+            .map(|m| m.agent_visible)
+            .unwrap_or(true) // Default to visible if no metadata
+    }
 }
 
 #[cfg(test)]
@@ -931,5 +985,100 @@ mod tests {
         let message: Message = serde_json::from_str(clean_json).unwrap();
 
         assert_eq!(message.as_concat_text(), "Hello world 世界 🌍");
+    }
+
+    #[test]
+    fn test_message_metadata() {
+        use crate::conversation::message::MessageMetadata;
+
+        // Test creating a message with metadata
+        let message = Message::user()
+            .with_text("This is a test message")
+            .with_metadata(true, false);
+
+        // Check that metadata was added
+        assert_eq!(message.content.len(), 2);
+
+        // Check visibility methods
+        assert!(message.is_user_visible());
+        assert!(!message.is_agent_visible());
+
+        // Check get_visibility method
+        let metadata = message.get_visibility().unwrap();
+        assert!(metadata.user_visible);
+        assert!(!metadata.agent_visible);
+        assert!(metadata.marked_at.is_some());
+    }
+
+    #[test]
+    fn test_message_metadata_defaults() {
+        // Message without metadata should default to visible
+        let message = Message::user().with_text("No metadata");
+
+        assert!(message.is_user_visible());
+        assert!(message.is_agent_visible());
+        assert!(message.get_visibility().is_none());
+    }
+
+    #[test]
+    fn test_message_metadata_serialization() {
+        let message = Message::assistant()
+            .with_text("Summary of conversation")
+            .with_metadata(false, true);
+
+        let json_str = serde_json::to_string_pretty(&message).unwrap();
+        println!("Serialized message with metadata: {}", json_str);
+
+        // Parse back to Value to check structure
+        let value: Value = serde_json::from_str(&json_str).unwrap();
+
+        // Check metadata content
+        let content = &value["content"];
+        assert_eq!(content[1]["type"], "metadata");
+        assert_eq!(content[1]["userVisible"], false);
+        assert_eq!(content[1]["agentVisible"], true);
+        assert!(content[1]["markedAt"].is_i64());
+    }
+
+    #[test]
+    fn test_message_metadata_deserialization() {
+        let json_str = r#"{
+            "role": "user",
+            "created": 1740171566,
+            "content": [
+                {
+                    "type": "text",
+                    "text": "Old message before compaction"
+                },
+                {
+                    "type": "metadata",
+                    "userVisible": true,
+                    "agentVisible": false,
+                    "markedAt": 1740171566
+                }
+            ]
+        }"#;
+
+        let message: Message = serde_json::from_str(json_str).unwrap();
+
+        assert_eq!(message.content.len(), 2);
+        assert!(message.is_user_visible());
+        assert!(!message.is_agent_visible());
+
+        if let MessageContent::Metadata(metadata) = &message.content[1] {
+            assert!(metadata.user_visible);
+            assert!(!metadata.agent_visible);
+            assert_eq!(metadata.marked_at, Some(1740171566));
+        } else {
+            panic!("Expected Metadata content");
+        }
+    }
+
+    #[test]
+    fn test_metadata_display() {
+        let message = Message::user().with_text("Test").with_metadata(true, false);
+
+        let debug_str = message.debug();
+        assert!(debug_str.contains("[Metadata: user_visible=true, agent_visible=false]"));
     }
 }

@@ -102,6 +102,16 @@ impl Conversation {
         self.0.clear();
     }
 
+    /// Get messages filtered by user visibility
+    pub fn user_visible_messages(&self) -> Vec<&Message> {
+        self.0.iter().filter(|m| m.is_user_visible()).collect()
+    }
+
+    /// Get messages filtered by agent visibility
+    pub fn agent_visible_messages(&self) -> Vec<&Message> {
+        self.0.iter().filter(|m| m.is_agent_visible()).collect()
+    }
+
     fn validate(self) -> Result<Self, InvalidConversation> {
         let (_messages, issues) = fix_messages(self.0.clone());
         if !issues.is_empty() {
