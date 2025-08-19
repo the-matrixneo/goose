@@ -441,8 +441,7 @@ function BaseChatContent({
                     </SearchView>
                   )}
 
-                  {error &&
-                    !(error as Error & { isTokenLimitError?: boolean }).isTokenLimitError && (
+                  {error && (
                       <>
                         <div className="flex flex-col items-center justify-center p-4">
                           <div className="text-red-700 dark:text-red-300 bg-red-400/50 p-3 rounded-lg mb-2">
@@ -454,30 +453,11 @@ function BaseChatContent({
                             <div
                               className="px-3 py-2 text-center whitespace-nowrap cursor-pointer text-textStandard border border-borderSubtle hover:bg-bgSubtle rounded-full inline-block transition-all duration-150"
                               onClick={async () => {
-                                // Create a contextLengthExceeded message similar to token limit errors
-                                const contextMessage: Message = {
-                                  id: `context-${Date.now()}`,
-                                  role: 'assistant',
-                                  created: Math.floor(Date.now() / 1000),
-                                  content: [
-                                    {
-                                      type: 'contextLengthExceeded',
-                                      msg: 'Summarization requested due to error. Creating summary to help resolve the issue.',
-                                    },
-                                  ],
-                                  display: true,
-                                  sendToLLM: false,
-                                };
-
-                                // Add the context message to trigger ContextHandler
-                                const updatedMessages = [...messages, contextMessage];
-                                setMessages(updatedMessages);
-
-                                // Clear the error state since we're handling it with summarization
+                                // Clear the error state and retry
                                 clearError();
                               }}
                             >
-                              Summarize Conversation
+                              Clear Error
                             </div>
                             <div
                               className="px-3 py-2 text-center whitespace-nowrap cursor-pointer text-textStandard border border-borderSubtle hover:bg-bgSubtle rounded-full inline-block transition-all duration-150"
@@ -499,9 +479,6 @@ function BaseChatContent({
                       </>
                     )}
 
-                  {/* Token limit errors should be handled by ContextHandler, not shown here */}
-                  {error &&
-                    (error as Error & { isTokenLimitError?: boolean }).isTokenLimitError && <></>}
                   <div className="block h-8" />
                 </>
               ) : showPopularTopics ? (

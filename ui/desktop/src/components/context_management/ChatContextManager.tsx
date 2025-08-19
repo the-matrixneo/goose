@@ -39,10 +39,8 @@ interface ChatContextManagerActions {
   ) => void;
   openSummaryModal: () => void;
   closeSummaryModal: () => void;
-  hasContextHandlerContent: (message: Message) => boolean;
   hasContextLengthExceededContent: (message: Message) => boolean;
   hasSummarizationRequestedContent: (message: Message) => boolean;
-  getContextHandlerType: (message: Message) => 'contextLengthExceeded' | 'summarizationRequested';
   handleContextLengthExceeded: (messages: Message[]) => Promise<void>;
   handleManualCompaction: (messages: Message[], setMessages: (messages: Message[]) => void) => void;
 }
@@ -240,25 +238,12 @@ export const ChatContextManagerProvider: React.FC<{ children: React.ReactNode }>
     setSummaryContent('');
   };
 
-  const hasContextHandlerContent = (message: Message): boolean => {
-    return hasContextLengthExceededContent(message) || hasSummarizationRequestedContent(message);
-  };
-
   const hasContextLengthExceededContent = (message: Message): boolean => {
     return message.content.some((content) => content.type === 'contextLengthExceeded');
   };
 
   const hasSummarizationRequestedContent = (message: Message): boolean => {
     return message.content.some((content) => content.type === 'summarizationRequested');
-  };
-
-  const getContextHandlerType = (
-    message: Message
-  ): 'contextLengthExceeded' | 'summarizationRequested' => {
-    if (hasContextLengthExceededContent(message)) {
-      return 'contextLengthExceeded';
-    }
-    return 'summarizationRequested';
   };
 
   const openSummaryModal = () => {
@@ -285,10 +270,8 @@ export const ChatContextManagerProvider: React.FC<{ children: React.ReactNode }>
     resetMessagesWithSummary,
     openSummaryModal,
     closeSummaryModal,
-    hasContextHandlerContent,
     hasContextLengthExceededContent,
     hasSummarizationRequestedContent,
-    getContextHandlerType,
     handleContextLengthExceeded,
     handleManualCompaction,
   };

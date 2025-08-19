@@ -18,8 +18,6 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Message } from '../types/message';
 import GooseMessage from './GooseMessage';
 import UserMessage from './UserMessage';
-import { ContextHandler } from './context_management/ContextHandler';
-import { useChatContextManager } from './context_management/ChatContextManager';
 import { NotificationEvent } from '../hooks/useMessageStream';
 import LoadingGoose from './LoadingGoose';
 
@@ -66,23 +64,6 @@ export default function ProgressiveMessageList({
   const mountedRef = useRef(true);
   const hasOnlyToolResponses = (message: Message) =>
     message.content.every((c) => c.type === 'toolResponse');
-
-  // Try to use context manager, but don't require it for session history
-  let hasContextHandlerContent: ((message: Message) => boolean) | undefined;
-  let getContextHandlerType:
-    | ((message: Message) => 'contextLengthExceeded' | 'summarizationRequested')
-    | undefined;
-
-  try {
-    const contextManager = useChatContextManager();
-    hasContextHandlerContent = contextManager.hasContextHandlerContent;
-    getContextHandlerType = contextManager.getContextHandlerType;
-  } catch {
-    // Context manager not available (e.g., in session history view)
-    // This is fine, we'll just skip context handler functionality
-    hasContextHandlerContent = undefined;
-    getContextHandlerType = undefined;
-  }
 
   // Simple progressive loading - start immediately when component mounts if needed
   useEffect(() => {
@@ -196,52 +177,26 @@ export default function ProgressiveMessageList({
           >
             {isUser ? (
               <>
-                {hasContextHandlerContent && hasContextHandlerContent(message) ? (
-                  <ContextHandler
-                    messages={messages}
-                    messageId={message.id ?? message.created.toString()}
-                    chatId={chat.id}
-                    workingDir={window.appConfig.get('GOOSE_WORKING_DIR') as string}
-                    contextType={getContextHandlerType!(message)}
-                    onSummaryComplete={() => {
-                      window.setTimeout(() => onScrollToBottom?.(), 100);
-                    }}
-                  />
-                ) : (
-                  !hasOnlyToolResponses(message) && (
-                    <UserMessage message={message} onMessageUpdate={onMessageUpdate} />
-                  )
+                {!hasOnlyToolResponses(message) && (
+                  <UserMessage message={message} onMessageUpdate={onMessageUpdate} />
                 )}
               </>
             ) : (
               <>
-                {hasContextHandlerContent && hasContextHandlerContent(message) ? (
-                  <ContextHandler
-                    messages={messages}
-                    messageId={message.id ?? message.created.toString()}
-                    chatId={chat.id}
-                    workingDir={window.appConfig.get('GOOSE_WORKING_DIR') as string}
-                    contextType={getContextHandlerType!(message)}
-                    onSummaryComplete={() => {
-                      window.setTimeout(() => onScrollToBottom?.(), 100);
-                    }}
-                  />
-                ) : (
-                  <GooseMessage
-                    messageHistoryIndex={chat.messageHistoryIndex}
-                    message={message}
-                    messages={messages}
-                    append={append}
-                    appendMessage={appendMessage}
-                    toolCallNotifications={toolCallNotifications}
-                    isStreaming={
-                      isStreamingMessage &&
-                      !isUser &&
-                      index === messagesToRender.length - 1 &&
-                      message.role === 'assistant'
-                    }
-                  />
-                )}
+                <GooseMessage
+                  messageHistoryIndex={chat.messageHistoryIndex}
+                  message={message}
+                  messages={messages}
+                  append={append}
+                  appendMessage={appendMessage}
+                  toolCallNotifications={toolCallNotifications}
+                  isStreaming={
+                    isStreamingMessage &&
+                    !isUser &&
+                    index === messagesToRender.length - 1 &&
+                    message.role === 'assistant'
+                  }
+                />
               </>
             )}
           </div>
@@ -263,8 +218,6 @@ export default function ProgressiveMessageList({
     toolCallNotifications,
     isStreamingMessage,
     onMessageUpdate,
-    hasContextHandlerContent,
-    getContextHandlerType,
     onScrollToBottom,
   ]);
 

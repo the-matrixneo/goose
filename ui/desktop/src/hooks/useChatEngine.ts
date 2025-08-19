@@ -136,7 +136,6 @@ export const useChatEngine = ({
           {
             errorMessage: error.message,
             errorName: error.name,
-            isTokenLimitError: (error as Error & { isTokenLimitError?: boolean }).isTokenLimitError,
             errorStack: error.stack,
             timestamp: new Date().toISOString(),
             chatId: chat.id,
