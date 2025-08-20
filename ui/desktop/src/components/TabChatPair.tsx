@@ -49,15 +49,20 @@ export default function TabChatPair({
   const activeChat = tabs.find(tab => tab.id === activeTabId) || tabs[0];
   
   // Ensure active chat has messages array
-  const safeActiveChat = React.useMemo(() => ({
+  const safeActiveChat = {
     ...activeChat,
     messages: activeChat.messages || []
-  }), [activeChat]);
+  };
   
-  // Update parent chat state when active chat changes
+  // Update parent chat state when active chat changes - use callback ref pattern to avoid infinite loops
+  const firstRenderRef = React.useRef(true);
   React.useEffect(() => {
+    if (firstRenderRef.current) {
+      firstRenderRef.current = false;
+      return;
+    }
     setChat(safeActiveChat);
-  }, [safeActiveChat, setChat]);
+  }, [safeActiveChat.id, safeActiveChat.messages?.length, setChat]);
   
   const location = useLocation();
 
