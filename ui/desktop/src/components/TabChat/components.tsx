@@ -10,15 +10,15 @@ interface TabProps {
 }
 
 /**
- * A simple tab component that doesn't use any complex UI libraries
+ * A simple tab component with improved visibility
  */
 export const Tab: React.FC<TabProps> = ({ id, title, isActive, onSelect, onClose }) => {
   return (
     <div 
       className={`px-3 py-1.5 mr-1 rounded-t-md text-sm font-medium whitespace-nowrap cursor-pointer transition-colors ${
         isActive 
-          ? 'bg-background-default text-textProminent' 
-          : 'hover:bg-background-muted text-textStandard'
+          ? 'bg-blue-500 text-white shadow-md' 
+          : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
       }`}
       onClick={onSelect}
     >
@@ -44,12 +44,12 @@ interface NewTabButtonProps {
 }
 
 /**
- * A simple button to create a new tab
+ * A more visible button to create a new tab
  */
 export const NewTabButton: React.FC<NewTabButtonProps> = ({ onClick }) => {
   return (
     <div 
-      className="px-2 py-1.5 rounded-md text-textStandard hover:bg-background-muted cursor-pointer"
+      className="px-3 py-1.5 rounded-md bg-green-500 text-white hover:bg-green-600 cursor-pointer font-bold"
       onClick={onClick}
       title="New tab"
     >
@@ -70,7 +70,7 @@ interface TabBarProps {
 }
 
 /**
- * A simple tab bar component that doesn't use any complex UI libraries
+ * A more visible tab bar component
  */
 export const TabBar: React.FC<TabBarProps> = ({ 
   tabs, 
@@ -80,7 +80,7 @@ export const TabBar: React.FC<TabBarProps> = ({
   onNewTab 
 }) => {
   return (
-    <div className="flex overflow-x-auto border-b border-borderSubtle pb-1 mb-2 hide-scrollbar">
+    <div className="flex overflow-x-auto border-b-2 border-gray-300 pb-1 mb-2 px-2 pt-2 bg-gray-50">
       <style>{`
         .hide-scrollbar {
           -ms-overflow-style: none;
