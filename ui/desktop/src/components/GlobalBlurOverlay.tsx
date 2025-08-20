@@ -6,7 +6,7 @@ import { useFocusMode } from '../contexts/FocusModeContext';
  * 
  * A reusable component that provides a consistent glassmorphism effect across the application.
  * This component:
- * 1. Applies a simple solid color background
+ * 1. Renders a background image
  * 2. Applies a blur effect with theme-aware styling
  * 3. Adjusts opacity based on focus mode state
  * 4. Handles theme changes automatically
@@ -43,7 +43,7 @@ const GlobalBlurOverlay: React.FC = () => {
     };
   }, []);
 
-  // Fixed blur intensity
+  // Fixed blur intensity and background color based on theme
   const blurIntensity = 20; // Consistent blur for chat mode
   
   // Determine background color based on focus mode and theme
@@ -51,16 +51,15 @@ const GlobalBlurOverlay: React.FC = () => {
     ? (isDarkTheme ? 'rgba(0, 0, 0, 0.9)' : 'rgba(255, 255, 255, 0.9)') // 90% opacity in focus mode
     : (isDarkTheme ? 'rgba(0, 0, 0, 0.7)' : 'rgba(255, 255, 255, 0.7)'); // 70% opacity in normal mode
 
-  // Simple solid background colors
-  const bgColor = isDarkTheme ? '#1a1a2e' : '#f5f7fa';
-
   return (
     <>
-      {/* Simple solid background */}
-      <div 
-        className="fixed inset-0 -z-10" 
+      {/* Image background implementation */}
+      <div className="fixed inset-0 -z-10" 
         style={{
-          backgroundColor: bgColor,
+          backgroundImage: `url('/background.jpg')`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
         }}
       />
       
