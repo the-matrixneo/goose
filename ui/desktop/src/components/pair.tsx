@@ -77,6 +77,39 @@ export default function Pair({
       sidebarInset.classList.add('bg-transparent');
     }
 
+    // Target the sidebar element itself
+    const sidebar = document.querySelector('[data-slot="sidebar"]') as HTMLElement;
+    if (sidebar) {
+      // Add a style to make sure it doesn't block our background
+      sidebar.style.pointerEvents = 'auto';
+      sidebar.style.zIndex = '20';
+      // Make the sidebar background transparent
+      sidebar.style.background = 'transparent';
+      sidebar.style.backgroundColor = 'transparent';
+    }
+
+    // Target the sidebar wrapper
+    const sidebarWrapper = document.querySelector('[data-slot="sidebar-wrapper"]') as HTMLElement;
+    if (sidebarWrapper) {
+      sidebarWrapper.style.background = 'transparent';
+      sidebarWrapper.style.backgroundColor = 'transparent';
+    }
+
+    // Target the sidebar container
+    const sidebarContainer = document.querySelector('[data-slot="sidebar-container"]') as HTMLElement;
+    if (sidebarContainer) {
+      sidebarContainer.style.background = 'transparent';
+      sidebarContainer.style.backgroundColor = 'transparent';
+    }
+
+    // Target the sidebar inner
+    const sidebarInner = document.querySelector('[data-slot="sidebar-inner"]') as HTMLElement;
+    if (sidebarInner) {
+      // Keep the sidebar's own background but make sure it doesn't extend
+      sidebarInner.style.width = '100%';
+      sidebarInner.style.height = '100%';
+    }
+
     // Override MainPanelLayout background
     const mainPanels = document.querySelectorAll('.bg-background-default, .bg-background-muted') as NodeListOf<HTMLElement>;
     mainPanels.forEach(panel => {
@@ -106,6 +139,24 @@ export default function Pair({
         if (!sidebarInset.classList.contains('bg-background')) {
           sidebarInset.classList.add('bg-background');
         }
+      }
+      if (sidebar) {
+        sidebar.style.pointerEvents = '';
+        sidebar.style.zIndex = '';
+        sidebar.style.background = '';
+        sidebar.style.backgroundColor = '';
+      }
+      if (sidebarWrapper) {
+        sidebarWrapper.style.background = '';
+        sidebarWrapper.style.backgroundColor = '';
+      }
+      if (sidebarContainer) {
+        sidebarContainer.style.background = '';
+        sidebarContainer.style.backgroundColor = '';
+      }
+      if (sidebarInner) {
+        sidebarInner.style.width = '';
+        sidebarInner.style.height = '';
       }
       mainPanels.forEach(panel => {
         if (panel) {
