@@ -173,7 +173,7 @@ export default function TabChatPair({
 
   return (
     <div className="flex flex-col h-full relative bg-transparent">
-      {/* Tab Bar */}
+      {/* Floating Tab Bar */}
       <TabBar
         tabs={formattedTabs}
         activeTabId={activeTabId}

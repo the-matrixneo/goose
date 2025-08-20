@@ -10,19 +10,19 @@ interface TabProps {
 }
 
 /**
- * A simple tab component with improved visibility
+ * A pill-style tab component
  */
 export const Tab: React.FC<TabProps> = ({ id, title, isActive, onSelect, onClose }) => {
   return (
     <div 
-      className={`px-3 py-1.5 mr-1 rounded-t-md text-sm font-medium whitespace-nowrap cursor-pointer transition-colors ${
+      className={`px-3 py-1.5 mb-1 rounded-full text-sm font-medium whitespace-nowrap cursor-pointer transition-colors ${
         isActive 
-          ? 'bg-blue-500 text-white shadow-md' 
+          ? 'bg-blue-500 text-white shadow-sm' 
           : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
       }`}
       onClick={onSelect}
     >
-      {title}
+      <span className="truncate max-w-[120px] inline-block">{title}</span>
       {onClose && (
         <button
           className="ml-2 text-xs opacity-60 hover:opacity-100"
@@ -44,12 +44,12 @@ interface NewTabButtonProps {
 }
 
 /**
- * A more visible button to create a new tab
+ * A pill-style button to create a new tab
  */
 export const NewTabButton: React.FC<NewTabButtonProps> = ({ onClick }) => {
   return (
     <div 
-      className="px-3 py-1.5 rounded-md bg-green-500 text-white hover:bg-green-600 cursor-pointer font-bold"
+      className="px-3 py-1.5 rounded-full bg-green-500 text-white hover:bg-green-600 cursor-pointer font-bold"
       onClick={onClick}
       title="New tab"
     >
@@ -70,7 +70,7 @@ interface TabBarProps {
 }
 
 /**
- * A more visible tab bar component
+ * A floating pill-style tab bar component
  */
 export const TabBar: React.FC<TabBarProps> = ({ 
   tabs, 
@@ -80,7 +80,7 @@ export const TabBar: React.FC<TabBarProps> = ({
   onNewTab 
 }) => {
   return (
-    <div className="flex overflow-x-auto border-b-2 border-gray-300 pb-1 mb-2 px-2 pt-2 bg-gray-50">
+    <div className="absolute left-4 top-10 z-50 flex flex-col bg-white/80 backdrop-blur-md p-2 rounded-lg shadow-lg border border-gray-200">
       <style>{`
         .hide-scrollbar {
           -ms-overflow-style: none;
