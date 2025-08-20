@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Plus } from 'lucide-react';
 import TabPill from './TabPill';
-import { ScrollArea } from '../ui/scroll-area';
+import { ScrollArea, ScrollAreaHandle } from '../ui/scroll-area';
 import { cn } from '../../utils';
 
 export interface ChatTab {
@@ -26,38 +26,42 @@ const TabBar: React.FC<TabBarProps> = ({
   onNewTab
 }) => {
   const [scrollAreaWidth, setScrollAreaWidth] = useState<number>(0);
-  const [scrollRef, setScrollRef] = useState<HTMLDivElement | null>(null);
+  const scrollAreaRef = useRef<ScrollAreaHandle>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Scroll to active tab when it changes
   useEffect(() => {
-    if (scrollRef) {
-      const activeTabElement = scrollRef.querySelector(`[data-tab-id="${activeTabId}"]`);
-      if (activeTabElement) {
-        // Calculate position to center the active tab
-        const tabRect = activeTabElement.getBoundingClientRect();
-        const scrollAreaRect = scrollRef.getBoundingClientRect();
-        const centerPosition = tabRect.left + tabRect.width / 2 - scrollAreaRect.width / 2;
-        
-        scrollRef.scrollTo({
-          left: centerPosition,
-          behavior: 'smooth'
-        });
+    if (containerRef.current) {
+      const activeTabElement = containerRef.current.querySelector(`[data-tab-id="${activeTabId}"]`);
+      if (activeTabElement && activeTabElement instanceof HTMLElement) {
+        // Get the scroll container
+        const scrollContainer = containerRef.current.parentElement;
+        if (scrollContainer) {
+          // Calculate position to center the active tab
+          const tabRect = activeTabElement.getBoundingClientRect();
+          const scrollContainerRect = scrollContainer.getBoundingClientRect();
+          const centerPosition = tabRect.left - scrollContainerRect.left - 
+                               (scrollContainerRect.width / 2) + (tabRect.width / 2);
+          
+          // Scroll to position
+          scrollContainer.scrollLeft = centerPosition;
+        }
       }
     }
-  }, [activeTabId, scrollRef]);
+  }, [activeTabId, tabs]);
 
   // Update scroll area width on resize
   useEffect(() => {
     const updateWidth = () => {
-      if (scrollRef) {
-        setScrollAreaWidth(scrollRef.offsetWidth);
+      if (containerRef.current) {
+        setScrollAreaWidth(containerRef.current.offsetWidth);
       }
     };
 
     updateWidth();
     window.addEventListener('resize', updateWidth);
     return () => window.removeEventListener('resize', updateWidth);
-  }, [scrollRef]);
+  }, []);
 
   return (
     <div className="flex flex-col">
@@ -66,9 +70,12 @@ const TabBar: React.FC<TabBarProps> = ({
           orientation="horizontal" 
           className="pb-1"
           scrollbarClassName="h-1.5"
-          ref={setScrollRef as any}
+          ref={scrollAreaRef}
         >
-          <div className="flex items-center gap-1 px-1 py-1.5">
+          <div 
+            ref={containerRef}
+            className="flex items-center gap-1 px-1 py-1.5"
+          >
             {tabs.map((tab) => (
               <div 
                 key={tab.id} 
