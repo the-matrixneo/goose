@@ -77,36 +77,30 @@ const AppLayoutContent: React.FC<AppLayoutProps> = ({ setIsGoosehintsModalOpen }
       {/* Global background */}
       <GlobalBackground blur={false} opacity={1} />
       
-      {/* Top navigation bar with pill in center and new window button on right */}
-      <div className="flex justify-between items-center w-full px-4 py-3 absolute top-0 left-0 z-50">
-        {/* Empty space on left to balance */}
-        <div className="w-10">
-          {/* Spacer */}
-        </div>
-        
-        {/* Pill Navigation in center */}
-        <div className="flex-grow flex justify-center">
+      {/* Floating pill navigation in center */}
+      <div className="absolute top-4 left-0 right-0 z-50 flex justify-center pointer-events-none">
+        <div className="pointer-events-auto">
           <PillSideNav />
         </div>
-        
-        {/* New Window button in top right */}
-        {!shouldHideButtons && (
-          <div className="w-10 flex justify-end">
-            <Button
-              onClick={handleNewWindow}
-              className="no-drag hover:!bg-white/10 text-white"
-              variant="ghost"
-              size="xs"
-              title="Start a new session in a new window"
-            >
-              {safeIsMacOS ? <AppWindowMac className="w-4 h-4" /> : <AppWindow className="w-4 h-4" />}
-            </Button>
-          </div>
-        )}
       </div>
       
+      {/* New Window button in top right */}
+      {!shouldHideButtons && (
+        <div className="absolute top-4 right-4 z-50">
+          <Button
+            onClick={handleNewWindow}
+            className="no-drag hover:!bg-white/10 text-white"
+            variant="ghost"
+            size="xs"
+            title="Start a new session in a new window"
+          >
+            {safeIsMacOS ? <AppWindowMac className="w-4 h-4" /> : <AppWindow className="w-4 h-4" />}
+          </Button>
+        </div>
+      )}
+      
       {/* Main Content */}
-      <div className="w-full h-full pt-16">
+      <div className="w-full h-full">
         <Outlet />
       </div>
     </div>

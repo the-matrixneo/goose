@@ -56,16 +56,16 @@ export const PillSideNav: React.FC = () => {
     setIsExpanded(false);
   };
 
-  // Navigation items configuration with colors
+  // Navigation items configuration
   const navItems = [
-    { icon: <HomeIcon size={18} />, label: 'Home', path: '/', color: 'bg-blue-600' },
-    { icon: <ChatIcon size={18} />, label: 'Chat', path: '/pair', color: 'bg-purple-600' },
-    { icon: <HistoryIcon size={18} />, label: 'History', path: '/sessions', color: 'bg-amber-600' },
-    { icon: <FileIcon size={18} />, label: 'Recipes', path: '/recipes', color: 'bg-green-600' },
-    { icon: <SettingsIcon size={18} />, label: 'Settings', path: '/settings', color: 'bg-gray-600' },
+    { icon: <HomeIcon size={18} />, label: 'Home', path: '/' },
+    { icon: <ChatIcon size={18} />, label: 'Chat', path: '/pair' },
+    { icon: <HistoryIcon size={18} />, label: 'History', path: '/sessions' },
+    { icon: <FileIcon size={18} />, label: 'Recipes', path: '/recipes' },
+    { icon: <SettingsIcon size={18} />, label: 'Settings', path: '/settings' },
   ];
 
-  // Find the current active item to determine pill color
+  // Find the current active item
   const activeItem = navItems.find(item => item.path === currentPath) || navItems[0];
   
   // Get current mode label
@@ -76,9 +76,10 @@ export const PillSideNav: React.FC = () => {
       {/* Collapsed Pill */}
       {!isExpanded && (
         <div 
-          className={`h-10 ${activeItem.color} rounded-full 
-                    flex items-center cursor-pointer shadow-lg
-                    transition-all duration-300 hover:shadow-xl px-4 space-x-2`}
+          className="h-9 bg-white/10 backdrop-blur-md rounded-full 
+                    flex items-center cursor-pointer shadow-md
+                    transition-all duration-300 hover:bg-white/15 px-4
+                    border border-white/20"
           onClick={() => setIsExpanded(true)}
         >
           <span className="text-white font-medium text-sm">{currentModeLabel}</span>
@@ -88,8 +89,8 @@ export const PillSideNav: React.FC = () => {
       {/* Expanded Navigation */}
       {isExpanded && (
         <div className="absolute left-1/2 transform -translate-x-1/2 top-0 z-50
-                      bg-gradient-to-b from-gray-800/95 to-gray-900/95 backdrop-blur-xl
-                      border border-white/10 shadow-xl rounded-lg animate-in fade-in duration-200">
+                      bg-black/70 backdrop-blur-xl
+                      border border-white/20 shadow-xl rounded-lg animate-in fade-in duration-200">
           <div className="flex flex-col p-2">
             {/* Header with close button */}
             <div className="flex items-center justify-between px-2 py-1 mb-1">
