@@ -60,12 +60,12 @@ export default function Pair({
   // Get recipe configuration and parameter handling
   const { initialPrompt: recipeInitialPrompt } = useRecipeManager(chat.messages, location.state);
 
+  // Get sidebar state
+  const { state: sidebarState } = useSidebar();
+  const isCollapsed = sidebarState === 'collapsed';
+
   // Override backgrounds to allow our gradient to show through
   useEffect(() => {
-    // Get sidebar state to adjust our approach
-    const { state } = useSidebar();
-    const isCollapsed = state === 'collapsed';
-    
     // Override SidebarInset background
     const sidebarInset = document.querySelector('[data-slot="sidebar-inset"]') as HTMLElement;
     if (sidebarInset) {
@@ -166,7 +166,7 @@ export default function Pair({
         appRoot.style.backgroundColor = '';
       }
     };
-  }, []);
+  }, [isCollapsed]); // Add isCollapsed as a dependency to re-run when sidebar state changes
 
   // Handle recipe loading from recipes view - reset chat if needed
   useEffect(() => {
