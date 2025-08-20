@@ -6,6 +6,7 @@ import { Button } from '../ui/button';
 import { SidebarProvider, useSidebar } from '../ui/sidebar';
 import GlobalBlurOverlay from '../GlobalBlurOverlay';
 import PillSideNav from '../PillSideNav';
+import BackgroundImageFix from '../BackgroundImageFix';
 
 interface AppLayoutProps {
   setIsGoosehintsModalOpen?: (isOpen: boolean) => void;
@@ -74,7 +75,10 @@ const AppLayoutContent: React.FC<AppLayoutProps> = ({ setIsGoosehintsModalOpen }
 
   return (
     <div className="flex flex-1 w-full relative animate-fade-in">
-      {/* Global background */}
+      {/* Add the new background fix component */}
+      <BackgroundImageFix />
+      
+      {/* Keep the original background components for compatibility */}
       <GlobalBlurOverlay />
       
       {/* Floating pill navigation in center */}

@@ -6,7 +6,7 @@ import { useFocusMode } from '../contexts/FocusModeContext';
  * 
  * A reusable component that provides a consistent glassmorphism effect across the application.
  * This component:
- * 1. Renders a background image
+ * 1. Renders a background image from app settings
  * 2. Applies a blur effect with theme-aware styling
  * 3. Adjusts opacity based on focus mode state
  * 4. Handles theme changes automatically
@@ -17,6 +17,9 @@ import { useFocusMode } from '../contexts/FocusModeContext';
 const GlobalBlurOverlay: React.FC = () => {
   const { isInFocusMode } = useFocusMode();
   const [isDarkTheme, setIsDarkTheme] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
+  const [backgroundId, setBackgroundId] = useState<string>('default-gradient');
   
   // Update theme detection when it changes
   useEffect(() => {
@@ -38,41 +41,163 @@ const GlobalBlurOverlay: React.FC = () => {
     
     observer.observe(document.documentElement, { attributes: true });
     
+    // Load background settings
+    const savedBackground = localStorage.getItem('dashboard-background');
+    const savedCustomImage = localStorage.getItem('dashboard-custom-image');
+    
+    if (savedBackground) {
+      setBackgroundId(savedBackground);
+    }
+    
+    if (savedBackground === 'custom-image' && savedCustomImage) {
+      setBackgroundImage(savedCustomImage);
+      
+      // Preload the custom image
+      const img = new Image();
+      img.onload = () => {
+        console.log("Custom background image loaded successfully");
+        setImageLoaded(true);
+      };
+      img.onerror = (e) => {
+        console.error("Failed to load custom background image:", e);
+      };
+      img.src = savedCustomImage;
+    } else {
+      // If not using custom image, mark as loaded
+      setImageLoaded(true);
+    }
+    
+    // Listen for background changes
+    const handleBackgroundChange = (e: CustomEvent) => {
+      console.log("Background changed:", e.detail);
+      setBackgroundId(e.detail.backgroundId);
+      
+      if (e.detail.backgroundId === 'custom-image' && e.detail.customImage) {
+        setBackgroundImage(e.detail.customImage);
+        setImageLoaded(true);
+      } else {
+        setBackgroundImage(null);
+      }
+    };
+    
+    window.addEventListener('dashboard-background-changed', handleBackgroundChange as EventListener);
+    
     return () => {
       observer.disconnect();
+      window.removeEventListener('dashboard-background-changed', handleBackgroundChange as EventListener);
     };
   }, []);
 
-  // Fixed blur intensity and background color based on theme
+  // Fixed blur intensity
   const blurIntensity = 20; // Consistent blur for chat mode
   
   // Determine background color based on focus mode and theme
+  // Using more grey-tinted overlays to match the home page
   const backgroundColor = isInFocusMode
-    ? (isDarkTheme ? 'rgba(0, 0, 0, 0.9)' : 'rgba(255, 255, 255, 0.9)') // 90% opacity in focus mode
-    : (isDarkTheme ? 'rgba(0, 0, 0, 0.7)' : 'rgba(255, 255, 255, 0.7)'); // 70% opacity in normal mode
+    ? (isDarkTheme ? 'rgba(24, 24, 27, 0.8)' : 'rgba(245, 245, 250, 0.8)') // 80% opacity in focus mode
+    : (isDarkTheme ? 'rgba(24, 24, 27, 0.5)' : 'rgba(245, 245, 250, 0.5)'); // 50% opacity in normal mode
 
-  return (
-    <>
-      {/* Image background implementation */}
-      <div className="fixed inset-0 -z-10" 
-        style={{
-          backgroundImage: `url('/background.jpg')`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-        }}
-      />
+  // Determine background style based on settings
+  const getBackgroundStyle = () => {
+    // If using custom image, return image style
+    if (backgroundId === 'custom-image' && backgroundImage) {
+      return {
+        backgroundImage: `url(${backgroundImage})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+      };
+    }
+    
+    // Fallback to default image
+    return {
+      backgroundImage: `url('/background.jpg')`,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+      backgroundRepeat: 'no-repeat',
+    };
+  };
+
+  // Create a div element to append to the body
+  useEffect(() => {
+    // Create background and blur overlay elements
+    const backgroundDiv = document.createElement('div');
+    const blurDiv = document.createElement('div');
+    
+    // Set styles for background image
+    Object.assign(backgroundDiv.style, {
+      position: 'fixed',
+      top: '0',
+      right: '0',
+      bottom: '0',
+      left: '0',
+      zIndex: '-8',
+      ...getBackgroundStyle(),
+      opacity: imageLoaded ? '1' : '0',
+      transition: 'opacity 0.5s ease-in-out',
+    });
+    
+    // Set styles for blur overlay
+    Object.assign(blurDiv.style, {
+      position: 'fixed',
+      top: '0',
+      right: '0',
+      bottom: '0',
+      left: '0',
+      zIndex: '-5',
+      backdropFilter: `blur(${blurIntensity}px)`,
+      backgroundColor: backgroundColor,
+      transition: 'background-color 0.5s ease',
+      pointerEvents: 'none',
+    });
+    
+    // Append elements to body
+    document.body.appendChild(backgroundDiv);
+    document.body.appendChild(blurDiv);
+    
+    // Debug info
+    if (process.env.NODE_ENV === 'development') {
+      const debugDiv = document.createElement('div');
+      Object.assign(debugDiv.style, {
+        position: 'fixed',
+        bottom: '16px',
+        right: '16px',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        color: 'white',
+        padding: '8px',
+        borderRadius: '4px',
+        fontSize: '12px',
+        zIndex: '50',
+      });
       
-      {/* Fixed blur overlay - always present with consistent intensity */}
-      <div 
-        className="fixed inset-0 -z-5 pointer-events-none transition-colors duration-500"
-        style={{ 
-          backdropFilter: `blur(${blurIntensity}px)`,
-          backgroundColor: backgroundColor
-        }}
-      />
-    </>
-  );
+      debugDiv.innerHTML = `
+        Image Loaded: ${imageLoaded ? 'Yes' : 'No'}<br />
+        Background ID: ${backgroundId}<br />
+        Custom Image: ${backgroundImage ? 'Yes' : 'No'}<br />
+        Dark Theme: ${isDarkTheme ? 'Yes' : 'No'}<br />
+        Focus Mode: ${isInFocusMode ? 'Yes' : 'No'}<br />
+        Overlay Color: ${backgroundColor}
+      `;
+      
+      document.body.appendChild(debugDiv);
+    }
+    
+    // Cleanup function
+    return () => {
+      document.body.removeChild(backgroundDiv);
+      document.body.removeChild(blurDiv);
+      
+      if (process.env.NODE_ENV === 'development') {
+        const debugElement = document.body.querySelector('[style*="position: fixed"][style*="bottom: 16px"][style*="right: 16px"]');
+        if (debugElement) {
+          document.body.removeChild(debugElement);
+        }
+      }
+    };
+  }, [backgroundId, backgroundImage, imageLoaded, isDarkTheme, isInFocusMode, backgroundColor]);
+
+  // Return null since we're appending directly to the body
+  return null;
 };
 
 export default GlobalBlurOverlay;
