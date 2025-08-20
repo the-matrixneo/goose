@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '../../ui/button';
 import { Card } from '../../ui/card';
 import { Upload, X, RotateCcw } from 'lucide-react';
@@ -98,73 +98,177 @@ const DEFAULT_BACKGROUNDS: BackgroundOption[] = [
 const STORAGE_KEY = 'dashboard-background';
 const CUSTOM_IMAGE_KEY = 'dashboard-custom-image';
 const DOT_OVERLAY_KEY = 'dashboard-dot-overlay';
+const MAX_IMAGE_SIZE_MB = 5; // 5MB limit for images
 
 export default function BackgroundSelector() {
   const [selectedBackground, setSelectedBackground] = useState<string>('default-gradient');
   const [customImage, setCustomImage] = useState<string | null>(null);
   const [showDotOverlay, setShowDotOverlay] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Load saved settings
-  useEffect(() => {
-    const savedBackground = localStorage.getItem(STORAGE_KEY);
-    const savedCustomImage = localStorage.getItem(CUSTOM_IMAGE_KEY);
-    const savedDotOverlay = localStorage.getItem(DOT_OVERLAY_KEY);
-
-    if (savedBackground) {
-      setSelectedBackground(savedBackground);
-    }
-    if (savedCustomImage) {
-      setCustomImage(savedCustomImage);
-    }
-    if (savedDotOverlay !== null) {
-      setShowDotOverlay(savedDotOverlay === 'true');
+  // Safe event dispatch function
+  const safeDispatchEvent = useCallback((eventName: string, detail: any) => {
+    try {
+      // Use requestAnimationFrame to ensure UI updates before dispatching event
+      requestAnimationFrame(() => {
+        window.dispatchEvent(new CustomEvent(eventName, { detail }));
+      });
+      return true;
+    } catch (error) {
+      console.error(`Error dispatching ${eventName} event:`, error);
+      setError(`Failed to update background. Please try again.`);
+      return false;
     }
   }, []);
 
-  // Save settings and trigger update
-  const saveAndApplyBackground = (backgroundId: string, imageData?: string | null) => {
-    setSelectedBackground(backgroundId);
-    localStorage.setItem(STORAGE_KEY, backgroundId);
+  // Load saved settings with error handling
+  useEffect(() => {
+    try {
+      const savedBackground = localStorage.getItem(STORAGE_KEY);
+      const savedCustomImage = localStorage.getItem(CUSTOM_IMAGE_KEY);
+      const savedDotOverlay = localStorage.getItem(DOT_OVERLAY_KEY);
 
-    if (imageData !== undefined) {
-      if (imageData) {
-        localStorage.setItem(CUSTOM_IMAGE_KEY, imageData);
-      } else {
-        localStorage.removeItem(CUSTOM_IMAGE_KEY);
+      if (savedBackground) {
+        setSelectedBackground(savedBackground);
       }
-      setCustomImage(imageData);
+      if (savedCustomImage) {
+        setCustomImage(savedCustomImage);
+      }
+      if (savedDotOverlay !== null) {
+        setShowDotOverlay(savedDotOverlay === 'true');
+      }
+    } catch (error) {
+      console.error('Error loading background settings:', error);
+      // Continue with defaults if loading fails
     }
+  }, []);
 
-    // Trigger a custom event to notify the dashboard to update
-    window.dispatchEvent(new CustomEvent('dashboard-background-changed', {
-      detail: { backgroundId, customImage: imageData !== undefined ? imageData : customImage }
-    }));
-  };
+  // Save settings and trigger update with improved async handling
+  const saveAndApplyBackground = useCallback((backgroundId: string, imageData?: string | null) => {
+    // Clear any previous errors
+    setError(null);
+    
+    // Set updating state to show loading indicator
+    setIsUpdating(true);
 
-  const handleDotOverlayToggle = (enabled: boolean) => {
-    setShowDotOverlay(enabled);
-    localStorage.setItem(DOT_OVERLAY_KEY, String(enabled));
-    window.dispatchEvent(new CustomEvent('dashboard-dot-overlay-changed', {
-      detail: { enabled }
-    }));
-  };
+    // Use requestAnimationFrame to ensure UI updates before potentially intensive operations
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        try {
+          // Update state first
+          setSelectedBackground(backgroundId);
+          
+          // Then update storage
+          localStorage.setItem(STORAGE_KEY, backgroundId);
 
-  const handleFileUpload = (file: File) => {
+          if (imageData !== undefined) {
+            if (imageData) {
+              localStorage.setItem(CUSTOM_IMAGE_KEY, imageData);
+            } else {
+              localStorage.removeItem(CUSTOM_IMAGE_KEY);
+            }
+            setCustomImage(imageData);
+          }
+
+          // Dispatch event after state and storage are updated
+          safeDispatchEvent('dashboard-background-changed', {
+            backgroundId, 
+            customImage: imageData !== undefined ? imageData : customImage
+          });
+        } catch (error) {
+          console.error('Error saving background settings:', error);
+          setError('Failed to save background settings. Please try again.');
+        } finally {
+          // Clear updating state after a short delay
+          setTimeout(() => {
+            setIsUpdating(false);
+          }, 300);
+        }
+      }, 0);
+    });
+  }, [customImage, safeDispatchEvent]);
+
+  const handleDotOverlayToggle = useCallback((enabled: boolean) => {
+    setIsUpdating(true);
+    setError(null);
+    
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        try {
+          setShowDotOverlay(enabled);
+          localStorage.setItem(DOT_OVERLAY_KEY, String(enabled));
+          
+          safeDispatchEvent('dashboard-dot-overlay-changed', { enabled });
+        } catch (error) {
+          console.error('Error toggling dot overlay:', error);
+          setError('Failed to update overlay settings. Please try again.');
+        } finally {
+          setTimeout(() => {
+            setIsUpdating(false);
+          }, 300);
+        }
+      }, 0);
+    });
+  }, [safeDispatchEvent]);
+
+  // Validate and process image with size limits
+  const handleFileUpload = useCallback((file: File) => {
     if (!file.type.startsWith('image/')) {
-      alert('Please select an image file');
+      setError('Please select a valid image file');
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const imageData = e.target?.result as string;
-      saveAndApplyBackground('custom-image', imageData);
-    };
-    reader.readAsDataURL(file);
-  };
+    // Check file size (limit to 5MB)
+    if (file.size > MAX_IMAGE_SIZE_MB * 1024 * 1024) {
+      setError(`Image size exceeds ${MAX_IMAGE_SIZE_MB}MB limit. Please choose a smaller file.`);
+      return;
+    }
 
-  const handleDrop = (e: React.DragEvent) => {
+    setIsUpdating(true);
+    setError(null);
+
+    // Process image in a non-blocking way
+    const reader = new FileReader();
+    
+    reader.onload = (e) => {
+      try {
+        const imageData = e.target?.result as string;
+        
+        // Validate image data
+        if (!imageData || !imageData.startsWith('data:image/')) {
+          throw new Error('Invalid image data');
+        }
+        
+        // Create an image to verify it loads correctly
+        const img = new Image();
+        img.onload = () => {
+          // Image loaded successfully, now safe to use
+          saveAndApplyBackground('custom-image', imageData);
+        };
+        img.onerror = () => {
+          setError('Failed to process image. The file may be corrupted.');
+          setIsUpdating(false);
+        };
+        img.src = imageData;
+      } catch (error) {
+        console.error('Error processing image:', error);
+        setError('Failed to process image. Please try another file.');
+        setIsUpdating(false);
+      }
+    };
+    
+    reader.onerror = () => {
+      console.error('Error reading file');
+      setError('Failed to read image file. Please try again.');
+      setIsUpdating(false);
+    };
+    
+    reader.readAsDataURL(file);
+  }, [saveAndApplyBackground]);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
 
@@ -173,41 +277,88 @@ export default function BackgroundSelector() {
     
     if (imageFile) {
       handleFileUpload(imageFile);
+    } else if (files.length > 0) {
+      setError('Please drop an image file (JPG, PNG, GIF, etc.)');
     }
-  };
+  }, [handleFileUpload]);
 
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(true);
-  };
+  }, []);
 
-  const handleDragLeave = (e: React.DragEvent) => {
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-  };
+  }, []);
 
-  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       handleFileUpload(file);
     }
-  };
+  }, [handleFileUpload]);
 
-  const removeCustomImage = () => {
+  const removeCustomImage = useCallback(() => {
     saveAndApplyBackground('default-gradient', null);
-  };
+  }, [saveAndApplyBackground]);
 
-  const resetToDefault = () => {
-    saveAndApplyBackground('default-gradient', null);
-    setShowDotOverlay(true);
-    localStorage.setItem(DOT_OVERLAY_KEY, 'true');
-    window.dispatchEvent(new CustomEvent('dashboard-dot-overlay-changed', {
-      detail: { enabled: true }
-    }));
-  };
+  const resetToDefault = useCallback(() => {
+    setIsUpdating(true);
+    setError(null);
+    
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        try {
+          // Update background
+          saveAndApplyBackground('default-gradient', null);
+          
+          // Update overlay
+          setShowDotOverlay(true);
+          localStorage.setItem(DOT_OVERLAY_KEY, 'true');
+          
+          safeDispatchEvent('dashboard-dot-overlay-changed', { enabled: true });
+        } catch (error) {
+          console.error('Error resetting to default:', error);
+          setError('Failed to reset settings. Please try again.');
+        } finally {
+          setTimeout(() => {
+            setIsUpdating(false);
+          }, 300);
+        }
+      }, 0);
+    });
+  }, [saveAndApplyBackground, safeDispatchEvent]);
+
+  // Loading overlay that blocks interaction during updates
+  const LoadingOverlay = () => (
+    isUpdating ? (
+      <div className="fixed inset-0 bg-background-default/50 backdrop-blur-sm flex items-center justify-center z-50">
+        <div className="bg-background-default p-4 rounded-lg shadow-lg flex flex-col items-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-textStandard mb-2"></div>
+          <p className="text-sm text-textStandard">Updating background...</p>
+        </div>
+      </div>
+    ) : null
+  );
+
+  // Error message display
+  const ErrorMessage = () => (
+    error ? (
+      <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-3 mb-4">
+        <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+      </div>
+    ) : null
+  );
 
   return (
     <div className="space-y-6">
+      {/* Loading overlay */}
+      <LoadingOverlay />
+      
+      {/* Error message */}
+      <ErrorMessage />
+      
       {/* Dot Overlay Toggle */}
       <div className="flex items-center justify-between">
         <div>
@@ -220,6 +371,7 @@ export default function BackgroundSelector() {
           checked={showDotOverlay}
           onCheckedChange={handleDotOverlayToggle}
           variant="mono"
+          disabled={isUpdating}
         />
       </div>
 
@@ -234,8 +386,8 @@ export default function BackgroundSelector() {
                 selectedBackground === bg.id
                   ? 'ring-2 ring-blue-500 shadow-lg'
                   : 'hover:shadow-md'
-              }`}
-              onClick={() => saveAndApplyBackground(bg.id)}
+              } ${isUpdating ? 'pointer-events-none opacity-50' : ''}`}
+              onClick={() => !isUpdating && saveAndApplyBackground(bg.id)}
             >
               <div className="aspect-video relative">
                 <div
@@ -278,8 +430,8 @@ export default function BackgroundSelector() {
                 selectedBackground === 'custom-image'
                   ? 'ring-2 ring-blue-500 shadow-lg'
                   : 'hover:shadow-md'
-              }`}
-              onClick={() => saveAndApplyBackground('custom-image')}
+              } ${isUpdating ? 'pointer-events-none opacity-50' : ''}`}
+              onClick={() => !isUpdating && saveAndApplyBackground('custom-image')}
             >
               <div className="aspect-video relative">
                 <img
@@ -312,16 +464,18 @@ export default function BackgroundSelector() {
                 size="sm"
                 onClick={removeCustomImage}
                 className="flex items-center gap-2"
+                disabled={isUpdating}
               >
                 <X size={14} />
                 Remove
               </Button>
-              <label>
+              <label className={isUpdating ? 'pointer-events-none opacity-50' : ''}>
                 <Button
                   variant="outline"
                   size="sm"
                   className="flex items-center gap-2 cursor-pointer"
                   asChild
+                  disabled={isUpdating}
                 >
                   <span>
                     <Upload size={14} />
@@ -333,6 +487,7 @@ export default function BackgroundSelector() {
                   accept="image/*"
                   onChange={handleFileInputChange}
                   className="hidden"
+                  disabled={isUpdating}
                 />
               </label>
             </div>
@@ -343,7 +498,7 @@ export default function BackgroundSelector() {
               isDragging
                 ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/20'
                 : 'border-borderSubtle hover:border-borderStandard'
-            }`}
+            } ${isUpdating ? 'pointer-events-none opacity-50' : ''}`}
             onDrop={handleDrop}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
@@ -353,10 +508,16 @@ export default function BackgroundSelector() {
               Drop an image here or click to upload
             </p>
             <p className="text-xs text-textSubtle mb-4">
-              Supports JPG, PNG, GIF, WebP
+              Supports JPG, PNG, GIF, WebP (max {MAX_IMAGE_SIZE_MB}MB)
             </p>
-            <label>
-              <Button variant="outline" size="sm" className="cursor-pointer" asChild>
+            <label className={isUpdating ? 'pointer-events-none opacity-50' : ''}>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="cursor-pointer" 
+                asChild
+                disabled={isUpdating}
+              >
                 <span>Choose File</span>
               </Button>
               <input
@@ -364,6 +525,7 @@ export default function BackgroundSelector() {
                 accept="image/*"
                 onChange={handleFileInputChange}
                 className="hidden"
+                disabled={isUpdating}
               />
             </label>
           </div>
@@ -377,6 +539,7 @@ export default function BackgroundSelector() {
           size="sm"
           onClick={resetToDefault}
           className="flex items-center gap-2"
+          disabled={isUpdating}
         >
           <RotateCcw size={14} />
           Reset to Default
