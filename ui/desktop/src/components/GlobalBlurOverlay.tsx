@@ -6,7 +6,7 @@ import { useFocusMode } from '../contexts/FocusModeContext';
  * 
  * A reusable component that provides a consistent glassmorphism effect across the application.
  * This component:
- * 1. Applies an animated gradient background
+ * 1. Applies a simple solid color background
  * 2. Applies a blur effect with theme-aware styling
  * 3. Adjusts opacity based on focus mode state
  * 4. Handles theme changes automatically
@@ -43,7 +43,7 @@ const GlobalBlurOverlay: React.FC = () => {
     };
   }, []);
 
-  // Fixed blur intensity and background color based on theme
+  // Fixed blur intensity
   const blurIntensity = 20; // Consistent blur for chat mode
   
   // Determine background color based on focus mode and theme
@@ -51,33 +51,16 @@ const GlobalBlurOverlay: React.FC = () => {
     ? (isDarkTheme ? 'rgba(0, 0, 0, 0.9)' : 'rgba(255, 255, 255, 0.9)') // 90% opacity in focus mode
     : (isDarkTheme ? 'rgba(0, 0, 0, 0.7)' : 'rgba(255, 255, 255, 0.7)'); // 70% opacity in normal mode
 
-  // Animated gradient background for dark and light themes
-  const darkGradient = `
-    linear-gradient(135deg, 
-      rgba(26, 26, 46, 1) 0%, 
-      rgba(22, 33, 62, 1) 25%, 
-      rgba(15, 52, 96, 1) 50%,
-      rgba(22, 33, 62, 1) 75%,
-      rgba(26, 26, 46, 1) 100%)
-  `;
-  
-  const lightGradient = `
-    linear-gradient(135deg, 
-      rgba(245, 247, 250, 1) 0%, 
-      rgba(228, 232, 240, 1) 25%, 
-      rgba(195, 207, 226, 1) 50%,
-      rgba(228, 232, 240, 1) 75%,
-      rgba(245, 247, 250, 1) 100%)
-  `;
+  // Simple solid background colors
+  const bgColor = isDarkTheme ? '#1a1a2e' : '#f5f7fa';
 
   return (
     <>
-      {/* Animated gradient background */}
+      {/* Simple solid background */}
       <div 
-        className="fixed inset-0 -z-10 animate-gradient-slow" 
+        className="fixed inset-0 -z-10" 
         style={{
-          background: isDarkTheme ? darkGradient : lightGradient,
-          backgroundSize: '400% 400%',
+          backgroundColor: bgColor,
         }}
       />
       
