@@ -176,6 +176,10 @@ export const ChatContextManagerProvider: React.FC<{ children: React.ReactNode }>
     setAncestorMessages: (messages: Message[]) => void,
     summaryContent: string
   ) => {
+    // Ensure we have valid arrays
+    const safeMessages = messages || [];
+    const safeAncestorMessages = ancestorMessages || [];
+    
     // Create a copy of the summarized thread
     const updatedSummarizedThread = [...summarizedThread];
 
@@ -214,19 +218,19 @@ export const ChatContextManagerProvider: React.FC<{ children: React.ReactNode }>
     setMessages(finalUpdatedThread);
 
     // If ancestorMessages already has items, extend it instead of replacing it
-    if (ancestorMessages.length > 0) {
+    if (safeAncestorMessages.length > 0) {
       // Convert current messages to ancestor format
-      const newAncestorMessages = messages.map((msg) => ({
+      const newAncestorMessages = safeMessages.map((msg) => ({
         ...msg,
         display: true,
         sendToLLM: false,
       }));
 
       // Append new ancestor messages to existing ones
-      setAncestorMessages([...ancestorMessages, ...newAncestorMessages]);
+      setAncestorMessages([...safeAncestorMessages, ...newAncestorMessages]);
     } else {
       // Initial set of ancestor messages
-      const newAncestorMessages = messages.map((msg) => ({
+      const newAncestorMessages = safeMessages.map((msg) => ({
         ...msg,
         display: true,
         sendToLLM: false,

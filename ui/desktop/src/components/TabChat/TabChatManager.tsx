@@ -28,26 +28,38 @@ const TabChatManager: React.FC<TabChatManagerProps> = ({
   initialChat,
   setChat,
 }) => {
+  // Ensure initialChat has a properly initialized messages array
+  const safeInitialChat: ChatType = {
+    ...initialChat,
+    messages: initialChat.messages || [],
+  };
+  
   // State for all chat tabs
-  const [chatTabs, setChatTabs] = useState<ChatType[]>([initialChat]);
+  const [chatTabs, setChatTabs] = useState<ChatType[]>([safeInitialChat]);
   
   // State for active tab ID
-  const [activeTabId, setActiveTabId] = useState<string>(initialChat.id);
+  const [activeTabId, setActiveTabId] = useState<string>(safeInitialChat.id);
   
   // Get the active chat based on the active tab ID
   const activeChat = chatTabs.find(chat => chat.id === activeTabId) || chatTabs[0];
   
+  // Ensure activeChat always has a messages array
+  const safeActiveChat: ChatType = {
+    ...activeChat,
+    messages: activeChat.messages || [],
+  };
+  
   // Update the parent component's chat state when active chat changes
   useEffect(() => {
-    setChat(activeChat);
-  }, [activeChat, setChat]);
+    setChat(safeActiveChat);
+  }, [safeActiveChat, setChat]);
   
   // Function to create a new chat tab
   const handleNewTab = () => {
     const newChat: ChatType = {
       id: generateSessionId(),
       title: DEFAULT_CHAT_TITLE,
-      messages: [],
+      messages: [], // Explicitly initialize with empty array
       messageHistoryIndex: 0,
       recipeConfig: null,
     };
@@ -74,17 +86,28 @@ const TabChatManager: React.FC<TabChatManagerProps> = ({
   
   // Function to update the active chat
   const setActiveChat = (updatedChat: ChatType) => {
+    // Ensure the updated chat has a messages array
+    const safeUpdatedChat = {
+      ...updatedChat,
+      messages: updatedChat.messages || [],
+    };
+    
     setChatTabs(prev => 
-      prev.map(chat => chat.id === activeTabId ? updatedChat : chat)
+      prev.map(chat => chat.id === activeTabId ? safeUpdatedChat : chat)
     );
   };
   
   // Convert chat tabs to the format expected by TabBar
-  const tabBarTabs: ChatTab[] = chatTabs.map(chat => ({
-    id: chat.id,
-    title: chat.title || `Chat ${chatTabs.indexOf(chat) + 1}`,
-    isNewChat: chat.messages && chat.messages.length === 0
-  }));
+  const tabBarTabs: ChatTab[] = chatTabs.map(chat => {
+    // Ensure each chat has a messages array for the isNewChat check
+    const messages = chat.messages || [];
+    
+    return {
+      id: chat.id,
+      title: chat.title || `Chat ${chatTabs.indexOf(chat) + 1}`,
+      isNewChat: messages.length === 0
+    };
+  });
 
   return (
     <div className="flex flex-col h-full">
@@ -100,7 +123,7 @@ const TabChatManager: React.FC<TabChatManagerProps> = ({
       
       <div className="flex-grow overflow-hidden">
         {children({
-          activeChat,
+          activeChat: safeActiveChat,
           setActiveChat,
         })}
       </div>
