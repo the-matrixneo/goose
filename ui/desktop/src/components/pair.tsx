@@ -32,6 +32,7 @@ import GlobalBackground from './GlobalBackground';
 import { useRecipeManager } from '../hooks/useRecipeManager';
 import { useIsMobile } from '../hooks/use-mobile';
 import { useSidebar } from './ui/sidebar';
+import { useFocusMode } from '../contexts/FocusModeContext';
 import 'react-toastify/dist/ReactToastify.css';
 import { cn } from '../utils';
 
@@ -52,11 +53,11 @@ export default function Pair({
   const location = useLocation();
   const isMobile = useIsMobile();
   const { state: sidebarState } = useSidebar();
+  const { isInFocusMode, setIsInFocusMode } = useFocusMode();
   const [hasProcessedInitialInput, setHasProcessedInitialInput] = useState(false);
   const [shouldAutoSubmit, setShouldAutoSubmit] = useState(false);
   const [initialMessage, setInitialMessage] = useState<string | null>(null);
   const [isTransitioningFromHub, setIsTransitioningFromHub] = useState(false);
-  const [isInFocusMode, setIsInFocusMode] = useState(false);
 
   // Get recipe configuration and parameter handling
   const { initialPrompt: recipeInitialPrompt } = useRecipeManager(chat.messages, location.state);

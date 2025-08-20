@@ -27,6 +27,7 @@ import { useChat } from './hooks/useChat';
 import { AppLayout } from './components/Layout/AppLayout';
 import { ChatProvider } from './contexts/ChatContext';
 import { DraftProvider } from './contexts/DraftContext';
+import { FocusModeProvider } from './contexts/FocusModeContext';
 
 import 'react-toastify/dist/ReactToastify.css';
 import { useConfig, MalformedConfigError } from './components/ConfigContext';
@@ -1346,8 +1347,9 @@ export default function App() {
 
   return (
     <DraftProvider>
-      <ModelAndProviderProvider>
-        <HashRouter>
+      <FocusModeProvider>
+        <ModelAndProviderProvider>
+          <HashRouter>
           <ToastContainer
             aria-label="Toast notifications"
             toastClassName={() =>
@@ -1499,6 +1501,7 @@ export default function App() {
         </HashRouter>
         <AnnouncementModal />
       </ModelAndProviderProvider>
+      </FocusModeProvider>
     </DraftProvider>
   );
 }
