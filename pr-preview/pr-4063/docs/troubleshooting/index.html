@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://www.googletagmanager.com">
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZS5D6SB4ZJ"></script>
 <script>function gtag(){dataLayer.push(arguments)}window.dataLayer=window.dataLayer||[],gtag("js",new Date),gtag("config","G-ZS5D6SB4ZJ",{anonymize_ip:!0})</script><link rel="stylesheet" href="/goose/pr-preview/pr-4063/assets/css/styles.a8779ca4.css">
-<script src="/goose/pr-preview/pr-4063/assets/js/runtime~main.f3fbb98b.js" defer="defer"></script>
+<script src="/goose/pr-preview/pr-4063/assets/js/runtime~main.b5da1429.js" defer="defer"></script>
 <script src="/goose/pr-preview/pr-4063/assets/js/main.a0aacfd7.js" defer="defer"></script>
 </head>
 <body class="navigation-with-keyboard">
@@ -225,6 +225,9 @@ Similarly, if tools fail to create files or directories during use, it could be 
 </li>
 <li>
 <p><strong>Why this works:</strong> Goose only replaces known command names (<code>npx</code>, <code>uvx</code>, <code>jbang</code>, etc.) with its packaged shims. Custom names are passed through unchanged to your system&#x27;s actual executables.</p>
+</li>
+<li>
+<p><strong>Require more changes</strong>: In a corporate proxy environment or airgapped environment where the above doesn&#x27;t work, it is recommended that you customize and package up Goose desktop with shims/config that will work given the network constraints you have (for example, TLS certificate limitations, proxies, inability to download required content etc).</p>
 </li>
 </ol>
 <hr>
