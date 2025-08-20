@@ -521,12 +521,23 @@ mod tests {
 
     #[test]
     fn test_claude_code_model_config() {
-        let provider = ClaudeCodeProvider::default();
-        let config = provider.get_model_config();
+        // Clear environment variables that might affect ModelConfig
+        temp_env::with_vars(
+            vec![
+                ("GOOSE_TEMPERATURE", None::<&str>),
+                ("GOOSE_CONTEXT_LIMIT", None::<&str>),
+                ("GOOSE_TOOLSHIM", None::<&str>),
+                ("GOOSE_TOOLSHIM_OLLAMA_MODEL", None::<&str>),
+            ],
+            || {
+                let provider = ClaudeCodeProvider::default();
+                let config = provider.get_model_config();
 
-        assert_eq!(config.model_name, "claude-3-5-sonnet-latest");
-        // Context limit should be set by the ModelConfig
-        assert!(config.context_limit() > 0);
+                assert_eq!(config.model_name, "claude-3-5-sonnet-latest");
+                // Context limit should be set by the ModelConfig
+                assert!(config.context_limit() > 0);
+            },
+        );
     }
 
     #[test]

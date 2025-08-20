@@ -239,6 +239,11 @@ impl ModelConfig {
         self
     }
 
+    pub fn with_model(mut self, model: &str) -> Self {
+        self.model_name = model.to_string();
+        self
+    }
+
     pub fn context_limit(&self) -> usize {
         self.context_limit.unwrap_or(DEFAULT_CONTEXT_LIMIT)
     }
@@ -364,6 +369,47 @@ mod tests {
                         assert_eq!(config.temperature, Some(0.7));
                         assert!(config.toolshim);
                         assert_eq!(config.toolshim_model, Some("llama3".to_string()));
+                    });
+                });
+            });
+        });
+    }
+
+    #[test]
+    #[serial]
+    fn test_fast_model_configuration() {
+        // Clear environment variables
+        with_var("GOOSE_TEMPERATURE", None::<&str>, || {
+            with_var("GOOSE_CONTEXT_LIMIT", None::<&str>, || {
+                with_var("GOOSE_TOOLSHIM", None::<&str>, || {
+                    with_var("GOOSE_TOOLSHIM_OLLAMA_MODEL", None::<&str>, || {
+                        // Test that we can set and retrieve fast model
+                        let config = ModelConfig::new("gpt-4o")
+                            .unwrap()
+                            .with_fast_model(Some("gpt-4o-mini".to_string()));
+                        
+                        assert_eq!(config.model_name, "gpt-4o");
+                        assert_eq!(config.fast_model, Some("gpt-4o-mini".to_string()));
+                    });
+                });
+            });
+        });
+    }
+
+    #[test]
+    #[serial]
+    fn test_with_model_builder() {
+        // Clear environment variables
+        with_var("GOOSE_TEMPERATURE", None::<&str>, || {
+            with_var("GOOSE_CONTEXT_LIMIT", None::<&str>, || {
+                with_var("GOOSE_TOOLSHIM", None::<&str>, || {
+                    with_var("GOOSE_TOOLSHIM_OLLAMA_MODEL", None::<&str>, || {
+                        // Test that with_model changes the model name
+                        let config = ModelConfig::new("gpt-4o")
+                            .unwrap()
+                            .with_model("gpt-4o-mini");
+                        
+                        assert_eq!(config.model_name, "gpt-4o-mini");
                     });
                 });
             });

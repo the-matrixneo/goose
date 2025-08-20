@@ -238,15 +238,13 @@ impl Provider for OpenAiProvider {
         // If we have a fast model configured, use it
         if let Some(fast_model) = &self.model.fast_model {
             // Create a temporary model config with the fast model
-            let fast_config = ModelConfig::new(fast_model)
-                .map_err(|e| {
-                    ProviderError::ExecutionError(format!(
-                        "Failed to create fast model config: {}",
-                        e
-                    ))
-                })?
+            let fast_config = self
+                .model
+                .clone()
+                .with_model(fast_model)
                 .with_temperature(Some(0.0)); // Use low temperature for consistency
 
+            // Create the request with the fast model config
             let payload =
                 create_request(&fast_config, system, messages, tools, &ImageFormat::OpenAi)?;
             let json_response = self.post(&payload).await?;
