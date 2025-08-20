@@ -1,4 +1,5 @@
 pub mod base;
+pub mod custom_providers;
 mod experiments;
 pub mod extensions;
 pub mod permission;
@@ -7,6 +8,7 @@ pub mod signup_tetrate;
 
 pub use crate::agents::ExtensionConfig;
 pub use base::{Config, ConfigError, APP_STRATEGY};
+pub use custom_providers::CustomProviderConfig;
 pub use experiments::ExperimentManager;
 pub use extensions::{ExtensionConfigManager, ExtensionEntry};
 pub use permission::PermissionManager;
