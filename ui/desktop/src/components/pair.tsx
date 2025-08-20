@@ -72,58 +72,14 @@ export default function Pair({
       sidebarInset.style.background = 'transparent';
     }
 
-    // Override MainPanelLayout background - this is crucial
-    const mainPanelElements = document.querySelectorAll('.bg-background-muted, .bg-background-default') as NodeListOf<HTMLElement>;
-    mainPanelElements.forEach(element => {
-      if (element) {
-        element.style.background = 'transparent';
-        element.style.backgroundColor = 'transparent';
-      }
-    });
-
-    // Apply glassmorphic effect to ChatInput (same as Hub)
+    // Override ChatInput background to be transparent with glass effect
     const chatInputContainer = document.querySelector('[data-drop-zone="true"]') as HTMLElement;
     if (chatInputContainer) {
       chatInputContainer.style.background = 'rgba(255, 255, 255, 0.05)';
-      chatInputContainer.style.backdropFilter = 'blur(20px)';
+      chatInputContainer.style.backdropFilter = 'blur(10px)';
       // @ts-expect-error - webkitBackdropFilter is a valid CSS property
-      chatInputContainer.style.webkitBackdropFilter = 'blur(20px)';
+      chatInputContainer.style.webkitBackdropFilter = 'blur(10px)';
       chatInputContainer.style.border = '1px solid rgba(255, 255, 255, 0.1)';
-      chatInputContainer.style.boxShadow = '0 8px 16px 0 rgba(0, 0, 0, 0.1)';
-    }
-    
-    // Override any ScrollArea background to ensure transparency
-    const scrollAreas = document.querySelectorAll('.ScrollAreaRoot, .ScrollAreaViewport') as NodeListOf<HTMLElement>;
-    scrollAreas.forEach(scrollArea => {
-      if (scrollArea) {
-        scrollArea.style.background = `
-          linear-gradient(135deg, 
-            rgba(255, 255, 255, 0.1) 0%, 
-            rgba(255, 255, 255, 0.05) 100%
-          )
-        `;
-        scrollArea.style.backdropFilter = 'blur(20px) saturate(180%)';
-        // @ts-expect-error - webkitBackdropFilter is a valid CSS property
-        scrollArea.style.webkitBackdropFilter = 'blur(20px) saturate(180%)';
-        scrollArea.style.border = '1px solid rgba(255, 255, 255, 0.1)';
-        scrollArea.style.boxShadow = '0 8px 16px 0 rgba(0, 0, 0, 0.1)';
-      }
-    });
-
-    // Make sure the parent containers are transparent too
-    const parentContainers = document.querySelectorAll('.h-dvh, .h-full') as NodeListOf<HTMLElement>;
-    parentContainers.forEach(container => {
-      if (container) {
-        container.style.backgroundColor = 'transparent';
-        container.style.background = 'transparent';
-      }
-    });
-
-    // Make sure the GlobalBackground is visible across the entire screen
-    const appRoot = document.getElementById('root') as HTMLElement;
-    if (appRoot) {
-      appRoot.style.background = 'transparent';
-      appRoot.style.backgroundColor = 'transparent';
     }
     
     // Cleanup on unmount
@@ -131,42 +87,15 @@ export default function Pair({
       if (sidebarInset) {
         sidebarInset.style.background = '';
       }
-      mainPanelElements.forEach(element => {
-        if (element) {
-          element.style.background = '';
-          element.style.backgroundColor = '';
-        }
-      });
       if (chatInputContainer) {
         chatInputContainer.style.background = '';
         chatInputContainer.style.backdropFilter = '';
         // @ts-expect-error - webkitBackdropFilter is a valid CSS property
         chatInputContainer.style.webkitBackdropFilter = '';
         chatInputContainer.style.border = '';
-        chatInputContainer.style.boxShadow = '';
-      }
-      scrollAreas.forEach(scrollArea => {
-        if (scrollArea) {
-          scrollArea.style.background = '';
-          scrollArea.style.backdropFilter = '';
-          // @ts-expect-error - webkitBackdropFilter is a valid CSS property
-          scrollArea.style.webkitBackdropFilter = '';
-          scrollArea.style.border = '';
-          scrollArea.style.boxShadow = '';
-        }
-      });
-      parentContainers.forEach(container => {
-        if (container) {
-          container.style.backgroundColor = '';
-          container.style.background = '';
-        }
-      });
-      if (appRoot) {
-        appRoot.style.background = '';
-        appRoot.style.backgroundColor = '';
       }
     };
-  }, [isSidebarCollapsed]); // Add isSidebarCollapsed as a dependency to re-run when sidebar state changes
+  }, []);
 
   // Handle recipe loading from recipes view - reset chat if needed
   useEffect(() => {
@@ -307,13 +236,13 @@ export default function Pair({
   };
 
   return (
-    <div className="flex flex-col h-full relative" style={{ backgroundColor: 'transparent' }}>
-      {/* Use GlobalBackground to respect user's selected background */}
+    <div className="flex flex-col h-full relative">
+      {/* Global background - no blur for dashboard */}
       <GlobalBackground blur={false} opacity={1} />
-
+      
       {/* Centered chat content */}
-      <div className="relative z-10 flex justify-center h-full" style={{ backgroundColor: 'transparent' }}>
-        <div className="w-full max-w-[1000px] h-full" style={{ backgroundColor: 'transparent' }}>
+      <div className="relative z-10 flex justify-center h-full">
+        <div className="w-full max-w-[1000px] h-full">
           <BaseChat
             chat={chat}
             setChat={setChat}
