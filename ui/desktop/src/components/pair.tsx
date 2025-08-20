@@ -348,7 +348,7 @@ export default function Pair({
       />
       
       {/* Centered chat content */}
-      <div className="relative z-10 flex justify-center h-full bg-transparent">
+      <div className="relative z-10 flex justify-center h-full bg-transparent pt-14"> {/* Added pt-14 for top spacing */}
         <div className="w-full max-w-[1000px] h-full bg-transparent">
           <BaseChat
             chat={chat}
