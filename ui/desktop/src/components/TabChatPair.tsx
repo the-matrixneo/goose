@@ -1,29 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { type View, ViewOptions } from '../App';
 import BaseChat from './BaseChat';
 import { ChatType } from '../types/chat';
 import { generateSessionId } from '../sessions';
 import { DEFAULT_CHAT_TITLE } from '../contexts/ChatContext';
-
-// Simple tab interface styles
-const styles = {
-  tabContainer: 'flex overflow-x-auto border-b border-borderSubtle pb-1 mb-2 hide-scrollbar',
-  tab: 'px-3 py-1.5 mr-1 rounded-t-md text-sm font-medium whitespace-nowrap cursor-pointer transition-colors',
-  activeTab: 'bg-background-default text-textProminent',
-  inactiveTab: 'hover:bg-background-muted text-textStandard',
-  newTab: 'px-2 py-1.5 rounded-md text-textStandard hover:bg-background-muted cursor-pointer',
-  closeButton: 'ml-2 text-xs opacity-60 hover:opacity-100',
-  hideScrollbar: `
-    .hide-scrollbar {
-      -ms-overflow-style: none;
-      scrollbar-width: none;
-    }
-    .hide-scrollbar::-webkit-scrollbar {
-      display: none;
-    }
-  `
-};
+import { TabBar, ChatContent } from './TabChat/components';
 
 export default function TabChatPair({
   chat,
@@ -56,7 +38,7 @@ export default function TabChatPair({
   
   // Update parent chat state when active chat changes - use callback ref pattern to avoid infinite loops
   const firstRenderRef = React.useRef(true);
-  React.useEffect(() => {
+  useEffect(() => {
     if (firstRenderRef.current) {
       firstRenderRef.current = false;
       return;
@@ -67,7 +49,7 @@ export default function TabChatPair({
   const location = useLocation();
 
   // Handle recipe loading from recipes view - reset chat if needed
-  React.useEffect(() => {
+  useEffect(() => {
     if (location.state?.resetChat && location.state?.recipeConfig) {
       // Reset the active chat to start fresh with the recipe
       const updatedChat = {
@@ -110,9 +92,7 @@ export default function TabChatPair({
   };
   
   // Close a tab
-  const handleCloseTab = (tabId: string, event: React.MouseEvent) => {
-    event.stopPropagation(); // Prevent tab selection when clicking close button
-    
+  const handleCloseTab = (tabId: string) => {
     // Don't close if it's the only tab
     if (tabs.length <= 1) return;
     
@@ -143,59 +123,40 @@ export default function TabChatPair({
     );
   };
 
+  // Format tabs for the TabBar component
+  const formattedTabs = tabs.map(tab => ({
+    id: tab.id,
+    title: tab.title || `Chat ${tabs.indexOf(tab) + 1}`
+  }));
+
   return (
     <div className="flex flex-col h-full relative bg-transparent">
-      {/* Inject the scrollbar hiding styles */}
-      <style>{styles.hideScrollbar}</style>
+      {/* Tab Bar */}
+      <TabBar
+        tabs={formattedTabs}
+        activeTabId={activeTabId}
+        onTabSelect={setActiveTabId}
+        onTabClose={handleCloseTab}
+        onNewTab={handleNewTab}
+      />
       
-      {/* Simple tab bar */}
-      <div className={styles.tabContainer}>
-        {tabs.map(tab => (
-          <div 
-            key={tab.id}
-            className={`${styles.tab} ${tab.id === activeTabId ? styles.activeTab : styles.inactiveTab}`}
-            onClick={() => setActiveTabId(tab.id)}
-          >
-            {tab.title || `Chat ${tabs.indexOf(tab) + 1}`}
-            {tabs.length > 1 && (
-              <button
-                className={styles.closeButton}
-                onClick={(e) => handleCloseTab(tab.id, e)}
-                aria-label="Close tab"
-              >
-                ✕
-              </button>
-            )}
-          </div>
-        ))}
-        <div 
-          className={styles.newTab}
-          onClick={handleNewTab}
-          title="New tab"
-        >
-          +
-        </div>
-      </div>
-      
-      {/* Chat content */}
-      <div className="relative z-10 flex justify-center h-full bg-transparent flex-grow">
-        <div className="w-full max-w-[1000px] h-full bg-transparent">
-          <BaseChat
-            chat={safeActiveChat}
-            setChat={handleSetActiveChat}
-            setView={setView}
-            setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
-            enableLocalStorage={true}
-            customMainLayoutProps={{
+      {/* Chat Content */}
+      <ChatContent chat={safeActiveChat}>
+        <BaseChat
+          chat={safeActiveChat}
+          setChat={handleSetActiveChat}
+          setView={setView}
+          setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
+          enableLocalStorage={true}
+          customMainLayoutProps={{
+            backgroundColor: 'transparent',
+            style: { 
               backgroundColor: 'transparent',
-              style: { 
-                backgroundColor: 'transparent',
-                background: 'transparent'
-              }
-            }}
-          />
-        </div>
-      </div>
+              background: 'transparent'
+            }
+          }}
+        />
+      </ChatContent>
     </div>
   );
 }
