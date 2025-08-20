@@ -39,7 +39,7 @@ import RecipeEditor from './components/RecipeEditor';
 
 // Import the new modules
 import { createNavigationHandler, View, ViewOptions } from './utils/navigationUtils';
-import { initializeApp } from './utils/appInitialization';
+import { initializeAgent } from './utils/appInitialization';
 
 // Route Components
 const HubRouteWrapper = ({
@@ -495,7 +495,7 @@ export default function App() {
       const provider = (await read('GOOSE_PROVIDER', false)) ?? config.GOOSE_DEFAULT_PROVIDER;
       const model = (await read('GOOSE_MODEL', false)) ?? config.GOOSE_DEFAULT_MODEL;
 
-      await initializeApp({
+      await initializeAgent({
         getExtensions,
         addExtension,
         setPairChat,

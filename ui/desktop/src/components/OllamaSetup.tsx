@@ -9,7 +9,7 @@ import {
   getPreferredModel,
   type PullProgress,
 } from '../utils/ollamaDetection';
-import { initializeSystem } from '../utils/providerUtils';
+//import { initializeSystem } from '../utils/providerUtils';
 import { toastService } from '../toasts';
 
 interface OllamaSetupProps {
@@ -18,7 +18,8 @@ interface OllamaSetupProps {
 }
 
 export function OllamaSetup({ onSuccess, onCancel }: OllamaSetupProps) {
-  const { addExtension, getExtensions, upsert } = useConfig();
+  //const { addExtension, getExtensions, upsert } = useConfig();
+  const { upsert } = useConfig();
   const [isChecking, setIsChecking] = useState(true);
   const [ollamaDetected, setOllamaDetected] = useState(false);
   const [isPolling, setIsPolling] = useState(false);

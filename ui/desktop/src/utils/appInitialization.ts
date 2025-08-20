@@ -18,7 +18,7 @@ interface InitializationDependencies {
   model: string;
 }
 
-export const initializeApp = async ({
+export const initializeAgent = async ({
   getExtensions,
   addExtension,
   setPairChat,

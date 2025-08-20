@@ -10,7 +10,6 @@ interface ChatContextType {
   chat: ChatType;
   setChat: (chat: ChatType) => void;
   resetChat: () => void;
-  startNewSession: (workingDir?: string) => Promise<void>;
   hasActiveSession: boolean;
   setRecipeConfig: (recipe: Recipe | null) => void;
   clearRecipeConfig: () => void;
