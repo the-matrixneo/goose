@@ -60,9 +60,9 @@ export default function Pair({
   // Get recipe configuration and parameter handling
   const { initialPrompt: recipeInitialPrompt } = useRecipeManager(chat.messages, location.state);
 
-  // Get sidebar state
-  const { state: sidebarState } = useSidebar();
-  const isCollapsed = sidebarState === 'collapsed';
+  // Get sidebar state for background adjustments
+  const { state: currentSidebarState } = useSidebar();
+  const isSidebarCollapsed = currentSidebarState === 'collapsed';
 
   // Override backgrounds to allow our gradient to show through
   useEffect(() => {
@@ -166,7 +166,7 @@ export default function Pair({
         appRoot.style.backgroundColor = '';
       }
     };
-  }, [isCollapsed]); // Add isCollapsed as a dependency to re-run when sidebar state changes
+  }, [isSidebarCollapsed]); // Add isSidebarCollapsed as a dependency to re-run when sidebar state changes
 
   // Handle recipe loading from recipes view - reset chat if needed
   useEffect(() => {
@@ -325,7 +325,7 @@ export default function Pair({
             renderBeforeMessages={renderBeforeMessages}
             customChatInputProps={customChatInputProps}
             customMainLayoutProps={customMainLayoutProps} // Override background
-            contentClassName={cn('pr-1 pb-10', (isMobile || sidebarState === 'collapsed') && 'pt-11')} // Use dynamic content class with mobile margin and sidebar state
+            contentClassName={cn('pr-1 pb-10', (isMobile || currentSidebarState === 'collapsed') && 'pt-11')} // Use dynamic content class with mobile margin and sidebar state
             showPopularTopics={!isTransitioningFromHub} // Don't show popular topics while transitioning from Hub
             suppressEmptyState={isTransitioningFromHub} // Suppress all empty state content while transitioning from Hub
           />
