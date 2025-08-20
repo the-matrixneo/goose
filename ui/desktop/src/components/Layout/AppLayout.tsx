@@ -3,7 +3,7 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { View, ViewOptions } from '../../App';
 import { AppWindowMac, AppWindow } from 'lucide-react';
 import { Button } from '../ui/button';
-import { Sidebar, SidebarInset, SidebarProvider, SidebarTrigger, useSidebar } from '../ui/sidebar';
+import { SidebarProvider, useSidebar } from '../ui/sidebar';
 import GlobalBackground from '../GlobalBackground';
 import PillSideNav from '../PillSideNav';
 
@@ -18,7 +18,7 @@ const AppLayoutContent: React.FC<AppLayoutProps> = ({ setIsGoosehintsModalOpen }
   const safeIsMacOS = (window?.electron?.platform || 'darwin') === 'darwin';
   const { isMobile, openMobile } = useSidebar();
 
-  // Calculate padding based on sidebar state and macOS
+  // Calculate padding based on macOS
   const headerPadding = safeIsMacOS ? 'pl-21' : 'pl-4';
 
   // Hide buttons when mobile sheet is showing
@@ -80,8 +80,12 @@ const AppLayoutContent: React.FC<AppLayoutProps> = ({ setIsGoosehintsModalOpen }
       {/* Global background */}
       <GlobalBackground blur={false} opacity={1} />
       
-      {!shouldHideButtons && (
-        <div className={`${headerPadding} absolute top-3 right-3 z-50 flex items-center`}>
+      <div className="flex justify-between items-start w-full px-4 py-3 absolute top-0 left-0 z-50">
+        {/* Pill Navigation in top left */}
+        <PillSideNav />
+        
+        {/* New Window button in top right */}
+        {!shouldHideButtons && (
           <Button
             onClick={handleNewWindow}
             className="no-drag hover:!bg-white/10 text-white"
@@ -91,12 +95,7 @@ const AppLayoutContent: React.FC<AppLayoutProps> = ({ setIsGoosehintsModalOpen }
           >
             {safeIsMacOS ? <AppWindowMac className="w-4 h-4" /> : <AppWindow className="w-4 h-4" />}
           </Button>
-        </div>
-      )}
-      
-      {/* Pill Navigation */}
-      <div className="absolute left-3 top-1/2 transform -translate-y-1/2 z-50">
-        <PillSideNav />
+        )}
       </div>
       
       {/* Main Content */}
