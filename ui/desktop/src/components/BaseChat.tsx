@@ -357,7 +357,7 @@ function BaseChatContent({
               className={`flex-1 rounded-b-2xl min-h-0 relative ${contentClassName}`}
               style={{
                 background: 'transparent',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
+                border: 'none',
               }}
               autoScroll
               onDrop={handleDrop}
