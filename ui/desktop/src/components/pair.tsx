@@ -66,6 +66,17 @@ export default function Pair({
 
   // Override backgrounds to allow our gradient to show through
   useEffect(() => {
+    // Target the specific SidebarInset component with the complex class
+    const sidebarInset = document.querySelector('[data-slot="sidebar-inset"]') as HTMLElement;
+    if (sidebarInset) {
+      sidebarInset.style.background = 'transparent';
+      sidebarInset.style.backgroundColor = 'transparent';
+      // Remove the bg-background class that might be causing the issue
+      sidebarInset.classList.remove('bg-background');
+      // Add bg-transparent class
+      sidebarInset.classList.add('bg-transparent');
+    }
+
     // Override MainPanelLayout background
     const mainPanels = document.querySelectorAll('.bg-background-default, .bg-background-muted') as NodeListOf<HTMLElement>;
     mainPanels.forEach(panel => {
@@ -74,12 +85,6 @@ export default function Pair({
         panel.style.backgroundColor = 'transparent';
       }
     });
-    
-    // Override SidebarInset background
-    const sidebarInset = document.querySelector('[data-slot="sidebar-inset"]') as HTMLElement;
-    if (sidebarInset) {
-      sidebarInset.style.background = 'transparent';
-    }
 
     // Override ChatInput background to be transparent with glass effect
     const chatInputContainer = document.querySelector('[data-drop-zone="true"]') as HTMLElement;
@@ -93,15 +98,21 @@ export default function Pair({
     
     // Cleanup on unmount
     return () => {
+      if (sidebarInset) {
+        sidebarInset.style.background = '';
+        sidebarInset.style.backgroundColor = '';
+        sidebarInset.classList.remove('bg-transparent');
+        // Restore the original class if needed
+        if (!sidebarInset.classList.contains('bg-background')) {
+          sidebarInset.classList.add('bg-background');
+        }
+      }
       mainPanels.forEach(panel => {
         if (panel) {
           panel.style.background = '';
           panel.style.backgroundColor = '';
         }
       });
-      if (sidebarInset) {
-        sidebarInset.style.background = '';
-      }
       if (chatInputContainer) {
         chatInputContainer.style.background = '';
         chatInputContainer.style.backdropFilter = '';
@@ -255,8 +266,34 @@ export default function Pair({
 
   return (
     <div className="flex flex-col h-full relative bg-transparent">
-      {/* Global background - no blur for dashboard */}
-      <GlobalBackground blur={false} opacity={1} />
+      {/* Custom background implementation */}
+      <div className="fixed inset-0 -z-10 animate-gradient-slow" 
+        style={{
+          background: `
+            radial-gradient(circle at 20% 80%, rgba(100, 100, 110, 0.25) 0%, transparent 50%),
+            radial-gradient(circle at 80% 20%, rgba(120, 120, 125, 0.22) 0%, transparent 50%),
+            radial-gradient(circle at 40% 40%, rgba(90, 95, 100, 0.18) 0%, transparent 50%),
+            linear-gradient(135deg, 
+              rgba(0, 0, 0, 0.02) 0%, 
+              rgba(0, 0, 0, 0.04) 25%, 
+              rgba(0, 0, 0, 0.02) 50%, 
+              rgba(0, 0, 0, 0.06) 75%, 
+              rgba(0, 0, 0, 0.03) 100%
+            )
+          `,
+          backgroundSize: '400% 400%',
+        }}
+      />
+      
+      {/* Dot pattern overlay */}
+      <div 
+        className="fixed inset-0 -z-10 opacity-10 dark:opacity-20"
+        style={{
+          backgroundImage: `radial-gradient(circle, rgba(0, 0, 0, 0.4) 1px, transparent 1px)`,
+          backgroundSize: '24px 24px',
+          backgroundPosition: '12px 12px',
+        }}
+      />
       
       {/* Centered chat content */}
       <div className="relative z-10 flex justify-center h-full bg-transparent">
