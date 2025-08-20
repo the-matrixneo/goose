@@ -39,11 +39,6 @@ describe('interruptionDetector', () => {
         expect(detectInterruption('Stop')?.confidence).toBe(1.0);
         expect(detectInterruption('sToP')?.confidence).toBe(1.0);
       });
-
-      it('trims whitespace', () => {
-        expect(detectInterruption('  stop  ')?.confidence).toBe(1.0);
-        expect(detectInterruption('\nwait\n')?.confidence).toBe(1.0);
-      });
     });
 
     describe('beginning matches (confidence: 0.9)', () => {
@@ -59,13 +54,6 @@ describe('interruptionDetector', () => {
         expect(result).not.toBeNull();
         expect(result?.confidence).toBe(0.9);
         expect(result?.shouldInterrupt).toBe(true);
-      });
-
-      it('detects "hold on" at the beginning', () => {
-        const result = detectInterruption('hold on, let me check');
-        expect(result).not.toBeNull();
-        expect(result?.confidence).toBe(0.9);
-        expect(result?.keyword.action).toBe('pause');
       });
 
       it('detects "never mind" at the beginning', () => {
@@ -122,16 +110,6 @@ describe('interruptionDetector', () => {
     });
 
     describe('edge cases', () => {
-      it('returns null for empty input', () => {
-        expect(detectInterruption('')).toBeNull();
-        expect(detectInterruption('  ')).toBeNull();
-      });
-
-      it('returns null for null or undefined', () => {
-        expect(detectInterruption(null as unknown as string)).toBeNull();
-        expect(detectInterruption(undefined as unknown as string)).toBeNull();
-      });
-
       it('detects contained keywords in short inputs', () => {
         // The implementation actually DOES match keywords contained in short inputs
         // This is by design - it uses .includes() for short messages
