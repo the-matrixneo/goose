@@ -56,6 +56,7 @@ export default function Pair({
   const [shouldAutoSubmit, setShouldAutoSubmit] = useState(false);
   const [initialMessage, setInitialMessage] = useState<string | null>(null);
   const [isTransitioningFromHub, setIsTransitioningFromHub] = useState(false);
+  const [isInFocusMode, setIsInFocusMode] = useState(false);
 
   // Get recipe configuration and parameter handling
   const { initialPrompt: recipeInitialPrompt } = useRecipeManager(chat.messages, location.state);
@@ -63,6 +64,9 @@ export default function Pair({
   // Get sidebar state for background adjustments
   const { state: currentSidebarState } = useSidebar();
   const isSidebarCollapsed = currentSidebarState === 'collapsed';
+
+  // Get system theme preference
+  const prefersDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
 
   // Override backgrounds to allow our gradient to show through
   useEffect(() => {
@@ -123,9 +127,6 @@ export default function Pair({
     const chatInputContainer = document.querySelector('[data-drop-zone="true"]') as HTMLElement;
     if (chatInputContainer) {
       chatInputContainer.style.background = 'rgba(255, 255, 255, 0.05)';
-      chatInputContainer.style.backdropFilter = 'blur(10px)';
-      // @ts-expect-error - webkitBackdropFilter is a valid CSS property
-      chatInputContainer.style.webkitBackdropFilter = 'blur(10px)';
       chatInputContainer.style.border = '1px solid rgba(255, 255, 255, 0.1)';
     }
     
@@ -166,9 +167,6 @@ export default function Pair({
       });
       if (chatInputContainer) {
         chatInputContainer.style.background = '';
-        chatInputContainer.style.backdropFilter = '';
-        // @ts-expect-error - webkitBackdropFilter is a valid CSS property
-        chatInputContainer.style.webkitBackdropFilter = '';
         chatInputContainer.style.border = '';
       }
     };
@@ -282,6 +280,7 @@ export default function Pair({
     // This is called after a message is submitted
     setShouldAutoSubmit(false);
     setIsTransitioningFromHub(false); // Clear transitioning state once message is submitted
+    setIsInFocusMode(true); // Enable focus mode when user sends a message
     console.log('Message submitted:', message);
   };
 
@@ -289,6 +288,7 @@ export default function Pair({
   const handleMessageStreamFinish = () => {
     // This will be called with the proper append function from BaseChat
     // For now, we'll handle auto-execution in the BaseChat component
+    // Focus mode remains active until chat is refreshed
   };
 
   // Determine the initial value for the chat input
@@ -315,6 +315,17 @@ export default function Pair({
     return <div>{/* Any Pair-specific content before messages can go here */}</div>;
   };
 
+  // Fixed blur intensity and background color based on theme - matching home page styling
+  const blurIntensity = 20; // Consistent blur for chat mode
+  
+  // Get the actual theme from document.documentElement
+  const isDarkTheme = document.documentElement.classList.contains('dark');
+  
+  // Determine background color based on focus mode and theme
+  const backgroundColor = isInFocusMode
+    ? (isDarkTheme ? 'rgba(0, 0, 0, 0.9)' : 'rgba(255, 255, 255, 0.9)') // 90% opacity in focus mode
+    : (isDarkTheme ? 'rgba(0, 0, 0, 0.7)' : 'rgba(255, 255, 255, 0.7)'); // 70% opacity in normal mode
+
   return (
     <div className="flex flex-col h-full relative bg-transparent">
       {/* Image background implementation */}
@@ -327,9 +338,13 @@ export default function Pair({
         }}
       />
       
-      {/* Optional overlay for better text readability */}
+      {/* Fixed blur overlay - always present with consistent intensity */}
       <div 
-        className="fixed inset-0 -z-10 bg-black/20"
+        className="fixed inset-0 -z-5 pointer-events-none transition-colors duration-500"
+        style={{ 
+          backdropFilter: `blur(${blurIntensity}px)`,
+          backgroundColor: backgroundColor
+        }}
       />
       
       {/* Centered chat content */}
