@@ -1,41 +1,44 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { type View, ViewOptions } from '../App';
+import BaseChat from './BaseChat';
 import { ChatType } from '../types/chat';
 import { generateSessionId } from '../sessions';
 import { DEFAULT_CHAT_TITLE } from '../contexts/ChatContext';
-import { TabBar, ChatContent } from './TabChat/components';
+import { TabBar } from './TabChat/components';
 
-// Simple placeholder component for chat content
-const SimpleChatPlaceholder: React.FC<{
+// Wrapper for BaseChat that prevents unnecessary re-renders
+const StableBaseChat: React.FC<{
   chat: ChatType;
-  onNewChat: () => void;
-}> = ({ chat, onNewChat }) => {
+  setChat: (chat: ChatType) => void;
+  setView: (view: View, viewOptions?: ViewOptions) => void;
+  setIsGoosehintsModalOpen: (isOpen: boolean) => void;
+}> = React.memo(({ chat, setChat, setView, setIsGoosehintsModalOpen }) => {
   return (
-    <div className="flex flex-col items-center justify-center h-full p-8 text-center">
-      <h2 className="text-2xl font-bold mb-4">Tab Chat Interface</h2>
-      <p className="mb-6 max-w-md">
-        This is a simplified implementation of the tab chat interface. The full implementation
-        with chat functionality will be added once the infinite update loop issues are resolved.
-      </p>
-      <p className="mb-4">
-        <strong>Current chat ID:</strong> {chat.id}
-      </p>
-      <p className="mb-4">
-        <strong>Title:</strong> {chat.title || 'Untitled Chat'}
-      </p>
-      <p className="mb-4">
-        <strong>Messages:</strong> {chat.messages?.length || 0}
-      </p>
-      <button
-        className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-        onClick={onNewChat}
-      >
-        Create New Tab
-      </button>
+    <div className="relative z-10 flex justify-center h-full bg-transparent flex-grow">
+      <div className="w-full max-w-[1000px] h-full bg-transparent">
+        <BaseChat
+          chat={chat}
+          setChat={setChat}
+          setView={setView}
+          setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
+          enableLocalStorage={true}
+          customMainLayoutProps={{
+            backgroundColor: 'transparent',
+            style: { 
+              backgroundColor: 'transparent',
+              background: 'transparent'
+            }
+          }}
+        />
+      </div>
     </div>
   );
-};
+}, (prevProps, nextProps) => {
+  // Only re-render if the chat ID changes or messages length changes
+  return prevProps.chat.id === nextProps.chat.id && 
+         prevProps.chat.messages?.length === nextProps.chat.messages?.length;
+});
 
 export default function TabChatPair({
   chat,
@@ -66,15 +69,14 @@ export default function TabChatPair({
     messages: activeChat.messages || []
   };
   
-  // Update parent chat state when active tab changes
-  const firstRenderRef = React.useRef(true);
+  // Update parent chat state when active tab changes - but only when tab ID changes
+  const prevTabIdRef = React.useRef(activeTabId);
   useEffect(() => {
-    if (firstRenderRef.current) {
-      firstRenderRef.current = false;
-      return;
+    if (prevTabIdRef.current !== activeTabId) {
+      prevTabIdRef.current = activeTabId;
+      setChat(safeActiveChat);
     }
-    setChat(safeActiveChat);
-  }, [safeActiveChat.id, setChat]);
+  }, [activeTabId, safeActiveChat, setChat]);
   
   const location = useLocation();
 
@@ -136,6 +138,22 @@ export default function TabChatPair({
     // Remove the tab
     setTabs(prevTabs => prevTabs.filter(tab => tab.id !== tabId));
   };
+  
+  // Update the active chat - with optimized update logic
+  const handleSetActiveChat = (updatedChat: ChatType) => {
+    // Ensure the updated chat has a messages array
+    const safeUpdatedChat = {
+      ...updatedChat,
+      messages: updatedChat.messages || [],
+    };
+    
+    // Update the tab in the tabs array
+    setTabs(prevTabs => 
+      prevTabs.map(tab => 
+        tab.id === activeTabId ? safeUpdatedChat : tab
+      )
+    );
+  };
 
   // Format tabs for the TabBar component
   const formattedTabs = tabs.map(tab => ({
@@ -154,13 +172,13 @@ export default function TabChatPair({
         onNewTab={handleNewTab}
       />
       
-      {/* Simple placeholder instead of BaseChat */}
-      <div className="flex-grow">
-        <SimpleChatPlaceholder 
-          chat={safeActiveChat}
-          onNewChat={handleNewTab}
-        />
-      </div>
+      {/* Stable BaseChat wrapper */}
+      <StableBaseChat
+        chat={safeActiveChat}
+        setChat={handleSetActiveChat}
+        setView={setView}
+        setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
+      />
     </div>
   );
 }
