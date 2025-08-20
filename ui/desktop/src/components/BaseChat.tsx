@@ -144,7 +144,6 @@ function BaseChatContent({
     error,
     setMessages,
     input,
-    setInput: _setInput,
     handleSubmit: engineHandleSubmit,
     onStopGoose,
     sessionTokenCount,
@@ -201,7 +200,7 @@ function BaseChatContent({
     handleRecipeAccept,
     handleRecipeCancel,
     hasSecurityWarnings,
-  } = useRecipeManager(messages, location.state);
+  } = useRecipeManager(chat, location.state);
 
   // Reset recipe usage tracking when recipe changes
   useEffect(() => {
@@ -531,6 +530,7 @@ function BaseChatContent({
           className={`relative z-10 ${disableAnimation ? '' : 'animate-[fadein_400ms_ease-in_forwards]'}`}
         >
           <ChatInput
+            sessionId={chat.sessionId}
             handleSubmit={handleSubmit}
             chatState={chatState}
             onStop={onStopGoose}

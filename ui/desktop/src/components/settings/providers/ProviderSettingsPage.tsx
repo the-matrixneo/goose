@@ -4,7 +4,7 @@ import BackButton from '../../ui/BackButton';
 import ProviderGrid from './ProviderGrid';
 import { useConfig } from '../../ConfigContext';
 import { ProviderDetails } from '../../../api/types.gen';
-import { initializeSystem } from '../../../utils/providerUtils';
+//import { initializeSystem } from '../../../utils/providerUtils';
 import WelcomeGooseLogo from '../../WelcomeGooseLogo';
 import { toastService } from '../../../toasts';
 
@@ -68,11 +68,13 @@ export default function ProviderSettings({ onClose, isOnboarding }: ProviderSett
           console.log('Setting GOOSE_MODEL to', model)
         );
 
+        // Douwe: I don't think we need to initialize the agent here, since we haven't
+        // started a conversation yet.
         // initialize agent
-        await initializeSystem(provider.name, model, {
-          getExtensions,
-          addExtension,
-        });
+        // await initializeSystem(provider.name, model, {
+        //   getExtensions,
+        //   addExtension,
+        // });
 
         toastService.configure({ silent: false });
         toastService.success({

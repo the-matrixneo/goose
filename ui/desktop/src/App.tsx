@@ -118,13 +118,13 @@ const PairRouteWrapper = ({
     const resetChat = location.state?.resetChat as boolean | undefined;
 
     if (resumedSession) {
-      console.log('Loading resumed session in pair view:', resumedSession.session_id);
+      console.log('Loading resumed session in pair view:', resumedSession.sessionId);
       console.log('Current chat before resume:', chatRef.current);
 
       // Convert session to chat format - this clears any existing recipe config
       const sessionChat: ChatType = {
-        sessionId: resumedSession.session_id,
-        title: resumedSession.metadata?.description || `ID: ${resumedSession.session_id}`,
+        sessionId: resumedSession.sessionId,
+        title: resumedSession.metadata?.description || `ID: ${resumedSession.sessionId}`,
         messages: resumedSession.messages,
         messageHistoryIndex: resumedSession.messages.length,
         recipeConfig: null, // Clear recipe config when resuming a session

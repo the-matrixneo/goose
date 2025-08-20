@@ -112,7 +112,7 @@ const SessionMessages: React.FC<{
                   <ProgressiveMessageList
                     messages={filteredMessages}
                     chat={{
-                      id: 'session-preview',
+                      sessionId: 'session-preview',
                       messageHistoryIndex: filteredMessages.length,
                     }}
                     toolCallNotifications={new Map()}
@@ -220,7 +220,7 @@ const SessionHistoryView: React.FC<SessionHistoryViewProps> = ({
 
   const handleLaunchInNewWindow = () => {
     if (session) {
-      console.log('Launching session in new window:', session.session_id);
+      console.log('Launching session in new window:', session.sessionId);
       console.log('Session details:', session);
 
       // Get the working directory from the session metadata
@@ -228,7 +228,7 @@ const SessionHistoryView: React.FC<SessionHistoryViewProps> = ({
 
       if (workingDir) {
         console.log(
-          `Opening new window with session ID: ${session.session_id}, in working dir: ${workingDir}`
+          `Opening new window with session ID: ${session.sessionId}, in working dir: ${workingDir}`
         );
 
         // Create a new chat window with the working directory and session ID
@@ -236,7 +236,7 @@ const SessionHistoryView: React.FC<SessionHistoryViewProps> = ({
           undefined, // query
           workingDir, // dir
           undefined, // version
-          session.session_id // resumeSessionId
+          session.sessionId // resumeSessionId
         );
 
         console.log('createChatWindow called successfully');

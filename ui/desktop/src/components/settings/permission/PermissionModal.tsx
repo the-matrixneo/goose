@@ -41,7 +41,8 @@ export default function PermissionModal({ extensionName, onClose }: PermissionMo
     const fetchTools = async () => {
       try {
         const response = await getTools({
-          query: { extension_name: extensionName, session_id: sessionId },
+          // TODO(Douwe): pass session ID or maybe? do we configure the tools for the agent or globally?
+          query: { extension_name: extensionName, session_id: '' },
         });
         if (response.error) {
           console.error('Failed to get tools');

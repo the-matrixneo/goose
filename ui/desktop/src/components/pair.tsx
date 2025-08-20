@@ -57,7 +57,7 @@ export default function Pair({
   const [isTransitioningFromHub, setIsTransitioningFromHub] = useState(false);
 
   // Get recipe configuration and parameter handling
-  const { initialPrompt: recipeInitialPrompt } = useRecipeManager(chat.messages, location.state);
+  const { initialPrompt: recipeInitialPrompt } = useRecipeManager(chat, location.state);
 
   // Handle recipe loading from recipes view - reset chat if needed
   useEffect(() => {

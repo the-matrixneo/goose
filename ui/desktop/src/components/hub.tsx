@@ -84,6 +84,7 @@ export default function Hub({
         </div>
 
         <ChatInput
+          sessionId={null}
           handleSubmit={handleSubmit}
           chatState={ChatState.Idle}
           onStop={() => {}}

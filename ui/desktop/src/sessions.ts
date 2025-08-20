@@ -35,7 +35,7 @@ export interface Session {
 }
 
 export interface SessionDetails {
-  session_id: string;
+  sessionId: string;
   metadata: SessionMetadata;
   messages: Message[];
 }
@@ -105,7 +105,7 @@ export async function fetchSessionDetails(sessionId: string): Promise<SessionDet
 
   // Convert the SessionHistoryResponse to a SessionDetails object
   return {
-    session_id: response.data.sessionId,
+    sessionId: response.data.sessionId,
     metadata: ensureWorkingDir(response.data.metadata),
     messages: response.data.messages.map((message: ApiMessage) =>
       convertApiMessageToFrontendMessage(message, true, true)

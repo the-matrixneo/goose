@@ -43,7 +43,7 @@ const ModelAndProviderContext = createContext<ModelAndProviderContextType | unde
 export const ModelAndProviderProvider: React.FC<ModelAndProviderProviderProps> = ({ children }) => {
   const [currentModel, setCurrentModel] = useState<string | null>(null);
   const [currentProvider, setCurrentProvider] = useState<string | null>(null);
-  const { read, upsert, getProviders, config } = useConfig();
+  const { read, upsert, getProviders } = useConfig();
 
   const changeModel = useCallback(
     async (sessionId: string | null, model: Model) => {
@@ -174,19 +174,6 @@ export const ModelAndProviderProvider: React.FC<ModelAndProviderProviderProps> =
   useEffect(() => {
     refreshCurrentModelAndProvider();
   }, [refreshCurrentModelAndProvider]);
-
-  // Extract config values for dependency array
-  const configObj = config as Record<string, unknown>;
-  const gooseModel = configObj?.GOOSE_MODEL;
-  const gooseProvider = configObj?.GOOSE_PROVIDER;
-
-  // Listen for config changes and refresh when GOOSE_MODEL or GOOSE_PROVIDER changes
-  useEffect(() => {
-    // Only refresh if the config has loaded and model/provider values exist
-    if (config && Object.keys(config).length > 0 && (gooseModel || gooseProvider)) {
-      refreshCurrentModelAndProvider();
-    }
-  }, [config, gooseModel, gooseProvider, refreshCurrentModelAndProvider]);
 
   const contextValue = useMemo(
     () => ({

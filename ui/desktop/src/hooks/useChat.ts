@@ -34,10 +34,10 @@ export const useChat = ({ setIsLoadingSession, setView, setPairChat }: UseChatAr
         const sessionDetails = await fetchSessionDetails(resumeSessionId);
 
         // Only set view if we have valid session details
-        if (sessionDetails && sessionDetails.session_id) {
+        if (sessionDetails && sessionDetails.sessionId) {
           const sessionChat = {
-            sessionId: sessionDetails.session_id,
-            title: sessionDetails.metadata?.description || `ID: ${sessionDetails.session_id}`,
+            sessionId: sessionDetails.sessionId,
+            title: sessionDetails.metadata?.description || `ID: ${sessionDetails.sessionId}`,
             messages: sessionDetails.messages,
             messageHistoryIndex: sessionDetails.messages.length,
             recipeConfig: null, // Sessions don't have recipes by default

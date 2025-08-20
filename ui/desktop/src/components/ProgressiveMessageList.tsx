@@ -26,7 +26,7 @@ import { ChatType } from '../types/chat';
 
 interface ProgressiveMessageListProps {
   messages: Message[];
-  chat?: ChatType; //{ id: string; messageHistoryIndex: number }; // Make optional for session history
+  chat?: Pick<ChatType, 'sessionId' | 'messageHistoryIndex'>;
   toolCallNotifications?: Map<string, NotificationEvent[]>; // Make optional
   append?: (value: string) => void; // Make optional
   appendMessage?: (message: Message) => void; // Make optional
@@ -228,6 +228,7 @@ export default function ProgressiveMessageList({
                   />
                 ) : (
                   <GooseMessage
+                    sessionId={chat.sessionId}
                     messageHistoryIndex={chat.messageHistoryIndex}
                     message={message}
                     messages={messages}

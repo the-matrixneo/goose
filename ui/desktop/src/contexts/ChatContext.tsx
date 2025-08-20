@@ -3,7 +3,6 @@ import { ChatType } from '../types/chat';
 import { generateSessionId } from '../sessions';
 import { Recipe } from '../recipe';
 import { useDraftContext } from './DraftContext';
-import { startAgent } from '../api';
 
 export const DEFAULT_CHAT_TITLE = 'New Chat';
 
@@ -56,7 +55,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
   const resetChat = () => {
     const newSessionId = generateSessionId();
     setChat({
-      id: newSessionId,
+      sessionId: newSessionId,
       title: DEFAULT_CHAT_TITLE,
       messages: [],
       messageHistoryIndex: 0,

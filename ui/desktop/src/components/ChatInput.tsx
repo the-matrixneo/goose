@@ -50,6 +50,7 @@ interface ModelLimit {
 }
 
 interface ChatInputProps {
+  sessionId: string | null;
   handleSubmit: (e: React.FormEvent) => void;
   chatState: ChatState;
   onStop?: () => void;
@@ -79,6 +80,7 @@ interface ChatInputProps {
 }
 
 export default function ChatInput({
+  sessionId,
   handleSubmit,
   chatState = ChatState.Idle,
   onStop,
@@ -1298,6 +1300,7 @@ export default function ChatInput({
           <Tooltip>
             <div>
               <ModelsBottomBar
+                sessionId={sessionId}
                 dropdownRef={dropdownRef}
                 setView={setView}
                 alerts={alerts}

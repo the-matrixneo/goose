@@ -77,6 +77,7 @@ const substituteParameters = (text: string, params: Record<string, string>): str
  * This should be called after recipe parameters are collected
  */
 export const updateSystemPromptWithParameters = async (
+  sessionId: string,
   recipeParameters: Record<string, string>,
   recipeConfig?: {
     instructions?: string | null;
@@ -97,6 +98,7 @@ export const updateSystemPromptWithParameters = async (
     // Update the system prompt with substituted instructions
     const response = await extendPrompt({
       body: {
+        session_id: sessionId,
         extension: `${desktopPromptBot}\nIMPORTANT instructions for you to operate as agent:\n${substitutedInstructions}`,
       },
     });
@@ -114,7 +116,7 @@ export const updateSystemPromptWithParameters = async (
         }
       }
     }
-    await addSubRecipesToAgent(subRecipes);
+    await addSubRecipesToAgent(sessionId, subRecipes);
   }
 };
 
@@ -227,17 +229,19 @@ export const initializeSystem = async (
     // Extend the system prompt with desktop-specific information
     await extendPrompt({
       body: {
+        session_id: sessionId,
         extension: prompt,
       },
     });
 
     if (!hasParameters && hasSubRecipes) {
-      await addSubRecipesToAgent(subRecipes);
+      await addSubRecipesToAgent(sessionId, subRecipes);
     }
     // Configure session with response config if present
     if (responseConfig?.json_schema) {
       const sessionConfigResponse = await updateSessionConfig({
         body: {
+          session_id: sessionId,
           response: responseConfig,
         },
       });
