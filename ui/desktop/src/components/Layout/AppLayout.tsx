@@ -18,9 +18,6 @@ const AppLayoutContent: React.FC<AppLayoutProps> = ({ setIsGoosehintsModalOpen }
   const safeIsMacOS = (window?.electron?.platform || 'darwin') === 'darwin';
   const { isMobile, openMobile } = useSidebar();
 
-  // Calculate padding based on macOS
-  const headerPadding = safeIsMacOS ? 'pl-21' : 'pl-4';
-
   // Hide buttons when mobile sheet is showing
   const shouldHideButtons = isMobile && openMobile;
 
@@ -80,26 +77,36 @@ const AppLayoutContent: React.FC<AppLayoutProps> = ({ setIsGoosehintsModalOpen }
       {/* Global background */}
       <GlobalBackground blur={false} opacity={1} />
       
-      <div className="flex justify-between items-start w-full px-4 py-3 absolute top-0 left-0 z-50">
-        {/* Pill Navigation in top left */}
-        <PillSideNav />
+      {/* Top navigation bar with pill in center and new window button on right */}
+      <div className="flex justify-between items-center w-full px-4 py-3 absolute top-0 left-0 z-50">
+        {/* Empty space on left to balance */}
+        <div className="w-10">
+          {/* Spacer */}
+        </div>
+        
+        {/* Pill Navigation in center */}
+        <div className="flex-grow flex justify-center">
+          <PillSideNav />
+        </div>
         
         {/* New Window button in top right */}
         {!shouldHideButtons && (
-          <Button
-            onClick={handleNewWindow}
-            className="no-drag hover:!bg-white/10 text-white"
-            variant="ghost"
-            size="xs"
-            title="Start a new session in a new window"
-          >
-            {safeIsMacOS ? <AppWindowMac className="w-4 h-4" /> : <AppWindow className="w-4 h-4" />}
-          </Button>
+          <div className="w-10 flex justify-end">
+            <Button
+              onClick={handleNewWindow}
+              className="no-drag hover:!bg-white/10 text-white"
+              variant="ghost"
+              size="xs"
+              title="Start a new session in a new window"
+            >
+              {safeIsMacOS ? <AppWindowMac className="w-4 h-4" /> : <AppWindow className="w-4 h-4" />}
+            </Button>
+          </div>
         )}
       </div>
       
       {/* Main Content */}
-      <div className="w-full h-full">
+      <div className="w-full h-full pt-16">
         <Outlet />
       </div>
     </div>
