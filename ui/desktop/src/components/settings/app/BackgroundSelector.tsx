@@ -104,6 +104,7 @@ export default function BackgroundSelector() {
   const [customImage, setCustomImage] = useState<string | null>(null);
   const [showDotOverlay, setShowDotOverlay] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   // Load saved settings
   useEffect(() => {
@@ -124,30 +125,67 @@ export default function BackgroundSelector() {
 
   // Save settings and trigger update
   const saveAndApplyBackground = (backgroundId: string, imageData?: string | null) => {
-    setSelectedBackground(backgroundId);
-    localStorage.setItem(STORAGE_KEY, backgroundId);
+    // Set updating state to show loading indicator
+    setIsUpdating(true);
 
-    if (imageData !== undefined) {
-      if (imageData) {
-        localStorage.setItem(CUSTOM_IMAGE_KEY, imageData);
-      } else {
-        localStorage.removeItem(CUSTOM_IMAGE_KEY);
+    // Use setTimeout to ensure UI updates before potentially intensive operations
+    setTimeout(() => {
+      try {
+        setSelectedBackground(backgroundId);
+        localStorage.setItem(STORAGE_KEY, backgroundId);
+
+        if (imageData !== undefined) {
+          if (imageData) {
+            localStorage.setItem(CUSTOM_IMAGE_KEY, imageData);
+          } else {
+            localStorage.removeItem(CUSTOM_IMAGE_KEY);
+          }
+          setCustomImage(imageData);
+        }
+
+        // Trigger a custom event to notify the dashboard to update
+        // Wrap in try-catch to prevent app from crashing if event dispatch fails
+        try {
+          window.dispatchEvent(new CustomEvent('dashboard-background-changed', {
+            detail: { backgroundId, customImage: imageData !== undefined ? imageData : customImage }
+          }));
+        } catch (error) {
+          console.error('Error dispatching dashboard-background-changed event:', error);
+        }
+      } catch (error) {
+        console.error('Error saving background settings:', error);
+      } finally {
+        // Clear updating state after a short delay to ensure UI has time to process changes
+        setTimeout(() => {
+          setIsUpdating(false);
+        }, 300);
       }
-      setCustomImage(imageData);
-    }
-
-    // Trigger a custom event to notify the dashboard to update
-    window.dispatchEvent(new CustomEvent('dashboard-background-changed', {
-      detail: { backgroundId, customImage: imageData !== undefined ? imageData : customImage }
-    }));
+    }, 0);
   };
 
   const handleDotOverlayToggle = (enabled: boolean) => {
-    setShowDotOverlay(enabled);
-    localStorage.setItem(DOT_OVERLAY_KEY, String(enabled));
-    window.dispatchEvent(new CustomEvent('dashboard-dot-overlay-changed', {
-      detail: { enabled }
-    }));
+    setIsUpdating(true);
+    
+    setTimeout(() => {
+      try {
+        setShowDotOverlay(enabled);
+        localStorage.setItem(DOT_OVERLAY_KEY, String(enabled));
+        
+        try {
+          window.dispatchEvent(new CustomEvent('dashboard-dot-overlay-changed', {
+            detail: { enabled }
+          }));
+        } catch (error) {
+          console.error('Error dispatching dashboard-dot-overlay-changed event:', error);
+        }
+      } catch (error) {
+        console.error('Error toggling dot overlay:', error);
+      } finally {
+        setTimeout(() => {
+          setIsUpdating(false);
+        }, 300);
+      }
+    }, 0);
   };
 
   const handleFileUpload = (file: File) => {
@@ -156,10 +194,21 @@ export default function BackgroundSelector() {
       return;
     }
 
+    setIsUpdating(true);
+
     const reader = new FileReader();
     reader.onload = (e) => {
-      const imageData = e.target?.result as string;
-      saveAndApplyBackground('custom-image', imageData);
+      try {
+        const imageData = e.target?.result as string;
+        saveAndApplyBackground('custom-image', imageData);
+      } catch (error) {
+        console.error('Error processing image:', error);
+        setIsUpdating(false);
+      }
+    };
+    reader.onerror = () => {
+      console.error('Error reading file');
+      setIsUpdating(false);
     };
     reader.readAsDataURL(file);
   };
@@ -198,16 +247,48 @@ export default function BackgroundSelector() {
   };
 
   const resetToDefault = () => {
-    saveAndApplyBackground('default-gradient', null);
-    setShowDotOverlay(true);
-    localStorage.setItem(DOT_OVERLAY_KEY, 'true');
-    window.dispatchEvent(new CustomEvent('dashboard-dot-overlay-changed', {
-      detail: { enabled: true }
-    }));
+    setIsUpdating(true);
+    
+    setTimeout(() => {
+      try {
+        saveAndApplyBackground('default-gradient', null);
+        setShowDotOverlay(true);
+        localStorage.setItem(DOT_OVERLAY_KEY, 'true');
+        
+        try {
+          window.dispatchEvent(new CustomEvent('dashboard-dot-overlay-changed', {
+            detail: { enabled: true }
+          }));
+        } catch (error) {
+          console.error('Error dispatching dashboard-dot-overlay-changed event:', error);
+        }
+      } catch (error) {
+        console.error('Error resetting to default:', error);
+      } finally {
+        setTimeout(() => {
+          setIsUpdating(false);
+        }, 300);
+      }
+    }, 0);
   };
+
+  // Loading overlay that blocks interaction during updates
+  const LoadingOverlay = () => (
+    isUpdating ? (
+      <div className="fixed inset-0 bg-background-default/50 backdrop-blur-sm flex items-center justify-center z-50">
+        <div className="bg-background-default p-4 rounded-lg shadow-lg flex flex-col items-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-textStandard mb-2"></div>
+          <p className="text-sm text-textStandard">Updating background...</p>
+        </div>
+      </div>
+    ) : null
+  );
 
   return (
     <div className="space-y-6">
+      {/* Loading overlay */}
+      <LoadingOverlay />
+      
       {/* Dot Overlay Toggle */}
       <div className="flex items-center justify-between">
         <div>
@@ -220,6 +301,7 @@ export default function BackgroundSelector() {
           checked={showDotOverlay}
           onCheckedChange={handleDotOverlayToggle}
           variant="mono"
+          disabled={isUpdating}
         />
       </div>
 
@@ -234,8 +316,8 @@ export default function BackgroundSelector() {
                 selectedBackground === bg.id
                   ? 'ring-2 ring-blue-500 shadow-lg'
                   : 'hover:shadow-md'
-              }`}
-              onClick={() => saveAndApplyBackground(bg.id)}
+              } ${isUpdating ? 'pointer-events-none opacity-50' : ''}`}
+              onClick={() => !isUpdating && saveAndApplyBackground(bg.id)}
             >
               <div className="aspect-video relative">
                 <div
@@ -278,8 +360,8 @@ export default function BackgroundSelector() {
                 selectedBackground === 'custom-image'
                   ? 'ring-2 ring-blue-500 shadow-lg'
                   : 'hover:shadow-md'
-              }`}
-              onClick={() => saveAndApplyBackground('custom-image')}
+              } ${isUpdating ? 'pointer-events-none opacity-50' : ''}`}
+              onClick={() => !isUpdating && saveAndApplyBackground('custom-image')}
             >
               <div className="aspect-video relative">
                 <img
@@ -312,16 +394,18 @@ export default function BackgroundSelector() {
                 size="sm"
                 onClick={removeCustomImage}
                 className="flex items-center gap-2"
+                disabled={isUpdating}
               >
                 <X size={14} />
                 Remove
               </Button>
-              <label>
+              <label className={isUpdating ? 'pointer-events-none opacity-50' : ''}>
                 <Button
                   variant="outline"
                   size="sm"
                   className="flex items-center gap-2 cursor-pointer"
                   asChild
+                  disabled={isUpdating}
                 >
                   <span>
                     <Upload size={14} />
@@ -333,6 +417,7 @@ export default function BackgroundSelector() {
                   accept="image/*"
                   onChange={handleFileInputChange}
                   className="hidden"
+                  disabled={isUpdating}
                 />
               </label>
             </div>
@@ -343,7 +428,7 @@ export default function BackgroundSelector() {
               isDragging
                 ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/20'
                 : 'border-borderSubtle hover:border-borderStandard'
-            }`}
+            } ${isUpdating ? 'pointer-events-none opacity-50' : ''}`}
             onDrop={handleDrop}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
@@ -355,8 +440,14 @@ export default function BackgroundSelector() {
             <p className="text-xs text-textSubtle mb-4">
               Supports JPG, PNG, GIF, WebP
             </p>
-            <label>
-              <Button variant="outline" size="sm" className="cursor-pointer" asChild>
+            <label className={isUpdating ? 'pointer-events-none opacity-50' : ''}>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="cursor-pointer" 
+                asChild
+                disabled={isUpdating}
+              >
                 <span>Choose File</span>
               </Button>
               <input
@@ -364,6 +455,7 @@ export default function BackgroundSelector() {
                 accept="image/*"
                 onChange={handleFileInputChange}
                 className="hidden"
+                disabled={isUpdating}
               />
             </label>
           </div>
@@ -377,6 +469,7 @@ export default function BackgroundSelector() {
           size="sm"
           onClick={resetToDefault}
           className="flex items-center gap-2"
+          disabled={isUpdating}
         >
           <RotateCcw size={14} />
           Reset to Default

@@ -20,6 +20,7 @@ const GlobalBlurOverlay: React.FC = () => {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
   const [backgroundId, setBackgroundId] = useState<string>('default-gradient');
+  const [isProcessingChange, setIsProcessingChange] = useState(false);
   
   // Update theme detection when it changes
   useEffect(() => {
@@ -70,14 +71,49 @@ const GlobalBlurOverlay: React.FC = () => {
     // Listen for background changes
     const handleBackgroundChange = (e: CustomEvent) => {
       console.log("Background changed:", e.detail);
-      setBackgroundId(e.detail.backgroundId);
       
-      if (e.detail.backgroundId === 'custom-image' && e.detail.customImage) {
-        setBackgroundImage(e.detail.customImage);
-        setImageLoaded(true);
-      } else {
-        setBackgroundImage(null);
-      }
+      // Set processing flag to prevent UI freezes
+      setIsProcessingChange(true);
+      
+      // Use setTimeout to defer processing to next tick
+      setTimeout(() => {
+        try {
+          setBackgroundId(e.detail.backgroundId);
+          
+          if (e.detail.backgroundId === 'custom-image' && e.detail.customImage) {
+            setBackgroundImage(e.detail.customImage);
+            
+            // For custom images, we need to wait for them to load
+            if (e.detail.customImage !== backgroundImage) {
+              setImageLoaded(false);
+              const img = new Image();
+              img.onload = () => {
+                console.log("New custom background image loaded successfully");
+                setImageLoaded(true);
+                setIsProcessingChange(false);
+              };
+              img.onerror = (e) => {
+                console.error("Failed to load new custom background image:", e);
+                setImageLoaded(true); // Still mark as loaded to prevent UI freeze
+                setIsProcessingChange(false);
+              };
+              img.src = e.detail.customImage;
+            } else {
+              // If it's the same image, no need to reload
+              setImageLoaded(true);
+              setIsProcessingChange(false);
+            }
+          } else {
+            setBackgroundImage(null);
+            setImageLoaded(true);
+            setIsProcessingChange(false);
+          }
+        } catch (error) {
+          console.error("Error handling background change:", error);
+          setImageLoaded(true); // Ensure we don't get stuck in loading state
+          setIsProcessingChange(false);
+        }
+      }, 0);
     };
     
     window.addEventListener('dashboard-background-changed', handleBackgroundChange as EventListener);
@@ -86,7 +122,7 @@ const GlobalBlurOverlay: React.FC = () => {
       observer.disconnect();
       window.removeEventListener('dashboard-background-changed', handleBackgroundChange as EventListener);
     };
-  }, []);
+  }, [backgroundImage]);
 
   // Fixed blur intensity
   const blurIntensity = 20; // Consistent blur for chat mode
@@ -176,7 +212,8 @@ const GlobalBlurOverlay: React.FC = () => {
         Custom Image: ${backgroundImage ? 'Yes' : 'No'}<br />
         Dark Theme: ${isDarkTheme ? 'Yes' : 'No'}<br />
         Focus Mode: ${isInFocusMode ? 'Yes' : 'No'}<br />
-        Overlay Color: ${backgroundColor}
+        Overlay Color: ${backgroundColor}<br />
+        Processing Change: ${isProcessingChange ? 'Yes' : 'No'}
       `;
       
       document.body.appendChild(debugDiv);
@@ -194,7 +231,19 @@ const GlobalBlurOverlay: React.FC = () => {
         }
       }
     };
-  }, [backgroundId, backgroundImage, imageLoaded, isDarkTheme, isInFocusMode, backgroundColor]);
+  }, [backgroundId, backgroundImage, imageLoaded, isDarkTheme, isInFocusMode, backgroundColor, isProcessingChange]);
+
+  // Loading overlay to prevent interaction during background changes
+  if (isProcessingChange) {
+    return (
+      <div className="fixed inset-0 bg-background-default/50 backdrop-blur-sm flex items-center justify-center z-50">
+        <div className="bg-background-default p-4 rounded-lg shadow-lg flex flex-col items-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-textStandard mb-2"></div>
+          <p className="text-sm text-textStandard">Updating background...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Return null since we're appending directly to the body
   return null;
