@@ -266,33 +266,19 @@ export default function Pair({
 
   return (
     <div className="flex flex-col h-full relative bg-transparent">
-      {/* Custom background implementation */}
-      <div className="fixed inset-0 -z-10 animate-gradient-slow" 
+      {/* Image background implementation */}
+      <div className="fixed inset-0 -z-10" 
         style={{
-          background: `
-            radial-gradient(circle at 20% 80%, rgba(100, 100, 110, 0.25) 0%, transparent 50%),
-            radial-gradient(circle at 80% 20%, rgba(120, 120, 125, 0.22) 0%, transparent 50%),
-            radial-gradient(circle at 40% 40%, rgba(90, 95, 100, 0.18) 0%, transparent 50%),
-            linear-gradient(135deg, 
-              rgba(0, 0, 0, 0.02) 0%, 
-              rgba(0, 0, 0, 0.04) 25%, 
-              rgba(0, 0, 0, 0.02) 50%, 
-              rgba(0, 0, 0, 0.06) 75%, 
-              rgba(0, 0, 0, 0.03) 100%
-            )
-          `,
-          backgroundSize: '400% 400%',
+          backgroundImage: `url('/background.jpg')`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
         }}
       />
       
-      {/* Dot pattern overlay */}
+      {/* Optional overlay for better text readability */}
       <div 
-        className="fixed inset-0 -z-10 opacity-10 dark:opacity-20"
-        style={{
-          backgroundImage: `radial-gradient(circle, rgba(0, 0, 0, 0.4) 1px, transparent 1px)`,
-          backgroundSize: '24px 24px',
-          backgroundPosition: '12px 12px',
-        }}
+        className="fixed inset-0 -z-10 bg-black/20"
       />
       
       {/* Centered chat content */}
