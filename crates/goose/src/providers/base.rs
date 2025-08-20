@@ -337,6 +337,26 @@ pub trait Provider: Send + Sync {
         tools: &[Tool],
     ) -> Result<(Message, ProviderUsage), ProviderError>;
 
+    /// Generate the next message using a fast model (if configured)
+    /// Falls back to regular complete() if no fast model is configured
+    ///
+    /// # Arguments
+    /// * `system` - The system prompt that guides the model's behavior
+    /// * `messages` - The conversation history as a sequence of messages
+    /// * `tools` - Optional list of tools the model can use
+    ///
+    /// # Returns
+    /// A tuple containing the model's response message and provider usage statistics
+    async fn complete_fast(
+        &self,
+        system: &str,
+        messages: &[Message],
+        tools: &[Tool],
+    ) -> Result<(Message, ProviderUsage), ProviderError> {
+        // Default implementation just calls regular complete
+        self.complete(system, messages, tools).await
+    }
+
     /// Get the model config from the provider
     fn get_model_config(&self) -> ModelConfig;
 

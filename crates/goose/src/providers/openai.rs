@@ -22,10 +22,12 @@ use super::utils::{
 };
 use crate::config::custom_providers::CustomProviderConfig;
 use crate::conversation::message::Message;
+use crate::conversation::Conversation;
 use crate::impl_provider_default;
 use crate::model::ModelConfig;
 use crate::providers::base::MessageStream;
 use crate::providers::formats::openai::response_to_streaming_message;
+use crate::utils::safe_truncate;
 use rmcp::model::Tool;
 
 pub const OPEN_AI_DEFAULT_MODEL: &str = "gpt-4o";
@@ -40,6 +42,9 @@ pub const OPEN_AI_KNOWN_MODELS: &[(&str, usize)] = &[
     ("gpt-4-turbo", 128_000),
     ("o4-mini", 128_000),
 ];
+
+// Fast models for OpenAI - used for summarization, session naming, etc.
+pub const OPEN_AI_FAST_MODEL: &str = "gpt-4o-mini";
 
 pub const OPEN_AI_DOC_URL: &str = "https://platform.openai.com/docs/models";
 
@@ -58,7 +63,12 @@ pub struct OpenAiProvider {
 impl_provider_default!(OpenAiProvider);
 
 impl OpenAiProvider {
-    pub fn from_env(model: ModelConfig) -> Result<Self> {
+    pub fn from_env(mut model: ModelConfig) -> Result<Self> {
+        // Set the fast model if not already configured
+        if model.fast_model.is_none() {
+            model.fast_model = Some(OPEN_AI_FAST_MODEL.to_string());
+        }
+
         let config = crate::config::Config::global();
         let api_key: String = config.get_secret("OPENAI_API_KEY")?;
         let host: String = config
@@ -217,6 +227,66 @@ impl Provider for OpenAiProvider {
         let model = get_model(&json_response);
         emit_debug_trace(&self.model, &payload, &json_response, &usage);
         Ok((message, ProviderUsage::new(model, usage)))
+    }
+
+    async fn complete_fast(
+        &self,
+        system: &str,
+        messages: &[Message],
+        tools: &[Tool],
+    ) -> Result<(Message, ProviderUsage), ProviderError> {
+        // If we have a fast model configured, use it
+        if let Some(fast_model) = &self.model.fast_model {
+            // Create a temporary model config with the fast model
+            let fast_config = ModelConfig::new(fast_model)
+                .map_err(|e| {
+                    ProviderError::ExecutionError(format!(
+                        "Failed to create fast model config: {}",
+                        e
+                    ))
+                })?
+                .with_temperature(Some(0.0)); // Use low temperature for consistency
+
+            let payload =
+                create_request(&fast_config, system, messages, tools, &ImageFormat::OpenAi)?;
+            let json_response = self.post(&payload).await?;
+
+            let message = response_to_message(&json_response)?;
+            let usage = json_response
+                .get("usage")
+                .map(get_usage)
+                .unwrap_or_else(|| {
+                    tracing::debug!("Failed to get usage data");
+                    Usage::default()
+                });
+            let model = get_model(&json_response);
+            emit_debug_trace(&fast_config, &payload, &json_response, &usage);
+            Ok((message, ProviderUsage::new(model, usage)))
+        } else {
+            // Fall back to regular complete
+            self.complete(system, messages, tools).await
+        }
+    }
+
+    async fn generate_session_name(
+        &self,
+        messages: &Conversation,
+    ) -> Result<String, ProviderError> {
+        let context = self.get_initial_user_messages(messages);
+        let prompt = self.create_session_name_prompt(&context);
+        let message = Message::user().with_text(&prompt);
+
+        // Use the fast model for session naming
+        let result = self
+            .complete_fast(
+                "Reply with only a description in four words or less",
+                &[message],
+                &[],
+            )
+            .await?;
+
+        let description = result.0.as_concat_text();
+        Ok(safe_truncate(&description, 100))
     }
 
     async fn fetch_supported_models(&self) -> Result<Option<Vec<String>>, ProviderError> {

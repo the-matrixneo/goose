@@ -72,6 +72,8 @@ pub struct ModelConfig {
     pub max_tokens: Option<i32>,
     pub toolshim: bool,
     pub toolshim_model: Option<String>,
+    /// Optional fast model for things like summarization and session naming
+    pub fast_model: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -101,6 +103,7 @@ impl ModelConfig {
             max_tokens: None,
             toolshim,
             toolshim_model,
+            fast_model: None,
         })
     }
 
@@ -228,6 +231,11 @@ impl ModelConfig {
 
     pub fn with_toolshim_model(mut self, model: Option<String>) -> Self {
         self.toolshim_model = model;
+        self
+    }
+
+    pub fn with_fast_model(mut self, model: Option<String>) -> Self {
+        self.fast_model = model;
         self
     }
 
