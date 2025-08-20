@@ -6,7 +6,7 @@ import { useFocusMode } from '../contexts/FocusModeContext';
  * 
  * A reusable component that provides a consistent glassmorphism effect across the application.
  * This component:
- * 1. Applies a gradient background
+ * 1. Applies an animated gradient background
  * 2. Applies a blur effect with theme-aware styling
  * 3. Adjusts opacity based on focus mode state
  * 4. Handles theme changes automatically
@@ -51,18 +51,33 @@ const GlobalBlurOverlay: React.FC = () => {
     ? (isDarkTheme ? 'rgba(0, 0, 0, 0.9)' : 'rgba(255, 255, 255, 0.9)') // 90% opacity in focus mode
     : (isDarkTheme ? 'rgba(0, 0, 0, 0.7)' : 'rgba(255, 255, 255, 0.7)'); // 70% opacity in normal mode
 
-  // Gradient background for dark and light themes
-  const gradientBg = isDarkTheme
-    ? 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)'
-    : 'linear-gradient(135deg, #f5f7fa 0%, #e4e8f0 50%, #c3cfe2 100%)';
+  // Animated gradient background for dark and light themes
+  const darkGradient = `
+    linear-gradient(135deg, 
+      rgba(26, 26, 46, 1) 0%, 
+      rgba(22, 33, 62, 1) 25%, 
+      rgba(15, 52, 96, 1) 50%,
+      rgba(22, 33, 62, 1) 75%,
+      rgba(26, 26, 46, 1) 100%)
+  `;
+  
+  const lightGradient = `
+    linear-gradient(135deg, 
+      rgba(245, 247, 250, 1) 0%, 
+      rgba(228, 232, 240, 1) 25%, 
+      rgba(195, 207, 226, 1) 50%,
+      rgba(228, 232, 240, 1) 75%,
+      rgba(245, 247, 250, 1) 100%)
+  `;
 
   return (
     <>
-      {/* Gradient background implementation */}
-      <div className="fixed inset-0 -z-10" 
+      {/* Animated gradient background */}
+      <div 
+        className="fixed inset-0 -z-10 animate-gradient-slow" 
         style={{
-          background: gradientBg,
-          backgroundSize: 'cover',
+          background: isDarkTheme ? darkGradient : lightGradient,
+          backgroundSize: '400% 400%',
         }}
       />
       
