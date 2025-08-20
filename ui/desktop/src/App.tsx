@@ -18,6 +18,7 @@ import ProviderGuard from './components/ProviderGuard';
 import { ChatType } from './types/chat';
 import Hub from './components/hub';
 import Pair from './components/pair';
+import TabChatRoute from './components/TabChatRoute';
 import SettingsView, { SettingsViewOptions } from './components/settings/SettingsView';
 import SessionsView from './components/sessions/SessionsView';
 import SharedSessionView from './components/sessions/SharedSessionView';
@@ -27,6 +28,7 @@ import { useChat } from './hooks/useChat';
 import { AppLayout } from './components/Layout/AppLayout';
 import { ChatProvider } from './contexts/ChatContext';
 import { DraftProvider } from './contexts/DraftContext';
+import { FocusModeProvider } from './contexts/FocusModeContext';
 
 import 'react-toastify/dist/ReactToastify.css';
 import { useConfig, MalformedConfigError } from './components/ConfigContext';
@@ -1409,7 +1411,7 @@ export default function App() {
                         contextKey={`pair-${pairChat.id}`}
                         key={pairChat.id} // Add key prop to force re-render when chat ID changes
                       >
-                        <PairRouteWrapper
+                        <TabChatRoute
                           chat={pairChat}
                           setChat={setPairChat}
                           setPairChat={setPairChat}
