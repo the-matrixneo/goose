@@ -1,8 +1,8 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { type View, ViewOptions } from '../App';
-import { TabChatPair } from './TabChat';
 import { FocusModeProvider } from '../contexts/FocusModeContext';
+import TabChatPair from './TabChatPair';
 
 const TabChatRoute = ({
   chat,
