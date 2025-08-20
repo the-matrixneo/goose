@@ -11,9 +11,9 @@ import { backupConfig, initConfig, readAllConfig, recoverConfig, validateConfig 
 import { COST_TRACKING_ENABLED } from '../updates';
 
 interface InitializationDependencies {
-  getExtensions?: (b: boolean) => Promise<FixedExtensionEntry[]>;
-  addExtension?: (name: string, config: ExtensionConfig, enabled: boolean) => Promise<void>;
-  setPairChat: (chat: ChatType | ((prev: ChatType) => ChatType)) => void;
+  getExtensions: (b: boolean) => Promise<FixedExtensionEntry[]>;
+  addExtension: (name: string, config: ExtensionConfig, enabled: boolean) => Promise<void>;
+  setPairChat: (chat: ChatType) => void;
   provider: string;
   model: string;
 }

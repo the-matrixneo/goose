@@ -36,10 +36,7 @@ import ExtensionsView, { ExtensionsViewOptions } from './components/extensions/E
 import { Recipe } from './recipe';
 import RecipesView from './components/RecipesView';
 import RecipeEditor from './components/RecipeEditor';
-
-// Import the new modules
 import { createNavigationHandler, View, ViewOptions } from './utils/navigationUtils';
-import { initializeAgent } from './utils/appInitialization';
 
 // Route Components
 const HubRouteWrapper = ({
@@ -416,8 +413,7 @@ export default function App() {
     recipeConfig: null,
   });
 
-  const { getExtensions, addExtension, read } = useConfig();
-  const initAttemptedRef = useRef(false);
+  const { addExtension } = useConfig();
 
   // Create a setView function for useChat hook - we'll use window.history instead of navigate
   const setView = (view: View, viewOptions: ViewOptions = {}) => {
@@ -482,33 +478,6 @@ export default function App() {
     const url = new URL(link);
     return url.searchParams.get('url');
   }
-
-  useEffect(() => {
-    if (initAttemptedRef.current) {
-      console.log('Initialization already attempted, skipping...');
-      return;
-    }
-    initAttemptedRef.current = true;
-
-    const initialize = async () => {
-      const config = window.electron.getConfig();
-      const provider = (await read('GOOSE_PROVIDER', false)) ?? config.GOOSE_DEFAULT_PROVIDER;
-      const model = (await read('GOOSE_MODEL', false)) ?? config.GOOSE_DEFAULT_MODEL;
-
-      await initializeAgent({
-        getExtensions,
-        addExtension,
-        setPairChat,
-        provider: provider as string,
-        model: model as string,
-      });
-    };
-
-    initialize().catch((error) => {
-      console.error('Fatal error during initialization:', error);
-      setFatalError(error instanceof Error ? error.message : 'Unknown error occurred');
-    });
-  }, [getExtensions, addExtension, read, setPairChat]);
 
   useEffect(() => {
     console.log('Sending reactReady signal to Electron');

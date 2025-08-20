@@ -11,6 +11,7 @@
  * - Provides the main conversational interface for extended interactions
  * - Enables local storage persistence for conversation continuity
  * - Supports all advanced chat features like file attachments, tool usage, etc.
+ * - Initializes the agent when entering active conversation mode
  *
  * Navigation Flow:
  * Hub (initial message) → Pair (active conversation) → Hub (new session)
@@ -19,6 +20,7 @@
  * - Processes initial input from the Hub transition
  * - Enables conversation persistence
  * - Provides the full-featured chat experience
+ * - Initializes the agent for conversation handling
  *
  * Unlike Hub, Pair assumes an active conversation state and focuses on
  * maintaining conversation flow rather than onboarding new users.
@@ -31,6 +33,7 @@ import BaseChat from './BaseChat';
 import { useRecipeManager } from '../hooks/useRecipeManager';
 import { useIsMobile } from '../hooks/use-mobile';
 import { useSidebar } from './ui/sidebar';
+import { useAgent } from '../hooks/useAgent';
 import 'react-toastify/dist/ReactToastify.css';
 import { cn } from '../utils';
 
@@ -56,8 +59,21 @@ export default function Pair({
   const [initialMessage, setInitialMessage] = useState<string | null>(null);
   const [isTransitioningFromHub, setIsTransitioningFromHub] = useState(false);
 
+  // Use the shared agent hook
+  const {
+    isAgentInitialized,
+    isInitializing,
+    initializeAgentIfNeeded,
+    error: agentError,
+  } = useAgent(setChat);
+
   // Get recipe configuration and parameter handling
   const { initialPrompt: recipeInitialPrompt } = useRecipeManager(chat, location.state);
+
+  // Initialize agent when Pair component mounts
+  useEffect(() => {
+    initializeAgentIfNeeded();
+  }, [initializeAgentIfNeeded]);
 
   // Handle recipe loading from recipes view - reset chat if needed
   useEffect(() => {
@@ -123,8 +139,8 @@ export default function Pair({
 
   // Auto-submit the initial message after it's been set and component is ready
   useEffect(() => {
-    if (shouldAutoSubmit && initialMessage) {
-      // Wait for the component to be fully rendered
+    if (shouldAutoSubmit && initialMessage && isAgentInitialized) {
+      // Wait for the component to be fully rendered AND agent to be initialized
       const timer = setTimeout(() => {
         // Try to trigger form submission programmatically
         const textarea = document.querySelector(
@@ -160,7 +176,7 @@ export default function Pair({
 
     // Return undefined when condition is not met
     return undefined;
-  }, [shouldAutoSubmit, initialMessage]);
+  }, [shouldAutoSubmit, initialMessage, isAgentInitialized]);
 
   // Custom message submit handler
   const handleMessageSubmit = (message: string) => {
@@ -190,6 +206,30 @@ export default function Pair({
   const renderBeforeMessages = () => {
     return <div>{/* Any Pair-specific content before messages can go here */}</div>;
   };
+
+  // Show loading state while agent is initializing
+  if (isInitializing) {
+    return (
+      <div className="flex justify-center items-center h-full">
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-textStandard"></div>
+      </div>
+    );
+  }
+
+  // Show error state if agent initialization failed
+  if (agentError) {
+    return (
+      <div className="flex flex-col justify-center items-center h-full space-y-4">
+        <div className="text-red-500">Failed to initialize agent: {agentError}</div>
+        <button
+          onClick={initializeAgentIfNeeded}
+          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
 
   return (
     <>
