@@ -10,7 +10,7 @@ interface LocationState {
   reset?: boolean;
 }
 
-export const useRecipeManager = (messages: Message[], locationState?: LocationState) => {
+export const useRecipeManager = (messages: Message[] = [], locationState?: LocationState) => {
   const [isGeneratingRecipe, setIsGeneratingRecipe] = useState(false);
   const [isParameterModalOpen, setIsParameterModalOpen] = useState(false);
   const [readyForAutoUserPrompt, setReadyForAutoUserPrompt] = useState(false);
@@ -22,12 +22,12 @@ export const useRecipeManager = (messages: Message[], locationState?: LocationSt
   const chatContext = useChatContext();
 
   // Use a ref to capture the current messages for the event handler
-  const messagesRef = useRef(messages);
+  const messagesRef = useRef(messages || []);
   const isCreatingRecipeRef = useRef(false);
 
   // Update the ref when messages change
   useEffect(() => {
-    messagesRef.current = messages;
+    messagesRef.current = messages || [];
   }, [messages]);
 
   // Get recipeConfig from multiple sources with priority:
@@ -195,7 +195,7 @@ export const useRecipeManager = (messages: Message[], locationState?: LocationSt
       recipeConfig?.isScheduledExecution &&
       recipeConfig?.prompt &&
       (!hasRequiredParams || recipeParameters) &&
-      messages.length === 0 &&
+      messages && messages.length === 0 &&
       !isLoading &&
       readyForAutoUserPrompt &&
       recipeAccepted

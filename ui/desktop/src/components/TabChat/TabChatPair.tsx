@@ -34,7 +34,11 @@ export default function TabChatPair({
   const [isTransitioningFromHub, setIsTransitioningFromHub] = React.useState(false);
 
   // Get recipe configuration and parameter handling
-  const { initialPrompt: recipeInitialPrompt } = useRecipeManager(chat.messages, location.state);
+  // Ensure we pass a default empty array if chat.messages is undefined
+  const { initialPrompt: recipeInitialPrompt } = useRecipeManager(
+    chat.messages || [], 
+    location.state
+  );
 
   // Get sidebar state for background adjustments
   const { state: currentSidebarState } = useSidebar();

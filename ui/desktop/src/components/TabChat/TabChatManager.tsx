@@ -83,7 +83,7 @@ const TabChatManager: React.FC<TabChatManagerProps> = ({
   const tabBarTabs: ChatTab[] = chatTabs.map(chat => ({
     id: chat.id,
     title: chat.title || `Chat ${chatTabs.indexOf(chat) + 1}`,
-    isNewChat: chat.messages.length === 0
+    isNewChat: chat.messages && chat.messages.length === 0
   }));
 
   return (
