@@ -329,6 +329,9 @@ export default function Pair({
 
   return (
     <div className="flex flex-col h-full relative bg-transparent">
+      {/* Add back the GlobalBlurOverlay for the chat page */}
+      <GlobalBlurOverlay />
+      
       {/* Centered chat content */}
       <div className="relative z-10 flex justify-center h-full bg-transparent">
         <div className="w-full max-w-[1000px] h-full bg-transparent">
