@@ -64,10 +64,8 @@ impl_provider_default!(OpenAiProvider);
 
 impl OpenAiProvider {
     pub fn from_env(mut model: ModelConfig) -> Result<Self> {
-        // Set the fast model if not already configured
-        if model.fast_model.is_none() {
-            model.fast_model = Some(OPEN_AI_FAST_MODEL.to_string());
-        }
+        // Hard-code the fast model for OpenAI
+        model.fast_model = Some(OPEN_AI_FAST_MODEL.to_string());
 
         let config = crate::config::Config::global();
         let api_key: String = config.get_secret("OPENAI_API_KEY")?;
@@ -235,14 +233,12 @@ impl Provider for OpenAiProvider {
         messages: &[Message],
         tools: &[Tool],
     ) -> Result<(Message, ProviderUsage), ProviderError> {
-        // If we have a fast model configured, use it
+        // Check if we have a fast model configured
         if let Some(fast_model) = &self.model.fast_model {
             // Create a temporary model config with the fast model
-            let fast_config = self
-                .model
-                .clone()
-                .with_model(fast_model)
-                .with_temperature(Some(0.0)); // Use low temperature for consistency
+            let mut fast_config = self.model.clone();
+            fast_config.model_name = fast_model.clone();
+            fast_config.temperature = Some(0.0); // Use low temperature for consistency
 
             // Create the request with the fast model config
             let payload =

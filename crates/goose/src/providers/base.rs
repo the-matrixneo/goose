@@ -340,7 +340,8 @@ pub trait Provider: Send + Sync {
     /// Generate the next message using a fast model (if configured)
     ///
     /// This default implementation just calls regular complete().
-    /// Providers should override this to use their fast model configuration.
+    /// Providers that have a fast model configured should override this
+    /// to temporarily swap in their fast model for the completion.
     ///
     /// # Arguments
     /// * `system` - The system prompt that guides the model's behavior
@@ -355,7 +356,7 @@ pub trait Provider: Send + Sync {
         messages: &[Message],
         tools: &[Tool],
     ) -> Result<(Message, ProviderUsage), ProviderError> {
-        // Default implementation just calls regular complete
+        // Default: just call regular complete
         // Providers with fast model support should override this
         self.complete(system, messages, tools).await
     }
