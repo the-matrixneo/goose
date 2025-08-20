@@ -6,7 +6,7 @@ import { useFocusMode } from '../contexts/FocusModeContext';
  * 
  * A reusable component that provides a consistent glassmorphism effect across the application.
  * This component:
- * 1. Renders a background image
+ * 1. Applies a gradient background
  * 2. Applies a blur effect with theme-aware styling
  * 3. Adjusts opacity based on focus mode state
  * 4. Handles theme changes automatically
@@ -51,15 +51,18 @@ const GlobalBlurOverlay: React.FC = () => {
     ? (isDarkTheme ? 'rgba(0, 0, 0, 0.9)' : 'rgba(255, 255, 255, 0.9)') // 90% opacity in focus mode
     : (isDarkTheme ? 'rgba(0, 0, 0, 0.7)' : 'rgba(255, 255, 255, 0.7)'); // 70% opacity in normal mode
 
+  // Gradient background for dark and light themes
+  const gradientBg = isDarkTheme
+    ? 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)'
+    : 'linear-gradient(135deg, #f5f7fa 0%, #e4e8f0 50%, #c3cfe2 100%)';
+
   return (
     <>
-      {/* Image background implementation */}
+      {/* Gradient background implementation */}
       <div className="fixed inset-0 -z-10" 
         style={{
-          backgroundImage: `url('/background.jpg')`,
+          background: gradientBg,
           backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
         }}
       />
       
