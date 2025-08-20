@@ -66,6 +66,15 @@ export default function Pair({
 
   // Override backgrounds to allow our gradient to show through
   useEffect(() => {
+    // Override MainPanelLayout background
+    const mainPanels = document.querySelectorAll('.bg-background-default, .bg-background-muted') as NodeListOf<HTMLElement>;
+    mainPanels.forEach(panel => {
+      if (panel) {
+        panel.style.background = 'transparent';
+        panel.style.backgroundColor = 'transparent';
+      }
+    });
+    
     // Override SidebarInset background
     const sidebarInset = document.querySelector('[data-slot="sidebar-inset"]') as HTMLElement;
     if (sidebarInset) {
@@ -84,6 +93,12 @@ export default function Pair({
     
     // Cleanup on unmount
     return () => {
+      mainPanels.forEach(panel => {
+        if (panel) {
+          panel.style.background = '';
+          panel.style.backgroundColor = '';
+        }
+      });
       if (sidebarInset) {
         sidebarInset.style.background = '';
       }
