@@ -62,6 +62,10 @@ export default function Pair({
 
   // Override backgrounds to allow our gradient to show through
   useEffect(() => {
+    // Get sidebar state to adjust our approach
+    const { state } = useSidebar();
+    const isCollapsed = state === 'collapsed';
+    
     // Override SidebarInset background
     const sidebarInset = document.querySelector('[data-slot="sidebar-inset"]') as HTMLElement;
     if (sidebarInset) {
@@ -114,6 +118,13 @@ export default function Pair({
         container.style.background = 'transparent';
       }
     });
+
+    // Make sure the GlobalBackground is visible across the entire screen
+    const appRoot = document.getElementById('root') as HTMLElement;
+    if (appRoot) {
+      appRoot.style.background = 'transparent';
+      appRoot.style.backgroundColor = 'transparent';
+    }
     
     // Cleanup on unmount
     return () => {
@@ -150,6 +161,10 @@ export default function Pair({
           container.style.background = '';
         }
       });
+      if (appRoot) {
+        appRoot.style.background = '';
+        appRoot.style.backgroundColor = '';
+      }
     };
   }, []);
 
