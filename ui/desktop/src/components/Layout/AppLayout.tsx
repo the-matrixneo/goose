@@ -4,8 +4,9 @@ import { View, ViewOptions } from '../../App';
 import { AppWindowMac, AppWindow } from 'lucide-react';
 import { Button } from '../ui/button';
 import { SidebarProvider, useSidebar } from '../ui/sidebar';
-import GlobalBackground from '../GlobalBackground';
+import GlobalBlurOverlay from '../GlobalBlurOverlay';
 import PillSideNav from '../PillSideNav';
+import BackgroundImageFix from '../BackgroundImageFix';
 
 interface AppLayoutProps {
   setIsGoosehintsModalOpen?: (isOpen: boolean) => void;
@@ -74,8 +75,11 @@ const AppLayoutContent: React.FC<AppLayoutProps> = ({ setIsGoosehintsModalOpen }
 
   return (
     <div className="flex flex-1 w-full relative animate-fade-in">
-      {/* Global background */}
-      <GlobalBackground blur={false} opacity={1} />
+      {/* Add the new background fix component */}
+      <BackgroundImageFix />
+      
+      {/* Keep the original background components for compatibility */}
+      <GlobalBlurOverlay />
       
       {/* Floating pill navigation in center */}
       <div className="absolute top-4 left-0 right-0 z-50 flex justify-center pointer-events-none">
