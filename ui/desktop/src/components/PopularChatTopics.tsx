@@ -3,6 +3,7 @@ import { FolderTree, MessageSquare, Code } from 'lucide-react';
 
 interface PopularChatTopicsProps {
   append: (text: string) => void;
+  onTopicSelected?: () => void; // Optional callback when a topic is selected
 }
 
 interface ChatTopic {
@@ -36,9 +37,13 @@ const POPULAR_TOPICS: ChatTopic[] = [
   },
 ];
 
-export default function PopularChatTopics({ append }: PopularChatTopicsProps) {
+export default function PopularChatTopics({ append, onTopicSelected }: PopularChatTopicsProps) {
   const handleTopicClick = (prompt: string) => {
     append(prompt);
+    // Call the optional callback to notify parent components (like Pair) that a topic was selected
+    if (onTopicSelected) {
+      onTopicSelected();
+    }
   };
 
   return (

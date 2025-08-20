@@ -518,7 +518,15 @@ function BaseChatContent({
           {/* PopularChatTopics - rendered outside container when no messages/recipes */}
           {showPopularTopics && filteredMessages.length === 0 && !recipeConfig && !suppressEmptyState && (
             <div className="absolute inset-0 flex items-end justify-start p-6">
-              <PopularChatTopics append={(text: string) => append(text)} />
+              <PopularChatTopics 
+                append={(text: string) => append(text)} 
+                onTopicSelected={() => {
+                  // Enable focus mode when a popular topic is selected
+                  if (onMessageSubmit) {
+                    onMessageSubmit("");
+                  }
+                }}
+              />
             </div>
           )}
 
