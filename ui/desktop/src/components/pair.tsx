@@ -60,15 +60,66 @@ export default function Pair({
   // Get recipe configuration and parameter handling
   const { initialPrompt: recipeInitialPrompt } = useRecipeManager(chat.messages, location.state);
 
+  // Get sidebar state for background adjustments
+  const { state: currentSidebarState } = useSidebar();
+  const isSidebarCollapsed = currentSidebarState === 'collapsed';
+
   // Override backgrounds to allow our gradient to show through
   useEffect(() => {
-    // Override SidebarInset background
+    // Target the specific SidebarInset component with the complex class
     const sidebarInset = document.querySelector('[data-slot="sidebar-inset"]') as HTMLElement;
     if (sidebarInset) {
       sidebarInset.style.background = 'transparent';
+      sidebarInset.style.backgroundColor = 'transparent';
+      // Remove the bg-background class that might be causing the issue
+      sidebarInset.classList.remove('bg-background');
+      // Add bg-transparent class
+      sidebarInset.classList.add('bg-transparent');
     }
 
-    // Apply reduced blur effect to ChatInput (same as Hub but less aggressive)
+    // Target the sidebar element itself
+    const sidebar = document.querySelector('[data-slot="sidebar"]') as HTMLElement;
+    if (sidebar) {
+      // Add a style to make sure it doesn't block our background
+      sidebar.style.pointerEvents = 'auto';
+      sidebar.style.zIndex = '20';
+      // Make the sidebar background transparent
+      sidebar.style.background = 'transparent';
+      sidebar.style.backgroundColor = 'transparent';
+    }
+
+    // Target the sidebar wrapper
+    const sidebarWrapper = document.querySelector('[data-slot="sidebar-wrapper"]') as HTMLElement;
+    if (sidebarWrapper) {
+      sidebarWrapper.style.background = 'transparent';
+      sidebarWrapper.style.backgroundColor = 'transparent';
+    }
+
+    // Target the sidebar container
+    const sidebarContainer = document.querySelector('[data-slot="sidebar-container"]') as HTMLElement;
+    if (sidebarContainer) {
+      sidebarContainer.style.background = 'transparent';
+      sidebarContainer.style.backgroundColor = 'transparent';
+    }
+
+    // Target the sidebar inner
+    const sidebarInner = document.querySelector('[data-slot="sidebar-inner"]') as HTMLElement;
+    if (sidebarInner) {
+      // Keep the sidebar's own background but make sure it doesn't extend
+      sidebarInner.style.width = '100%';
+      sidebarInner.style.height = '100%';
+    }
+
+    // Override MainPanelLayout background
+    const mainPanels = document.querySelectorAll('.bg-background-default, .bg-background-muted') as NodeListOf<HTMLElement>;
+    mainPanels.forEach(panel => {
+      if (panel) {
+        panel.style.background = 'transparent';
+        panel.style.backgroundColor = 'transparent';
+      }
+    });
+
+    // Override ChatInput background to be transparent with glass effect
     const chatInputContainer = document.querySelector('[data-drop-zone="true"]') as HTMLElement;
     if (chatInputContainer) {
       chatInputContainer.style.background = 'rgba(255, 255, 255, 0.05)';
@@ -82,7 +133,37 @@ export default function Pair({
     return () => {
       if (sidebarInset) {
         sidebarInset.style.background = '';
+        sidebarInset.style.backgroundColor = '';
+        sidebarInset.classList.remove('bg-transparent');
+        // Restore the original class if needed
+        if (!sidebarInset.classList.contains('bg-background')) {
+          sidebarInset.classList.add('bg-background');
+        }
       }
+      if (sidebar) {
+        sidebar.style.pointerEvents = '';
+        sidebar.style.zIndex = '';
+        sidebar.style.background = '';
+        sidebar.style.backgroundColor = '';
+      }
+      if (sidebarWrapper) {
+        sidebarWrapper.style.background = '';
+        sidebarWrapper.style.backgroundColor = '';
+      }
+      if (sidebarContainer) {
+        sidebarContainer.style.background = '';
+        sidebarContainer.style.backgroundColor = '';
+      }
+      if (sidebarInner) {
+        sidebarInner.style.width = '';
+        sidebarInner.style.height = '';
+      }
+      mainPanels.forEach(panel => {
+        if (panel) {
+          panel.style.background = '';
+          panel.style.backgroundColor = '';
+        }
+      });
       if (chatInputContainer) {
         chatInputContainer.style.background = '';
         chatInputContainer.style.backdropFilter = '';
@@ -91,7 +172,7 @@ export default function Pair({
         chatInputContainer.style.border = '';
       }
     };
-  });
+  }, []);
 
   // Handle recipe loading from recipes view - reset chat if needed
   useEffect(() => {
@@ -222,8 +303,11 @@ export default function Pair({
 
   // Custom main layout props to override background completely
   const customMainLayoutProps = {
-    backgroundColor: '', // Remove any background class
-    style: { backgroundColor: 'transparent' }, // Force transparent background with inline style
+    backgroundColor: 'transparent', // Use transparent instead of empty string
+    style: { 
+      backgroundColor: 'transparent',
+      background: 'transparent'
+    }, // Force transparent background with inline style
   };
 
   // Custom content before messages
@@ -232,13 +316,25 @@ export default function Pair({
   };
 
   return (
-    <div className="flex flex-col h-full relative" style={{ backgroundColor: 'transparent' }}>
-      {/* Use GlobalBackground to respect user's selected background */}
-      <GlobalBackground blur={false} opacity={1} />
-
+    <div className="flex flex-col h-full relative bg-transparent">
+      {/* Image background implementation */}
+      <div className="fixed inset-0 -z-10" 
+        style={{
+          backgroundImage: `url('/background.jpg')`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+        }}
+      />
+      
+      {/* Optional overlay for better text readability */}
+      <div 
+        className="fixed inset-0 -z-10 bg-black/20"
+      />
+      
       {/* Centered chat content */}
-      <div className="relative z-10 flex justify-center h-full" style={{ backgroundColor: 'transparent' }}>
-        <div className="w-full max-w-[1000px] h-full" style={{ backgroundColor: 'transparent' }}>
+      <div className="relative z-10 flex justify-center h-full bg-transparent">
+        <div className="w-full max-w-[1000px] h-full bg-transparent">
           <BaseChat
             chat={chat}
             setChat={setChat}
@@ -250,7 +346,7 @@ export default function Pair({
             renderBeforeMessages={renderBeforeMessages}
             customChatInputProps={customChatInputProps}
             customMainLayoutProps={customMainLayoutProps} // Override background
-            contentClassName={cn('pr-1 pb-10', (isMobile || sidebarState === 'collapsed') && 'pt-11')} // Use dynamic content class with mobile margin and sidebar state
+            contentClassName={cn('pr-1 pb-10', (isMobile || currentSidebarState === 'collapsed') && 'pt-11')} // Use dynamic content class with mobile margin and sidebar state
             showPopularTopics={!isTransitioningFromHub} // Don't show popular topics while transitioning from Hub
             suppressEmptyState={isTransitioningFromHub} // Suppress all empty state content while transitioning from Hub
           />

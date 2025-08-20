@@ -1,11 +1,11 @@
 import React from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import AppSidebar from '../GooseSidebar/AppSidebar';
-import GlobalBackground from '../GlobalBackground';
 import { View, ViewOptions } from '../../App';
 import { AppWindowMac, AppWindow } from 'lucide-react';
 import { Button } from '../ui/button';
-import { Sidebar, SidebarInset, SidebarProvider, SidebarTrigger, useSidebar } from '../ui/sidebar';
+import { SidebarProvider, useSidebar } from '../ui/sidebar';
+import GlobalBackground from '../GlobalBackground';
+import PillSideNav from '../PillSideNav';
 
 interface AppLayoutProps {
   setIsGoosehintsModalOpen?: (isOpen: boolean) => void;
@@ -17,10 +17,6 @@ const AppLayoutContent: React.FC<AppLayoutProps> = ({ setIsGoosehintsModalOpen }
   const location = useLocation();
   const safeIsMacOS = (window?.electron?.platform || 'darwin') === 'darwin';
   const { isMobile, openMobile } = useSidebar();
-
-  // Calculate padding based on sidebar state and macOS
-  const headerPadding = safeIsMacOS ? 'pl-21' : 'pl-4';
-  // const headerPadding = '';
 
   // Hide buttons when mobile sheet is showing
   const shouldHideButtons = isMobile && openMobile;
@@ -69,11 +65,6 @@ const AppLayoutContent: React.FC<AppLayoutProps> = ({ setIsGoosehintsModalOpen }
     }
   };
 
-  const handleSelectSession = async (sessionId: string) => {
-    // Navigate to chat with session data
-    navigate('/', { state: { sessionId } });
-  };
-
   const handleNewWindow = () => {
     window.electron.createChatWindow(
       undefined,
@@ -83,17 +74,22 @@ const AppLayoutContent: React.FC<AppLayoutProps> = ({ setIsGoosehintsModalOpen }
 
   return (
     <div className="flex flex-1 w-full relative animate-fade-in">
-      {/* Global background with aggressive blur for chat sections */}
-      <GlobalBackground blur={true} opacity={0.3} />
+      {/* Global background */}
+      <GlobalBackground blur={false} opacity={1} />
       
+      {/* Floating pill navigation in center */}
+      <div className="absolute top-4 left-0 right-0 z-50 flex justify-center pointer-events-none">
+        <div className="pointer-events-auto">
+          <PillSideNav />
+        </div>
+      </div>
+      
+      {/* New Window button in top right */}
       {!shouldHideButtons && (
-        <div className={`${headerPadding} absolute top-3 z-100 flex items-center`}>
-          <SidebarTrigger
-            className={`no-drag hover:border-border-strong hover:text-text-default hover:!bg-background-medium hover:scale-105`}
-          />
+        <div className="absolute top-4 right-4 z-50">
           <Button
             onClick={handleNewWindow}
-            className="no-drag hover:!bg-background-medium"
+            className="no-drag hover:!bg-white/10 text-white"
             variant="ghost"
             size="xs"
             title="Start a new session in a new window"
@@ -102,17 +98,11 @@ const AppLayoutContent: React.FC<AppLayoutProps> = ({ setIsGoosehintsModalOpen }
           </Button>
         </div>
       )}
-      <Sidebar variant="inset" collapsible="offcanvas">
-        <AppSidebar
-          onSelectSession={handleSelectSession}
-          setView={setView}
-          setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
-          currentPath={location.pathname}
-        />
-      </Sidebar>
-      <SidebarInset>
+      
+      {/* Main Content */}
+      <div className="w-full h-full">
         <Outlet />
-      </SidebarInset>
+      </div>
     </div>
   );
 };
