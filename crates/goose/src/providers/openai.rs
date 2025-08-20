@@ -22,12 +22,10 @@ use super::utils::{
 };
 use crate::config::custom_providers::CustomProviderConfig;
 use crate::conversation::message::Message;
-use crate::conversation::Conversation;
 use crate::impl_provider_default;
 use crate::model::ModelConfig;
 use crate::providers::base::MessageStream;
 use crate::providers::formats::openai::response_to_streaming_message;
-use crate::utils::safe_truncate;
 use rmcp::model::Tool;
 
 pub const OPEN_AI_DEFAULT_MODEL: &str = "gpt-4o";
@@ -260,27 +258,6 @@ impl Provider for OpenAiProvider {
             // Fall back to regular complete
             self.complete(system, messages, tools).await
         }
-    }
-
-    async fn generate_session_name(
-        &self,
-        messages: &Conversation,
-    ) -> Result<String, ProviderError> {
-        let context = self.get_initial_user_messages(messages);
-        let prompt = self.create_session_name_prompt(&context);
-        let message = Message::user().with_text(&prompt);
-
-        // Use the fast model for session naming
-        let result = self
-            .complete_fast(
-                "Reply with only a description in four words or less",
-                &[message],
-                &[],
-            )
-            .await?;
-
-        let description = result.0.as_concat_text();
-        Ok(safe_truncate(&description, 100))
     }
 
     async fn fetch_supported_models(&self) -> Result<Option<Vec<String>>, ProviderError> {

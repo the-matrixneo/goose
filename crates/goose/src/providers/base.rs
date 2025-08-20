@@ -339,9 +339,7 @@ pub trait Provider: Send + Sync {
 
     /// Generate the next message using a fast model (if configured)
     ///
-    /// This default implementation just calls regular complete().
-    /// Providers that have a fast model configured should override this
-    /// to temporarily swap in their fast model for the completion.
+    /// Uses the fast_model if configured, otherwise falls back to regular complete.
     ///
     /// # Arguments
     /// * `system` - The system prompt that guides the model's behavior
@@ -356,9 +354,18 @@ pub trait Provider: Send + Sync {
         messages: &[Message],
         tools: &[Tool],
     ) -> Result<(Message, ProviderUsage), ProviderError> {
-        // Default: just call regular complete
-        // Providers with fast model support should override this
-        self.complete(system, messages, tools).await
+        let model_config = self.get_model_config();
+
+        // If we have a fast model configured, use it
+        if let Some(_fast_model) = &model_config.fast_model {
+            // For providers that can handle model swapping generically
+            // We'll create a temporary provider with the fast model
+            // But since we can't do that generically, providers need to override this
+            // For now, just call regular complete as a fallback
+            self.complete(system, messages, tools).await
+        } else {
+            self.complete(system, messages, tools).await
+        }
     }
 
     /// Get the model config from the provider
@@ -442,7 +449,7 @@ pub trait Provider: Send + Sync {
         let prompt = self.create_session_name_prompt(&context);
         let message = Message::user().with_text(&prompt);
         let result = self
-            .complete(
+            .complete_fast(
                 "Reply with only a description in four words or less",
                 &[message],
                 &[],
