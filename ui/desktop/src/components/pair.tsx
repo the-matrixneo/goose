@@ -226,8 +226,11 @@ export default function Pair({
 
   // Custom main layout props to override background completely
   const customMainLayoutProps = {
-    backgroundColor: '', // Remove any background class
-    style: { backgroundColor: 'transparent' }, // Force transparent background with inline style
+    backgroundColor: 'transparent', // Use transparent instead of empty string
+    style: { 
+      backgroundColor: 'transparent',
+      background: 'transparent'
+    }, // Force transparent background with inline style
   };
 
   // Custom content before messages
@@ -236,13 +239,13 @@ export default function Pair({
   };
 
   return (
-    <div className="flex flex-col h-full relative">
+    <div className="flex flex-col h-full relative bg-transparent">
       {/* Global background - no blur for dashboard */}
       <GlobalBackground blur={false} opacity={1} />
       
       {/* Centered chat content */}
-      <div className="relative z-10 flex justify-center h-full">
-        <div className="w-full max-w-[1000px] h-full">
+      <div className="relative z-10 flex justify-center h-full bg-transparent">
+        <div className="w-full max-w-[1000px] h-full bg-transparent">
           <BaseChat
             chat={chat}
             setChat={setChat}
