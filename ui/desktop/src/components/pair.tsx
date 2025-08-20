@@ -312,7 +312,7 @@ export default function Pair({
 
   // Custom content before messages
   const renderBeforeMessages = () => {
-    return <div>{/* Any Pair-specific content before messages can go here */}</div>;
+    return <div className="pt-14">{/* Space above the first message for new navigation */}</div>;
   };
 
   // Fixed blur intensity and background color based on theme - matching home page styling
@@ -348,7 +348,7 @@ export default function Pair({
       />
       
       {/* Centered chat content */}
-      <div className="relative z-10 flex justify-center h-full bg-transparent pt-14"> {/* Added pt-14 for top spacing */}
+      <div className="relative z-10 flex justify-center h-full bg-transparent">
         <div className="w-full max-w-[1000px] h-full bg-transparent">
           <BaseChat
             chat={chat}
