@@ -1,47 +1,3 @@
-/**
- * BaseChat Component
- *
- * BaseChat is the foundational chat component that provides the core conversational interface
- * for the Goose Desktop application. It serves as the shared base for both Hub and Pair components,
- * offering a flexible and extensible chat experience.
- *
- * Key Responsibilities:
- * - Manages the complete chat lifecycle (messages, input, submission, responses)
- * - Handles file drag-and-drop functionality with preview generation
- * - Integrates with multiple specialized hooks for chat engine, recipes, sessions, etc.
- * - Provides context management and session summarization capabilities
- * - Supports both user and assistant message rendering with tool call integration
- * - Manages loading states, error handling, and retry functionality
- * - Offers customization points through render props and configuration options
- *
- * Architecture:
- * - Uses a provider pattern (ChatContextManagerProvider) for state management
- * - Leverages composition through render props for flexible UI customization
- * - Integrates with multiple custom hooks for separation of concerns:
- *   - useChatEngine: Core chat functionality and API integration
- *   - useRecipeManager: Recipe/agent configuration management
- *   - useSessionContinuation: Session persistence and resumption
- *   - useFileDrop: Drag-and-drop file handling with previews
- *   - useCostTracking: Token usage and cost calculation
- *
- * Customization Points:
- * - renderHeader(): Custom header content (used by Hub for insights/recipe controls)
- * - renderBeforeMessages(): Content before message list (used by Hub for SessionInsights)
- * - renderAfterMessages(): Content after message list
- * - customChatInputProps: Props passed to ChatInput for specialized behavior
- * - customMainLayoutProps: Props passed to MainPanelLayout
- * - contentClassName: Custom CSS classes for the content area
- *
- * File Handling:
- * - Supports drag-and-drop of files with visual feedback
- * - Generates image previews for supported file types
- * - Integrates dropped files with chat input for seamless attachment
- * - Uses data-drop-zone="true" to designate safe drop areas
- *
- * The component is designed to be the single source of truth for chat functionality
- * while remaining flexible enough to support different UI contexts (Hub vs Pair).
- */
-
 import React, { useEffect, useContext, createContext, useRef, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { SearchView } from './conversation/SearchView';
@@ -202,7 +158,7 @@ function BaseChatContent({
     recipeAccepted,
     handleRecipeAccept,
     handleRecipeCancel,
-  } = useRecipeManager(messages, location.state);
+  } = useRecipeManager(messages || [], location.state);
 
   // Reset recipe usage tracking when recipe changes
   useEffect(() => {
@@ -214,8 +170,8 @@ function BaseChatContent({
       setCurrentRecipeTitle(newTitle);
 
       const isSwitchingBetweenRecipes = previousTitle && newTitle;
-      const isInitialRecipeLoad = !previousTitle && newTitle && messages.length === 0;
-      const hasExistingConversation = newTitle && messages.length > 0;
+      const isInitialRecipeLoad = !previousTitle && newTitle && messages && messages.length === 0;
+      const hasExistingConversation = newTitle && messages && messages.length > 0;
 
       if (isSwitchingBetweenRecipes) {
         console.log('Switching from recipe:', previousTitle, 'to:', newTitle);
@@ -228,7 +184,7 @@ function BaseChatContent({
         setHasStartedUsingRecipe(true);
       }
     }
-  }, [recipeConfig?.title, currentRecipeTitle, messages.length, setMessages, setAncestorMessages]);
+  }, [recipeConfig?.title, currentRecipeTitle, messages, setMessages, setAncestorMessages]);
 
   // Handle recipe auto-execution
   useEffect(() => {
@@ -261,7 +217,7 @@ function BaseChatContent({
 
   useEffect(() => {
     window.electron.logInfo(
-      'Initial messages when resuming session: ' + JSON.stringify(chat.messages, null, 2)
+      'Initial messages when resuming session: ' + JSON.stringify(chat.messages || [], null, 2)
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Empty dependency array means this runs once on mount
@@ -280,7 +236,7 @@ function BaseChatContent({
       summarizedThread.length > 0
         ? () => {
             resetMessagesWithSummary(
-              messages,
+              messages || [],
               setMessages,
               ancestorMessages,
               setAncestorMessages,
@@ -333,6 +289,10 @@ function BaseChatContent({
     }
   }, []);
 
+  // Ensure we have messages array to avoid errors
+  const safeMessages = messages || [];
+  const safeFilteredMessages = filteredMessages || [];
+
   return (
     <div className="h-full flex flex-col min-h-0">
       <MainPanelLayout
@@ -349,7 +309,7 @@ function BaseChatContent({
         {/* Chat container with sticky recipe header */}
         <div className="flex flex-col flex-1 mb-0.5 min-h-0 relative">
           {/* Only show ScrollArea with glassmorphism when there are messages or recipes */}
-          {(filteredMessages.length > 0 || 
+          {(safeFilteredMessages.length > 0 || 
             (recipeConfig && recipeAccepted && hasStartedUsingRecipe) ||
             (recipeConfig && recipeAccepted && !hasStartedUsingRecipe && !suppressEmptyState)) ? (
             <ScrollArea
@@ -414,12 +374,12 @@ function BaseChatContent({
                     {disableSearch ? (
                       // Render messages without SearchView wrapper when search is disabled
                       <ProgressiveMessageList
-                        messages={filteredMessages}
+                        messages={safeFilteredMessages}
                         chat={chat}
                         toolCallNotifications={toolCallNotifications}
                         append={append}
                         appendMessage={(newMessage) => {
-                          const updatedMessages = [...messages, newMessage];
+                          const updatedMessages = [...safeMessages, newMessage];
                           setMessages(updatedMessages);
                         }}
                         isUserMessage={isUserMessage}
@@ -430,12 +390,12 @@ function BaseChatContent({
                       // Render messages with SearchView wrapper when search is enabled
                       <SearchView>
                         <ProgressiveMessageList
-                          messages={filteredMessages}
+                          messages={safeFilteredMessages}
                           chat={chat}
                           toolCallNotifications={toolCallNotifications}
                           append={append}
                           appendMessage={(newMessage) => {
-                            const updatedMessages = [...messages, newMessage];
+                            const updatedMessages = [...safeMessages, newMessage];
                             setMessages(updatedMessages);
                           }}
                           isUserMessage={isUserMessage}
@@ -474,7 +434,7 @@ function BaseChatContent({
                                   };
 
                                   // Add the context message to trigger ContextHandler
-                                  const updatedMessages = [...messages, contextMessage];
+                                  const updatedMessages = [...safeMessages, contextMessage];
                                   setMessages(updatedMessages);
 
                                   // Clear the error state since we're handling it with summarization
@@ -487,7 +447,7 @@ function BaseChatContent({
                                 className="px-3 py-2 text-center whitespace-nowrap cursor-pointer text-textStandard border border-borderSubtle hover:bg-bgSubtle rounded-full inline-block transition-all duration-150"
                                 onClick={async () => {
                                   // Find the last user message
-                                  const lastUserMessage = messages.reduceRight(
+                                  const lastUserMessage = safeMessages.reduceRight(
                                     (found, m) => found || (m.role === 'user' ? m : null),
                                     null as Message | null
                                   );
@@ -516,7 +476,7 @@ function BaseChatContent({
           ) : null}
 
           {/* PopularChatTopics - rendered outside container when no messages/recipes */}
-          {showPopularTopics && filteredMessages.length === 0 && !recipeConfig && !suppressEmptyState && (
+          {showPopularTopics && safeFilteredMessages.length === 0 && !recipeConfig && !suppressEmptyState && (
             <div className="absolute inset-0 flex items-end justify-start p-6">
               <PopularChatTopics 
                 append={(text: string) => append(text)} 
@@ -557,7 +517,7 @@ function BaseChatContent({
               outputTokens={sessionOutputTokens || localOutputTokens}
               droppedFiles={droppedFiles}
               onFilesProcessed={() => setDroppedFiles([])} // Clear dropped files after processing
-              messages={messages}
+              messages={safeMessages}
               setMessages={setMessages}
               disableAnimation={disableAnimation}
               sessionCosts={sessionCosts}
