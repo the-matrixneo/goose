@@ -33,12 +33,12 @@ export const MessageQueue: React.FC<MessageQueueProps> = ({
   className = '',
   isPaused = false,
 }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true);
   const [draggedItem, setDraggedItem] = useState<string | null>(null);
   const [dragOverItem, setDragOverItem] = useState<string | null>(null);
   const [hoveredMessage, setHoveredMessage] = useState<string | null>(null);
   const [editingMessage, setEditingMessage] = useState<string | null>(null);
-  const [editContent, setEditContent] = useState<string>("");
+  const [editContent, setEditContent] = useState<string>('');
 
   if (queuedMessages.length === 0) {
     return null;
@@ -62,12 +62,12 @@ export const MessageQueue: React.FC<MessageQueueProps> = ({
 
   const handleDrop = (e: React.DragEvent, targetMessageId: string) => {
     e.preventDefault();
-    
+
     if (!draggedItem || !onReorderMessages) return;
-    
-    const draggedIndex = queuedMessages.findIndex(msg => msg.id === draggedItem);
-    const targetIndex = queuedMessages.findIndex(msg => msg.id === targetMessageId);
-    
+
+    const draggedIndex = queuedMessages.findIndex((msg) => msg.id === draggedItem);
+    const targetIndex = queuedMessages.findIndex((msg) => msg.id === targetMessageId);
+
     if (draggedIndex === -1 || targetIndex === -1 || draggedIndex === targetIndex) {
       setDraggedItem(null);
       setDragOverItem(null);
@@ -77,7 +77,7 @@ export const MessageQueue: React.FC<MessageQueueProps> = ({
     const newMessages = [...queuedMessages];
     const [removed] = newMessages.splice(draggedIndex, 1);
     newMessages.splice(targetIndex, 0, removed);
-    
+
     onReorderMessages(newMessages);
     setDraggedItem(null);
     setDragOverItem(null);
@@ -104,7 +104,7 @@ export const MessageQueue: React.FC<MessageQueueProps> = ({
     return (
       <div className={`relative ${className}`}>
         {/* Compact Header */}
-        <div 
+        <div
           className="flex items-center justify-between px-4 py-2.5 bg-background border-b border-border/20 cursor-pointer hover:bg-muted/30 transition-all duration-200"
           onClick={() => setIsExpanded(true)}
         >
@@ -119,17 +119,16 @@ export const MessageQueue: React.FC<MessageQueueProps> = ({
                 {isPaused ? 'Paused' : 'Next'}
               </span>
             </div>
-            
+
             {/* Next message preview */}
             <div className="flex-1 min-w-0">
               <p className="text-sm text-muted-foreground truncate" title={nextMessage.content}>
-                {nextMessage.content.length > 40 
-                  ? `${nextMessage.content.substring(0, 40)}...` 
-                  : nextMessage.content
-                }
+                {nextMessage.content.length > 40
+                  ? `${nextMessage.content.substring(0, 40)}...`
+                  : nextMessage.content}
               </p>
             </div>
-            
+
             {/* Queue count */}
             {remainingCount > 0 && (
               <div className="flex items-center gap-1 text-xs text-muted-foreground bg-bgSubtle border border-borderSubtle px-2 py-1 rounded-full font-medium">
@@ -137,7 +136,7 @@ export const MessageQueue: React.FC<MessageQueueProps> = ({
               </div>
             )}
           </div>
-          
+
           <div className="flex items-center gap-2">
             {/* Quick Send Now button */}
             {onStopAndSend && (
@@ -154,7 +153,7 @@ export const MessageQueue: React.FC<MessageQueueProps> = ({
                 <Send className="w-3 h-3" />
               </Button>
             )}
-            
+
             {/* Expand button */}
             <Button
               variant="ghost"
@@ -204,12 +203,12 @@ export const MessageQueue: React.FC<MessageQueueProps> = ({
               {isPaused ? 'Queue Paused' : 'Message Queue'}
             </span>
             <span className="text-xs text-muted-foreground">
-              {queuedMessages.length} message{queuedMessages.length !== 1 ? 's' : ''} 
+              {queuedMessages.length} message{queuedMessages.length !== 1 ? 's' : ''}
               {isPaused ? ' waiting' : ' queued'}
             </span>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-2">
           {queuedMessages.length > 1 && (
             <Button
@@ -221,7 +220,7 @@ export const MessageQueue: React.FC<MessageQueueProps> = ({
               Clear All
             </Button>
           )}
-          
+
           {/* Collapse button */}
           <Button
             variant="ghost"
@@ -240,11 +239,13 @@ export const MessageQueue: React.FC<MessageQueueProps> = ({
         <div className="px-4 py-2 bg-amber-50/80 dark:bg-amber-900/20 border-b border-amber-200/50 dark:border-amber-800/50">
           <div className="flex items-center gap-2 text-sm text-amber-800 dark:text-amber-200">
             <Zap className="w-4 h-4" />
-            <span>Queue paused by interruption. Use "Send Now" or add a new message to resume.</span>
+            <span>
+              Queue paused by interruption. Use "Send Now" or add a new message to resume.
+            </span>
           </div>
         </div>
       )}
-      
+
       {/* Message Bubbles */}
       <div className="p-4 space-y-3 bg-background max-h-80 overflow-y-auto">
         {queuedMessages.map((message, index) => (
@@ -261,36 +262,41 @@ export const MessageQueue: React.FC<MessageQueueProps> = ({
             onMouseLeave={() => setHoveredMessage(null)}
           >
             {/* Main message bubble */}
-            <div className={`relative flex items-center gap-3 rounded-xl px-4 py-3 border transition-all duration-300 ease-out ${
-              draggedItem === message.id 
-                ? 'bg-info/20 border-info opacity-60 scale-105 shadow-lg rotate-2' 
-                : dragOverItem === message.id
-                ? 'bg-green-100/80 border-green-400 shadow-lg dark:bg-green-950/50 dark:border-green-600 scale-102'
-                : hoveredMessage === message.id
-                ? 'bg-muted/90 border-border shadow-md scale-101'
-                : 'bg-muted/60 hover:bg-muted/80 border-border/60 hover:border-border dark:border-border/60 dark:hover:border-border'
-            } backdrop-blur-sm`}>
-              
+            <div
+              className={`relative flex items-center gap-3 rounded-xl px-4 py-3 border transition-all duration-300 ease-out ${
+                draggedItem === message.id
+                  ? 'bg-info/20 border-info opacity-60 scale-105 shadow-lg rotate-2'
+                  : dragOverItem === message.id
+                    ? 'bg-green-100/80 border-green-400 shadow-lg dark:bg-green-950/50 dark:border-green-600 scale-102'
+                    : hoveredMessage === message.id
+                      ? 'bg-muted/90 border-border shadow-md scale-101'
+                      : 'bg-muted/60 hover:bg-muted/80 border-border/60 hover:border-border dark:border-border/60 dark:hover:border-border'
+              } backdrop-blur-sm`}
+            >
               {/* Priority indicator */}
               <div className="flex items-center gap-2">
-                <div className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold transition-colors ${
-                  index === 0 
-                    ? 'bg-blue-500 text-white shadow-md' 
-                    : 'bg-muted text-muted-foreground'
-                }`}>
+                <div
+                  className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold transition-colors ${
+                    index === 0
+                      ? 'bg-blue-500 text-white shadow-md'
+                      : 'bg-muted text-muted-foreground'
+                  }`}
+                >
                   {index + 1}
                 </div>
-                
+
                 {/* Drag handle */}
                 {onReorderMessages && (
-                  <div className={`opacity-0 group-hover:opacity-60 hover:opacity-100 transition-all duration-200 cursor-grab active:cursor-grabbing ${
-                    hoveredMessage === message.id ? 'opacity-40' : ''
-                  }`}>
+                  <div
+                    className={`opacity-0 group-hover:opacity-60 hover:opacity-100 transition-all duration-200 cursor-grab active:cursor-grabbing ${
+                      hoveredMessage === message.id ? 'opacity-40' : ''
+                    }`}
+                  >
                     <GripVertical className="w-4 h-4 text-muted-foreground hover:text-foreground" />
                   </div>
                 )}
               </div>
-              
+
               {/* Message content */}
               <div className="flex-1 min-w-0">
                 {editingMessage === message.id ? (
@@ -316,7 +322,7 @@ export const MessageQueue: React.FC<MessageQueueProps> = ({
                           if (onTriggerQueueProcessing) {
                             setTimeout(onTriggerQueueProcessing, 100);
                           }
-                          setEditContent("");
+                          setEditContent('');
                         }}
                         className="h-6 px-2 text-xs"
                       >
@@ -332,7 +338,7 @@ export const MessageQueue: React.FC<MessageQueueProps> = ({
                           if (onTriggerQueueProcessing) {
                             setTimeout(onTriggerQueueProcessing, 100);
                           }
-                          setEditContent("");
+                          setEditContent('');
                         }}
                         className="h-6 px-2 text-xs"
                       >
@@ -341,8 +347,8 @@ export const MessageQueue: React.FC<MessageQueueProps> = ({
                     </div>
                   </div>
                 ) : (
-                  <p 
-                    className="text-sm text-foreground leading-relaxed cursor-pointer hover:bg-muted/30 rounded px-1 py-0.5 transition-colors" 
+                  <p
+                    className="text-sm text-foreground leading-relaxed cursor-pointer hover:bg-muted/30 rounded px-1 py-0.5 transition-colors"
                     title={`${message.content} (Click to edit)`}
                     onClick={() => {
                       setEditingMessage(message.id);
@@ -350,20 +356,19 @@ export const MessageQueue: React.FC<MessageQueueProps> = ({
                       setEditContent(message.content);
                     }}
                   >
-                    {message.content.length > 80 
-                      ? `${message.content.substring(0, 80)}...` 
-                      : message.content
-                    }
+                    {message.content.length > 80
+                      ? `${message.content.substring(0, 80)}...`
+                      : message.content}
                   </p>
                 )}
               </div>
-              
+
               {/* Right side actions */}
               <div className="flex items-center gap-2 flex-shrink-0">
                 <span className="text-xs text-muted-foreground font-mono">
                   {formatTimestamp(message.timestamp)}
                 </span>
-                
+
                 {/* Send Now button - inline */}
                 {onStopAndSend && (
                   <Button
@@ -372,18 +377,20 @@ export const MessageQueue: React.FC<MessageQueueProps> = ({
                     onClick={() => onStopAndSend(message.id)}
                     disabled={editingMessage === message.id}
                     className={`h-7 w-7 p-0 rounded-full transition-all duration-200 ${
-                      editingMessage === message.id 
-                        ? "opacity-30 cursor-not-allowed" 
-                        : "hover:bg-muted/50"
+                      editingMessage === message.id
+                        ? 'opacity-30 cursor-not-allowed'
+                        : 'hover:bg-muted/50'
                     }`}
-                    title={editingMessage === message.id 
-                      ? "Cannot send while editing" 
-                      : "Stop current processing and send this message now"}
+                    title={
+                      editingMessage === message.id
+                        ? 'Cannot send while editing'
+                        : 'Stop current processing and send this message now'
+                    }
                   >
                     <Send className="w-3 h-3" />
                   </Button>
                 )}
-                
+
                 {/* Remove button */}
                 <Button
                   variant="ghost"
@@ -396,12 +403,12 @@ export const MessageQueue: React.FC<MessageQueueProps> = ({
                 </Button>
               </div>
             </div>
-            
+
             {/* Drop indicator with enhanced visuals */}
             {dragOverItem === message.id && draggedItem !== message.id && (
               <div className="absolute inset-0 border-2 border-green-400 rounded-xl pointer-events-none animate-pulse bg-green-100/20 dark:bg-green-900/20" />
             )}
-            
+
             {/* Next up indicator */}
             {index === 0 && !isPaused && (
               <div className="absolute -top-2 -right-2 bg-blue-500 text-white text-xs px-2 py-1 rounded-full font-medium shadow-md">
@@ -411,7 +418,7 @@ export const MessageQueue: React.FC<MessageQueueProps> = ({
           </div>
         ))}
       </div>
-      
+
       {/* Drag instructions */}
       {onReorderMessages && queuedMessages.length > 1 && (
         <div className="px-4 pb-3 text-xs text-muted-foreground flex items-center gap-2 opacity-60 hover:opacity-100 transition-opacity">
