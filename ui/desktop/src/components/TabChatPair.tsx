@@ -52,13 +52,20 @@ export default function TabChatPair({
   setIsGoosehintsModalOpen: (isOpen: boolean) => void;
 }) {
   // Initialize tabs state with the provided chat
-  const [tabs, setTabs] = useState<ChatType[]>([{
-    ...chat,
-    messages: chat.messages || []
-  }]);
+  const [tabs, setTabs] = useState<ChatType[]>(() => {
+    // Ensure we always have at least one tab with the current chat
+    return [{
+      ...chat,
+      messages: chat.messages || []
+    }];
+  });
   
   // Track active tab ID
   const [activeTabId, setActiveTabId] = useState<string>(chat.id);
+  
+  // Log for debugging
+  console.log('Current tabs:', tabs.map(tab => ({ id: tab.id, title: tab.title })));
+  console.log('Active tab ID:', activeTabId);
   
   // Get active chat
   const activeChat = tabs.find(tab => tab.id === activeTabId) || tabs[0];
@@ -119,6 +126,7 @@ export default function TabChatPair({
       recipeConfig: null,
     };
     
+    console.log('Creating new tab:', newChat.id);
     setTabs(prevTabs => [...prevTabs, newChat]);
     setActiveTabId(newChat.id);
   };
@@ -127,6 +135,8 @@ export default function TabChatPair({
   const handleCloseTab = (tabId: string) => {
     // Don't close if it's the only tab
     if (tabs.length <= 1) return;
+    
+    console.log('Closing tab:', tabId);
     
     // If closing the active tab, switch to another tab
     if (tabId === activeTabId) {
