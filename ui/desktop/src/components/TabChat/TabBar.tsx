@@ -25,60 +25,18 @@ const TabBar: React.FC<TabBarProps> = ({
   onTabClose,
   onNewTab
 }) => {
-  const [scrollAreaWidth, setScrollAreaWidth] = useState<number>(0);
   const scrollAreaRef = useRef<ScrollAreaHandle>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const hasScrolledToActiveTab = useRef<boolean>(false);
 
-  // Scroll to active tab when it changes or tabs change
-  // Using a layout effect to scroll before paint
+  // Update scroll area width on resize - no automatic scrolling for now
   useEffect(() => {
-    // Only try to scroll if we haven't already scrolled to this tab
-    if (!hasScrolledToActiveTab.current) {
-      // Use requestAnimationFrame to ensure DOM is ready
-      requestAnimationFrame(() => {
-        if (containerRef.current) {
-          const activeTabElement = containerRef.current.querySelector(`[data-tab-id="${activeTabId}"]`);
-          if (activeTabElement && activeTabElement instanceof HTMLElement) {
-            // Get the scroll container - this should be the viewport of the ScrollArea
-            const scrollViewport = containerRef.current.closest('[data-radix-scroll-area-viewport]');
-            if (scrollViewport) {
-              // Calculate position to center the active tab
-              const tabRect = activeTabElement.getBoundingClientRect();
-              const scrollRect = scrollViewport.getBoundingClientRect();
-              
-              // Calculate the center position
-              const leftOffset = tabRect.left - scrollRect.left;
-              const centerPosition = leftOffset - (scrollRect.width / 2) + (tabRect.width / 2);
-              
-              // Scroll to position
-              scrollViewport.scrollLeft += centerPosition;
-              
-              // Mark that we've scrolled to this tab
-              hasScrolledToActiveTab.current = true;
-            }
-          }
-        }
-      });
-    }
-  }, [activeTabId]);
-
-  // Reset the scroll flag when activeTabId changes
-  useEffect(() => {
-    hasScrolledToActiveTab.current = false;
-  }, [activeTabId]);
-
-  // Update scroll area width on resize
-  useEffect(() => {
-    const updateWidth = () => {
-      if (containerRef.current) {
-        setScrollAreaWidth(containerRef.current.offsetWidth);
-      }
+    const handleResize = () => {
+      // This is just to ensure the component responds to window resizing
+      // No actual state updates to prevent infinite loops
     };
 
-    updateWidth();
-    window.addEventListener('resize', updateWidth);
-    return () => window.removeEventListener('resize', updateWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   return (
