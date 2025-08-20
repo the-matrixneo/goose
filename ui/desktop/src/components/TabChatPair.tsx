@@ -13,6 +13,7 @@ const StableBaseChat: React.FC<{
   setChat: (chat: ChatType) => void;
   setView: (view: View, viewOptions?: ViewOptions) => void;
   setIsGoosehintsModalOpen: (isOpen: boolean) => void;
+  key: string; // Add key prop to force re-render when active tab changes
 }> = React.memo(({ chat, setChat, setView, setIsGoosehintsModalOpen }) => {
   return (
     <div className="relative z-10 flex justify-center h-full bg-transparent flex-grow">
@@ -34,10 +35,6 @@ const StableBaseChat: React.FC<{
       </div>
     </div>
   );
-}, (prevProps, nextProps) => {
-  // Only re-render if the chat ID changes or messages length changes
-  return prevProps.chat.id === nextProps.chat.id && 
-         prevProps.chat.messages?.length === nextProps.chat.messages?.length;
 });
 
 export default function TabChatPair({
@@ -77,12 +74,9 @@ export default function TabChatPair({
   };
   
   // Update parent chat state when active tab changes - but only when tab ID changes
-  const prevTabIdRef = React.useRef(activeTabId);
   useEffect(() => {
-    if (prevTabIdRef.current !== activeTabId) {
-      prevTabIdRef.current = activeTabId;
-      setChat(safeActiveChat);
-    }
+    console.log('Active tab changed to:', activeTabId);
+    setChat(safeActiveChat);
   }, [activeTabId, safeActiveChat, setChat]);
   
   const location = useLocation();
@@ -118,17 +112,30 @@ export default function TabChatPair({
   
   // Create a new tab
   const handleNewTab = () => {
+    const newId = generateSessionId();
     const newChat: ChatType = {
-      id: generateSessionId(),
-      title: DEFAULT_CHAT_TITLE,
+      id: newId,
+      title: `Chat ${tabs.length + 1}`,
       messages: [], // Initialize with empty array
       messageHistoryIndex: 0,
       recipeConfig: null,
     };
     
-    console.log('Creating new tab:', newChat.id);
+    console.log('Creating new tab with ID:', newId);
+    
+    // Add the new tab
     setTabs(prevTabs => [...prevTabs, newChat]);
-    setActiveTabId(newChat.id);
+    
+    // Switch to the new tab
+    setActiveTabId(newId);
+    
+    // Update parent chat state
+    setChat(newChat);
+    
+    // Log the updated tabs
+    setTimeout(() => {
+      console.log('Updated tabs after adding new tab:', tabs.length + 1);
+    }, 0);
   };
   
   // Close a tab
@@ -142,7 +149,11 @@ export default function TabChatPair({
     if (tabId === activeTabId) {
       const tabIndex = tabs.findIndex(tab => tab.id === tabId);
       const newActiveIndex = tabIndex === 0 ? 1 : tabIndex - 1;
-      setActiveTabId(tabs[newActiveIndex].id);
+      const newActiveId = tabs[newActiveIndex].id;
+      setActiveTabId(newActiveId);
+      
+      // Update parent chat state
+      setChat(tabs[newActiveIndex]);
     }
     
     // Remove the tab
@@ -151,6 +162,8 @@ export default function TabChatPair({
   
   // Update the active chat - with optimized update logic
   const handleSetActiveChat = (updatedChat: ChatType) => {
+    console.log('Updating active chat:', updatedChat.id);
+    
     // Ensure the updated chat has a messages array
     const safeUpdatedChat = {
       ...updatedChat,
@@ -182,8 +195,9 @@ export default function TabChatPair({
         onNewTab={handleNewTab}
       />
       
-      {/* Stable BaseChat wrapper */}
+      {/* Stable BaseChat wrapper with key to force re-render when active tab changes */}
       <StableBaseChat
+        key={activeTabId} // Force re-render when active tab changes
         chat={safeActiveChat}
         setChat={handleSetActiveChat}
         setView={setView}
