@@ -64,7 +64,7 @@ export default function Pair({
     if (location.state?.resetChat && location.state?.recipeConfig) {
       // Reset the chat to start fresh with the recipe
       const newChat = {
-        id: chat.id, // Keep the same ID to maintain the session
+        sessionId: chat.sessionId, // Keep the same ID to maintain the session
         title: location.state.recipeConfig.title || 'Recipe Chat',
         messages: [], // Clear messages to start fresh
         messageHistoryIndex: 0,
@@ -77,7 +77,7 @@ export default function Pair({
       window.history.replaceState({}, '', '/pair');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.state, chat.id]);
+  }, [location.state, chat.sessionId]);
 
   // Handle initial message from hub page
   useEffect(() => {

@@ -1,6 +1,4 @@
-import { getApiUrl } from '../config';
 import { FullExtensionConfig } from '../extensions';
-import { initializeAgent } from '../agent';
 import {
   initializeBundledExtensions,
   syncBundledExtensions,
@@ -17,6 +15,7 @@ import {
   addExtension as apiAddExtension,
   updateSessionConfig,
   extendPrompt,
+  updateAgentProvider,
 } from '../api';
 import { addSubRecipesToAgent } from '../recipe/add_sub_recipe_on_agent';
 
@@ -195,6 +194,7 @@ export const migrateExtensionsToSettingsV3 = async () => {
 };
 
 export const initializeSystem = async (
+  sessionId: string,
   provider: string,
   model: string,
   options?: {
@@ -204,7 +204,13 @@ export const initializeSystem = async (
 ) => {
   try {
     console.log('initializing agent with provider', provider, 'model', model);
-    await initializeAgent({ provider, model });
+    await updateAgentProvider({
+      body: {
+        session_id: sessionId,
+        provider,
+        model,
+      },
+    });
 
     // Get recipeConfig directly here
     const recipeConfig = window.appConfig?.get?.('recipe');

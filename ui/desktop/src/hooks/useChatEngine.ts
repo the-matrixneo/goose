@@ -21,10 +21,7 @@ const isUserMessage = (message: Message): boolean => {
   if (message.role === 'assistant') {
     return false;
   }
-  if (message.content.every((c) => c.type === 'toolConfirmationRequest')) {
-    return false;
-  }
-  return true;
+  return !message.content.every((c) => c.type === 'toolConfirmationRequest');
 };
 
 interface UseChatEngineProps {
@@ -91,16 +88,18 @@ export const useChatEngine = ({
     input: _input,
     setInput: _setInput,
     handleInputChange: _handleInputChange,
-    handleSubmit: _submitMessage,
     updateMessageStreamBody,
     notifications,
     sessionMetadata,
     setError,
   } = useMessageStream({
     api: getApiUrl('/reply'),
-    id: chat.id,
+    id: chat.sessionId,
     initialMessages: chat.messages,
-    body: { session_id: chat.id, session_working_dir: window.appConfig.get('GOOSE_WORKING_DIR') },
+    body: {
+      session_id: chat.sessionId,
+      session_working_dir: window.appConfig.get('GOOSE_WORKING_DIR'),
+    },
     onFinish: async (_message, _reason) => {
       stopPowerSaveBlocker();
 
@@ -116,7 +115,7 @@ export const useChatEngine = ({
 
       // Always emit refresh event when message stream finishes for new sessions
       // Check if this is a new session by looking at the current session ID format
-      const isNewSession = chat.id && chat.id.match(/^\d{8}_\d{6}$/);
+      const isNewSession = chat.sessionId && chat.sessionId.match(/^\d{8}_\d{6}$/);
       if (isNewSession) {
         console.log(
           'ChatEngine: Message stream finished for new session, emitting message-stream-finished event'
@@ -139,7 +138,7 @@ export const useChatEngine = ({
             isTokenLimitError: (error as Error & { isTokenLimitError?: boolean }).isTokenLimitError,
             errorStack: error.stack,
             timestamp: new Date().toISOString(),
-            chatId: chat.id,
+            sessionId: chat.sessionId,
           },
           null,
           2
@@ -203,7 +202,7 @@ export const useChatEngine = ({
   useEffect(() => {
     const fetchSessionTokens = async () => {
       try {
-        const sessionDetails = await fetchSessionDetails(chat.id);
+        const sessionDetails = await fetchSessionDetails(chat.sessionId);
         setSessionTokenCount(sessionDetails.metadata.total_tokens || 0);
         setSessionInputTokens(sessionDetails.metadata.accumulated_input_tokens || 0);
         setSessionOutputTokens(sessionDetails.metadata.accumulated_output_tokens || 0);
@@ -211,10 +210,10 @@ export const useChatEngine = ({
         console.error('Error fetching session token count:', err);
       }
     };
-    if (chat.id) {
+    if (chat.sessionId) {
       fetchSessionTokens();
     }
-  }, [chat.id, messages]);
+  }, [chat.sessionId, messages]);
 
   // Update token counts when sessionMetadata changes from the message stream
   useEffect(() => {

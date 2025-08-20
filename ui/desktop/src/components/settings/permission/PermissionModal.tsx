@@ -40,7 +40,9 @@ export default function PermissionModal({ extensionName, onClose }: PermissionMo
   useEffect(() => {
     const fetchTools = async () => {
       try {
-        const response = await getTools({ query: { extension_name: extensionName } });
+        const response = await getTools({
+          query: { extension_name: extensionName, session_id: sessionId },
+        });
         if (response.error) {
           console.error('Failed to get tools');
         } else {

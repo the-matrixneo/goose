@@ -123,7 +123,7 @@ const PairRouteWrapper = ({
 
       // Convert session to chat format - this clears any existing recipe config
       const sessionChat: ChatType = {
-        id: resumedSession.session_id,
+        sessionId: resumedSession.session_id,
         title: resumedSession.metadata?.description || `ID: ${resumedSession.session_id}`,
         messages: resumedSession.messages,
         messageHistoryIndex: resumedSession.messages.length,
@@ -140,7 +140,7 @@ const PairRouteWrapper = ({
       console.log('Loading new recipe config in pair view:', recipeConfig.title);
 
       const updatedChat: ChatType = {
-        id: chatRef.current.id, // Keep the same ID
+        sessionId: chatRef.current.sessionId, // Keep the same ID
         title: recipeConfig.title || 'Recipe Chat',
         messages: [], // Clear messages to start fresh
         messageHistoryIndex: 0,
@@ -409,7 +409,7 @@ export default function App() {
 
   // Add separate state for pair chat to maintain its own conversation
   const [pairChat, setPairChat] = useState<ChatType>({
-    id: generateSessionId(),
+    sessionId: generateSessionId(),
     title: 'Pair Chat',
     messages: [],
     messageHistoryIndex: 0,
@@ -634,7 +634,7 @@ export default function App() {
       window.electron.off('recipe-decoded', handleRecipeDecoded);
       window.electron.off('recipe-decode-error', handleRecipeDecodeError);
     };
-  }, [setPairChat, pairChat.id]);
+  }, [setPairChat, pairChat.sessionId]);
 
   useEffect(() => {
     console.log('Setting up keyboard shortcuts');
@@ -951,8 +951,8 @@ export default function App() {
                       <ChatProvider
                         chat={pairChat}
                         setChat={setPairChat}
-                        contextKey={`pair-${pairChat.id}`}
-                        key={pairChat.id}
+                        contextKey={`pair-${pairChat.sessionId}`}
+                        key={pairChat.sessionId}
                       >
                         <PairRouteWrapper
                           chat={pairChat}

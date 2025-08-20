@@ -12,11 +12,6 @@
  *
  * Navigation Flow:
  * Hub (input submission) → Pair (new conversation with the submitted message)
- *
- * Unlike the previous implementation that used BaseChat, the Hub now uses only
- * ChatInput directly, which allows for clean separation between the landing page
- * and active conversation states. This ensures that every message submitted from
- * the Hub creates a brand new chat session in the Pair view.
  */
 
 import { useState } from 'react';
@@ -56,9 +51,9 @@ export default function Hub({
 
     if (combinedTextFromInput.trim()) {
       // Always create a completely new chat session with a unique ID for the PAIR
-      const newChatId = generateSessionId();
+      const sessionId = generateSessionId();
       const newPairChat = {
-        id: newChatId, // This generates a unique ID each time
+        sessionId: sessionId,
         title: DEFAULT_CHAT_TITLE,
         messages: [], // Always start with empty messages
         messageHistoryIndex: 0,
@@ -105,6 +100,7 @@ export default function Hub({
           disableAnimation={false}
           sessionCosts={undefined}
           setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
+          toolCount={0}
         />
 
         {showGame && <FlappyGoose onClose={() => setShowGame(false)} />}

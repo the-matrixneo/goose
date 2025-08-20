@@ -12,7 +12,7 @@ type UseChatArgs = {
 };
 export const useChat = ({ setIsLoadingSession, setView, setPairChat }: UseChatArgs) => {
   const [chat, setChat] = useState<ChatType>({
-    id: generateSessionId(),
+    sessionId: generateSessionId(),
     title: DEFAULT_CHAT_TITLE,
     messages: [],
     messageHistoryIndex: 0,
@@ -36,7 +36,7 @@ export const useChat = ({ setIsLoadingSession, setView, setPairChat }: UseChatAr
         // Only set view if we have valid session details
         if (sessionDetails && sessionDetails.session_id) {
           const sessionChat = {
-            id: sessionDetails.session_id,
+            sessionId: sessionDetails.session_id,
             title: sessionDetails.metadata?.description || `ID: ${sessionDetails.session_id}`,
             messages: sessionDetails.messages,
             messageHistoryIndex: sessionDetails.messages.length,

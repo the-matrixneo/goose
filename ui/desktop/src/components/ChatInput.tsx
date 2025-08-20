@@ -13,7 +13,6 @@ import { DirSwitcher } from './bottom_menu/DirSwitcher';
 import ModelsBottomBar from './settings/models/bottom_bar/ModelsBottomBar';
 import { BottomMenuModeSelection } from './bottom_menu/BottomMenuModeSelection';
 import { AlertType, useAlerts } from './alerts';
-import { useToolCount } from './alerts/useToolCount';
 import { useConfig } from './ConfigContext';
 import { useModelAndProvider } from './ModelAndProviderContext';
 import { useWhisper } from '../hooks/useWhisper';
@@ -76,6 +75,7 @@ interface ChatInputProps {
   recipeConfig?: Recipe | null;
   recipeAccepted?: boolean;
   initialPrompt?: string;
+  toolCount: number;
 }
 
 export default function ChatInput({
@@ -98,6 +98,7 @@ export default function ChatInput({
   recipeConfig,
   recipeAccepted,
   initialPrompt,
+  toolCount,
 }: ChatInputProps) {
   const [_value, setValue] = useState(initialValue);
   const [displayValue, setDisplayValue] = useState(initialValue); // For immediate visual feedback
@@ -110,7 +111,6 @@ export default function ChatInput({
   const dropdownRef: React.RefObject<HTMLDivElement> = useRef<HTMLDivElement>(
     null
   ) as React.RefObject<HTMLDivElement>;
-  const toolCount = useToolCount();
   const { isLoadingCompaction, handleManualCompaction } = useChatContextManager();
   const { getProviders, read } = useConfig();
   const { getCurrentModelAndProvider, currentModel, currentProvider } = useModelAndProvider();
@@ -841,6 +841,13 @@ export default function ChatInput({
     }
   };
 
+  const canSubmit =
+    !isLoading &&
+    !isLoadingCompaction &&
+    (displayValue.trim() ||
+      pastedImages.some((img) => img.filePath && !img.error && !img.isLoading) ||
+      allDroppedFiles.some((file) => !file.error && !file.isLoading));
+
   const handleKeyDown = (evt: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // If mention popover is open, handle arrow keys and enter
     if (mentionPopover.isOpen && mentionPopoverRef.current) {
@@ -892,12 +899,6 @@ export default function ChatInput({
       }
 
       evt.preventDefault();
-      const canSubmit =
-        !isLoading &&
-        !isLoadingCompaction &&
-        (displayValue.trim() ||
-          pastedImages.some((img) => img.filePath && !img.error && !img.isLoading) ||
-          allDroppedFiles.some((file) => !file.error && !file.isLoading));
       if (canSubmit) {
         performSubmit();
       }
@@ -906,12 +907,6 @@ export default function ChatInput({
 
   const onFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const canSubmit =
-      !isLoading &&
-      !isLoadingCompaction &&
-      (displayValue.trim() ||
-        pastedImages.some((img) => img.filePath && !img.error && !img.isLoading) ||
-        allDroppedFiles.some((file) => !file.error && !file.isLoading));
     if (canSubmit) {
       performSubmit();
     }
