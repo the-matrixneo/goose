@@ -28,7 +28,7 @@ import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { type View, ViewOptions } from '../App';
 import BaseChat from './BaseChat';
-import GlobalBackground from './GlobalBackground';
+import GlobalBlurOverlay from './GlobalBlurOverlay';
 import { useRecipeManager } from '../hooks/useRecipeManager';
 import { useIsMobile } from '../hooks/use-mobile';
 import { useSidebar } from './ui/sidebar';
@@ -329,24 +329,7 @@ export default function Pair({
 
   return (
     <div className="flex flex-col h-full relative bg-transparent">
-      {/* Image background implementation */}
-      <div className="fixed inset-0 -z-10" 
-        style={{
-          backgroundImage: `url('/background.jpg')`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-        }}
-      />
-      
-      {/* Fixed blur overlay - always present with consistent intensity */}
-      <div 
-        className="fixed inset-0 -z-5 pointer-events-none transition-colors duration-500"
-        style={{ 
-          backdropFilter: `blur(${blurIntensity}px)`,
-          backgroundColor: backgroundColor
-        }}
-      />
+      <GlobalBlurOverlay />
       
       {/* Centered chat content */}
       <div className="relative z-10 flex justify-center h-full bg-transparent">
