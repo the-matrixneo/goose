@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { FolderKey, ScrollText } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/Tooltip';
 import { Button } from './ui/button';
-import type { View } from '../App';
+import type { View } from '../utils/navigationUtils';
 import Stop from './ui/Stop';
 import { Attach, Send, Close, Microphone } from './icons';
 import { ChatState } from '../types/chatState';
@@ -141,7 +141,9 @@ export default function ChatInput({
   });
 
   const { alerts, addAlert, clearAlerts } = useAlerts();
-  const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const dropdownRef: React.RefObject<HTMLDivElement> = useRef<HTMLDivElement>(
+    null
+  ) as React.RefObject<HTMLDivElement>;
   const toolCount = useToolCount();
   const { isLoadingCompaction, handleManualCompaction } = useChatContextManager();
   const { getProviders, read } = useConfig();
