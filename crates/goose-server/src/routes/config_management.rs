@@ -830,8 +830,7 @@ pub fn routes(state: Arc<AppState>) -> Router {
 mod tests {
     use super::*;
 
-    #[tokio::test]
-    async fn test_read_model_limits() {
+    async fn create_test_state() -> Arc<AppState> {
         let test_state = AppState::new(
             Arc::new(goose::agents::Agent::default()),
             "test".to_string(),
@@ -845,6 +844,12 @@ mod tests {
             .await
             .unwrap();
         test_state.set_scheduler(sched).await;
+        test_state
+    }
+
+    #[tokio::test]
+    async fn test_read_model_limits() {
+        let test_state = create_test_state().await;
         let mut headers = HeaderMap::new();
         headers.insert("X-Secret-Key", "test".parse().unwrap());
 
@@ -868,5 +873,43 @@ mod tests {
         let gpt4_limit = limits.iter().find(|l| l.pattern == "gpt-4o");
         assert!(gpt4_limit.is_some());
         assert_eq!(gpt4_limit.unwrap().context_limit, 128_000);
+    }
+
+    #[tokio::test]
+    async fn test_get_provider_models_unknown_provider() {
+        let test_state = create_test_state().await;
+        let mut headers = HeaderMap::new();
+        headers.insert("X-Secret-Key", "test".parse().unwrap());
+
+        let result = get_provider_models(
+            State(test_state),
+            headers,
+            Path("unknown_provider".to_string()),
+        )
+        .await;
+
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn test_get_provider_models_openai_configured() {
+        std::env::set_var("OPENAI_API_KEY", "test-key");
+
+        let test_state = create_test_state().await;
+        let mut headers = HeaderMap::new();
+        headers.insert("X-Secret-Key", "test".parse().unwrap());
+
+        let result =
+            get_provider_models(State(test_state), headers, Path("openai".to_string())).await;
+
+        // The response should be INTERNAL_SERVER_ERROR since the API key is invalid
+        assert!(
+            result.is_err(),
+            "Expected error response from OpenAI provider with invalid key"
+        );
+        assert_eq!(result.unwrap_err(), StatusCode::INTERNAL_SERVER_ERROR);
+
+        std::env::remove_var("OPENAI_API_KEY");
     }
 }
