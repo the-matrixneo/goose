@@ -21,7 +21,7 @@ import FlappyGoose from './FlappyGoose';
 import { type View, ViewOptions } from '../App';
 import ChatInput from './ChatInput';
 import GlobalBackground from './GlobalBackground';
-import { generateSessionId } from '../sessions';
+import WidgetManager from "./widgets/WidgetManager";import { generateSessionId } from '../sessions';
 import { ChatState } from '../types/chatState';
 import { ChatContextManagerProvider } from './context_management/ChatContextManager';
 import { DashboardCanvas } from './dashboard/DashboardCanvas';
@@ -121,7 +121,9 @@ export default function Hub({
         <div className="flex flex-col h-full relative">
           {/* Global background - no blur for dashboard */}
           <GlobalBackground blur={false} opacity={1} />
-          
+        
+        {/* Moveable Widgets */}
+        <WidgetManager />          
           {/* Loading state with Goose icon */}
           <div className="flex-1 flex items-center justify-center relative z-10">
             <div className="text-center space-y-4">
@@ -171,6 +173,8 @@ export default function Hub({
         {/* Global background - no blur for dashboard */}
         <GlobalBackground blur={false} opacity={1} />
         
+        {/* Moveable Widgets */}
+        <WidgetManager />        
         {/* Dashboard Canvas - now takes full height */}
         <div className="absolute inset-0">
           <DashboardCanvas
