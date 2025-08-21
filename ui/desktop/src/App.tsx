@@ -70,11 +70,13 @@ const PairRouteWrapper = ({
   setChat,
   setPairChat,
   setIsGoosehintsModalOpen,
+  setFatalError,
 }: {
   chat: ChatType;
   setChat: (chat: ChatType) => void;
   setPairChat: (chat: ChatType) => void;
   setIsGoosehintsModalOpen: (isOpen: boolean) => void;
+  setFatalError: (value: ((prevState: string | null) => string | null) | string | null) => void;
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -180,6 +182,7 @@ const PairRouteWrapper = ({
       chat={chat}
       setChat={setChat}
       setView={setView}
+      setFatalError={setFatalError}
       setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
     />
   );
@@ -491,22 +494,47 @@ export default function App() {
     }
   }, []);
 
-  // Handle navigation to pair view for recipe deeplinks after router is ready
+  // Handle URL parameters and deeplinks on app startup
   useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const viewType = urlParams.get('view');
+    const resumeSessionId = urlParams.get('resumeSessionId');
     const recipeConfig = window.appConfig?.get('recipe');
-    if (
-      recipeConfig &&
-      typeof recipeConfig === 'object' &&
-      window.location.hash === '#/' &&
-      !window.sessionStorage.getItem('ignoreRecipeConfigChanges')
-    ) {
-      console.log('Router ready - navigating to pair view for recipe deeplink:', recipeConfig);
-      // Small delay to ensure router is fully initialized
-      setTimeout(() => {
-        window.location.hash = '#/pair';
-      }, 100);
-    } else if (window.sessionStorage.getItem('ignoreRecipeConfigChanges')) {
-      console.log('Router ready - ignoring recipe config navigation due to new window creation');
+
+    if (resumeSessionId || (recipeConfig && typeof recipeConfig === 'object')) {
+      return;
+    }
+
+    if (!viewType) {
+      if (window.location.hash === '' || window.location.hash === '#') {
+        window.location.hash = '#/';
+        window.history.replaceState({}, '', '#/');
+      }
+    } else {
+      if (viewType === 'recipeEditor' && recipeConfig) {
+        window.location.hash = '#/recipe-editor';
+        window.history.replaceState({ config: recipeConfig }, '', '#/recipe-editor');
+      } else {
+        const routeMap: Record<string, string> = {
+          chat: '#/',
+          pair: '#/pair',
+          settings: '#/settings',
+          sessions: '#/sessions',
+          schedules: '#/schedules',
+          recipes: '#/recipes',
+          permission: '#/permission',
+          ConfigureProviders: '#/configure-providers',
+          sharedSession: '#/shared-session',
+          recipeEditor: '#/recipe-editor',
+          welcome: '#/welcome',
+        };
+
+        const route = routeMap[viewType];
+        if (route) {
+          window.location.hash = route;
+          window.history.replaceState({}, '', route);
+        }
+      }
     }
   }, []);
 
@@ -927,6 +955,7 @@ export default function App() {
                           chat={pairChat}
                           setChat={setPairChat}
                           setPairChat={setPairChat}
+                          setFatalError={setFatalError}
                           setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
                         />
                       </ChatProvider>

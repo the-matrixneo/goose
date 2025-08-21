@@ -45,11 +45,13 @@ export default function Pair({
   setChat,
   setView,
   setIsGoosehintsModalOpen,
+  setFatalError,
 }: {
   chat: ChatType;
   setChat: (chat: ChatType) => void;
   setView: (view: View, viewOptions?: ViewOptions) => void;
   setIsGoosehintsModalOpen: (isOpen: boolean) => void;
+  setFatalError: (value: ((prevState: string | null) => string | null) | string | null) => void;
 }) {
   const location = useLocation();
   const isMobile = useIsMobile();
@@ -60,41 +62,27 @@ export default function Pair({
   const [isTransitioningFromHub, setIsTransitioningFromHub] = useState(false);
 
   // Use the shared agent hook
-  const {
-    isAgentInitialized,
-    isInitializing,
-    initializeAgentIfNeeded,
-    error: agentError,
-  } = useAgent(setChat);
+  const { isAgentInitialized, isInitializing, initializeAgentIfNeeded } = useAgent(setChat);
 
   // Get recipe configuration and parameter handling
   const { initialPrompt: recipeInitialPrompt } = useRecipeManager(chat, location.state);
 
-  // Initialize agent when Pair component mounts
-  useEffect(() => {
-    initializeAgentIfNeeded();
-  }, [initializeAgentIfNeeded]);
+  const recipeConfig = location.state?.recipeConfig || null;
 
-  // Handle recipe loading from recipes view - reset chat if needed
   useEffect(() => {
-    if (location.state?.resetChat && location.state?.recipeConfig) {
-      // Reset the chat to start fresh with the recipe
-      const newChat = {
-        sessionId: chat.sessionId, // Keep the same ID to maintain the session
-        title: location.state.recipeConfig.title || 'Recipe Chat',
-        messages: [], // Clear messages to start fresh
-        messageHistoryIndex: 0,
-        recipeConfig: location.state.recipeConfig, // Set the recipe config in chat state
-        recipeParameters: null, // Clear parameters for new recipe
-      };
-      setChat(newChat);
-
-      // Clear the location state to prevent re-processing
-      window.history.replaceState({}, '', '/pair');
+    try {
+      initializeAgentIfNeeded({
+        recipeConfig,
+        resumedChat: chat,
+      });
+    } catch (error) {
+      setFatalError(
+        `Agent init failure: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.state, chat.sessionId]);
+  }, [initializeAgentIfNeeded, setFatalError, chat, recipeConfig]);
 
+  // Handle initial chat setup when entering Pair mode
   // Handle initial message from hub page
   useEffect(() => {
     const messageFromHub = location.state?.initialMessage;
@@ -212,21 +200,6 @@ export default function Pair({
     return (
       <div className="flex justify-center items-center h-full">
         <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-textStandard"></div>
-      </div>
-    );
-  }
-
-  // Show error state if agent initialization failed
-  if (agentError) {
-    return (
-      <div className="flex flex-col justify-center items-center h-full space-y-4">
-        <div className="text-red-500">Failed to initialize agent: {agentError}</div>
-        <button
-          onClick={initializeAgentIfNeeded}
-          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-        >
-          Retry
-        </button>
       </div>
     );
   }
