@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -46,6 +46,7 @@ export const BitChatWidget: React.FC<BitChatWidgetProps> = ({
 }) => {
   const [position, setPosition] = useState(initialPosition);
   const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isExpanded, setIsExpanded] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
   const [message, setMessage] = useState('');
@@ -56,41 +57,7 @@ export const BitChatWidget: React.FC<BitChatWidgetProps> = ({
   const [meshStrength, setMeshStrength] = useState(3);
   const [currentTime, setCurrentTime] = useState(new Date());
   
-  // Refs for smooth dragging
   const widgetRef = useRef<HTMLDivElement>(null);
-  const dragStartRef = useRef<{ x: number; y: number } | null>(null);
-  const animationFrameRef = useRef<number | null>(null);
-
-  // Load saved state on mount
-  useEffect(() => {
-    try {
-      const savedState = localStorage.getItem('bitchat-widget-state');
-      if (savedState) {
-        const parsed = JSON.parse(savedState);
-        if (parsed.position) {
-          setPosition(parsed.position);
-        }
-        if (typeof parsed.isExpanded === 'boolean') {
-          setIsExpanded(parsed.isExpanded);
-        }
-      }
-    } catch (error) {
-      console.warn('Failed to load BitChat widget state:', error);
-    }
-  }, []);
-
-  // Save state function
-  const saveWidgetState = useCallback((newPosition?: Position, newExpanded?: boolean) => {
-    try {
-      const currentState = {
-        position: newPosition || position,
-        isExpanded: newExpanded !== undefined ? newExpanded : isExpanded,
-      };
-      localStorage.setItem('bitchat-widget-state', JSON.stringify(currentState));
-    } catch (error) {
-      console.warn('Failed to save BitChat widget state:', error);
-    }
-  }, [position, isExpanded]);
 
   // Update time every second for pager-like display
   useEffect(() => {
@@ -100,6 +67,54 @@ export const BitChatWidget: React.FC<BitChatWidgetProps> = ({
     return () => clearInterval(timer);
   }, []);
 
+  // Handle mouse down for dragging - MATCHES ClockWidget
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!widgetRef.current) return;
+    
+    const rect = widgetRef.current.getBoundingClientRect();
+    setDragOffset({
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    });
+    setIsDragging(true);
+  };
+
+  // Handle mouse move for dragging - MATCHES ClockWidget
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDragging) return;
+
+      const newPosition = {
+        x: e.clientX - dragOffset.x,
+        y: e.clientY - dragOffset.y,
+      };
+
+      // Keep widget within viewport bounds
+      const maxX = window.innerWidth - 380; // BitChat widget width
+      const maxY = window.innerHeight - 100; // Approximate widget height
+      
+      newPosition.x = Math.max(0, Math.min(maxX, newPosition.x));
+      newPosition.y = Math.max(0, Math.min(maxY, newPosition.y));
+
+      setPosition(newPosition);
+      onPositionChange?.(newPosition);
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, dragOffset, onPositionChange]);
+
   // Mock data with hacker/underground theme
   useEffect(() => {
     const mockMessages: BitChatMessage[] = [
@@ -107,222 +122,92 @@ export const BitChatWidget: React.FC<BitChatWidgetProps> = ({
         id: '1',
         sender: 'n0d3_runner',
         content: '>>> mesh network expanding... 7 nodes active',
-        timestamp: new Date(Date.now() - 8 * 60 * 1000),
+        timestamp: new Date(Date.now() - 300000),
         type: 'system',
-        hops: 0,
-      },
-      {
-        id: '2',
-        sender: 'crypto_ghost',
-        content: 'anyone copy? running silent protocol',
-        timestamp: new Date(Date.now() - 6 * 60 * 1000),
-        type: 'public',
         hops: 2,
         encrypted: true,
       },
       {
-        id: '3',
-        sender: 'mesh_walker',
-        content: '/status',
-        timestamp: new Date(Date.now() - 4 * 60 * 1000),
+        id: '2',
+        sender: 'cipher_ghost',
+        content: 'anyone got eyes on the downtown relay?',
+        timestamp: new Date(Date.now() - 240000),
         type: 'public',
         hops: 1,
+        encrypted: false,
       },
       {
-        id: '4',
-        sender: 'system',
-        content: '[MESH_STATUS] 12 peers | 4 relays | signal: strong',
-        timestamp: new Date(Date.now() - 4 * 60 * 1000),
+        id: '3',
+        sender: 'data_mule',
+        content: '/status - all green, 12 hops to main grid',
+        timestamp: new Date(Date.now() - 180000),
         type: 'system',
-      },
-      {
-        id: '5',
-        sender: 'dark_signal',
-        content: 'freq hopping enabled. stay low.',
-        timestamp: new Date(Date.now() - 2 * 60 * 1000),
-        type: 'alert',
         hops: 3,
         encrypted: true,
       },
       {
-        id: '6',
-        sender: 'byte_phantom',
-        content: 'mesh relay operational. passing traffic.',
-        timestamp: new Date(Date.now() - 1 * 60 * 1000),
-        type: 'public',
-        hops: 1,
+        id: '4',
+        sender: 'mesh_walker',
+        content: 'signal strength dropping... switching to backup node',
+        timestamp: new Date(Date.now() - 120000),
+        type: 'alert',
+        hops: 4,
+        encrypted: false,
       },
+      {
+        id: '5',
+        sender: 'void_seeker',
+        content: 'new drop point established at coordinates 37.7749,-122.4194',
+        timestamp: new Date(Date.now() - 60000),
+        type: 'private',
+        hops: 2,
+        encrypted: true,
+      }
     ];
 
     const mockPeers: MeshPeer[] = [
       {
-        id: 'n0d3_runner',
-        name: 'n0d3_runner',
-        signalStrength: 92,
-        lastSeen: new Date(Date.now() - 15 * 1000),
+        id: '1',
+        name: 'relay_alpha',
+        signalStrength: 85,
+        lastSeen: new Date(),
         isConnected: true,
         nodeType: 'relay',
       },
       {
-        id: 'crypto_ghost',
-        name: 'crypto_ghost',
-        signalStrength: 78,
-        lastSeen: new Date(Date.now() - 30 * 1000),
-        isConnected: true,
-        nodeType: 'endpoint',
-      },
-      {
-        id: 'mesh_walker',
-        name: 'mesh_walker',
-        signalStrength: 65,
-        lastSeen: new Date(Date.now() - 45 * 1000),
+        id: '2',
+        name: 'bridge_beta',
+        signalStrength: 72,
+        lastSeen: new Date(Date.now() - 30000),
         isConnected: true,
         nodeType: 'bridge',
       },
       {
-        id: 'dark_signal',
-        name: 'dark_signal',
-        signalStrength: 43,
-        lastSeen: new Date(Date.now() - 90 * 1000),
-        isConnected: true,
+        id: '3',
+        name: 'endpoint_gamma',
+        signalStrength: 45,
+        lastSeen: new Date(Date.now() - 120000),
+        isConnected: false,
         nodeType: 'endpoint',
-      },
-      {
-        id: 'byte_phantom',
-        name: 'byte_phantom',
-        signalStrength: 89,
-        lastSeen: new Date(Date.now() - 20 * 1000),
-        isConnected: true,
-        nodeType: 'relay',
       },
     ];
 
     setMessages(mockMessages);
     setPeers(mockPeers);
 
-    // Simulate mesh activity with hacker-style messages
-    const interval = setInterval(() => {
-      if (Math.random() < 0.4) {
-        const hackerMessages = [
-          'packet routing through node_7x9a',
-          '>>> encryption key rotated',
-          'stealth mode: active',
-          '/scan frequencies',
-          'mesh topology updated',
-          'signal bouncing off 4 relays',
-          'underground channel secure',
-          'frequency: 2.4ghz clear',
-          'data packet fragmented x3',
-          'mesh bridge established',
-        ];
-        
-        const senders = ['n0d3_runner', 'crypto_ghost', 'mesh_walker', 'dark_signal', 'byte_phantom'];
-        
-        const newMessage: BitChatMessage = {
-          id: Date.now().toString(),
-          sender: Math.random() < 0.3 ? 'system' : senders[Math.floor(Math.random() * senders.length)],
-          content: hackerMessages[Math.floor(Math.random() * hackerMessages.length)],
-          timestamp: new Date(),
-          type: Math.random() < 0.2 ? 'alert' : Math.random() < 0.3 ? 'system' : 'public',
-          hops: Math.floor(Math.random() * 5) + 1,
-          encrypted: Math.random() < 0.4,
-        };
-        
-        setMessages(prev => [...prev.slice(-12), newMessage]);
-      }
+    // Simulate network activity
+    const networkTimer = setInterval(() => {
+      setBatteryLevel(prev => Math.max(20, prev - Math.random() * 2));
+      setMeshStrength(prev => Math.max(1, Math.min(5, prev + (Math.random() - 0.5))));
+      setIsOnline(prev => Math.random() > 0.05 ? true : !prev);
+    }, 5000);
 
-      // Simulate battery drain and signal fluctuation
-      setBatteryLevel(prev => Math.max(20, prev - (Math.random() < 0.1 ? 1 : 0)));
-      setMeshStrength(prev => Math.max(1, Math.min(5, prev + (Math.random() - 0.5) * 2)));
-    }, 6000);
-
-    return () => clearInterval(interval);
+    return () => clearInterval(networkTimer);
   }, []);
 
-  // Smooth position update function
-  const updatePosition = useCallback((clientX: number, clientY: number) => {
-    if (!dragStartRef.current) return;
+  const connectedPeers = peers.filter(p => p.isConnected);
 
-    const newPosition = {
-      x: clientX - dragStartRef.current.x,
-      y: clientY - dragStartRef.current.y,
-    };
-
-    // Keep widget within viewport bounds
-    const maxX = window.innerWidth - 380;
-    const maxY = window.innerHeight - (isExpanded ? 500 : 140);
-    
-    newPosition.x = Math.max(0, Math.min(maxX, newPosition.x));
-    newPosition.y = Math.max(0, Math.min(maxY, newPosition.y));
-
-    setPosition(newPosition);
-    
-    // Throttled callback to parent
-    if (onPositionChange) {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-      animationFrameRef.current = requestAnimationFrame(() => {
-        onPositionChange(newPosition);
-      });
-    }
-  }, [isExpanded, onPositionChange]);
-
-  // Handle mouse down for dragging
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (!widgetRef.current) return;
-    
-    e.preventDefault();
-    const rect = widgetRef.current.getBoundingClientRect();
-    dragStartRef.current = {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
-    };
-    setIsDragging(true);
-  }, []);
-
-  // Handle mouse move for dragging
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isDragging || !dragStartRef.current) return;
-      e.preventDefault();
-      updatePosition(e.clientX, e.clientY);
-    };
-
-    const handleMouseUp = () => {
-      if (isDragging) {
-        setIsDragging(false);
-        dragStartRef.current = null;
-        
-        // Save final position
-        saveWidgetState(position);
-        
-        // Clean up animation frame
-        if (animationFrameRef.current) {
-          cancelAnimationFrame(animationFrameRef.current);
-          animationFrameRef.current = null;
-        }
-      }
-    };
-
-    if (isDragging) {
-      document.addEventListener('mousemove', handleMouseMove, { passive: false });
-      document.addEventListener('mouseup', handleMouseUp);
-      document.body.style.userSelect = 'none';
-    }
-
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-      document.body.style.userSelect = '';
-      
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-    };
-  }, [isDragging, updatePosition, position, saveWidgetState]);
-
-  const handleSendMessage = useCallback(() => {
+  const handleSendMessage = () => {
     if (!message.trim()) return;
 
     const newMessage: BitChatMessage = {
@@ -337,7 +222,7 @@ export const BitChatWidget: React.FC<BitChatWidgetProps> = ({
 
     setMessages(prev => [...prev.slice(-12), newMessage]);
     setMessage('');
-  }, [message]);
+  };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -345,12 +230,10 @@ export const BitChatWidget: React.FC<BitChatWidgetProps> = ({
     }
   };
 
-  const handleToggleExpanded = useCallback((e: React.MouseEvent) => {
+  const handleToggleExpanded = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const newExpanded = !isExpanded;
-    setIsExpanded(newExpanded);
-    saveWidgetState(undefined, newExpanded);
-  }, [isExpanded, saveWidgetState]);
+    setIsExpanded(!isExpanded);
+  };
 
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString([], { 
@@ -373,13 +256,20 @@ export const BitChatWidget: React.FC<BitChatWidgetProps> = ({
   const getMessageTypePrefix = (type: BitChatMessage['type']) => {
     switch (type) {
       case 'system': return '[SYS]';
-      case 'alert': return '[!!!]';
       case 'private': return '[PVT]';
-      default: return '';
+      case 'alert': return '[!!!]';
+      default: return '[PUB]';
     }
   };
 
-  const connectedPeers = peers.filter(peer => peer.isConnected);
+  const getMessageColor = (type: BitChatMessage['type']) => {
+    switch (type) {
+      case 'system': return 'text-blue-400';
+      case 'private': return 'text-purple-400';
+      case 'alert': return 'text-red-400';
+      default: return 'text-green-400';
+    }
+  };
 
   return (
     <Card
@@ -450,118 +340,101 @@ export const BitChatWidget: React.FC<BitChatWidgetProps> = ({
             ) : (
               <WifiOff className="w-3 h-3 text-red-500" />
             )}
-            <span className="text-green-500/80">MESH_ACTIVE</span>
+            <span className={isOnline ? 'text-green-500' : 'text-red-500'}>
+              {isOnline ? 'MESH' : 'OFFLINE'}
+            </span>
           </div>
         </div>
 
         {/* Expanded Content */}
         {isExpanded && (
           <div className="space-y-3">
-            {/* Terminal-style Messages */}
-            <div className="bg-black/60 border border-green-500/20 rounded p-2 max-h-56 overflow-y-auto font-mono text-xs">
-              <div className="space-y-1">
-                {messages.slice(-10).map((msg) => (
-                  <div key={msg.id} className="leading-tight">
-                    <div className="flex items-center gap-1 text-green-600/80">
-                      <span>{formatTime(msg.timestamp)}</span>
-                      <span className="text-green-500/40">|</span>
-                      {msg.hops && <span>h{msg.hops}</span>}
-                      {msg.encrypted && <span className="text-yellow-400">🔒</span>}
-                    </div>
-                    <div className="flex items-start gap-1">
-                      <span className={`${
-                        msg.type === 'system' ? 'text-cyan-400' :
-                        msg.type === 'alert' ? 'text-red-400' :
-                        msg.sender === 'local_node' ? 'text-green-300' :
-                        'text-green-400'
-                      }`}>
-                        {getMessageTypePrefix(msg.type)}
-                        {msg.sender !== 'system' && `${msg.sender}:`}
-                      </span>
-                      <span className={`${
-                        msg.type === 'system' ? 'text-cyan-300' :
-                        msg.type === 'alert' ? 'text-red-300' :
-                        'text-green-200'
-                      }`}>
-                        {msg.content}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Node List - Matrix Style */}
-            <div className="bg-black/60 border border-green-500/20 rounded p-2 font-mono">
-              <div className="text-xs text-green-400 mb-1 border-b border-green-500/20 pb-1">
-                MESH_NODES [{connectedPeers.length}]
-              </div>
+            {/* Message Feed */}
+            <div className="bg-black/50 border border-green-500/20 rounded p-2 h-48 overflow-y-auto">
               <div className="space-y-1 text-xs">
-                {peers.slice(0, 5).map((peer) => (
-                  <div key={peer.id} className="flex items-center justify-between">
+                {messages.map((msg) => (
+                  <div key={msg.id} className="flex flex-col gap-1">
                     <div className="flex items-center gap-2">
-                      <span className="text-green-500">{getNodeTypeIcon(peer.nodeType)}</span>
-                      <span className={peer.isConnected ? 'text-green-300' : 'text-green-600'}>
-                        {peer.name}
+                      <span className={`${getMessageColor(msg.type)} font-bold`}>
+                        {getMessageTypePrefix(msg.type)}
                       </span>
+                      <span className="text-green-300">{msg.sender}</span>
+                      <span className="text-green-500/60 text-xs">
+                        {msg.formatTime ? msg.formatTime(msg.timestamp) : formatTime(msg.timestamp)}
+                      </span>
+                      {msg.encrypted && <span className="text-yellow-400">🔒</span>}
+                      {msg.hops && <span className="text-blue-400">h:{msg.hops}</span>}
                     </div>
-                    <div className="flex items-center gap-2">
-                      <div className="flex items-center">
-                        {Array.from({length: Math.floor(peer.signalStrength / 20)}).map((_, i) => (
-                          <div key={i} className="w-1 h-2 bg-green-500 mr-px" />
-                        ))}
-                        {Array.from({length: 5 - Math.floor(peer.signalStrength / 20)}).map((_, i) => (
-                          <div key={i} className="w-1 h-2 bg-green-500/20 mr-px" />
-                        ))}
-                      </div>
-                      <span className="text-green-400 text-xs">{peer.signalStrength}%</span>
+                    <div className="text-green-200 ml-2 break-words">
+                      {msg.content}
                     </div>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Command Input - Terminal Style */}
-            <div className="flex gap-1 bg-black/60 border border-green-500/20 rounded p-1">
-              <span className="text-green-500 text-xs font-mono py-1 px-1">&gt;</span>
+            {/* Message Input */}
+            <div className="flex gap-2">
               <Input
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder="enter command or message..."
-                className="text-xs h-6 bg-transparent border-none text-green-300 placeholder-green-600 font-mono focus:ring-0 focus:outline-none"
-                onClick={(e) => e.stopPropagation()}
+                placeholder="Type message..."
+                className="flex-1 bg-black/50 border-green-500/30 text-green-200 text-xs font-mono placeholder:text-green-500/50 focus:border-green-500/60"
               />
               <Button
+                onClick={handleSendMessage}
                 size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleSendMessage();
-                }}
-                className="h-6 px-2 bg-green-500/20 hover:bg-green-500/30 border border-green-500/40 text-green-400"
+                className="bg-green-600/20 hover:bg-green-600/40 border border-green-500/30 text-green-400"
               >
                 <Send className="w-3 h-3" />
               </Button>
             </div>
+
+            {/* Peer List */}
+            <div className="bg-black/50 border border-green-500/20 rounded p-2">
+              <div className="text-xs text-green-400 mb-2 font-bold">MESH NODES:</div>
+              <div className="space-y-1">
+                {peers.map((peer) => (
+                  <div key={peer.id} className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className="text-green-300">
+                        {getNodeTypeIcon(peer.nodeType)}
+                      </span>
+                      <span className={peer.isConnected ? 'text-green-400' : 'text-red-400'}>
+                        {peer.name}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1">
+                        {Array.from({length: Math.ceil(peer.signalStrength / 20)}).map((_, i) => (
+                          <div key={i} className="w-1 h-2 bg-green-500" />
+                        ))}
+                        {Array.from({length: 5 - Math.ceil(peer.signalStrength / 20)}).map((_, i) => (
+                          <div key={i} className="w-1 h-2 bg-green-500/20" />
+                        ))}
+                      </div>
+                      <span className="text-green-500/60">{peer.signalStrength}%</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 
-        {/* Collapsed Status - Pager Style */}
+        {/* Collapsed Status */}
         {!isExpanded && (
-          <div className="space-y-1">
-            <div className="text-xs font-mono">
-              {messages.length > 0 && (
-                <div className="flex items-center gap-1 text-green-300">
-                  <span className="text-green-500">&gt;</span>
-                  <span className="text-green-400">{messages[messages.length - 1].sender}:</span>
-                  <span className="truncate text-green-200">{messages[messages.length - 1].content}</span>
-                </div>
-              )}
+          <div className="text-xs text-green-400 font-mono">
+            <div className="flex items-center justify-between">
+              <span>Last: {messages.length > 0 ? messages[messages.length - 1].sender : 'none'}</span>
+              <span className="text-green-500/60">Click to expand</span>
             </div>
-            <div className="flex items-center justify-between text-xs text-green-500/80 font-mono">
-              <span>{connectedPeers.length} nodes online</span>
-              <span className="text-green-600">tap to expand</span>
-            </div>
+            {messages.length > 0 && (
+              <div className="text-green-300/80 mt-1 truncate">
+                {messages[messages.length - 1].content}
+              </div>
+            )}
           </div>
         )}
       </div>
