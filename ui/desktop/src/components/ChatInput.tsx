@@ -113,22 +113,26 @@ export default function ChatInput({
   const [isFocused, setIsFocused] = useState(false);
   const [pastedImages, setPastedImages] = useState<PastedImage[]>([]);
 
+  // Derived state - chatState != Idle means we're in some form of loading state
+  const isLoading = chatState !== ChatState.Idle;
+  const wasLoadingRef = useRef(isLoading);
+
   // Queue functionality - initialize from storage
   const [queuedMessages, setQueuedMessages] = useState<QueuedMessage[]>(() => {
     // Load queue from storage on component mount
     return QueueStorage.loadQueue();
   });
-  const isLoading = chatState !== ChatState.Idle;
-  const wasLoadingRef = useRef(isLoading);
-  const queuePausedRef = useRef((() => {
-    // Load pause state from storage
-    try {
-      const stored = window.sessionStorage.getItem('goose-queue-paused');
-      return stored ? JSON.parse(stored) : false;
-    } catch {
-      return false;
-    }
-  })());
+  const queuePausedRef = useRef(
+    (() => {
+      // Load pause state from storage
+      try {
+        const stored = window.sessionStorage.getItem('goose-queue-paused');
+        return stored ? JSON.parse(stored) : false;
+      } catch {
+        return false;
+      }
+    })()
+  );
   const editingMessageIdRef = useRef<string | null>(null);
   const [lastInterruption, setLastInterruption] = useState<string | null>(() => {
     // Load interruption state from storage
@@ -198,22 +202,40 @@ export default function ChatInput({
 
   // Queue processing
   useEffect(() => {
-    if (wasLoadingRef.current && !isLoading && queuedMessages.length > 0 && !queuePausedRef.current) {
-      const nextMessage = queuedMessages[0];
-      LocalMessageStorage.addMessage(nextMessage.content);
-      handleSubmit(new CustomEvent("submit", { detail: { value: nextMessage.content } }) as unknown as React.FormEvent);
-      setQueuedMessages(prev => {
-        const newQueue = prev.slice(1);
-        // If queue becomes empty after processing, clear the paused state
-        if (newQueue.length === 0) {
-          queuePausedRef.current = false;
+    if (wasLoadingRef.current && !isLoading && queuedMessages.length > 0) {
+      // After an interruption, we should process the interruption message immediately
+      // The queue is only truly paused if there was an interruption AND we want to keep it paused
+      const shouldProcessQueue = !queuePausedRef.current || lastInterruption;
+
+      if (shouldProcessQueue) {
+        const nextMessage = queuedMessages[0];
+        LocalMessageStorage.addMessage(nextMessage.content);
+        handleSubmit(
+          new CustomEvent('submit', {
+            detail: { value: nextMessage.content },
+          }) as unknown as React.FormEvent
+        );
+        setQueuedMessages((prev) => {
+          const newQueue = prev.slice(1);
+          // If queue becomes empty after processing, clear the paused state
+          if (newQueue.length === 0) {
+            queuePausedRef.current = false;
+            setLastInterruption(null);
+          }
+          return newQueue;
+        });
+
+        // Clear the interruption flag after processing the interruption message
+        if (lastInterruption) {
           setLastInterruption(null);
+          // Keep the queue paused after sending the interruption message
+          // User can manually resume if they want to continue with queued messages
+          queuePausedRef.current = true;
         }
-        return newQueue;
-      });
+      }
     }
     wasLoadingRef.current = isLoading;
-  }, [isLoading, queuedMessages, handleSubmit]);
+  }, [isLoading, queuedMessages, handleSubmit, lastInterruption]);
   const [mentionPopover, setMentionPopover] = useState<{
     isOpen: boolean;
     position: { x: number; y: number };
@@ -876,6 +898,54 @@ export default function ChatInput({
     }
   };
 
+  // Helper function to handle interruption and queue logic when loading
+  const handleInterruptionAndQueue = () => {
+    if (!isLoading || !displayValue.trim()) {
+      return false; // Return false if no action was taken
+    }
+
+    const interruptionMatch = detectInterruption(displayValue.trim());
+
+    if (interruptionMatch && interruptionMatch.shouldInterrupt) {
+      setLastInterruption(interruptionMatch.matchedText);
+      if (onStop) onStop();
+      queuePausedRef.current = true;
+
+      // For interruptions, we need to queue the message to be sent after the stop completes
+      // rather than trying to send it immediately while the system is still loading
+      const interruptionMessage = {
+        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+        content: displayValue.trim(),
+        timestamp: Date.now(),
+      };
+
+      // Add the interruption message to the front of the queue so it gets sent first
+      setQueuedMessages((prev) => [interruptionMessage, ...prev]);
+
+      setDisplayValue('');
+      setValue('');
+      return true; // Return true if interruption was handled
+    }
+
+    const newMessage = {
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      content: displayValue.trim(),
+      timestamp: Date.now(),
+    };
+    setQueuedMessages((prev) => {
+      const newQueue = [...prev, newMessage];
+      // If adding to an empty queue, reset the paused state
+      if (prev.length === 0) {
+        queuePausedRef.current = false;
+        setLastInterruption(null);
+      }
+      return newQueue;
+    });
+    setDisplayValue('');
+    setValue('');
+    return true; // Return true if message was queued
+  };
+
   const performSubmit = () => {
     const validPastedImageFilesPaths = pastedImages
       .filter((img) => img.filePath && !img.error && !img.isLoading)
@@ -907,7 +977,12 @@ export default function ChatInput({
       );
 
       // Auto-resume queue after sending a NON-interruption message (if it was paused due to interruption)
-      if (queuePausedRef.current && lastInterruption && textToSend && !detectInterruption(textToSend)) {
+      if (
+        queuePausedRef.current &&
+        lastInterruption &&
+        textToSend &&
+        !detectInterruption(textToSend)
+      ) {
         queuePausedRef.current = false;
         setLastInterruption(null);
       }
@@ -940,41 +1015,6 @@ export default function ChatInput({
     if (mentionPopover.isOpen && mentionPopoverRef.current) {
       if (evt.key === 'ArrowDown') {
         evt.preventDefault();
-      
-      // Handle interruption and queue logic
-      if (isLoading && displayValue.trim()) {
-        const interruptionMatch = detectInterruption(displayValue.trim());
-        
-        if (interruptionMatch && interruptionMatch.shouldInterrupt) {
-          setLastInterruption(interruptionMatch.matchedText);
-          if (onStop) onStop();
-          queuePausedRef.current = true;
-          
-          LocalMessageStorage.addMessage(displayValue.trim());
-          handleSubmit(new CustomEvent("submit", { detail: { value: displayValue.trim() } }) as unknown as React.FormEvent);
-          setDisplayValue("");
-          setValue("");
-          return;
-        }
-        
-        const newMessage = {
-          id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-          content: displayValue.trim(),
-          timestamp: Date.now()
-        };
-        setQueuedMessages(prev => {
-        const newQueue = [...prev, newMessage];
-        // If adding to an empty queue, reset the paused state
-        if (prev.length === 0) {
-          queuePausedRef.current = false;
-          setLastInterruption(null);
-        }
-        return newQueue;
-      });
-        setDisplayValue("");
-        setValue("");
-        return;
-      }
         const displayFiles = mentionPopoverRef.current.getDisplayFiles();
         const maxIndex = Math.max(0, displayFiles.length - 1);
         setMentionPopover((prev) => ({
@@ -985,41 +1025,6 @@ export default function ChatInput({
       }
       if (evt.key === 'ArrowUp') {
         evt.preventDefault();
-      
-      // Handle interruption and queue logic
-      if (isLoading && displayValue.trim()) {
-        const interruptionMatch = detectInterruption(displayValue.trim());
-        
-        if (interruptionMatch && interruptionMatch.shouldInterrupt) {
-          setLastInterruption(interruptionMatch.matchedText);
-          if (onStop) onStop();
-          queuePausedRef.current = true;
-          
-          LocalMessageStorage.addMessage(displayValue.trim());
-          handleSubmit(new CustomEvent("submit", { detail: { value: displayValue.trim() } }) as unknown as React.FormEvent);
-          setDisplayValue("");
-          setValue("");
-          return;
-        }
-        
-        const newMessage = {
-          id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-          content: displayValue.trim(),
-          timestamp: Date.now()
-        };
-        setQueuedMessages(prev => {
-        const newQueue = [...prev, newMessage];
-        // If adding to an empty queue, reset the paused state
-        if (prev.length === 0) {
-          queuePausedRef.current = false;
-          setLastInterruption(null);
-        }
-        return newQueue;
-      });
-        setDisplayValue("");
-        setValue("");
-        return;
-      }
         setMentionPopover((prev) => ({
           ...prev,
           selectedIndex: Math.max(prev.selectedIndex - 1, 0),
@@ -1028,81 +1033,11 @@ export default function ChatInput({
       }
       if (evt.key === 'Enter') {
         evt.preventDefault();
-      
-      // Handle interruption and queue logic
-      if (isLoading && displayValue.trim()) {
-        const interruptionMatch = detectInterruption(displayValue.trim());
-        
-        if (interruptionMatch && interruptionMatch.shouldInterrupt) {
-          setLastInterruption(interruptionMatch.matchedText);
-          if (onStop) onStop();
-          queuePausedRef.current = true;
-          
-          LocalMessageStorage.addMessage(displayValue.trim());
-          handleSubmit(new CustomEvent("submit", { detail: { value: displayValue.trim() } }) as unknown as React.FormEvent);
-          setDisplayValue("");
-          setValue("");
-          return;
-        }
-        
-        const newMessage = {
-          id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-          content: displayValue.trim(),
-          timestamp: Date.now()
-        };
-        setQueuedMessages(prev => {
-        const newQueue = [...prev, newMessage];
-        // If adding to an empty queue, reset the paused state
-        if (prev.length === 0) {
-          queuePausedRef.current = false;
-          setLastInterruption(null);
-        }
-        return newQueue;
-      });
-        setDisplayValue("");
-        setValue("");
-        return;
-      }
         mentionPopoverRef.current.selectFile(mentionPopover.selectedIndex);
         return;
       }
       if (evt.key === 'Escape') {
         evt.preventDefault();
-      
-      // Handle interruption and queue logic
-      if (isLoading && displayValue.trim()) {
-        const interruptionMatch = detectInterruption(displayValue.trim());
-        
-        if (interruptionMatch && interruptionMatch.shouldInterrupt) {
-          setLastInterruption(interruptionMatch.matchedText);
-          if (onStop) onStop();
-          queuePausedRef.current = true;
-          
-          LocalMessageStorage.addMessage(displayValue.trim());
-          handleSubmit(new CustomEvent("submit", { detail: { value: displayValue.trim() } }) as unknown as React.FormEvent);
-          setDisplayValue("");
-          setValue("");
-          return;
-        }
-        
-        const newMessage = {
-          id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-          content: displayValue.trim(),
-          timestamp: Date.now()
-        };
-        setQueuedMessages(prev => {
-        const newQueue = [...prev, newMessage];
-        // If adding to an empty queue, reset the paused state
-        if (prev.length === 0) {
-          queuePausedRef.current = false;
-          setLastInterruption(null);
-        }
-        return newQueue;
-      });
-        setDisplayValue("");
-        setValue("");
-        return;
-      }
         setMentionPopover((prev) => ({ ...prev, isOpen: false }));
         return;
       }
@@ -1126,41 +1061,12 @@ export default function ChatInput({
       }
 
       evt.preventDefault();
-      
+
       // Handle interruption and queue logic
-      if (isLoading && displayValue.trim()) {
-        const interruptionMatch = detectInterruption(displayValue.trim());
-        
-        if (interruptionMatch && interruptionMatch.shouldInterrupt) {
-          setLastInterruption(interruptionMatch.matchedText);
-          if (onStop) onStop();
-          queuePausedRef.current = true;
-          
-          LocalMessageStorage.addMessage(displayValue.trim());
-          handleSubmit(new CustomEvent("submit", { detail: { value: displayValue.trim() } }) as unknown as React.FormEvent);
-          setDisplayValue("");
-          setValue("");
-          return;
-        }
-        
-        const newMessage = {
-          id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-          content: displayValue.trim(),
-          timestamp: Date.now()
-        };
-        setQueuedMessages(prev => {
-        const newQueue = [...prev, newMessage];
-        // If adding to an empty queue, reset the paused state
-        if (prev.length === 0) {
-          queuePausedRef.current = false;
-          setLastInterruption(null);
-        }
-        return newQueue;
-      });
-        setDisplayValue("");
-        setValue("");
+      if (handleInterruptionAndQueue()) {
         return;
       }
+
       const canSubmit =
         !isLoading &&
         !isLoadingCompaction &&
@@ -1225,10 +1131,9 @@ export default function ChatInput({
   const isAnyImageLoading = pastedImages.some((img) => img.isLoading);
   const isAnyDroppedFileLoading = allDroppedFiles.some((file) => file.isLoading);
 
-
   // Queue management functions
   const handleRemoveQueuedMessage = (messageId: string) => {
-    setQueuedMessages(prev => prev.filter(msg => msg.id !== messageId));
+    setQueuedMessages((prev) => prev.filter((msg) => msg.id !== messageId));
     QueueStorage.removeMessage(messageId);
   };
 
@@ -1245,30 +1150,30 @@ export default function ChatInput({
   };
 
   const handleEditMessage = (messageId: string, newContent: string) => {
-    setQueuedMessages(prev => 
-      prev.map(msg => 
-        msg.id === messageId 
-          ? { ...msg, content: newContent }
-          : msg
-      )
+    setQueuedMessages((prev) =>
+      prev.map((msg) => (msg.id === messageId ? { ...msg, content: newContent } : msg))
     );
     QueueStorage.updateMessage(messageId, newContent);
   };
 
   const handleStopAndSend = (messageId: string) => {
-    const messageToSend = queuedMessages.find(msg => msg.id === messageId);
+    const messageToSend = queuedMessages.find((msg) => msg.id === messageId);
     if (!messageToSend) return;
-    
+
     // Stop current processing and temporarily pause queue to prevent double-send
     if (onStop) onStop();
     const wasPaused = queuePausedRef.current;
     queuePausedRef.current = true;
-    
+
     // Remove the message from queue and send it immediately
-    setQueuedMessages(prev => prev.filter(msg => msg.id !== messageId));
+    setQueuedMessages((prev) => prev.filter((msg) => msg.id !== messageId));
     LocalMessageStorage.addMessage(messageToSend.content);
-    handleSubmit(new CustomEvent("submit", { detail: { value: messageToSend.content } }) as unknown as React.FormEvent);
-    
+    handleSubmit(
+      new CustomEvent('submit', {
+        detail: { value: messageToSend.content },
+      }) as unknown as React.FormEvent
+    );
+
     // Restore previous pause state after a brief delay to prevent race condition
     setTimeout(() => {
       queuePausedRef.current = wasPaused;
@@ -1281,8 +1186,12 @@ export default function ChatInput({
     if (!isLoading && queuedMessages.length > 0) {
       const nextMessage = queuedMessages[0];
       LocalMessageStorage.addMessage(nextMessage.content);
-      handleSubmit(new CustomEvent("submit", { detail: { value: nextMessage.content } }) as unknown as React.FormEvent);
-      setQueuedMessages(prev => {
+      handleSubmit(
+        new CustomEvent('submit', {
+          detail: { value: nextMessage.content },
+        }) as unknown as React.FormEvent
+      );
+      setQueuedMessages((prev) => {
         const newQueue = prev.slice(1);
         // If queue becomes empty after processing, clear the paused state
         if (newQueue.length === 0) {
