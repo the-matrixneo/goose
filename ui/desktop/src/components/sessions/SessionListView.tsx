@@ -349,7 +349,7 @@ const SessionListView: React.FC<SessionListViewProps> = React.memo(({ onSelectSe
     return (
       <Card
         onClick={handleCardClick}
-        className="session-item h-full py-3 px-4 hover:shadow-default cursor-pointer transition-all duration-150 flex flex-col justify-between relative group"
+        className="session-item h-full py-3 px-4 hover:shadow-default cursor-pointer transition-all duration-150 flex flex-col justify-between relative group bg-background-card/20 backdrop-blur-md border border-white/10 hover:bg-background-card/30 hover:border-white/15"
       >
         <button
           onClick={handleEditClick}
@@ -399,7 +399,7 @@ const SessionListView: React.FC<SessionListViewProps> = React.memo(({ onSelectSe
     const tokenWidths = ['w-12', 'w-10', 'w-14', 'w-8'];
 
     return (
-      <Card className="session-skeleton h-full py-3 px-4 flex flex-col justify-between">
+      <Card className="session-skeleton h-full py-3 px-4 flex flex-col justify-between bg-background-card/15 backdrop-blur-md border border-white/8">
         <div className="flex-1">
           <Skeleton className={`h-5 ${titleWidths[variant % titleWidths.length]} mb-2`} />
           <div className="flex items-center mb-1">
@@ -469,7 +469,7 @@ const SessionListView: React.FC<SessionListViewProps> = React.memo(({ onSelectSe
       <div className="space-y-8">
         {dateGroups.map((group) => (
           <div key={group.label} className="space-y-4">
-            <div className="sticky top-0 z-10 bg-background-default/95 backdrop-blur-sm">
+            <div className="sticky top-0 z-10 bg-transparent">
               <h2 className="text-text-muted">{group.label}</h2>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">

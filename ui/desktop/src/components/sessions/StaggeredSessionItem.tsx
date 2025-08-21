@@ -48,7 +48,7 @@ export const StaggeredSessionItem: React.FC<StaggeredSessionItemProps> = ({
   return (
     <div 
       className={cn(
-        "bg-background-default/40 backdrop-blur-sm hover:bg-background-default/60 border border-borderSubtle rounded-xl p-4 cursor-pointer transition-all duration-500 transform hover:shadow-md",
+        "bg-background-card/20 backdrop-blur-md hover:bg-background-card/30 border border-white/10 hover:border-white/15 rounded-xl p-4 cursor-pointer transition-all duration-500 transform hover:shadow-md",
         isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
       )}
       style={{
