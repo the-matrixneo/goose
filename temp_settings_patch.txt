@@ -1,0 +1,2 @@
+import BackgroundSelector from '../background/BackgroundSelector';
+import { Palette } from 'lucide-react';
