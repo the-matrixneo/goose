@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Card } from '../ui/card';
 import { Clock, Move, CheckCircle, Circle, AlertCircle } from 'lucide-react';
 
@@ -30,6 +30,37 @@ export const QueuedTasksWidget: React.FC<QueuedTasksWidgetProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isExpanded, setIsExpanded] = useState(false);
+
+  // Load saved state
+  useEffect(() => {
+    try {
+      const savedState = localStorage.getItem("queued-tasks-widget-state");
+      if (savedState) {
+        const parsed = JSON.parse(savedState);
+        if (parsed.position) {
+          setPosition(parsed.position);
+        }
+        if (typeof parsed.isExpanded === "boolean") {
+          setIsExpanded(parsed.isExpanded);
+        }
+      }
+    } catch (error) {
+      console.warn("Failed to load QueuedTasks widget state:", error);
+    }
+  }, []);
+
+  // Save state function
+  const saveWidgetState = useCallback((newPosition?: Position, newExpanded?: boolean) => {
+    try {
+      const currentState = {
+        position: newPosition || position,
+        isExpanded: newExpanded !== undefined ? newExpanded : isExpanded,
+      };
+      localStorage.setItem("queued-tasks-widget-state", JSON.stringify(currentState));
+    } catch (error) {
+      console.warn("Failed to save QueuedTasks widget state:", error);
+    }
+  }, [position, isExpanded]);
   const widgetRef = useRef<HTMLDivElement>(null);
 
   // Mock tasks for demonstration
@@ -140,7 +171,7 @@ export const QueuedTasksWidget: React.FC<QueuedTasksWidgetProps> = ({
   return (
     <Card
       ref={widgetRef}
-      className={`fixed bg-background-default/80 backdrop-blur-md border border-white/10 shadow-lg transition-all duration-200 select-none ${
+      className={`fixed bg-background-card/20 backdrop-blur-md border border-white/10 hover:bg-background-card/30 hover:border-white/15 shadow-lg transition-all duration-200 select-none ${
         isDragging ? 'cursor-grabbing scale-105 shadow-xl' : 'cursor-grab hover:shadow-xl hover:scale-105'
       }`}
       style={{
@@ -190,7 +221,7 @@ export const QueuedTasksWidget: React.FC<QueuedTasksWidgetProps> = ({
             {activeTasks.map((task) => (
               <div
                 key={task.id}
-                className="flex items-center gap-2 p-2 bg-background-muted/50 rounded-lg"
+                className="flex items-center gap-2 p-2 bg-background-card/15 backdrop-blur-sm border border-white/5 rounded-lg"
               >
                 {getStatusIcon(task.status)}
                 <div className="flex-1 min-w-0">
@@ -198,7 +229,7 @@ export const QueuedTasksWidget: React.FC<QueuedTasksWidgetProps> = ({
                     {task.title}
                   </div>
                   {task.status === 'running' && task.progress && (
-                    <div className="w-full bg-background-muted rounded-full h-1 mt-1">
+                    <div className="w-full bg-background-card/10 rounded-full h-1 mt-1">
                       <div
                         className="bg-blue-500 h-1 rounded-full transition-all duration-300"
                         style={{ width: `${task.progress}%` }}

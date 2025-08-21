@@ -4,16 +4,11 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { 
   Move, 
-  Wifi, 
   WifiOff, 
-  Users, 
   Send, 
-  MessageCircle, 
-  Bluetooth,
-  Signal,
   Hash,
-  User,
-  Clock
+  Zap,
+  Activity
 } from 'lucide-react';
 
 interface Position {
@@ -26,8 +21,9 @@ interface BitChatMessage {
   sender: string;
   content: string;
   timestamp: Date;
-  type: 'public' | 'private' | 'system';
+  type: 'public' | 'private' | 'system' | 'alert';
   hops?: number;
+  encrypted?: boolean;
 }
 
 interface MeshPeer {
@@ -36,6 +32,7 @@ interface MeshPeer {
   signalStrength: number;
   lastSeen: Date;
   isConnected: boolean;
+  nodeType: 'relay' | 'endpoint' | 'bridge';
 }
 
 interface BitChatWidgetProps {
@@ -49,174 +46,296 @@ export const BitChatWidget: React.FC<BitChatWidgetProps> = ({
 }) => {
   const [position, setPosition] = useState(initialPosition);
   const [isDragging, setIsDragging] = useState(false);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isExpanded, setIsExpanded] = useState(false);
-  const [isConnected, setIsConnected] = useState(true);
+  const [isOnline, setIsOnline] = useState(true);
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState<BitChatMessage[]>([]);
   const [peers, setPeers] = useState<MeshPeer[]>([]);
-  const [activeChannel, setActiveChannel] = useState('#general');
+  const [activeChannel, setActiveChannel] = useState('#underground');
+  const [batteryLevel, setBatteryLevel] = useState(87);
+  const [meshStrength, setMeshStrength] = useState(3);
+  const [currentTime, setCurrentTime] = useState(new Date());
+  
+  // Refs for smooth dragging
   const widgetRef = useRef<HTMLDivElement>(null);
+  const dragStartRef = useRef<{ x: number; y: number } | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
 
-  // Mock data for demonstration
+  // Load saved state on mount
+  useEffect(() => {
+    try {
+      const savedState = localStorage.getItem('bitchat-widget-state');
+      if (savedState) {
+        const parsed = JSON.parse(savedState);
+        if (parsed.position) {
+          setPosition(parsed.position);
+        }
+        if (typeof parsed.isExpanded === 'boolean') {
+          setIsExpanded(parsed.isExpanded);
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to load BitChat widget state:', error);
+    }
+  }, []);
+
+  // Save state function
+  const saveWidgetState = useCallback((newPosition?: Position, newExpanded?: boolean) => {
+    try {
+      const currentState = {
+        position: newPosition || position,
+        isExpanded: newExpanded !== undefined ? newExpanded : isExpanded,
+      };
+      localStorage.setItem('bitchat-widget-state', JSON.stringify(currentState));
+    } catch (error) {
+      console.warn('Failed to save BitChat widget state:', error);
+    }
+  }, [position, isExpanded]);
+
+  // Update time every second for pager-like display
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Mock data with hacker/underground theme
   useEffect(() => {
     const mockMessages: BitChatMessage[] = [
       {
         id: '1',
-        sender: 'alice_mesh',
-        content: 'Anyone else seeing the mesh network expand?',
-        timestamp: new Date(Date.now() - 5 * 60 * 1000),
-        type: 'public',
-        hops: 2,
+        sender: 'n0d3_runner',
+        content: '>>> mesh network expanding... 7 nodes active',
+        timestamp: new Date(Date.now() - 8 * 60 * 1000),
+        type: 'system',
+        hops: 0,
       },
       {
         id: '2',
-        sender: 'bob_node',
-        content: '/who',
-        timestamp: new Date(Date.now() - 3 * 60 * 1000),
+        sender: 'crypto_ghost',
+        content: 'anyone copy? running silent protocol',
+        timestamp: new Date(Date.now() - 6 * 60 * 1000),
+        type: 'public',
+        hops: 2,
+        encrypted: true,
+      },
+      {
+        id: '3',
+        sender: 'mesh_walker',
+        content: '/status',
+        timestamp: new Date(Date.now() - 4 * 60 * 1000),
         type: 'public',
         hops: 1,
       },
       {
-        id: '3',
+        id: '4',
         sender: 'system',
-        content: 'Connected peers: alice_mesh, bob_node, charlie_bt',
-        timestamp: new Date(Date.now() - 3 * 60 * 1000),
+        content: '[MESH_STATUS] 12 peers | 4 relays | signal: strong',
+        timestamp: new Date(Date.now() - 4 * 60 * 1000),
         type: 'system',
       },
       {
-        id: '4',
-        sender: 'charlie_bt',
-        content: 'This mesh chat is incredible! No internet needed 🔥',
+        id: '5',
+        sender: 'dark_signal',
+        content: 'freq hopping enabled. stay low.',
+        timestamp: new Date(Date.now() - 2 * 60 * 1000),
+        type: 'alert',
+        hops: 3,
+        encrypted: true,
+      },
+      {
+        id: '6',
+        sender: 'byte_phantom',
+        content: 'mesh relay operational. passing traffic.',
         timestamp: new Date(Date.now() - 1 * 60 * 1000),
         type: 'public',
-        hops: 3,
+        hops: 1,
       },
     ];
 
     const mockPeers: MeshPeer[] = [
       {
-        id: 'alice_mesh',
-        name: 'Alice',
-        signalStrength: 85,
+        id: 'n0d3_runner',
+        name: 'n0d3_runner',
+        signalStrength: 92,
+        lastSeen: new Date(Date.now() - 15 * 1000),
+        isConnected: true,
+        nodeType: 'relay',
+      },
+      {
+        id: 'crypto_ghost',
+        name: 'crypto_ghost',
+        signalStrength: 78,
         lastSeen: new Date(Date.now() - 30 * 1000),
         isConnected: true,
+        nodeType: 'endpoint',
       },
       {
-        id: 'bob_node',
-        name: 'Bob',
-        signalStrength: 72,
+        id: 'mesh_walker',
+        name: 'mesh_walker',
+        signalStrength: 65,
         lastSeen: new Date(Date.now() - 45 * 1000),
         isConnected: true,
+        nodeType: 'bridge',
       },
       {
-        id: 'charlie_bt',
-        name: 'Charlie',
-        signalStrength: 58,
-        lastSeen: new Date(Date.now() - 60 * 1000),
+        id: 'dark_signal',
+        name: 'dark_signal',
+        signalStrength: 43,
+        lastSeen: new Date(Date.now() - 90 * 1000),
         isConnected: true,
+        nodeType: 'endpoint',
       },
       {
-        id: 'diana_offline',
-        name: 'Diana',
-        signalStrength: 0,
-        lastSeen: new Date(Date.now() - 10 * 60 * 1000),
-        isConnected: false,
+        id: 'byte_phantom',
+        name: 'byte_phantom',
+        signalStrength: 89,
+        lastSeen: new Date(Date.now() - 20 * 1000),
+        isConnected: true,
+        nodeType: 'relay',
       },
     ];
 
     setMessages(mockMessages);
     setPeers(mockPeers);
 
-    // Simulate periodic mesh activity
+    // Simulate mesh activity with hacker-style messages
     const interval = setInterval(() => {
-      // Randomly add new messages
-      if (Math.random() < 0.3) {
-        const senders = ['alice_mesh', 'bob_node', 'charlie_bt'];
-        const contents = [
-          'Mesh network is stable',
-          'Anyone near the downtown area?',
-          '/slap bob_node',
-          'This decentralized chat rocks!',
-          'Battery at 85%, mesh mode active',
+      if (Math.random() < 0.4) {
+        const hackerMessages = [
+          'packet routing through node_7x9a',
+          '>>> encryption key rotated',
+          'stealth mode: active',
+          '/scan frequencies',
+          'mesh topology updated',
+          'signal bouncing off 4 relays',
+          'underground channel secure',
+          'frequency: 2.4ghz clear',
+          'data packet fragmented x3',
+          'mesh bridge established',
         ];
+        
+        const senders = ['n0d3_runner', 'crypto_ghost', 'mesh_walker', 'dark_signal', 'byte_phantom'];
         
         const newMessage: BitChatMessage = {
           id: Date.now().toString(),
-          sender: senders[Math.floor(Math.random() * senders.length)],
-          content: contents[Math.floor(Math.random() * contents.length)],
+          sender: Math.random() < 0.3 ? 'system' : senders[Math.floor(Math.random() * senders.length)],
+          content: hackerMessages[Math.floor(Math.random() * hackerMessages.length)],
           timestamp: new Date(),
-          type: 'public',
-          hops: Math.floor(Math.random() * 4) + 1,
+          type: Math.random() < 0.2 ? 'alert' : Math.random() < 0.3 ? 'system' : 'public',
+          hops: Math.floor(Math.random() * 5) + 1,
+          encrypted: Math.random() < 0.4,
         };
         
-        setMessages(prev => [...prev.slice(-10), newMessage]);
+        setMessages(prev => [...prev.slice(-12), newMessage]);
       }
-    }, 8000);
+
+      // Simulate battery drain and signal fluctuation
+      setBatteryLevel(prev => Math.max(20, prev - (Math.random() < 0.1 ? 1 : 0)));
+      setMeshStrength(prev => Math.max(1, Math.min(5, prev + (Math.random() - 0.5) * 2)));
+    }, 6000);
 
     return () => clearInterval(interval);
   }, []);
 
+  // Smooth position update function
+  const updatePosition = useCallback((clientX: number, clientY: number) => {
+    if (!dragStartRef.current) return;
+
+    const newPosition = {
+      x: clientX - dragStartRef.current.x,
+      y: clientY - dragStartRef.current.y,
+    };
+
+    // Keep widget within viewport bounds
+    const maxX = window.innerWidth - 380;
+    const maxY = window.innerHeight - (isExpanded ? 500 : 140);
+    
+    newPosition.x = Math.max(0, Math.min(maxX, newPosition.x));
+    newPosition.y = Math.max(0, Math.min(maxY, newPosition.y));
+
+    setPosition(newPosition);
+    
+    // Throttled callback to parent
+    if (onPositionChange) {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+      animationFrameRef.current = requestAnimationFrame(() => {
+        onPositionChange(newPosition);
+      });
+    }
+  }, [isExpanded, onPositionChange]);
+
   // Handle mouse down for dragging
-  const handleMouseDown = (e: React.MouseEvent) => {
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (!widgetRef.current) return;
     
+    e.preventDefault();
     const rect = widgetRef.current.getBoundingClientRect();
-    setDragOffset({
+    dragStartRef.current = {
       x: e.clientX - rect.left,
       y: e.clientY - rect.top,
-    });
+    };
     setIsDragging(true);
-  };
+  }, []);
 
   // Handle mouse move for dragging
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      if (!isDragging) return;
-
-      const newPosition = {
-        x: e.clientX - dragOffset.x,
-        y: e.clientY - dragOffset.y,
-      };
-
-      const maxX = window.innerWidth - 350;
-      const maxY = window.innerHeight - (isExpanded ? 400 : 120);
-      
-      newPosition.x = Math.max(0, Math.min(maxX, newPosition.x));
-      newPosition.y = Math.max(0, Math.min(maxY, newPosition.y));
-
-      setPosition(newPosition);
-      onPositionChange?.(newPosition);
+      if (!isDragging || !dragStartRef.current) return;
+      e.preventDefault();
+      updatePosition(e.clientX, e.clientY);
     };
 
     const handleMouseUp = () => {
-      setIsDragging(false);
+      if (isDragging) {
+        setIsDragging(false);
+        dragStartRef.current = null;
+        
+        // Save final position
+        saveWidgetState(position);
+        
+        // Clean up animation frame
+        if (animationFrameRef.current) {
+          cancelAnimationFrame(animationFrameRef.current);
+          animationFrameRef.current = null;
+        }
+      }
     };
 
     if (isDragging) {
-      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mousemove', handleMouseMove, { passive: false });
       document.addEventListener('mouseup', handleMouseUp);
+      document.body.style.userSelect = 'none';
     }
 
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.userSelect = '';
+      
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
     };
-  }, [isDragging, dragOffset, isExpanded, onPositionChange]);
+  }, [isDragging, updatePosition, position, saveWidgetState]);
 
   const handleSendMessage = useCallback(() => {
     if (!message.trim()) return;
 
     const newMessage: BitChatMessage = {
       id: Date.now().toString(),
-      sender: 'you',
+      sender: 'local_node',
       content: message,
       timestamp: new Date(),
       type: message.startsWith('/') ? 'system' : 'public',
       hops: 0,
+      encrypted: message.includes('encrypt') || message.includes('secure'),
     };
 
-    setMessages(prev => [...prev.slice(-10), newMessage]);
+    setMessages(prev => [...prev.slice(-12), newMessage]);
     setMessage('');
   }, [message]);
 
@@ -226,15 +345,38 @@ export const BitChatWidget: React.FC<BitChatWidgetProps> = ({
     }
   };
 
+  const handleToggleExpanded = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newExpanded = !isExpanded;
+    setIsExpanded(newExpanded);
+    saveWidgetState(undefined, newExpanded);
+  }, [isExpanded, saveWidgetState]);
+
   const formatTime = (date: Date) => {
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return date.toLocaleTimeString([], { 
+      hour12: false,
+      hour: '2-digit', 
+      minute: '2-digit',
+      second: '2-digit'
+    });
   };
 
-  const getSignalIcon = (strength: number) => {
-    if (strength > 70) return <Signal className="w-3 h-3 text-green-500" />;
-    if (strength > 40) return <Signal className="w-3 h-3 text-yellow-500" />;
-    if (strength > 0) return <Signal className="w-3 h-3 text-red-500" />;
-    return <WifiOff className="w-3 h-3 text-gray-500" />;
+  const getNodeTypeIcon = (type: MeshPeer['nodeType']) => {
+    switch (type) {
+      case 'relay': return '◊';
+      case 'bridge': return '▲';
+      case 'endpoint': return '●';
+      default: return '○';
+    }
+  };
+
+  const getMessageTypePrefix = (type: BitChatMessage['type']) => {
+    switch (type) {
+      case 'system': return '[SYS]';
+      case 'alert': return '[!!!]';
+      case 'private': return '[PVT]';
+      default: return '';
+    }
   };
 
   const connectedPeers = peers.filter(peer => peer.isConnected);
@@ -242,123 +384,152 @@ export const BitChatWidget: React.FC<BitChatWidgetProps> = ({
   return (
     <Card
       ref={widgetRef}
-      className={`fixed bg-background-default/80 backdrop-blur-md border border-white/10 shadow-lg transition-all duration-200 select-none ${
-        isDragging ? 'cursor-grabbing scale-105 shadow-xl' : 'cursor-grab hover:shadow-xl hover:scale-105'
+      className={`fixed bg-black/90 backdrop-blur-md border border-green-500/30 shadow-lg shadow-green-500/20 transition-all duration-200 select-none font-mono ${
+        isDragging ? 'cursor-grabbing scale-105 shadow-xl shadow-green-500/40' : 'cursor-grab hover:shadow-xl hover:shadow-green-500/30 hover:border-green-500/50'
       }`}
       style={{
         left: position.x,
         top: position.y,
         zIndex: 50,
-        minWidth: '320px',
-        maxWidth: '350px',
+        minWidth: '360px',
+        maxWidth: '380px',
+        background: 'linear-gradient(135deg, rgba(0,0,0,0.95) 0%, rgba(0,20,0,0.9) 100%)',
+        transform: isDragging ? 'none' : undefined,
+        willChange: isDragging ? 'transform' : 'auto',
       }}
       onMouseDown={handleMouseDown}
     >
-      <div className="p-4">
-        {/* Header */}
+      <div className="p-3">
+        {/* Header - Pager Style */}
         <div 
-          className="flex items-center gap-2 mb-3 cursor-pointer"
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsExpanded(!isExpanded);
-          }}
+          className="flex items-center gap-2 mb-2 cursor-pointer border-b border-green-500/20 pb-2"
+          onClick={handleToggleExpanded}
         >
-          <div className="flex items-center gap-2">
-            <Bluetooth className="w-4 h-4 text-blue-500" />
-            <MessageCircle className="w-4 h-4 text-text-muted" />
-            <span className="text-sm font-medium text-text-standard">
-              BitChat Mesh
+          {/* App Icon */}
+          <img 
+            src="/icons/bitchat-icon.png" 
+            alt="BitChat" 
+            className="w-6 h-6 rounded-sm opacity-90"
+          />
+          
+          <div className="flex items-center gap-2 flex-1">
+            <span className="text-green-400 text-xs font-bold tracking-wider">
+              BITCHAT.MESH
             </span>
+            <div className="flex items-center gap-1">
+              {Array.from({length: meshStrength}).map((_, i) => (
+                <div key={i} className="w-1 h-3 bg-green-500 opacity-80" />
+              ))}
+              {Array.from({length: 5 - meshStrength}).map((_, i) => (
+                <div key={i} className="w-1 h-3 bg-green-500/20" />
+              ))}
+            </div>
           </div>
-          <div className="flex items-center gap-1 ml-auto">
-            {isConnected ? (
-              <Wifi className="w-4 h-4 text-green-500" />
-            ) : (
-              <WifiOff className="w-4 h-4 text-red-500" />
-            )}
-            <Move className="w-3 h-3 text-text-muted opacity-50" />
+          
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-green-400">{formatTime(currentTime)}</span>
+            <div className="flex items-center gap-1">
+              <Zap className="w-3 h-3 text-yellow-400" />
+              <span className="text-yellow-400">{batteryLevel}%</span>
+            </div>
+            <Move className="w-3 h-3 text-green-500/50" />
           </div>
         </div>
 
-        {/* Status Bar */}
-        <div className="flex items-center justify-between text-xs text-text-muted mb-3">
+        {/* Status Line - Hacker Style */}
+        <div className="flex items-center justify-between text-xs text-green-400 mb-2 font-mono">
           <div className="flex items-center gap-2">
             <Hash className="w-3 h-3" />
             <span>{activeChannel}</span>
+            <span className="text-green-500/60">|</span>
+            <span>{connectedPeers.length} nodes</span>
           </div>
           <div className="flex items-center gap-2">
-            <Users className="w-3 h-3" />
-            <span>{connectedPeers.length} peers</span>
+            {isOnline ? (
+              <Activity className="w-3 h-3 text-green-500 animate-pulse" />
+            ) : (
+              <WifiOff className="w-3 h-3 text-red-500" />
+            )}
+            <span className="text-green-500/80">MESH_ACTIVE</span>
           </div>
         </div>
 
         {/* Expanded Content */}
         {isExpanded && (
           <div className="space-y-3">
-            {/* Messages */}
-            <div className="bg-background-muted/30 rounded-lg p-3 max-h-48 overflow-y-auto">
-              <div className="space-y-2">
-                {messages.slice(-8).map((msg) => (
-                  <div key={msg.id} className="text-xs">
-                    <div className="flex items-center gap-1 mb-1">
-                      <Clock className="w-3 h-3 text-text-muted" />
-                      <span className="text-text-muted">{formatTime(msg.timestamp)}</span>
-                      {msg.type === 'public' && msg.hops && (
-                        <span className="text-text-muted">({msg.hops} hops)</span>
-                      )}
+            {/* Terminal-style Messages */}
+            <div className="bg-black/60 border border-green-500/20 rounded p-2 max-h-56 overflow-y-auto font-mono text-xs">
+              <div className="space-y-1">
+                {messages.slice(-10).map((msg) => (
+                  <div key={msg.id} className="leading-tight">
+                    <div className="flex items-center gap-1 text-green-600/80">
+                      <span>{formatTime(msg.timestamp)}</span>
+                      <span className="text-green-500/40">|</span>
+                      {msg.hops && <span>h{msg.hops}</span>}
+                      {msg.encrypted && <span className="text-yellow-400">🔒</span>}
                     </div>
-                    <div className="flex items-start gap-2">
-                      {msg.type === 'system' ? (
-                        <span className="text-blue-400 font-mono">*</span>
-                      ) : (
-                        <User className="w-3 h-3 text-text-muted mt-0.5" />
-                      )}
-                      <div>
-                        <span className={`font-medium ${
-                          msg.sender === 'you' 
-                            ? 'text-blue-400' 
-                            : msg.type === 'system' 
-                            ? 'text-blue-400' 
-                            : 'text-text-standard'
-                        }`}>
-                          {msg.sender}:
-                        </span>
-                        <span className="ml-1 text-text-standard">{msg.content}</span>
-                      </div>
+                    <div className="flex items-start gap-1">
+                      <span className={`${
+                        msg.type === 'system' ? 'text-cyan-400' :
+                        msg.type === 'alert' ? 'text-red-400' :
+                        msg.sender === 'local_node' ? 'text-green-300' :
+                        'text-green-400'
+                      }`}>
+                        {getMessageTypePrefix(msg.type)}
+                        {msg.sender !== 'system' && `${msg.sender}:`}
+                      </span>
+                      <span className={`${
+                        msg.type === 'system' ? 'text-cyan-300' :
+                        msg.type === 'alert' ? 'text-red-300' :
+                        'text-green-200'
+                      }`}>
+                        {msg.content}
+                      </span>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Peers List */}
-            <div className="bg-background-muted/30 rounded-lg p-3">
-              <div className="text-xs font-medium text-text-standard mb-2">Mesh Peers</div>
-              <div className="space-y-1">
-                {peers.slice(0, 4).map((peer) => (
-                  <div key={peer.id} className="flex items-center justify-between text-xs">
+            {/* Node List - Matrix Style */}
+            <div className="bg-black/60 border border-green-500/20 rounded p-2 font-mono">
+              <div className="text-xs text-green-400 mb-1 border-b border-green-500/20 pb-1">
+                MESH_NODES [{connectedPeers.length}]
+              </div>
+              <div className="space-y-1 text-xs">
+                {peers.slice(0, 5).map((peer) => (
+                  <div key={peer.id} className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      {getSignalIcon(peer.signalStrength)}
-                      <span className={peer.isConnected ? 'text-text-standard' : 'text-text-muted'}>
+                      <span className="text-green-500">{getNodeTypeIcon(peer.nodeType)}</span>
+                      <span className={peer.isConnected ? 'text-green-300' : 'text-green-600'}>
                         {peer.name}
                       </span>
                     </div>
-                    <span className="text-text-muted">
-                      {peer.isConnected ? `${peer.signalStrength}%` : 'offline'}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center">
+                        {Array.from({length: Math.floor(peer.signalStrength / 20)}).map((_, i) => (
+                          <div key={i} className="w-1 h-2 bg-green-500 mr-px" />
+                        ))}
+                        {Array.from({length: 5 - Math.floor(peer.signalStrength / 20)}).map((_, i) => (
+                          <div key={i} className="w-1 h-2 bg-green-500/20 mr-px" />
+                        ))}
+                      </div>
+                      <span className="text-green-400 text-xs">{peer.signalStrength}%</span>
+                    </div>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Message Input */}
-            <div className="flex gap-2">
+            {/* Command Input - Terminal Style */}
+            <div className="flex gap-1 bg-black/60 border border-green-500/20 rounded p-1">
+              <span className="text-green-500 text-xs font-mono py-1 px-1">&gt;</span>
               <Input
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder="Type message or /command..."
-                className="text-xs h-8"
+                placeholder="enter command or message..."
+                className="text-xs h-6 bg-transparent border-none text-green-300 placeholder-green-600 font-mono focus:ring-0 focus:outline-none"
                 onClick={(e) => e.stopPropagation()}
               />
               <Button
@@ -367,7 +538,7 @@ export const BitChatWidget: React.FC<BitChatWidgetProps> = ({
                   e.stopPropagation();
                   handleSendMessage();
                 }}
-                className="h-8 px-2"
+                className="h-6 px-2 bg-green-500/20 hover:bg-green-500/30 border border-green-500/40 text-green-400"
               >
                 <Send className="w-3 h-3" />
               </Button>
@@ -375,20 +546,21 @@ export const BitChatWidget: React.FC<BitChatWidgetProps> = ({
           </div>
         )}
 
-        {/* Collapsed Status */}
+        {/* Collapsed Status - Pager Style */}
         {!isExpanded && (
-          <div className="space-y-2">
-            <div className="text-xs text-text-muted">
+          <div className="space-y-1">
+            <div className="text-xs font-mono">
               {messages.length > 0 && (
-                <div className="flex items-center gap-1">
-                  <span className="font-medium">{messages[messages.length - 1].sender}:</span>
-                  <span className="truncate">{messages[messages.length - 1].content}</span>
+                <div className="flex items-center gap-1 text-green-300">
+                  <span className="text-green-500">&gt;</span>
+                  <span className="text-green-400">{messages[messages.length - 1].sender}:</span>
+                  <span className="truncate text-green-200">{messages[messages.length - 1].content}</span>
                 </div>
               )}
             </div>
-            <div className="flex items-center justify-between text-xs text-text-muted">
-              <span>{connectedPeers.length} peers online</span>
-              <span>Click to expand</span>
+            <div className="flex items-center justify-between text-xs text-green-500/80 font-mono">
+              <span>{connectedPeers.length} nodes online</span>
+              <span className="text-green-600">tap to expand</span>
             </div>
           </div>
         )}

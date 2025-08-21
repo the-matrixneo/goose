@@ -98,7 +98,7 @@ export const ClockWidget: React.FC<ClockWidgetProps> = ({
   return (
     <Card
       ref={widgetRef}
-      className={`fixed bg-background-default/80 backdrop-blur-md border border-white/10 shadow-lg transition-all duration-200 select-none ${
+      className={`fixed bg-background-card/20 backdrop-blur-md border border-white/10 hover:bg-background-card/30 hover:border-white/15 shadow-lg transition-all duration-200 select-none ${
         isDragging ? 'cursor-grabbing scale-105 shadow-xl' : 'cursor-grab hover:shadow-xl hover:scale-105'
       }`}
       style={{

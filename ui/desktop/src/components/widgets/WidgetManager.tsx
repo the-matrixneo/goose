@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import ClockWidget from './ClockWidget';
 import QueuedTasksWidget from './QueuedTasksWidget';
 import BitChatWidget from './BitChatWidget';
 
@@ -9,10 +8,6 @@ interface Position {
 }
 
 interface WidgetSettings {
-  clockWidget: {
-    enabled: boolean;
-    position: Position;
-  };
   queuedTasksWidget: {
     enabled: boolean;
     position: Position;
@@ -24,10 +19,6 @@ interface WidgetSettings {
 }
 
 const DEFAULT_SETTINGS: WidgetSettings = {
-  clockWidget: {
-    enabled: true,
-    position: { x: 20, y: 20 },
-  },
   queuedTasksWidget: {
     enabled: true,
     position: { x: 220, y: 20 },
@@ -64,16 +55,6 @@ export const WidgetManager: React.FC = () => {
     }
   };
 
-  const handleClockPositionChange = (position: Position) => {
-    saveSettings({
-      ...settings,
-      clockWidget: {
-        ...settings.clockWidget,
-        position,
-      },
-    });
-  };
-
   const handleQueuedTasksPositionChange = (position: Position) => {
     saveSettings({
       ...settings,
@@ -96,13 +77,6 @@ export const WidgetManager: React.FC = () => {
 
   return (
     <>
-      {settings.clockWidget.enabled && (
-        <ClockWidget
-          initialPosition={settings.clockWidget.position}
-          onPositionChange={handleClockPositionChange}
-        />
-      )}
-      
       {settings.queuedTasksWidget.enabled && (
         <QueuedTasksWidget
           initialPosition={settings.queuedTasksWidget.position}
