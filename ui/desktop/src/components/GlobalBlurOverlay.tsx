@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useFocusMode } from '../contexts/FocusModeContext';
 
 /**
- * GlobalBlurOverlay Component
+ * GlobalBlurOverlay Component - FIXED VERSION
  * 
  * A reusable component that provides a consistent glassmorphism effect across the application.
  * This component:
@@ -10,6 +10,8 @@ import { useFocusMode } from '../contexts/FocusModeContext';
  * 2. Applies a blur effect with theme-aware styling
  * 3. Adjusts opacity based on focus mode state
  * 4. Handles theme changes automatically
+ * 5. PREVENTS APP HANGING with robust error handling and timeouts
+ * 6. NO HARDCODED BACKGROUND.JPG - uses only custom images or transparent
  * 
  * The component is designed to be mounted once at the application level to ensure
  * consistent styling across all views.
@@ -17,15 +19,91 @@ import { useFocusMode } from '../contexts/FocusModeContext';
 const GlobalBlurOverlay: React.FC = () => {
   const { isInFocusMode } = useFocusMode();
   const [isDarkTheme, setIsDarkTheme] = useState(false);
-  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(true); // Start as true to prevent initial loading state
   const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
   const [backgroundId, setBackgroundId] = useState<string>('default-gradient');
-  const [isProcessingChange, setIsProcessingChange] = useState(false);
   
+  // Refs for cleanup and timeout management
+  const imageRef = useRef<HTMLImageElement | null>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Safe state clearing function to prevent stuck states
+  const clearProcessingState = useCallback(() => {
+    setImageLoaded(true);
+    
+    // Clear timeouts
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+    
+    // Clear image ref
+    if (imageRef.current) {
+      imageRef.current.onload = null;
+      imageRef.current.onerror = null;
+      imageRef.current = null;
+    }
+  }, []);
+
+  // Async image loading with timeout protection
+  const loadImageSafely = useCallback(async (imageUrl: string): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      // Clear any existing processing
+      clearProcessingState();
+      
+      // Set loading state briefly
+      setImageLoaded(false);
+      
+      // Create timeout for image loading (3 seconds max)
+      const loadTimeout = setTimeout(() => {
+        console.warn('Image loading timeout - clearing processing state');
+        clearProcessingState();
+        reject(new Error('Image loading timeout'));
+      }, 3000);
+      
+      timeoutRef.current = loadTimeout;
+      
+      try {
+        const img = new Image();
+        imageRef.current = img;
+        
+        img.onload = () => {
+          console.log("Background image loaded successfully");
+          clearTimeout(loadTimeout);
+          setImageLoaded(true);
+          resolve();
+        };
+        
+        img.onerror = (e) => {
+          console.error("Failed to load background image:", e);
+          clearTimeout(loadTimeout);
+          clearProcessingState();
+          reject(new Error('Failed to load image'));
+        };
+        
+        // Use requestAnimationFrame to prevent blocking
+        requestAnimationFrame(() => {
+          if (img) {
+            img.src = imageUrl;
+          }
+        });
+        
+      } catch (error) {
+        clearTimeout(loadTimeout);
+        clearProcessingState();
+        reject(error);
+      }
+    });
+  }, [clearProcessingState]);
+
   // Update theme detection when it changes
   useEffect(() => {
     const updateTheme = () => {
-      setIsDarkTheme(document.documentElement.classList.contains('dark'));
+      try {
+        setIsDarkTheme(document.documentElement.classList.contains('dark'));
+      } catch (error) {
+        console.error('Error updating theme:', error);
+      }
     };
     
     // Initial check
@@ -33,220 +111,153 @@ const GlobalBlurOverlay: React.FC = () => {
     
     // Set up observer to detect theme changes
     const observer = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
-        if (mutation.attributeName === 'class') {
-          updateTheme();
-        }
-      });
+      try {
+        mutations.forEach((mutation) => {
+          if (mutation.attributeName === 'class') {
+            updateTheme();
+          }
+        });
+      } catch (error) {
+        console.error('Error in theme observer:', error);
+      }
     });
     
     observer.observe(document.documentElement, { attributes: true });
     
-    // Load background settings
-    const savedBackground = localStorage.getItem('dashboard-background');
-    const savedCustomImage = localStorage.getItem('dashboard-custom-image');
-    
-    if (savedBackground) {
-      setBackgroundId(savedBackground);
-    }
-    
-    if (savedBackground === 'custom-image' && savedCustomImage) {
-      setBackgroundImage(savedCustomImage);
-      
-      // Preload the custom image
-      const img = new Image();
-      img.onload = () => {
-        console.log("Custom background image loaded successfully");
-        setImageLoaded(true);
-      };
-      img.onerror = (e) => {
-        console.error("Failed to load custom background image:", e);
-      };
-      img.src = savedCustomImage;
-    } else {
-      // If not using custom image, mark as loaded
-      setImageLoaded(true);
-    }
-    
-    // Listen for background changes
-    const handleBackgroundChange = (e: CustomEvent) => {
-      console.log("Background changed:", e.detail);
-      
-      // Set processing flag to prevent UI freezes
-      setIsProcessingChange(true);
-      
-      // Use setTimeout to defer processing to next tick
-      setTimeout(() => {
-        try {
-          setBackgroundId(e.detail.backgroundId);
-          
-          if (e.detail.backgroundId === 'custom-image' && e.detail.customImage) {
-            setBackgroundImage(e.detail.customImage);
-            
-            // For custom images, we need to wait for them to load
-            if (e.detail.customImage !== backgroundImage) {
-              setImageLoaded(false);
-              const img = new Image();
-              img.onload = () => {
-                console.log("New custom background image loaded successfully");
-                setImageLoaded(true);
-                setIsProcessingChange(false);
-              };
-              img.onerror = (e) => {
-                console.error("Failed to load new custom background image:", e);
-                setImageLoaded(true); // Still mark as loaded to prevent UI freeze
-                setIsProcessingChange(false);
-              };
-              img.src = e.detail.customImage;
-            } else {
-              // If it's the same image, no need to reload
-              setImageLoaded(true);
-              setIsProcessingChange(false);
-            }
-          } else {
-            setBackgroundImage(null);
-            setImageLoaded(true);
-            setIsProcessingChange(false);
-          }
-        } catch (error) {
-          console.error("Error handling background change:", error);
-          setImageLoaded(true); // Ensure we don't get stuck in loading state
-          setIsProcessingChange(false);
-        }
-      }, 0);
-    };
-    
-    window.addEventListener('dashboard-background-changed', handleBackgroundChange as EventListener);
-    
     return () => {
       observer.disconnect();
-      window.removeEventListener('dashboard-background-changed', handleBackgroundChange as EventListener);
     };
-  }, [backgroundImage]);
+  }, []);
+
+  // Load initial background settings
+  useEffect(() => {
+    try {
+      const savedBackground = localStorage.getItem('dashboard-background');
+      const savedCustomImage = localStorage.getItem('dashboard-custom-image');
+      
+      if (savedBackground) {
+        setBackgroundId(savedBackground);
+      }
+      
+      if (savedBackground === 'custom-image' && savedCustomImage) {
+        setBackgroundImage(savedCustomImage);
+        
+        // Load image asynchronously without blocking
+        loadImageSafely(savedCustomImage).catch((error) => {
+          console.error('Failed to load initial background image:', error);
+          // Fallback to default - NO HARDCODED BACKGROUND.JPG
+          setBackgroundId('default-gradient');
+          setBackgroundImage(null);
+        });
+      }
+    } catch (error) {
+      console.error('Error loading background settings:', error);
+      // Continue with defaults
+    }
+  }, [loadImageSafely]);
+
+  // Listen for background changes with robust error handling
+  useEffect(() => {
+    const handleBackgroundChange = async (e: Event) => {
+      try {
+        const customEvent = e as CustomEvent;
+        console.log("Background change requested:", customEvent.detail);
+        
+        const { backgroundId: newBackgroundId, customImage: newCustomImage } = customEvent.detail;
+        
+        // Use requestAnimationFrame to ensure smooth UI updates
+        requestAnimationFrame(async () => {
+          try {
+            setBackgroundId(newBackgroundId);
+            
+            if (newBackgroundId === 'custom-image' && newCustomImage) {
+              setBackgroundImage(newCustomImage);
+              await loadImageSafely(newCustomImage);
+            } else {
+              setBackgroundImage(null);
+              setImageLoaded(true);
+            }
+            
+          } catch (error) {
+            console.error('Error in background change handler:', error);
+            clearProcessingState();
+          }
+        });
+        
+      } catch (error) {
+        console.error('Error handling background change:', error);
+        clearProcessingState();
+      }
+    };
+    
+    window.addEventListener('dashboard-background-changed', handleBackgroundChange);
+    
+    return () => {
+      window.removeEventListener('dashboard-background-changed', handleBackgroundChange);
+    };
+  }, [loadImageSafely, clearProcessingState]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      clearProcessingState();
+    };
+  }, [clearProcessingState]);
 
   // Fixed blur intensity
   const blurIntensity = 20; // Consistent blur for chat mode
   
   // Determine background color based on focus mode and theme
-  // Using more grey-tinted overlays to match the home page
   const backgroundColor = isInFocusMode
     ? (isDarkTheme ? 'rgba(24, 24, 27, 0.8)' : 'rgba(245, 245, 250, 0.8)') // 80% opacity in focus mode
     : (isDarkTheme ? 'rgba(24, 24, 27, 0.5)' : 'rgba(245, 245, 250, 0.5)'); // 50% opacity in normal mode
 
-  // Determine background style based on settings
-  const getBackgroundStyle = () => {
-    // If using custom image, return image style
-    if (backgroundId === 'custom-image' && backgroundImage) {
-      return {
-        backgroundImage: `url(${backgroundImage})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
-      };
-    }
-    
-    // Fallback to default image
-    return {
-      backgroundImage: `url('/background.jpg')`,
-      backgroundSize: 'cover',
-      backgroundPosition: 'center',
-      backgroundRepeat: 'no-repeat',
-    };
-  };
-
-  // Create a div element to append to the body
-  useEffect(() => {
-    // Create background and blur overlay elements
-    const backgroundDiv = document.createElement('div');
-    const blurDiv = document.createElement('div');
-    
-    // Set styles for background image
-    Object.assign(backgroundDiv.style, {
-      position: 'fixed',
-      top: '0',
-      right: '0',
-      bottom: '0',
-      left: '0',
-      zIndex: '-8',
-      ...getBackgroundStyle(),
-      opacity: imageLoaded ? '1' : '0',
-      transition: 'opacity 0.5s ease-in-out',
-    });
-    
-    // Set styles for blur overlay
-    Object.assign(blurDiv.style, {
-      position: 'fixed',
-      top: '0',
-      right: '0',
-      bottom: '0',
-      left: '0',
-      zIndex: '-5',
-      backdropFilter: `blur(${blurIntensity}px)`,
-      backgroundColor: backgroundColor,
-      transition: 'background-color 0.5s ease',
-      pointerEvents: 'none',
-    });
-    
-    // Append elements to body
-    document.body.appendChild(backgroundDiv);
-    document.body.appendChild(blurDiv);
-    
-    // Debug info
-    if (process.env.NODE_ENV === 'development') {
-      const debugDiv = document.createElement('div');
-      Object.assign(debugDiv.style, {
-        position: 'fixed',
-        bottom: '16px',
-        right: '16px',
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        color: 'white',
-        padding: '8px',
-        borderRadius: '4px',
-        fontSize: '12px',
-        zIndex: '50',
-      });
-      
-      debugDiv.innerHTML = `
-        Image Loaded: ${imageLoaded ? 'Yes' : 'No'}<br />
-        Background ID: ${backgroundId}<br />
-        Custom Image: ${backgroundImage ? 'Yes' : 'No'}<br />
-        Dark Theme: ${isDarkTheme ? 'Yes' : 'No'}<br />
-        Focus Mode: ${isInFocusMode ? 'Yes' : 'No'}<br />
-        Overlay Color: ${backgroundColor}<br />
-        Processing Change: ${isProcessingChange ? 'Yes' : 'No'}
-      `;
-      
-      document.body.appendChild(debugDiv);
-    }
-    
-    // Cleanup function
-    return () => {
-      document.body.removeChild(backgroundDiv);
-      document.body.removeChild(blurDiv);
-      
-      if (process.env.NODE_ENV === 'development') {
-        const debugElement = document.body.querySelector('[style*="position: fixed"][style*="bottom: 16px"][style*="right: 16px"]');
-        if (debugElement) {
-          document.body.removeChild(debugElement);
-        }
+  // Determine background style based on settings - NO HARDCODED BACKGROUND.JPG
+  const getBackgroundStyle = useCallback((): React.CSSProperties => {
+    try {
+      // ONLY use custom image if explicitly set - NO FALLBACK TO BACKGROUND.JPG
+      if (backgroundId === 'custom-image' && backgroundImage) {
+        return {
+          backgroundImage: `url(${backgroundImage})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+        };
       }
-    };
-  }, [backgroundId, backgroundImage, imageLoaded, isDarkTheme, isInFocusMode, backgroundColor, isProcessingChange]);
+      
+      // Fallback to transparent - NO BACKGROUND.JPG
+      return {
+        backgroundColor: 'transparent',
+      };
+    } catch (error) {
+      console.error('Error getting background style:', error);
+      return { backgroundColor: 'transparent' };
+    }
+  }, [backgroundId, backgroundImage]);
 
-  // Loading overlay to prevent interaction during background changes
-  if (isProcessingChange) {
-    return (
-      <div className="fixed inset-0 bg-background-default/50 backdrop-blur-sm flex items-center justify-center z-50">
-        <div className="bg-background-default p-4 rounded-lg shadow-lg flex flex-col items-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-textStandard mb-2"></div>
-          <p className="text-sm text-textStandard">Updating background...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Return null since we're appending directly to the body
-  return null;
+  return (
+    <>
+      {/* Background Image Layer - Only render if we have a custom image */}
+      {backgroundId === 'custom-image' && backgroundImage && imageLoaded && (
+        <div
+          className="fixed inset-0 transition-opacity duration-500 ease-in-out z-[-10]"
+          style={{
+            ...getBackgroundStyle(),
+            opacity: 1,
+          }}
+        />
+      )}
+      
+      {/* Blur Overlay Layer - Always present for consistency */}
+      <div 
+        className="fixed inset-0 pointer-events-none transition-all duration-500 z-[-5]"
+        style={{ 
+          backdropFilter: `blur(${blurIntensity}px)`,
+          backgroundColor: backgroundColor,
+        }}
+      />
+    </>
+  );
 };
 
 export default GlobalBlurOverlay;
