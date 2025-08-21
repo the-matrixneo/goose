@@ -64,6 +64,10 @@ pub struct SessionMetadata {
     pub accumulated_input_tokens: Option<i32>,
     /// The number of output tokens used in the session. Accumulated across all messages.
     pub accumulated_output_tokens: Option<i32>,
+    /// The total number of tokens used by subagents only. Accumulated across all subagent interactions.
+    pub accumulated_total_tokens_subagent_only: Option<i32>,
+    /// The total number of tokens used by both main agent and subagents. This equals accumulated_total_tokens + accumulated_total_tokens_subagent_only.
+    pub accumulated_total_tokens_with_subagents: Option<i32>,
 }
 
 // Custom deserializer to handle old sessions without working_dir
@@ -83,6 +87,8 @@ impl<'de> Deserialize<'de> for SessionMetadata {
             accumulated_total_tokens: Option<i32>,
             accumulated_input_tokens: Option<i32>,
             accumulated_output_tokens: Option<i32>,
+            accumulated_total_tokens_subagent_only: Option<i32>,
+            accumulated_total_tokens_with_subagents: Option<i32>,
             working_dir: Option<PathBuf>,
         }
 
@@ -104,6 +110,8 @@ impl<'de> Deserialize<'de> for SessionMetadata {
             accumulated_total_tokens: helper.accumulated_total_tokens,
             accumulated_input_tokens: helper.accumulated_input_tokens,
             accumulated_output_tokens: helper.accumulated_output_tokens,
+            accumulated_total_tokens_subagent_only: helper.accumulated_total_tokens_subagent_only,
+            accumulated_total_tokens_with_subagents: helper.accumulated_total_tokens_with_subagents,
             working_dir,
         })
     }
@@ -129,6 +137,8 @@ impl SessionMetadata {
             accumulated_total_tokens: None,
             accumulated_input_tokens: None,
             accumulated_output_tokens: None,
+            accumulated_total_tokens_subagent_only: None,
+            accumulated_total_tokens_with_subagents: None,
         }
     }
 }
