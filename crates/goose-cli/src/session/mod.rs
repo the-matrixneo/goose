@@ -211,6 +211,7 @@ impl Session {
             // TODO: should set timeout
             timeout: Some(goose::config::DEFAULT_EXTENSION_TIMEOUT),
             bundled: None,
+            available_tools: Vec::new(),
         };
 
         self.agent
@@ -244,6 +245,7 @@ impl Session {
             // TODO: should set timeout
             timeout: Some(goose::config::DEFAULT_EXTENSION_TIMEOUT),
             bundled: None,
+            available_tools: Vec::new(),
         };
 
         self.agent
@@ -278,6 +280,7 @@ impl Session {
             // TODO: should set timeout
             timeout: Some(goose::config::DEFAULT_EXTENSION_TIMEOUT),
             bundled: None,
+            available_tools: Vec::new(),
         };
 
         self.agent
@@ -304,6 +307,7 @@ impl Session {
                 timeout: Some(goose::config::DEFAULT_EXTENSION_TIMEOUT),
                 bundled: None,
                 description: None,
+                available_tools: Vec::new(),
             };
             self.agent
                 .add_extension(config)
@@ -577,7 +581,7 @@ impl Session {
                     // Check if mode is valid
                     if !["auto", "approve", "chat", "smart_approve"].contains(&mode.as_str()) {
                         output::render_error(&format!(
-                            "Invalid mode '{}'. Mode must be one of: auto, approve, chat",
+                            "Invalid mode '{}'. Mode must be one of: auto, approve, chat, smart_approve",
                             mode
                         ));
                         continue;
