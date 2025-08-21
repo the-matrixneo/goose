@@ -104,7 +104,7 @@ export const ClockWidget: React.FC<ClockWidgetProps> = ({
       style={{
         left: position.x,
         top: position.y,
-        zIndex: 50,
+        zIndex: 10,
         minWidth: '180px',
       }}
       onMouseDown={handleMouseDown}

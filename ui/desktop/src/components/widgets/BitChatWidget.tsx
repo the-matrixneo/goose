@@ -390,7 +390,7 @@ export const BitChatWidget: React.FC<BitChatWidgetProps> = ({
       style={{
         left: position.x,
         top: position.y,
-        zIndex: 50,
+        zIndex: 10,
         minWidth: '360px',
         maxWidth: '380px',
         background: 'linear-gradient(135deg, rgba(0,0,0,0.95) 0%, rgba(0,20,0,0.9) 100%)',
