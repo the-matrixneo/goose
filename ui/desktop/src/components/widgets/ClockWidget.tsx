@@ -22,6 +22,10 @@ export const ClockWidget: React.FC<ClockWidgetProps> = ({
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const widgetRef = useRef<HTMLDivElement>(null);
 
+  // Sync position with initialPosition prop - CRITICAL FOR STATE PERSISTENCE
+  useEffect(() => {
+    setPosition(initialPosition);
+  }, [initialPosition]);
   // Update time every second
   useEffect(() => {
     const timer = setInterval(() => {

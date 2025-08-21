@@ -59,6 +59,11 @@ export const BitChatWidget: React.FC<BitChatWidgetProps> = ({
   
   const widgetRef = useRef<HTMLDivElement>(null);
 
+  // Sync position with initialPosition prop - CRITICAL FOR STATE PERSISTENCE
+  useEffect(() => {
+    setPosition(initialPosition);
+  }, [initialPosition]);
+
   // Update time every second for pager-like display
   useEffect(() => {
     const timer = setInterval(() => {
