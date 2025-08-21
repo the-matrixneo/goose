@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useConfig } from '../components/ConfigContext';
 import { generateSessionId } from '../sessions';
 import { ChatType } from '../types/chat';
@@ -8,83 +8,113 @@ import { initializeCostDatabase } from '../utils/costDatabase';
 import { backupConfig, initConfig, readAllConfig, recoverConfig, validateConfig } from '../api';
 import { COST_TRACKING_ENABLED } from '../updates';
 
-interface InitializationContext {
-  recipeConfig?: Recipe;
-  resumedChat?: ChatType;
+export enum AgentState {
+  UNINITIALIZED = 'uninitialized',
+  INITIALIZING = 'initializing',
+  NO_PROVIDER = 'no_provider',
+  INITIALIZED = 'initialized',
+  ERROR = 'error',
+}
+
+export interface InitializationContext {
+  recipeConfig?: Recipe | null;
+  resumedChat?: ChatType | null;
+  initialMessage?: string | null;
+  resetChat?: boolean;
 }
 
 interface UseAgentReturn {
-  isAgentInitialized: boolean;
-  isInitializing: boolean;
+  agentState: AgentState;
   initializeAgentIfNeeded: (context: InitializationContext) => Promise<void>;
 }
 
-export function useAgent(setPairChat: (chat: ChatType) => void): UseAgentReturn {
-  const [isAgentInitialized, setIsAgentInitialized] = useState(false);
-  const [isInitializing, setIsInitializing] = useState(false);
+export function useAgent(setChat: (chat: ChatType) => void): UseAgentReturn {
+  const [agentState, setAgentState] = useState<AgentState>(AgentState.UNINITIALIZED);
+  const initPromiseRef = useRef<Promise<void> | null>(null);
 
   const { getExtensions, addExtension, read } = useConfig();
 
   const initializeAgentIfNeeded = useCallback(
     async (initContext: InitializationContext) => {
-      if (isAgentInitialized || isInitializing) {
+      if (agentState === AgentState.INITIALIZED) {
         return;
       }
 
-      setIsInitializing(true);
+      if (initPromiseRef.current) {
+        return initPromiseRef.current;
+      }
 
-      try {
-        const config = window.electron.getConfig();
-        const provider = (await read('GOOSE_PROVIDER', false)) ?? config.GOOSE_DEFAULT_PROVIDER;
-        const model = (await read('GOOSE_MODEL', false)) ?? config.GOOSE_DEFAULT_MODEL;
-
-        let chatToSet: ChatType;
-
-        if (initContext.recipeConfig) {
-          chatToSet = {
-            sessionId: generateSessionId(),
-            title: initContext.recipeConfig?.title || 'Recipe Chat',
-            messages: [],
-            messageHistoryIndex: 0,
-            recipeConfig: initContext.recipeConfig,
-            recipeParameters: null,
-          };
-        } else if (initContext.resumedChat) {
-          chatToSet = initContext.resumedChat;
-        } else {
-          chatToSet = {
-            sessionId: generateSessionId(),
-            title: 'New Chat',
-            messages: [],
-            messageHistoryIndex: 0,
-            recipeConfig: null,
-            recipeParameters: null,
-          };
-        }
-
-        setPairChat(chatToSet);
-
-        // Initialize cost database if enabled
-        const costDbPromise = COST_TRACKING_ENABLED
-          ? initializeCostDatabase().catch((error) => {
-              console.error('Failed to initialize cost database:', error);
-            })
-          : (() => {
-              console.log('Cost tracking disabled, skipping cost database initialization');
-              return Promise.resolve();
-            })();
-
-        await initConfig();
+      const initPromise = (async () => {
+        setAgentState(AgentState.INITIALIZING);
 
         try {
-          await readAllConfig({ throwOnError: true });
-        } catch (error) {
-          console.warn('Initial config read failed, attempting recovery:', error);
-          await handleConfigRecovery();
-        }
+          const config = window.electron.getConfig();
+          const provider = (await read('GOOSE_PROVIDER', false)) ?? config.GOOSE_DEFAULT_PROVIDER;
+          const model = (await read('GOOSE_MODEL', false)) ?? config.GOOSE_DEFAULT_MODEL;
 
-        // Initialize the provider system and extensions
-        if (provider && model) {
+          if (!provider || !model) {
+            setAgentState(AgentState.NO_PROVIDER);
+            return;
+          }
+
+          let chatToSet: ChatType;
+          if (initContext.resumedChat) {
+            chatToSet = initContext.resumedChat;
+          } else if (initContext.resetChat && initContext.recipeConfig) {
+            chatToSet = {
+              sessionId: generateSessionId(),
+              title: initContext.recipeConfig.title || 'Recipe Chat',
+              messages: [],
+              messageHistoryIndex: 0,
+              recipeConfig: initContext.recipeConfig,
+              recipeParameters: null,
+            };
+          } else if (initContext.resetChat && initContext.initialMessage) {
+            chatToSet = {
+              sessionId: generateSessionId(),
+              title: 'New Chat',
+              messages: [],
+              messageHistoryIndex: 0,
+              recipeConfig: null,
+              recipeParameters: null,
+            };
+          } else if (initContext.recipeConfig) {
+            chatToSet = {
+              sessionId: generateSessionId(),
+              title: initContext.recipeConfig.title || 'Recipe Chat',
+              messages: [],
+              messageHistoryIndex: 0,
+              recipeConfig: initContext.recipeConfig,
+              recipeParameters: null,
+            };
+          } else {
+            chatToSet = {
+              sessionId: generateSessionId(),
+              title: 'New Chat',
+              messages: [],
+              messageHistoryIndex: 0,
+              recipeConfig: null,
+              recipeParameters: null,
+            };
+          }
+
+          setChat(chatToSet);
+
+          const costDbPromise = COST_TRACKING_ENABLED
+            ? initializeCostDatabase().catch((error) => {
+                console.error('Failed to initialize cost database:', error);
+              })
+            : Promise.resolve();
+
+          await initConfig();
+
+          try {
+            await readAllConfig({ throwOnError: true });
+          } catch (error) {
+            console.warn('Initial config read failed, attempting recovery:', error);
+            await handleConfigRecovery();
+          }
+
           const initPromises = [
             initializeSystem(chatToSet.sessionId, provider as string, model as string, {
               getExtensions,
@@ -98,21 +128,30 @@ export function useAgent(setPairChat: (chat: ChatType) => void): UseAgentReturn 
 
           await Promise.all(initPromises);
           console.log('Agent core initialization completed successfully');
-        } else {
-          throw new Error('Provider and model are required for agent initialization');
-        }
 
-        setIsAgentInitialized(true);
-      } finally {
-        setIsInitializing(false);
-      }
+          setAgentState(AgentState.INITIALIZED);
+        } catch (error) {
+          if ((error + '').includes('Failed to create provider')) {
+            // This is not ideal, but otherwise we end up showing a fatal error instead of
+            // allowing the user to fix their config:
+            setAgentState(AgentState.NO_PROVIDER);
+            return;
+          }
+          setAgentState(AgentState.ERROR);
+          throw error;
+        } finally {
+          initPromiseRef.current = null;
+        }
+      })();
+
+      initPromiseRef.current = initPromise;
+      return initPromise;
     },
-    [isAgentInitialized, isInitializing, getExtensions, addExtension, read, setPairChat]
+    [agentState, getExtensions, addExtension, read, setChat]
   );
 
   return {
-    isAgentInitialized,
-    isInitializing,
+    agentState,
     initializeAgentIfNeeded,
   };
 }

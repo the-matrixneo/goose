@@ -204,6 +204,7 @@ export const initializeSystem = async (
         provider,
         model,
       },
+      throwOnError: true,
     });
 
     // Get recipeConfig directly here

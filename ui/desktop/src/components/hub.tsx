@@ -7,7 +7,7 @@
  * Key Responsibilities:
  * - Displays SessionInsights to show session statistics and recent chats
  * - Provides a ChatInput for users to start new conversations
- * - Creates a new chat session with the submitted message and navigates to Pair
+ * - Navigates to Pair with the submitted message to start a new conversation
  * - Ensures each submission from Hub always starts a fresh conversation
  *
  * Navigation Flow:
@@ -19,52 +19,32 @@ import FlappyGoose from './FlappyGoose';
 
 import { SessionInsights } from './sessions/SessionsInsights';
 import ChatInput from './ChatInput';
-import { generateSessionId } from '../sessions';
 import { ChatState } from '../types/chatState';
 import { ChatContextManagerProvider } from './context_management/ChatContextManager';
 import 'react-toastify/dist/ReactToastify.css';
 
 import { ChatType } from '../types/chat';
-import { DEFAULT_CHAT_TITLE } from '../contexts/ChatContext';
 import { View, ViewOptions } from '../utils/navigationUtils';
 
 export default function Hub({
-  chat: _chat,
-  setChat: _setChat,
-  setPairChat,
   setView,
   setIsGoosehintsModalOpen,
 }: {
   readyForAutoUserPrompt: boolean;
   chat: ChatType;
   setChat: (chat: ChatType) => void;
-  setPairChat: (chat: ChatType) => void;
   setView: (view: View, viewOptions?: ViewOptions) => void;
   setIsGoosehintsModalOpen: (isOpen: boolean) => void;
 }) {
   const [showGame, setShowGame] = useState(false);
 
-  // Handle chat input submission - create new chat and navigate to pair
   const handleSubmit = (e: React.FormEvent) => {
     const customEvent = e as unknown as CustomEvent;
     const combinedTextFromInput = customEvent.detail?.value || '';
 
     if (combinedTextFromInput.trim()) {
-      // Always create a completely new chat session with a unique ID for the PAIR
-      const sessionId = generateSessionId();
-      const newPairChat = {
-        sessionId: sessionId,
-        title: DEFAULT_CHAT_TITLE,
-        messages: [], // Always start with empty messages
-        messageHistoryIndex: 0,
-        recipeConfig: null, // Clear recipe for new chats from Hub
-        recipeParameters: null, // Clear parameters for new chats from Hub
-      };
-
-      // Update the PAIR chat state immediately to prevent flashing
-      setPairChat(newPairChat);
-
-      // Navigate to pair page with the message to be submitted immediately
+      // Navigate to pair page with the message to be submitted
+      // Pair will handle creating the new chat session
       setView('pair', {
         disableAnimation: true,
         initialMessage: combinedTextFromInput,
@@ -72,7 +52,6 @@ export default function Hub({
       });
     }
 
-    // Prevent default form submission
     e.preventDefault();
   };
 

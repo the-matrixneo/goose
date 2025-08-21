@@ -1,44 +1,18 @@
-/**
- * Pair Component
- *
- * The Pair component represents the active conversation mode in the Goose Desktop application.
- * This is where users engage in ongoing conversations with the AI assistant after transitioning
- * from the Hub's initial welcome screen.
- *
- * Key Responsibilities:
- * - Manages active chat sessions with full message history
- * - Handles transitions from Hub with initial input processing
- * - Provides the main conversational interface for extended interactions
- * - Enables local storage persistence for conversation continuity
- * - Supports all advanced chat features like file attachments, tool usage, etc.
- * - Initializes the agent when entering active conversation mode
- *
- * Navigation Flow:
- * Hub (initial message) → Pair (active conversation) → Hub (new session)
- *
- * The Pair component is essentially a specialized wrapper around BaseChat that:
- * - Processes initial input from the Hub transition
- * - Enables conversation persistence
- * - Provides the full-featured chat experience
- * - Initializes the agent for conversation handling
- *
- * Unlike Hub, Pair assumes an active conversation state and focuses on
- * maintaining conversation flow rather than onboarding new users.
- */
-
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { View, ViewOptions } from '../utils/navigationUtils';
 import BaseChat from './BaseChat';
 import { useRecipeManager } from '../hooks/useRecipeManager';
 import { useIsMobile } from '../hooks/use-mobile';
 import { useSidebar } from './ui/sidebar';
-import { useAgent } from '../hooks/useAgent';
+import { AgentState, useAgent } from '../hooks/useAgent';
 import 'react-toastify/dist/ReactToastify.css';
 import { cn } from '../utils';
 
 import { ChatType } from '../types/chat';
 import { DEFAULT_CHAT_TITLE } from '../contexts/ChatContext';
+import { Recipe } from '../recipe';
+import { SessionDetails } from '../sessions';
 
 export default function Pair({
   chat,
@@ -60,92 +34,136 @@ export default function Pair({
   const [shouldAutoSubmit, setShouldAutoSubmit] = useState(false);
   const [initialMessage, setInitialMessage] = useState<string | null>(null);
   const [isTransitioningFromHub, setIsTransitioningFromHub] = useState(false);
+  const chatRef = useRef(chat);
 
-  // Use the shared agent hook
-  const { isAgentInitialized, isInitializing, initializeAgentIfNeeded } = useAgent(setChat);
+  useEffect(() => {
+    chatRef.current = chat;
+  }, [chat]);
 
-  // Get recipe configuration and parameter handling
+  const { agentState, initializeAgentIfNeeded } = useAgent(setChat);
+
   const { initialPrompt: recipeInitialPrompt } = useRecipeManager(chat, location.state);
 
-  const recipeConfig = location.state?.recipeConfig || null;
-
   useEffect(() => {
-    try {
-      initializeAgentIfNeeded({
-        recipeConfig,
-        resumedChat: chat,
-      });
-    } catch (error) {
-      setFatalError(
-        `Agent init failure: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
-    }
-  }, [initializeAgentIfNeeded, setFatalError, chat, recipeConfig]);
+    const initializeFromState = async () => {
+      const appConfig = window.appConfig?.get('recipe');
+      const resumedSession = location.state?.resumedSession as SessionDetails | undefined;
+      const recipeConfig = location.state?.recipeConfig as Recipe | undefined;
+      const resetChat = location.state?.resetChat as boolean | undefined;
+      const messageFromHub = location.state?.initialMessage;
 
-  // Handle initial chat setup when entering Pair mode
-  // Handle initial message from hub page
-  useEffect(() => {
-    const messageFromHub = location.state?.initialMessage;
-    const resetChat = location.state?.resetChat;
+      let chatToInit: ChatType | null = null;
+      let shouldClearState = false;
 
-    // If we have a resetChat flag from Hub, clear any existing recipe config
-    // This scenario occurs when a user navigates from Hub to start a new chat,
-    // ensuring any previous recipe configuration is cleared for a fresh start
-    if (resetChat) {
-      const newChat: ChatType = {
-        ...chat,
-        recipeConfig: null,
-        recipeParameters: null,
-        title: DEFAULT_CHAT_TITLE,
-        messages: [], // Clear messages for fresh start
-        messageHistoryIndex: 0,
-      };
-      setChat(newChat);
-    }
-
-    // Reset processing state when we have a new message from hub
-    if (messageFromHub) {
-      // Set transitioning state to prevent showing popular topics
-      setIsTransitioningFromHub(true);
-
-      // If this is a different message than what we processed before, reset the flag
-      if (messageFromHub !== initialMessage) {
-        setHasProcessedInitialInput(false);
+      if (appConfig && !chatRef.current.recipeConfig) {
+        const recipe = appConfig as Recipe;
+        chatToInit = {
+          ...chatRef.current,
+          recipeConfig: recipe,
+          title: recipe.title || chatRef.current.title,
+          messages: [],
+          messageHistoryIndex: 0,
+        };
+        shouldClearState = false;
+      } else if (resumedSession) {
+        console.log('Loading resumed session in pair view:', resumedSession.sessionId);
+        chatToInit = {
+          sessionId: resumedSession.sessionId,
+          title: resumedSession.metadata?.description || `ID: ${resumedSession.sessionId}`,
+          messages: resumedSession.messages,
+          messageHistoryIndex: resumedSession.messages.length,
+          recipeConfig: null,
+        };
+        shouldClearState = true;
+      } else if (recipeConfig && resetChat) {
+        console.log('Loading new recipe config in pair view:', recipeConfig.title);
+        chatToInit = {
+          sessionId: chatRef.current.sessionId,
+          title: recipeConfig.title || 'Recipe Chat',
+          messages: [],
+          messageHistoryIndex: 0,
+          recipeConfig: recipeConfig,
+          recipeParameters: null,
+        };
+        shouldClearState = true;
+      } else if (recipeConfig && !chatRef.current.recipeConfig) {
+        chatToInit = {
+          ...chatRef.current,
+          recipeConfig: recipeConfig,
+          title: recipeConfig.title || chatRef.current.title,
+        };
+        shouldClearState = true;
+      } else if (resetChat) {
+        chatToInit = {
+          ...chatRef.current,
+          recipeConfig: null,
+          recipeParameters: null,
+          title: DEFAULT_CHAT_TITLE,
+          messages: [],
+          messageHistoryIndex: 0,
+        };
+        shouldClearState = true;
       }
 
-      if (!hasProcessedInitialInput) {
-        setHasProcessedInitialInput(true);
-        setInitialMessage(messageFromHub);
-        setShouldAutoSubmit(true);
-
-        // Clear the location state to prevent re-processing
-        window.history.replaceState({}, '', '/pair');
+      if (messageFromHub) {
+        setIsTransitioningFromHub(true);
+        if (messageFromHub !== initialMessage) {
+          setHasProcessedInitialInput(false);
+        }
+        if (!hasProcessedInitialInput) {
+          setHasProcessedInitialInput(true);
+          setInitialMessage(messageFromHub);
+          setShouldAutoSubmit(true);
+        }
+        shouldClearState = true;
       }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.state, hasProcessedInitialInput, initialMessage]);
 
-  // Auto-submit the initial message after it's been set and component is ready
+      if (chatToInit) {
+        setChat(chatToInit);
+      }
+
+      try {
+        await initializeAgentIfNeeded({
+          recipeConfig: recipeConfig || (appConfig as Recipe) || null,
+          resumedChat: chatToInit || chatRef.current,
+          initialMessage: messageFromHub || null,
+        });
+      } catch (error) {
+        setFatalError(`Agent init failure: ${error instanceof Error ? error.message : '' + error}`);
+      }
+
+      if (shouldClearState && location.state) {
+        window.history.replaceState({}, document.title);
+      }
+    };
+
+    initializeFromState();
+  }, [
+    location.state,
+    hasProcessedInitialInput,
+    initialMessage,
+    initializeAgentIfNeeded,
+    setChat,
+    setFatalError,
+  ]);
+
   useEffect(() => {
-    if (shouldAutoSubmit && initialMessage && isAgentInitialized) {
-      // Wait for the component to be fully rendered AND agent to be initialized
+    if (agentState === AgentState.NO_PROVIDER) {
+      setView('welcome');
+      return;
+    }
+    if (shouldAutoSubmit && initialMessage && agentState === AgentState.INITIALIZED) {
       const timer = setTimeout(() => {
-        // Try to trigger form submission programmatically
         const textarea = document.querySelector(
           'textarea[data-testid="chat-input"]'
         ) as HTMLTextAreaElement;
         const form = textarea?.closest('form');
 
         if (textarea && form) {
-          // Set the textarea value
           textarea.value = initialMessage;
-          // eslint-disable-next-line no-undef
           textarea.dispatchEvent(new Event('input', { bubbles: true }));
-
-          // Focus the textarea
           textarea.focus();
 
-          // Simulate Enter key press to trigger submission
           const enterEvent = new KeyboardEvent('keydown', {
             key: 'Enter',
             code: 'Enter',
@@ -157,46 +175,38 @@ export default function Pair({
 
           setShouldAutoSubmit(false);
         }
-      }, 500); // Give more time for the component to fully mount
+      }, 500);
 
       return () => clearTimeout(timer);
     }
 
-    // Return undefined when condition is not met
     return undefined;
-  }, [shouldAutoSubmit, initialMessage, isAgentInitialized]);
+  }, [shouldAutoSubmit, initialMessage, agentState]);
 
-  // Custom message submit handler
+  if (agentState == AgentState.NO_PROVIDER) {
+    setView('welcome');
+    return;
+  }
+
   const handleMessageSubmit = (message: string) => {
-    // This is called after a message is submitted
     setShouldAutoSubmit(false);
-    setIsTransitioningFromHub(false); // Clear transitioning state once message is submitted
+    setIsTransitioningFromHub(false);
     console.log('Message submitted:', message);
   };
 
-  // Custom message stream finish handler to handle recipe auto-execution
-  const handleMessageStreamFinish = () => {
-    // This will be called with the proper append function from BaseChat
-    // For now, we'll handle auto-execution in the BaseChat component
-  };
+  const handleMessageStreamFinish = () => {};
 
-  // Determine the initial value for the chat input
-  // Priority: Hub message > Recipe prompt > empty
   const initialValue = initialMessage || recipeInitialPrompt || undefined;
 
-  // Custom chat input props for Pair-specific behavior
   const customChatInputProps = {
-    // Pass initial message from Hub or recipe prompt
     initialValue,
   };
 
-  // Custom content before messages
   const renderBeforeMessages = () => {
-    return <div>{/* Any Pair-specific content before messages can go here */}</div>;
+    return <div></div>;
   };
 
-  // Show loading state while agent is initializing
-  if (isInitializing) {
+  if (agentState === AgentState.INITIALIZING) {
     return (
       <div className="flex justify-center items-center h-full">
         <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-textStandard"></div>
@@ -211,14 +221,14 @@ export default function Pair({
         setChat={setChat}
         setView={setView}
         setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
-        enableLocalStorage={true} // Enable local storage for Pair mode
+        enableLocalStorage={true}
         onMessageSubmit={handleMessageSubmit}
         onMessageStreamFinish={handleMessageStreamFinish}
         renderBeforeMessages={renderBeforeMessages}
         customChatInputProps={customChatInputProps}
-        contentClassName={cn('pr-1 pb-10', (isMobile || sidebarState === 'collapsed') && 'pt-11')} // Use dynamic content class with mobile margin and sidebar state
-        showPopularTopics={!isTransitioningFromHub} // Don't show popular topics while transitioning from Hub
-        suppressEmptyState={isTransitioningFromHub} // Suppress all empty state content while transitioning from Hub
+        contentClassName={cn('pr-1 pb-10', (isMobile || sidebarState === 'collapsed') && 'pt-11')}
+        showPopularTopics={!isTransitioningFromHub}
+        suppressEmptyState={isTransitioningFromHub}
       />
     </>
   );

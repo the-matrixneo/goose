@@ -1,5 +1,6 @@
 use super::utils::verify_secret_key;
 use crate::state::AppState;
+use axum::response::IntoResponse;
 use axum::{
     extract::{Query, State},
     http::{HeaderMap, StatusCode},
@@ -10,16 +11,16 @@ use goose::config::PermissionManager;
 use goose::model::ModelConfig;
 use goose::providers::create;
 use goose::recipe::Response;
+use goose::session;
+use goose::session::storage::save_messages_with_metadata;
 use goose::{
     agents::{extension::ToolInfo, extension_manager::get_parameter_names},
     config::permission::PermissionLevel,
 };
 use goose::{config::Config, recipe::SubRecipe};
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 use std::path::PathBuf;
-use goose::session;
-use goose::session::storage::save_messages_with_metadata;
+use std::sync::Arc;
 
 #[derive(Deserialize, utoipa::ToSchema)]
 pub struct ExtendPromptRequest {
@@ -219,13 +220,13 @@ async fn update_agent_provider(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Json(payload): Json<UpdateProviderRequest>,
-) -> Result<StatusCode, StatusCode> {
-    verify_secret_key(&headers, &state)?;
+) -> Result<StatusCode, impl IntoResponse> {
+    verify_secret_key(&headers, &state).map_err(|e| (e, String::new()))?;
 
     let agent = state
         .get_agent()
         .await
-        .map_err(|_e| StatusCode::PRECONDITION_FAILED)?;
+        .map_err(|_e| (StatusCode::PRECONDITION_FAILED, String::new()))?;
 
     let config = Config::global();
     let model = match payload
@@ -233,17 +234,27 @@ async fn update_agent_provider(
         .or_else(|| config.get_param("GOOSE_MODEL").ok())
     {
         Some(m) => m,
-        None => return Err(StatusCode::BAD_REQUEST),
+        None => return Err((StatusCode::BAD_REQUEST, "No model specified".to_string())),
     };
 
-    let model_config = ModelConfig::new(&model).map_err(|_| StatusCode::BAD_REQUEST)?;
+    let model_config = ModelConfig::new(&model).map_err(|e| {
+        (
+            StatusCode::BAD_REQUEST,
+            format!("Invalid model config: {}", e),
+        )
+    })?;
 
-    let new_provider =
-        create(&payload.provider, model_config).map_err(|_| StatusCode::BAD_REQUEST)?;
+    let new_provider = create(&payload.provider, model_config).map_err(|e| {
+        (
+            StatusCode::BAD_REQUEST,
+            format!("Failed to create provider: {}", e),
+        )
+    })?;
+
     agent
         .update_provider(new_provider)
         .await
-        .map_err(|_e| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|_e| (StatusCode::INTERNAL_SERVER_ERROR, String::new()))?;
 
     Ok(StatusCode::OK)
 }
@@ -359,20 +370,29 @@ async fn start_agent(
     let (session_id, working_dir) = match payload.session_id {
         Some(existing_session_id) => {
             // Use existing session - get the working directory from session metadata
-            let session_path = match session::get_path(session::Identifier::Name(existing_session_id.clone())) {
-                Ok(path) => path,
-                Err(e) => {
-                    tracing::error!("Failed to get session path for {}: {}", existing_session_id, e);
-                    return Err(Json(ErrorResponse {
-                        error: format!("Failed to get session path: {}", e),
-                    }));
-                }
-            };
+            let session_path =
+                match session::get_path(session::Identifier::Name(existing_session_id.clone())) {
+                    Ok(path) => path,
+                    Err(e) => {
+                        tracing::error!(
+                            "Failed to get session path for {}: {}",
+                            existing_session_id,
+                            e
+                        );
+                        return Err(Json(ErrorResponse {
+                            error: format!("Failed to get session path: {}", e),
+                        }));
+                    }
+                };
 
             let working_dir = match session::read_metadata(&session_path) {
                 Ok(metadata) => metadata.working_dir,
                 Err(e) => {
-                    tracing::error!("Failed to read session metadata for {}: {}", existing_session_id, e);
+                    tracing::error!(
+                        "Failed to read session metadata for {}: {}",
+                        existing_session_id,
+                        e
+                    );
                     return Err(Json(ErrorResponse {
                         error: format!("Failed to read session metadata: {}", e),
                     }));
@@ -391,17 +411,22 @@ async fn start_agent(
                     }));
                 }
             };
-            
+
             let new_session_id = session::generate_session_id();
-            let session_path = match session::get_path(session::Identifier::Name(new_session_id.clone())) {
-                Ok(path) => path,
-                Err(e) => {
-                    tracing::error!("Failed to get session path for new session {}: {}", new_session_id, e);
-                    return Err(Json(ErrorResponse {
-                        error: format!("Failed to create session path: {}", e),
-                    }));
-                }
-            };
+            let session_path =
+                match session::get_path(session::Identifier::Name(new_session_id.clone())) {
+                    Ok(path) => path,
+                    Err(e) => {
+                        tracing::error!(
+                            "Failed to get session path for new session {}: {}",
+                            new_session_id,
+                            e
+                        );
+                        return Err(Json(ErrorResponse {
+                            error: format!("Failed to create session path: {}", e),
+                        }));
+                    }
+                };
 
             // Initialize the session with empty messages and metadata
             let empty_conversation = goose::conversation::Conversation::new_unvalidated(vec![]);
@@ -417,18 +442,16 @@ async fn start_agent(
                 accumulated_input_tokens: Some(0),
                 accumulated_output_tokens: Some(0),
             };
-            
-            if let Err(e) = save_messages_with_metadata(
-                &session_path,
-                &initial_metadata,
-                &empty_conversation,
-            ) {
+
+            if let Err(e) =
+                save_messages_with_metadata(&session_path, &initial_metadata, &empty_conversation)
+            {
                 tracing::error!("Failed to initialize session {}: {}", new_session_id, e);
                 return Err(Json(ErrorResponse {
                     error: format!("Failed to initialize session: {}", e),
                 }));
             }
-            
+
             (new_session_id, working_dir)
         }
     };
