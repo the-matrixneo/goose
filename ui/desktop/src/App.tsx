@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { IpcRendererEvent } from 'electron';
-import { HashRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import {
+  HashRouter,
+  Routes,
+  Route,
+  useNavigate,
+  useLocation,
+  NavigateFunction,
+} from 'react-router-dom';
 import { ErrorUI } from './components/ErrorBoundary';
 import { ConfirmationModal } from './components/ui/ConfirmationModal';
 import { ToastContainer } from 'react-toastify';
@@ -350,6 +357,21 @@ const ExtensionsRoute = () => {
   );
 };
 
+// Component to capture navigate function and provide it via callback
+const NavigateCapture = ({
+  onNavigateReady,
+}: {
+  onNavigateReady: (navigate: NavigateFunction) => void;
+}) => {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    onNavigateReady(navigate);
+  }, [navigate, onNavigateReady]);
+
+  return null;
+};
+
 export default function App() {
   const [fatalError, setFatalError] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
@@ -373,50 +395,59 @@ export default function App() {
   const { getExtensions, addExtension, read } = useConfig();
   const initAttemptedRef = useRef(false);
 
-  // Create a setView function for useChat hook - we'll use window.history instead of navigate
+  // Create a setView function for useChat hook
+  const navigateRef = useRef<NavigateFunction | null>(null);
   const setView = (view: View, viewOptions: ViewOptions = {}) => {
     console.log(`Setting view to: ${view}`, viewOptions);
     console.trace('setView called from:'); // This will show the call stack
-    // Convert view to route navigation using hash routing
-    switch (view) {
-      case 'chat':
-        window.location.hash = '#/';
-        break;
-      case 'pair':
-        window.location.hash = '#/pair';
-        break;
-      case 'settings':
-        window.location.hash = '#/settings';
-        break;
-      case 'extensions':
-        window.location.hash = '#/extensions';
-        break;
-      case 'sessions':
-        window.location.hash = '#/sessions';
-        break;
-      case 'schedules':
-        window.location.hash = '#/schedules';
-        break;
-      case 'recipes':
-        window.location.hash = '#/recipes';
-        break;
-      case 'permission':
-        window.location.hash = '#/permission';
-        break;
-      case 'ConfigureProviders':
-        window.location.hash = '#/configure-providers';
-        break;
-      case 'recipeEditor':
-        window.location.hash = '#/recipe-editor';
-        break;
-      case 'welcome':
-        window.location.hash = '#/welcome';
-        break;
-      default:
-        console.error(`Unknown view: ${view}, not navigating anywhere. This is likely a bug.`);
-        console.trace('Invalid setView call stack:');
-        // Don't navigate anywhere for unknown views to avoid unexpected redirects
-        break;
+
+    // Use React Router navigation if available, otherwise fallback to hash manipulation
+    if (navigateRef.current) {
+      const navigationHandler = createNavigationHandler(navigateRef.current);
+      navigationHandler(view, viewOptions);
+    } else {
+      // Fallback to hash manipulation for cases where navigate isn't available yet
+      console.warn('Navigate function not available, using hash fallback');
+      switch (view) {
+        case 'chat':
+          window.location.hash = '#/';
+          break;
+        case 'pair':
+          window.location.hash = '#/pair';
+          break;
+        case 'settings':
+          window.location.hash = '#/settings';
+          break;
+        case 'extensions':
+          window.location.hash = '#/extensions';
+          break;
+        case 'sessions':
+          window.location.hash = '#/sessions';
+          break;
+        case 'schedules':
+          window.location.hash = '#/schedules';
+          break;
+        case 'recipes':
+          window.location.hash = '#/recipes';
+          break;
+        case 'permission':
+          window.location.hash = '#/permission';
+          break;
+        case 'ConfigureProviders':
+          window.location.hash = '#/configure-providers';
+          break;
+        case 'recipeEditor':
+          window.location.hash = '#/recipe-editor';
+          break;
+        case 'welcome':
+          window.location.hash = '#/welcome';
+          break;
+        default:
+          console.error(`Unknown view: ${view}, not navigating anywhere. This is likely a bug.`);
+          console.trace('Invalid setView call stack:');
+          // Don't navigate anywhere for unknown views to avoid unexpected redirects
+          break;
+      }
     }
   };
 
@@ -834,6 +865,11 @@ export default function App() {
               onCancel={handleCancel}
             />
           )}
+          <NavigateCapture
+            onNavigateReady={(navigate) => {
+              navigateRef.current = navigate;
+            }}
+          />
           <div className="relative w-screen h-screen overflow-hidden bg-background-muted flex flex-col">
             <div className="titlebar-drag-region" />
             <Routes>
