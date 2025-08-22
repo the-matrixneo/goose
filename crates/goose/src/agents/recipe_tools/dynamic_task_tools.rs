@@ -124,10 +124,23 @@ fn create_text_instruction_tasks_from_params(
 
 fn create_task_execution_payload(tasks: Vec<Task>, execution_mode: ExecutionMode) -> Value {
     let task_ids: Vec<String> = tasks.iter().map(|task| task.id.clone()).collect();
-    json!({
+
+    // Include extension_filter in the output if it exists
+    let extension_filter = tasks.first().and_then(|t| t.extension_filter.as_ref());
+
+    let mut payload = json!({
         "task_ids": task_ids,
         "execution_mode": execution_mode
-    })
+    });
+
+    if let Some(filter) = extension_filter {
+        payload.as_object_mut().unwrap().insert(
+            "extension_filter".to_string(),
+            serde_json::to_value(filter).unwrap_or(Value::Null),
+        );
+    }
+
+    payload
 }
 
 pub async fn create_dynamic_task(params: Value, tasks_manager: &TasksManager) -> ToolCallResult {
