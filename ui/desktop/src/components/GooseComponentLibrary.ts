@@ -51,14 +51,16 @@ const Text: React.FC<TextProps> = ({
     large: 'text-base leading-none'
   };
 
-  return (
-    <span className={cn(
-      'select-none', // Matches Label component behavior
-      variantClasses[variant], 
-      className
-    )}>
-      {children}
-    </span>
+  return React.createElement(
+    'span',
+    { 
+      className: cn(
+        'select-none', // Matches Label component behavior
+        variantClasses[variant], 
+        className
+      )
+    },
+    children
   );
 };
 
