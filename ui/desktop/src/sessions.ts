@@ -137,3 +137,22 @@ export async function updateSessionMetadata(sessionId: string, description: stri
     throw new Error(`Failed to update session metadata: ${response.statusText} - ${errorText}`);
   }
 }
+
+/**
+ * Resumes a session. Currently, this opens a new window with the session loaded.
+ */
+export function resumeSession(session: SessionDetails | Session) {
+  const resumedSessionId = 'sessionId' in session ? session.sessionId : session.id;
+  console.log('Launching session in new window:', resumedSessionId);
+  const workingDir = session.metadata?.working_dir;
+  if (!workingDir) {
+    throw new Error('Cannot resume session: working directory is missing in session metadata');
+  }
+
+  window.electron.createChatWindow(
+    undefined, // query
+    workingDir,
+    undefined, // version
+    resumedSessionId
+  );
+}

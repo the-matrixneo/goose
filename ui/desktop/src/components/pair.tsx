@@ -48,6 +48,7 @@ export default function Pair({
     const initializeFromState = async () => {
       const appConfig = window.appConfig?.get('recipe');
       const resumedSession = location.state?.resumedSession as SessionDetails | undefined;
+      console.log('Resumed session from state:', resumedSession);
       const recipeConfig = location.state?.recipeConfig as Recipe | undefined;
       const resetChat = location.state?.resetChat as boolean | undefined;
       const messageFromHub = location.state?.initialMessage;

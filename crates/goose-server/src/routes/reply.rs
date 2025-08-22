@@ -18,14 +18,12 @@ use goose::{
 use goose::{
     permission::{Permission, PermissionConfirmation},
     session,
-    session::storage::save_messages_with_metadata,
 };
 use mcp_core::ToolResult;
 use rmcp::model::{Content, ServerNotification};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use serde_json::Value;
-use std::path::PathBuf;
 use std::{
     convert::Infallible,
     pin::Pin,
@@ -212,10 +210,43 @@ async fn reply_handler(
             }
         };
 
+        // Load session metadata to get the working directory and other config
+        let session_path = match session::get_path(session::Identifier::Name(session_id.clone())) {
+            Ok(path) => path,
+            Err(e) => {
+                tracing::error!("Failed to get session path for {}: {}", session_id, e);
+                let _ = stream_event(
+                    MessageEvent::Error {
+                        error: format!("Failed to get session path: {}", e),
+                    },
+                    &task_tx,
+                    &cancel_token,
+                )
+                .await;
+                return;
+            }
+        };
+
+        let session_metadata = match session::read_metadata(&session_path) {
+            Ok(metadata) => metadata,
+            Err(e) => {
+                tracing::error!("Failed to read session metadata for {}: {}", session_id, e);
+                let _ = stream_event(
+                    MessageEvent::Error {
+                        error: format!("Failed to read session metadata: {}", e),
+                    },
+                    &task_tx,
+                    &cancel_token,
+                )
+                .await;
+                return;
+            }
+        };
+
         let session_config = SessionConfig {
             id: session::Identifier::Name(session_id.clone()),
-            working_dir: PathBuf::from(&session_working_dir),
-            schedule_id: request.scheduled_job_id.clone(),
+            working_dir: session_metadata.working_dir.clone(),
+            schedule_id: session_metadata.schedule_id.clone(),
             execution_mode: None,
             max_turns: None,
             retry_config: None,
@@ -224,7 +255,7 @@ async fn reply_handler(
         let mut stream = match agent
             .reply(
                 messages.clone(),
-                Some(session_config),
+                Some(session_config.clone()),
                 Some(task_cancel.clone()),
             )
             .await
@@ -324,13 +355,25 @@ async fn reply_handler(
         }
 
         if all_messages.len() > saved_message_count {
-            if let Err(e) =
-                save_messages_with_metadata(&session_path, &session_metadata, &all_messages)
-            {
-                tracing::error!("Failed to store session history: {:?}", e);
+            if let Ok(provider) = agent.provider().await {
+                let provider = Arc::clone(&provider);
+                let session_path_clone = session_path.to_path_buf();
+                let all_messages_clone = all_messages.clone();
+                let working_dir = session_config.working_dir.clone();
+                tokio::spawn(async move {
+                    if let Err(e) = session::persist_messages(
+                        &session_path_clone,
+                        &all_messages_clone,
+                        Some(provider),
+                        Some(working_dir),
+                    )
+                    .await
+                    {
+                        tracing::error!("Failed to store session history: {:?}", e);
+                    }
+                });
             }
         }
-
         let session_duration = session_start.elapsed();
 
         if let Ok(metadata) = session::read_metadata(&session_path) {

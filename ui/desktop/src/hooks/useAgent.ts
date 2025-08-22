@@ -1,12 +1,22 @@
 import { useState, useCallback, useRef } from 'react';
 import { useConfig } from '../components/ConfigContext';
-import { generateSessionId } from '../sessions';
 import { ChatType } from '../types/chat';
 import { Recipe } from '../recipe';
 import { initializeSystem } from '../utils/providerUtils';
 import { initializeCostDatabase } from '../utils/costDatabase';
-import { backupConfig, initConfig, readAllConfig, recoverConfig, validateConfig } from '../api';
+import {
+  backupConfig,
+  //  extendPrompt,
+  initConfig,
+  Message as ApiMessage,
+  readAllConfig,
+  recoverConfig,
+  resumeAgent,
+  startAgent,
+  validateConfig,
+} from '../api';
 import { COST_TRACKING_ENABLED } from '../updates';
+import { convertApiMessageToFrontendMessage } from '../components/context_management';
 
 export enum AgentState {
   UNINITIALIZED = 'uninitialized',
@@ -57,48 +67,39 @@ export function useAgent(setChat: (chat: ChatType) => void): UseAgentReturn {
             return;
           }
 
-          let chatToSet: ChatType;
-          if (initContext.resumedChat) {
-            chatToSet = initContext.resumedChat;
-          } else if (initContext.resetChat && initContext.recipeConfig) {
-            chatToSet = {
-              sessionId: generateSessionId(),
-              title: initContext.recipeConfig.title || 'Recipe Chat',
-              messages: [],
-              messageHistoryIndex: 0,
-              recipeConfig: initContext.recipeConfig,
-              recipeParameters: null,
-            };
-          } else if (initContext.resetChat && initContext.initialMessage) {
-            chatToSet = {
-              sessionId: generateSessionId(),
-              title: 'New Chat',
-              messages: [],
-              messageHistoryIndex: 0,
-              recipeConfig: null,
-              recipeParameters: null,
-            };
-          } else if (initContext.recipeConfig) {
-            chatToSet = {
-              sessionId: generateSessionId(),
-              title: initContext.recipeConfig.title || 'Recipe Chat',
-              messages: [],
-              messageHistoryIndex: 0,
-              recipeConfig: initContext.recipeConfig,
-              recipeParameters: null,
-            };
-          } else {
-            chatToSet = {
-              sessionId: generateSessionId(),
-              title: 'New Chat',
-              messages: [],
-              messageHistoryIndex: 0,
-              recipeConfig: null,
-              recipeParameters: null,
-            };
+          const agentResponse = initContext.resumedChat
+            ? await resumeAgent({
+                body: {
+                  session_id: initContext.resumedChat?.sessionId,
+                },
+                throwOnError: true,
+              })
+            : await startAgent({
+                body: {
+                  working_dir: window.appConfig.get('GOOSE_WORKING_DIR') as string,
+                },
+                throwOnError: true,
+              });
+          const agentSessionInfo = agentResponse.data;
+          if (!agentSessionInfo) {
+            throw Error('Failed to get session info');
           }
 
-          setChat(chatToSet);
+          let initChat: ChatType = {
+            sessionId: agentSessionInfo.session_id,
+            title: agentSessionInfo.metadata.description,
+            messageHistoryIndex: 0,
+            messages: agentSessionInfo.messages.map((message: ApiMessage) =>
+              convertApiMessageToFrontendMessage(message, true, true)
+            ),
+          };
+          // TODO(Douwe): do this on the server:
+          if (initContext.recipeConfig) {
+            initChat.title = initContext.recipeConfig.title || initChat.title;
+            initChat.recipeConfig = initContext.recipeConfig;
+          }
+
+          setChat(initChat);
 
           const costDbPromise = COST_TRACKING_ENABLED
             ? initializeCostDatabase().catch((error) => {
@@ -116,7 +117,7 @@ export function useAgent(setChat: (chat: ChatType) => void): UseAgentReturn {
           }
 
           const initPromises = [
-            initializeSystem(chatToSet.sessionId, provider as string, model as string, {
+            initializeSystem(initChat.sessionId, provider as string, model as string, {
               getExtensions,
               addExtension,
             }),

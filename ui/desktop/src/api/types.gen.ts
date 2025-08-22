@@ -569,6 +569,10 @@ export type Response = {
     json_schema?: unknown;
 };
 
+export type ResumeAgentRequest = {
+    session_id: string;
+};
+
 /**
  * Configuration for retry logic in recipe execution
  */
@@ -724,14 +728,13 @@ export type Settings = {
 };
 
 export type StartAgentRequest = {
-    session_id?: string | null;
-    working_dir?: string | null;
+    working_dir: string;
 };
 
 export type StartAgentResponse = {
+    messages: Array<Message>;
+    metadata: SessionMetadata;
     session_id: string;
-    success: boolean;
-    working_dir: string;
 };
 
 export type SubRecipe = {
@@ -907,6 +910,37 @@ export type ExtendPromptResponses = {
 
 export type ExtendPromptResponse2 = ExtendPromptResponses[keyof ExtendPromptResponses];
 
+export type ResumeAgentData = {
+    body: ResumeAgentRequest;
+    path?: never;
+    query?: never;
+    url: '/agent/resume';
+};
+
+export type ResumeAgentErrors = {
+    /**
+     * Bad request - invalid working directory
+     */
+    400: unknown;
+    /**
+     * Unauthorized - invalid secret key
+     */
+    401: unknown;
+    /**
+     * Internal server error
+     */
+    500: unknown;
+};
+
+export type ResumeAgentResponses = {
+    /**
+     * Agent started successfully
+     */
+    200: StartAgentResponse;
+};
+
+export type ResumeAgentResponse = ResumeAgentResponses[keyof ResumeAgentResponses];
+
 export type UpdateSessionConfigData = {
     body: SessionConfigRequest;
     path?: never;
@@ -954,10 +988,6 @@ export type StartAgentErrors = {
      * Unauthorized - invalid secret key
      */
     401: unknown;
-    /**
-     * Agent not initialized
-     */
-    424: unknown;
     /**
      * Internal server error
      */

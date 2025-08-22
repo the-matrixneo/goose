@@ -85,6 +85,45 @@
         }
       }
     },
+    "/agent/resume": {
+      "post": {
+        "tags": [
+          "super::routes::agent"
+        ],
+        "operationId": "resume_agent",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResumeAgentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Agent started successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartAgentResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid working directory"
+          },
+          "401": {
+            "description": "Unauthorized - invalid secret key"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
     "/agent/session_config": {
       "post": {
         "tags": [
@@ -156,9 +195,6 @@
           },
           "401": {
             "description": "Unauthorized - invalid secret key"
-          },
-          "424": {
-            "description": "Agent not initialized"
           },
           "500": {
             "description": "Internal server error"
@@ -2947,6 +2983,17 @@
           }
         }
       },
+      "ResumeAgentRequest": {
+        "type": "object",
+        "required": [
+          "session_id"
+        ],
+        "properties": {
+          "session_id": {
+            "type": "string"
+          }
+        }
+      },
       "RetryConfig": {
         "type": "object",
         "description": "Configuration for retry logic in recipe execution",
@@ -3314,14 +3361,12 @@
       },
       "StartAgentRequest": {
         "type": "object",
+        "required": [
+          "working_dir"
+        ],
         "properties": {
-          "session_id": {
-            "type": "string",
-            "nullable": true
-          },
           "working_dir": {
-            "type": "string",
-            "nullable": true
+            "type": "string"
           }
         }
       },
@@ -3329,17 +3374,20 @@
         "type": "object",
         "required": [
           "session_id",
-          "working_dir",
-          "success"
+          "metadata",
+          "messages"
         ],
         "properties": {
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Message"
+            }
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/SessionMetadata"
+          },
           "session_id": {
-            "type": "string"
-          },
-          "success": {
-            "type": "boolean"
-          },
-          "working_dir": {
             "type": "string"
           }
         }

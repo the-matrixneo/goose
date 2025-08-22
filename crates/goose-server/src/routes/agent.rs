@@ -8,11 +8,14 @@ use axum::{
     Json, Router,
 };
 use goose::config::PermissionManager;
+use goose::conversation::message::Message;
+use goose::conversation::Conversation;
 use goose::model::ModelConfig;
 use goose::providers::create;
 use goose::recipe::Response;
 use goose::session;
 use goose::session::storage::save_messages_with_metadata;
+use goose::session::SessionMetadata;
 use goose::{
     agents::{extension::ToolInfo, extension_manager::get_parameter_names},
     config::permission::PermissionLevel,
@@ -21,6 +24,7 @@ use goose::{config::Config, recipe::SubRecipe};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Arc;
+use tracing::error;
 
 #[derive(Deserialize, utoipa::ToSchema)]
 pub struct ExtendPromptRequest {
@@ -76,20 +80,128 @@ pub struct UpdateRouterToolSelectorRequest {
 
 #[derive(Deserialize, utoipa::ToSchema)]
 pub struct StartAgentRequest {
-    session_id: Option<String>,
-    working_dir: Option<String>,
+    working_dir: String,
 }
 
+// This is the same as SessionHistoryResponse
+#[derive(Deserialize, utoipa::ToSchema)]
+pub struct ResumeAgentRequest {
+    session_id: String,
+}
+
+// This is the same as SessionHistoryResponse
 #[derive(Serialize, utoipa::ToSchema)]
 pub struct StartAgentResponse {
     session_id: String,
-    working_dir: String,
-    success: bool,
+    metadata: SessionMetadata,
+    messages: Vec<Message>,
 }
 
 #[derive(Serialize, utoipa::ToSchema)]
 pub struct ErrorResponse {
     error: String,
+}
+
+#[utoipa::path(
+    post,
+    path = "/agent/start",
+    request_body = StartAgentRequest,
+    responses(
+        (status = 200, description = "Agent started successfully", body = StartAgentResponse),
+        (status = 400, description = "Bad request - invalid working directory"),
+        (status = 401, description = "Unauthorized - invalid secret key"),
+        (status = 500, description = "Internal server error")
+    )
+)]
+async fn start_agent(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(payload): Json<StartAgentRequest>,
+) -> Result<Json<StartAgentResponse>, Json<ErrorResponse>> {
+    verify_secret_key(&headers, &state).map_err(|_| {
+        Json(ErrorResponse {
+            error: "Unauthorized - Invalid or missing API key".to_string(),
+        })
+    })?;
+
+    let session_id = session::generate_session_id();
+
+    let metadata = SessionMetadata {
+        working_dir: PathBuf::from(&payload.working_dir),
+        description: "New session".to_string(),
+        schedule_id: None,
+        message_count: 0,
+        total_tokens: Some(0),
+        input_tokens: Some(0),
+        output_tokens: Some(0),
+        accumulated_total_tokens: Some(0),
+        accumulated_input_tokens: Some(0),
+        accumulated_output_tokens: Some(0),
+    };
+
+    let conversation = Conversation::empty();
+
+    let session_path = match session::get_path(session::Identifier::Name(session_id.clone())) {
+        Ok(path) => path,
+        Err(e) => {
+            return Err(Json(ErrorResponse {
+                error: format!("Failed to get session path: {}", e),
+            }));
+        }
+    };
+
+    save_messages_with_metadata(&session_path, &metadata, &conversation).map_err(|e| {
+        Json(ErrorResponse {
+            error: format!("Failed to save initial messages: {}", e),
+        })
+    })?;
+
+    Ok(Json(StartAgentResponse {
+        session_id,
+        metadata,
+        messages: conversation.messages().clone(),
+    }))
+}
+
+#[utoipa::path(
+    post,
+    path = "/agent/resume",
+    request_body = ResumeAgentRequest,
+    responses(
+        (status = 200, description = "Agent started successfully", body = StartAgentResponse),
+        (status = 400, description = "Bad request - invalid working directory"),
+        (status = 401, description = "Unauthorized - invalid secret key"),
+        (status = 500, description = "Internal server error")
+    )
+)]
+async fn resume_agent(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(payload): Json<ResumeAgentRequest>,
+) -> Result<Json<StartAgentResponse>, StatusCode> {
+    verify_secret_key(&headers, &state)?;
+
+    let session_path =
+        match session::get_path(session::Identifier::Name(payload.session_id.clone())) {
+            Ok(path) => path,
+            Err(_) => return Err(StatusCode::BAD_REQUEST),
+        };
+
+    let metadata = session::read_metadata(&session_path).map_err(|_| StatusCode::NOT_FOUND)?;
+
+    let conversation = match session::read_messages(&session_path) {
+        Ok(messages) => messages,
+        Err(e) => {
+            error!("Failed to read session messages: {:?}", e);
+            return Err(StatusCode::NOT_FOUND);
+        }
+    };
+
+    Ok(Json(StartAgentResponse {
+        session_id: payload.session_id.clone(),
+        metadata,
+        messages: conversation.messages().clone(),
+    }))
 }
 
 #[utoipa::path(
@@ -344,137 +456,10 @@ async fn update_session_config(
     }
 }
 
-#[utoipa::path(
-    post,
-    path = "/agent/start",
-    request_body = StartAgentRequest,
-    responses(
-        (status = 200, description = "Agent started successfully", body = StartAgentResponse),
-        (status = 400, description = "Bad request - invalid working directory"),
-        (status = 401, description = "Unauthorized - invalid secret key"),
-        (status = 424, description = "Agent not initialized"),
-        (status = 500, description = "Internal server error")
-    )
-)]
-async fn start_agent(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-    Json(payload): Json<StartAgentRequest>,
-) -> Result<Json<StartAgentResponse>, Json<ErrorResponse>> {
-    verify_secret_key(&headers, &state).map_err(|_| {
-        Json(ErrorResponse {
-            error: "Unauthorized - Invalid or missing API key".to_string(),
-        })
-    })?;
-
-    let (session_id, working_dir) = match payload.session_id {
-        Some(existing_session_id) => {
-            // Use existing session - get the working directory from session metadata
-            let session_path =
-                match session::get_path(session::Identifier::Name(existing_session_id.clone())) {
-                    Ok(path) => path,
-                    Err(e) => {
-                        tracing::error!(
-                            "Failed to get session path for {}: {}",
-                            existing_session_id,
-                            e
-                        );
-                        return Err(Json(ErrorResponse {
-                            error: format!("Failed to get session path: {}", e),
-                        }));
-                    }
-                };
-
-            let working_dir = match session::read_metadata(&session_path) {
-                Ok(metadata) => metadata.working_dir,
-                Err(e) => {
-                    tracing::error!(
-                        "Failed to read session metadata for {}: {}",
-                        existing_session_id,
-                        e
-                    );
-                    return Err(Json(ErrorResponse {
-                        error: format!("Failed to read session metadata: {}", e),
-                    }));
-                }
-            };
-
-            (existing_session_id, working_dir)
-        }
-        None => {
-            // Create new session - working_dir is required for new sessions
-            let working_dir = match payload.working_dir {
-                Some(dir) => PathBuf::from(dir),
-                None => {
-                    return Err(Json(ErrorResponse {
-                        error: "working_dir is required when creating a new session".to_string(),
-                    }));
-                }
-            };
-
-            let new_session_id = session::generate_session_id();
-            let session_path =
-                match session::get_path(session::Identifier::Name(new_session_id.clone())) {
-                    Ok(path) => path,
-                    Err(e) => {
-                        tracing::error!(
-                            "Failed to get session path for new session {}: {}",
-                            new_session_id,
-                            e
-                        );
-                        return Err(Json(ErrorResponse {
-                            error: format!("Failed to create session path: {}", e),
-                        }));
-                    }
-                };
-
-            // Initialize the session with empty messages and metadata
-            let empty_conversation = goose::conversation::Conversation::new_unvalidated(vec![]);
-            let initial_metadata = goose::session::SessionMetadata {
-                working_dir: working_dir.clone(),
-                description: "New session".to_string(),
-                schedule_id: None,
-                message_count: 0,
-                total_tokens: Some(0),
-                input_tokens: Some(0),
-                output_tokens: Some(0),
-                accumulated_total_tokens: Some(0),
-                accumulated_input_tokens: Some(0),
-                accumulated_output_tokens: Some(0),
-            };
-
-            if let Err(e) =
-                save_messages_with_metadata(&session_path, &initial_metadata, &empty_conversation)
-            {
-                tracing::error!("Failed to initialize session {}: {}", new_session_id, e);
-                return Err(Json(ErrorResponse {
-                    error: format!("Failed to initialize session: {}", e),
-                }));
-            }
-
-            (new_session_id, working_dir)
-        }
-    };
-
-    // Convert working_dir back to string for response
-    let working_dir_str = working_dir.to_string_lossy().to_string();
-
-    tracing::info!(
-        "Agent started with session_id: {}, working_dir: {}",
-        session_id,
-        working_dir_str
-    );
-
-    Ok(Json(StartAgentResponse {
-        session_id,
-        working_dir: working_dir_str,
-        success: true,
-    }))
-}
-
 pub fn routes(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/agent/start", post(start_agent))
+        .route("/agent/resume", post(resume_agent))
         .route("/agent/prompt", post(extend_prompt))
         .route("/agent/tools", get(get_tools))
         .route("/agent/update_provider", post(update_agent_provider))
