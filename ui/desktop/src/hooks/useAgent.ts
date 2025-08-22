@@ -31,7 +31,7 @@ export interface InitializationContext {
   recipeConfig?: Recipe | null;
   resumedSession?: SessionDetails | null;
   initialMessage?: string | null;
-  setAgentWaitingMessage: (msg: string) => void;
+  setAgentWaitingMessage: (msg: string | null) => void;
   resetChat?: boolean;
 }
 
@@ -145,7 +145,7 @@ export function useAgent(setChat: (chat: ChatType) => void): UseAgentReturn {
           setAgentState(AgentState.ERROR);
           throw error;
         } finally {
-          initContext.setAgentWaitingMessage('');
+          initContext.setAgentWaitingMessage(null);
           initPromiseRef.current = null;
         }
       })();

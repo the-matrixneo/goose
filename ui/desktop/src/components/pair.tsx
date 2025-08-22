@@ -26,7 +26,7 @@ export default function Pair({
   setView: (view: View, viewOptions?: ViewOptions) => void;
   setIsGoosehintsModalOpen: (isOpen: boolean) => void;
   setFatalError: (value: ((prevState: string | null) => string | null) | string | null) => void;
-  setAgentWaitingMessage: (msg: string) => void;
+  setAgentWaitingMessage: (msg: string | null) => void;
 }) {
   const location = useLocation();
   const isMobile = useIsMobile();

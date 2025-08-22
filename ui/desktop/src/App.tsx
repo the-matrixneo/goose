@@ -68,7 +68,7 @@ const PairRouteWrapper = ({
   setChat: (chat: ChatType) => void;
   setchat: (chat: ChatType) => void;
   setIsGoosehintsModalOpen: (isOpen: boolean) => void;
-  setAgentWaitingMessage: (msg: string) => void;
+  setAgentWaitingMessage: (msg: string | null) => void;
   setFatalError: (value: ((prevState: string | null) => string | null) | string | null) => void;
 }) => {
   const navigate = useNavigate();
