@@ -10,7 +10,6 @@ import 'react-toastify/dist/ReactToastify.css';
 import { cn } from '../utils';
 
 import { ChatType } from '../types/chat';
-import { DEFAULT_CHAT_TITLE } from '../contexts/ChatContext';
 import { Recipe } from '../recipe';
 import { SessionDetails } from '../sessions';
 
@@ -20,12 +19,14 @@ export default function Pair({
   setView,
   setIsGoosehintsModalOpen,
   setFatalError,
+  setAgentWaitingMessage,
 }: {
   chat: ChatType;
   setChat: (chat: ChatType) => void;
   setView: (view: View, viewOptions?: ViewOptions) => void;
   setIsGoosehintsModalOpen: (isOpen: boolean) => void;
   setFatalError: (value: ((prevState: string | null) => string | null) | string | null) => void;
+  setAgentWaitingMessage: (msg: string) => void;
 }) {
   const location = useLocation();
   const isMobile = useIsMobile();
@@ -48,62 +49,20 @@ export default function Pair({
     const initializeFromState = async () => {
       const appConfig = window.appConfig?.get('recipe');
       const resumedSession = location.state?.resumedSession as SessionDetails | undefined;
-      console.log('Resumed session from state:', resumedSession);
       const recipeConfig = location.state?.recipeConfig as Recipe | undefined;
       const resetChat = location.state?.resetChat as boolean | undefined;
       const messageFromHub = location.state?.initialMessage;
-
-      let chatToInit: ChatType | null = null;
       let shouldClearState = false;
-
-      if (appConfig && !chatRef.current.recipeConfig) {
-        const recipe = appConfig as Recipe;
-        chatToInit = {
-          ...chatRef.current,
-          recipeConfig: recipe,
-          title: recipe.title || chatRef.current.title,
-          messages: [],
-          messageHistoryIndex: 0,
-        };
-        shouldClearState = false;
-      } else if (resumedSession) {
-        console.log('Loading resumed session in pair view:', resumedSession.sessionId);
-        chatToInit = {
-          sessionId: resumedSession.sessionId,
-          title: resumedSession.metadata?.description || `ID: ${resumedSession.sessionId}`,
-          messages: resumedSession.messages,
-          messageHistoryIndex: resumedSession.messages.length,
-          recipeConfig: null,
-        };
-        shouldClearState = true;
-      } else if (recipeConfig && resetChat) {
-        console.log('Loading new recipe config in pair view:', recipeConfig.title);
-        chatToInit = {
-          sessionId: chatRef.current.sessionId,
-          title: recipeConfig.title || 'Recipe Chat',
-          messages: [],
-          messageHistoryIndex: 0,
-          recipeConfig: recipeConfig,
-          recipeParameters: null,
-        };
-        shouldClearState = true;
-      } else if (recipeConfig && !chatRef.current.recipeConfig) {
-        chatToInit = {
-          ...chatRef.current,
-          recipeConfig: recipeConfig,
-          title: recipeConfig.title || chatRef.current.title,
-        };
-        shouldClearState = true;
-      } else if (resetChat) {
-        chatToInit = {
-          ...chatRef.current,
-          recipeConfig: null,
-          recipeParameters: null,
-          title: DEFAULT_CHAT_TITLE,
-          messages: [],
-          messageHistoryIndex: 0,
-        };
-        shouldClearState = true;
+      try {
+        await initializeAgentIfNeeded({
+          recipeConfig: recipeConfig || (appConfig as Recipe) || null,
+          resumedSession: resumedSession,
+          setAgentWaitingMessage,
+          initialMessage: messageFromHub || null,
+          resetChat,
+        });
+      } catch (error) {
+        setFatalError(`Agent init failure: ${error instanceof Error ? error.message : '' + error}`);
       }
 
       if (messageFromHub) {
@@ -119,20 +78,6 @@ export default function Pair({
         shouldClearState = true;
       }
 
-      if (chatToInit) {
-        setChat(chatToInit);
-      }
-
-      try {
-        await initializeAgentIfNeeded({
-          recipeConfig: recipeConfig || (appConfig as Recipe) || null,
-          resumedChat: chatToInit || chatRef.current,
-          initialMessage: messageFromHub || null,
-        });
-      } catch (error) {
-        setFatalError(`Agent init failure: ${error instanceof Error ? error.message : '' + error}`);
-      }
-
       if (shouldClearState && location.state) {
         window.history.replaceState({}, document.title);
       }
@@ -146,6 +91,8 @@ export default function Pair({
     initializeAgentIfNeeded,
     setChat,
     setFatalError,
+    setAgentWaitingMessage,
+    setView,
   ]);
 
   useEffect(() => {
@@ -162,6 +109,7 @@ export default function Pair({
 
         if (textarea && form) {
           textarea.value = initialMessage;
+          // eslint-disable-next-line no-undef
           textarea.dispatchEvent(new Event('input', { bubbles: true }));
           textarea.focus();
 
@@ -182,13 +130,14 @@ export default function Pair({
     }
 
     return undefined;
-  }, [shouldAutoSubmit, initialMessage, agentState]);
+  }, [shouldAutoSubmit, initialMessage, agentState, setView]);
 
   if (agentState == AgentState.NO_PROVIDER) {
     setView('welcome');
     return;
   }
 
+  // Custom message submit handler
   const handleMessageSubmit = (message: string) => {
     setShouldAutoSubmit(false);
     setIsTransitioningFromHub(false);
@@ -203,34 +152,20 @@ export default function Pair({
     initialValue,
   };
 
-  const renderBeforeMessages = () => {
-    return <div></div>;
-  };
-
-  if (agentState === AgentState.INITIALIZING) {
-    return (
-      <div className="flex justify-center items-center h-full">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-textStandard"></div>
-      </div>
-    );
-  }
-
   return (
-    <>
-      <BaseChat
-        chat={chat}
-        setChat={setChat}
-        setView={setView}
-        setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
-        enableLocalStorage={true}
-        onMessageSubmit={handleMessageSubmit}
-        onMessageStreamFinish={handleMessageStreamFinish}
-        renderBeforeMessages={renderBeforeMessages}
-        customChatInputProps={customChatInputProps}
-        contentClassName={cn('pr-1 pb-10', (isMobile || sidebarState === 'collapsed') && 'pt-11')}
-        showPopularTopics={!isTransitioningFromHub}
-        suppressEmptyState={isTransitioningFromHub}
-      />
-    </>
+    <BaseChat
+      chat={chat}
+      autoSubmit={shouldAutoSubmit}
+      setChat={setChat}
+      setView={setView}
+      setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
+      enableLocalStorage={true} // Enable local storage for Pair mode
+      onMessageSubmit={handleMessageSubmit}
+      onMessageStreamFinish={handleMessageStreamFinish}
+      customChatInputProps={customChatInputProps}
+      contentClassName={cn('pr-1 pb-10', (isMobile || sidebarState === 'collapsed') && 'pt-11')} // Use dynamic content class with mobile margin and sidebar state
+      showPopularTopics={!isTransitioningFromHub} // Don't show popular topics while transitioning from Hub
+      suppressEmptyState={isTransitioningFromHub} // Suppress all empty state content while transitioning from Hub
+    />
   );
 }

@@ -14,9 +14,6 @@
  * Hub (input submission) → Pair (new conversation with the submitted message)
  */
 
-import { useState } from 'react';
-import FlappyGoose from './FlappyGoose';
-
 import { SessionInsights } from './sessions/SessionsInsights';
 import ChatInput from './ChatInput';
 import { ChatState } from '../types/chatState';
@@ -36,8 +33,7 @@ export default function Hub({
   setView: (view: View, viewOptions?: ViewOptions) => void;
   setIsGoosehintsModalOpen: (isOpen: boolean) => void;
 }) {
-  const [showGame, setShowGame] = useState(false);
-
+  // Handle chat input submission - create new chat and navigate to pair
   const handleSubmit = (e: React.FormEvent) => {
     const customEvent = e as unknown as CustomEvent;
     const combinedTextFromInput = customEvent.detail?.value || '';
@@ -65,6 +61,7 @@ export default function Hub({
         <ChatInput
           sessionId={null}
           handleSubmit={handleSubmit}
+          autoSubmit={false}
           chatState={ChatState.Idle}
           onStop={() => {}}
           commandHistory={[]}
@@ -82,8 +79,6 @@ export default function Hub({
           setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
           toolCount={0}
         />
-
-        {showGame && <FlappyGoose onClose={() => setShowGame(false)} />}
       </div>
     </ChatContextManagerProvider>
   );

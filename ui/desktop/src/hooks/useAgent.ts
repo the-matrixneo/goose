@@ -17,6 +17,7 @@ import {
 } from '../api';
 import { COST_TRACKING_ENABLED } from '../updates';
 import { convertApiMessageToFrontendMessage } from '../components/context_management';
+import { SessionDetails } from '../sessions';
 
 export enum AgentState {
   UNINITIALIZED = 'uninitialized',
@@ -28,8 +29,9 @@ export enum AgentState {
 
 export interface InitializationContext {
   recipeConfig?: Recipe | null;
-  resumedChat?: ChatType | null;
+  resumedSession?: SessionDetails | null;
   initialMessage?: string | null;
+  setAgentWaitingMessage: (msg: string) => void;
   resetChat?: boolean;
 }
 
@@ -56,6 +58,7 @@ export function useAgent(setChat: (chat: ChatType) => void): UseAgentReturn {
 
       const initPromise = (async () => {
         setAgentState(AgentState.INITIALIZING);
+        initContext.setAgentWaitingMessage('Agent is initializing');
 
         try {
           const config = window.electron.getConfig();
@@ -67,10 +70,10 @@ export function useAgent(setChat: (chat: ChatType) => void): UseAgentReturn {
             return;
           }
 
-          const agentResponse = initContext.resumedChat
+          const agentResponse = initContext.resumedSession
             ? await resumeAgent({
                 body: {
-                  session_id: initContext.resumedChat?.sessionId,
+                  session_id: initContext.resumedSession?.sessionId,
                 },
                 throwOnError: true,
               })
@@ -127,6 +130,7 @@ export function useAgent(setChat: (chat: ChatType) => void): UseAgentReturn {
             initPromises.push(costDbPromise);
           }
 
+          initContext.setAgentWaitingMessage('Extensions are loading');
           await Promise.all(initPromises);
           console.log('Agent core initialization completed successfully');
 
@@ -141,6 +145,7 @@ export function useAgent(setChat: (chat: ChatType) => void): UseAgentReturn {
           setAgentState(AgentState.ERROR);
           throw error;
         } finally {
+          initContext.setAgentWaitingMessage('');
           initPromiseRef.current = null;
         }
       })();

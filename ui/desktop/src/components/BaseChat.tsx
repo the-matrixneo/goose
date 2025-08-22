@@ -42,7 +42,7 @@
  * while remaining flexible enough to support different UI contexts (Hub vs Pair).
  */
 
-import React, { createContext, useCallback, useContext, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { SearchView } from './conversation/SearchView';
 import { AgentHeader } from './AgentHeader';
@@ -93,6 +93,7 @@ interface BaseChatProps {
   disableSearch?: boolean; // Disable search functionality (for Hub)
   showPopularTopics?: boolean; // Show popular chat topics in empty state (for Pair)
   suppressEmptyState?: boolean; // Suppress empty state content (for transitions)
+  autoSubmit?: boolean;
 }
 
 function BaseChatContent({
@@ -112,6 +113,7 @@ function BaseChatContent({
   disableSearch = false,
   showPopularTopics = false,
   suppressEmptyState = false,
+  autoSubmit = false,
 }: BaseChatProps) {
   const location = useLocation();
   const scrollRef = useRef<ScrollAreaHandle>(null);
@@ -162,13 +164,6 @@ function BaseChatContent({
     chat,
     setChat,
     onMessageStreamFinish: () => {
-      // Auto-scroll to bottom when message stream finishes
-      setTimeout(() => {
-        if (scrollRef.current?.scrollToBottom) {
-          scrollRef.current.scrollToBottom();
-        }
-      }, 300);
-
       // Call the original callback if provided
       onMessageStreamFinish?.();
     },
@@ -302,11 +297,6 @@ function BaseChatContent({
           scrollRef.current.scrollToBottom();
         }
       }, 200);
-    } else {
-      // Immediate scroll for regular submit
-      if (scrollRef.current?.scrollToBottom) {
-        scrollRef.current.scrollToBottom();
-      }
     }
   };
 
@@ -320,18 +310,6 @@ function BaseChatContent({
     }
     append(text);
   };
-  // Callback to handle scroll to bottom from ProgressiveMessageList
-  const handleScrollToBottom = useCallback(() => {
-    // Only auto-scroll if user is not actively typing
-    const isUserTyping = document.activeElement?.id === 'dynamic-textarea';
-    if (!isUserTyping) {
-      setTimeout(() => {
-        if (scrollRef.current?.scrollToBottom) {
-          scrollRef.current.scrollToBottom();
-        }
-      }, 100);
-    }
-  }, []);
 
   // Listen for global scroll-to-bottom requests (e.g., from MCP UI prompt actions)
   useEffect(() => {
@@ -433,7 +411,6 @@ function BaseChatContent({
                         setMessages(updatedMessages);
                       }}
                       isUserMessage={isUserMessage}
-                      onScrollToBottom={handleScrollToBottom}
                       isStreamingMessage={chatState !== ChatState.Idle}
                       onMessageUpdate={onMessageUpdate}
                     />
@@ -450,7 +427,6 @@ function BaseChatContent({
                           setMessages(updatedMessages);
                         }}
                         isUserMessage={isUserMessage}
-                        onScrollToBottom={handleScrollToBottom}
                         isStreamingMessage={chatState !== ChatState.Idle}
                         onMessageUpdate={onMessageUpdate}
                       />
@@ -566,6 +542,7 @@ function BaseChatContent({
             recipeAccepted={recipeAccepted}
             initialPrompt={initialPrompt}
             toolCount={toolCount || 0}
+            autoSubmit={autoSubmit}
             {...customChatInputProps}
           />
         </div>
