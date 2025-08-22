@@ -188,13 +188,14 @@ impl SubAgent {
 
                         // Track subagent token usage if session config is provided
                         if let Some(ref session_config) = session_config {
-                            if let Some(ref usage) = usage {
-                                if let Err(e) = crate::agents::reply_parts::Agent::update_session_metrics_subagent(
+                            if let Err(e) =
+                                crate::session::storage::update_session_metrics_subagent(
                                     session_config,
-                                    usage,
-                                ).await {
-                                    debug!("Failed to update subagent token metrics: {}", e);
-                                }
+                                    &usage,
+                                )
+                                .await
+                            {
+                                debug!("Failed to update subagent token metrics: {}", e);
                             }
                         }
 
@@ -209,13 +210,13 @@ impl SubAgent {
 
                     // Track subagent token usage for intermediate responses if session config is provided
                     if let Some(ref session_config) = session_config {
-                        if let Some(ref usage) = usage {
-                            if let Err(e) = crate::agents::reply_parts::Agent::update_session_metrics_subagent(
-                                session_config,
-                                usage,
-                            ).await {
-                                debug!("Failed to update subagent token metrics: {}", e);
-                            }
+                        if let Err(e) = crate::session::storage::update_session_metrics_subagent(
+                            session_config,
+                            &usage,
+                        )
+                        .await
+                        {
+                            debug!("Failed to update subagent token metrics: {}", e);
                         }
                     }
 

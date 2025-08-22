@@ -1350,6 +1350,40 @@ pub async fn update_metadata(session_file: &Path, metadata: &SessionMetadata) ->
     save_messages_with_metadata(&secure_path, metadata, &messages)
 }
 
+/// Update session metadata with subagent token usage
+pub async fn update_session_metrics_subagent(
+    session_config: &crate::agents::types::SessionConfig,
+    usage: &crate::providers::base::ProviderUsage,
+) -> Result<()> {
+    let session_file_path = get_path(session_config.id.clone())?;
+    let mut metadata = read_metadata(&session_file_path)?;
+
+    metadata.schedule_id = session_config.schedule_id.clone();
+
+    let accumulate = |a: Option<i32>, b: Option<i32>| -> Option<i32> {
+        match (a, b) {
+            (Some(x), Some(y)) => Some(x + y),
+            _ => a.or(b),
+        }
+    };
+
+    // Add subagent tokens to the subagent-only counter
+    metadata.accumulated_total_tokens_subagent_only = accumulate(
+        metadata.accumulated_total_tokens_subagent_only,
+        usage.usage.total_tokens,
+    );
+
+    // Update combined totals: accumulated_total_tokens_with_subagents = accumulated_total_tokens + accumulated_total_tokens_subagent_only
+    metadata.accumulated_total_tokens_with_subagents = accumulate(
+        metadata.accumulated_total_tokens,
+        metadata.accumulated_total_tokens_subagent_only,
+    );
+
+    update_metadata(&session_file_path, &metadata).await?;
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
