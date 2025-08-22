@@ -137,18 +137,27 @@ export default function Pair({
     return;
   }
 
-  // Custom message submit handler
+  // Custom message submit handler;
   const handleMessageSubmit = (message: string) => {
+    // This is called after a message is submitted
     setShouldAutoSubmit(false);
-    setIsTransitioningFromHub(false);
+    setIsTransitioningFromHub(false); // Clear transitioning state once message is submitted
     console.log('Message submitted:', message);
   };
 
-  const handleMessageStreamFinish = () => {};
+  // Custom message stream finish handler to handle recipe auto-execution
+  const handleMessageStreamFinish = () => {
+    // This will be called with the proper append function from BaseChat
+    // For now, we'll handle auto-execution in the BaseChat component
+  };
 
+  // Determine the initial value for the chat input
+  // Priority: Hub message > Recipe prompt > empty
   const initialValue = initialMessage || recipeInitialPrompt || undefined;
 
+  // Custom chat input props for Pair-specific behavior
   const customChatInputProps = {
+    // Pass initial message from Hub or recipe prompt
     initialValue,
   };
 

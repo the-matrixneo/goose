@@ -18,6 +18,7 @@ export type View =
   | 'recipes'
   | 'permission';
 
+// TODO(Douwe): check these for usage, especiall key: string for resetChat
 export type ViewOptions = {
   extensionId?: string;
   showEnvVars?: boolean;
