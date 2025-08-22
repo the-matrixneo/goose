@@ -659,25 +659,42 @@ const createChat = async (
       .executeJavaScript(
         `
       (function() {
+        let retryCount = 0;
+        const maxRetries = 5;
+        const baseDelay = 100;
+        
         function setConfig() {
           try {
-            if (window.localStorage) {
+            if (window.localStorage && typeof window.localStorage.setItem === 'function') {
               localStorage.setItem('gooseConfig', '${configStr}');
+              console.log('[Renderer] Successfully set localStorage config');
               return true;
+            } else {
+              console.warn('[Renderer] localStorage not available or setItem not a function');
             }
           } catch (e) {
-            console.warn('localStorage access failed:', e);
+            console.warn('[Renderer] localStorage access failed:', e);
           }
           return false;
         }
 
-        if (!setConfig()) {
-          setTimeout(() => {
-            if (!setConfig()) {
-              console.error('Failed to set localStorage after retry - continuing without localStorage config');
-            }
-          }, 100);
+        function retrySetConfig() {
+          if (setConfig()) {
+            return; // Success, no need to retry
+          }
+          
+          retryCount++;
+          if (retryCount < maxRetries) {
+            const delay = baseDelay * Math.pow(2, retryCount - 1); // Exponential backoff
+            console.log(\`[Renderer] Retrying localStorage config set (attempt \${retryCount + 1}/\${maxRetries}) in \${delay}ms\`);
+            setTimeout(retrySetConfig, delay);
+          } else {
+            console.error('[Renderer] Failed to set localStorage after all retries - continuing without localStorage config');           
+          }
         }
+
+        // Initial attempt
+        retrySetConfig();
       })();
     `
       )
