@@ -36,7 +36,7 @@ use crate::context_mgmt::auto_compact;
 use crate::conversation::{debug_conversation_fix, fix_conversation, Conversation};
 use crate::permission::permission_judge::{check_tool_permissions, PermissionCheckResult};
 use crate::permission::PermissionConfirmation;
-use crate::providers::base::{Provider, ProviderUsage};
+use crate::providers::base::Provider;
 use crate::providers::errors::ProviderError;
 use crate::recipe::{Author, Recipe, Response, Settings, SubRecipe};
 use crate::scheduler_trait::SchedulerTrait;
@@ -1007,7 +1007,6 @@ impl Agent {
                 let mut added_message = false;
                 let mut messages_to_add = Vec::new();
                 let mut tools_updated = false;
-                let mut final_usage: Option<ProviderUsage> = None;
 
                 while let Some(next) = stream.next().await {
                     if is_token_cancelled(&cancel_token) {
@@ -1037,9 +1036,12 @@ impl Agent {
                                 }
                             }
 
-                            // Store the latest usage for session tracking (will be processed once outside the loop)
-                            if let Some(usage) = usage {
-                                final_usage = Some(usage);
+                            // Record usage for the session
+                            if let Some(ref session_config) = &session {
+                                if let Some(ref usage) = usage {
+                                    Self::update_session_metrics(session_config, usage, messages.len())
+                                        .await?;
+                                }
                             }
 
                             if let Some(response) = response {
@@ -1187,15 +1189,6 @@ impl Agent {
                         }
                     }
                 }
-
-                // Record usage for the session (only once per response, after streaming is complete)
-                if let Some(ref session_config) = &session {
-                    if let Some(ref usage) = final_usage {
-                        Self::update_session_metrics(session_config, usage, messages.len())
-                            .await?;
-                    }
-                }
-
                 if tools_updated {
                     (tools, toolshim_tools, system_prompt) = self.prepare_tools_and_prompt().await?;
                 }
