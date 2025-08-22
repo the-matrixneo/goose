@@ -15,11 +15,26 @@ pub enum ExecutionMode {
     Parallel,
 }
 
+/// Filter for selecting which extensions to load in a subagent
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(tag = "mode", rename_all = "lowercase")]
+pub enum ExtensionFilter {
+    /// Load only specified extensions (by normalized name)
+    Include { extensions: Vec<String> },
+    /// Load all except specified extensions
+    Exclude { extensions: Vec<String> },
+    /// Load no extensions
+    None,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Task {
     pub id: String,
     pub task_type: String,
     pub payload: Value,
+    /// Optional filter for which extensions to load in the subagent
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extension_filter: Option<ExtensionFilter>,
 }
 
 impl Task {
@@ -144,4 +159,84 @@ pub struct ExecutionResponse {
     pub status: String,
     pub results: Vec<TaskResult>,
     pub stats: ExecutionStats,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_extension_filter_serialization() {
+        // Test Include mode
+        let filter = ExtensionFilter::Include {
+            extensions: vec!["slack".to_string(), "github".to_string()],
+        };
+        let json = serde_json::to_value(&filter).unwrap();
+        assert_eq!(json["mode"], "include");
+        assert_eq!(json["extensions"], json!(["slack", "github"]));
+
+        // Test Exclude mode
+        let filter = ExtensionFilter::Exclude {
+            extensions: vec!["jira".to_string()],
+        };
+        let json = serde_json::to_value(&filter).unwrap();
+        assert_eq!(json["mode"], "exclude");
+        assert_eq!(json["extensions"], json!(["jira"]));
+
+        // Test None mode
+        let filter = ExtensionFilter::None;
+        let json = serde_json::to_value(&filter).unwrap();
+        assert_eq!(json["mode"], "none");
+    }
+
+    #[test]
+    fn test_extension_filter_deserialization() {
+        // Test Include mode
+        let json = json!({
+            "mode": "include",
+            "extensions": ["developer", "slack"]
+        });
+        let filter: ExtensionFilter = serde_json::from_value(json).unwrap();
+        match filter {
+            ExtensionFilter::Include { extensions } => {
+                assert_eq!(extensions, vec!["developer", "slack"]);
+            }
+            _ => panic!("Expected Include variant"),
+        }
+
+        // Test None mode
+        let json = json!({"mode": "none"});
+        let filter: ExtensionFilter = serde_json::from_value(json).unwrap();
+        assert!(matches!(filter, ExtensionFilter::None));
+    }
+
+    #[test]
+    fn test_task_with_extension_filter() {
+        let task = Task {
+            id: "test-123".to_string(),
+            task_type: "text_instruction".to_string(),
+            payload: json!({"text_instruction": "test"}),
+            extension_filter: Some(ExtensionFilter::Include {
+                extensions: vec!["developer".to_string()],
+            }),
+        };
+
+        let json = serde_json::to_value(&task).unwrap();
+        assert_eq!(json["extension_filter"]["mode"], "include");
+        assert_eq!(json["extension_filter"]["extensions"], json!(["developer"]));
+    }
+
+    #[test]
+    fn test_task_without_extension_filter() {
+        let task = Task {
+            id: "test-456".to_string(),
+            task_type: "text_instruction".to_string(),
+            payload: json!({"text_instruction": "test"}),
+            extension_filter: None,
+        };
+
+        let json = serde_json::to_value(&task).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("extension_filter"));
+    }
 }
