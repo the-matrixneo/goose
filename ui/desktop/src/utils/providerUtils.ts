@@ -117,7 +117,14 @@ export const initializeSystem = async (
   }
 ) => {
   try {
-    console.log('initializing agent with provider', provider, 'model', model);
+    console.log(
+      'initializing agent with provider',
+      provider,
+      'model',
+      model,
+      'sessionId',
+      sessionId
+    );
     await updateAgentProvider({
       body: {
         session_id: sessionId,
@@ -126,6 +133,10 @@ export const initializeSystem = async (
       },
       throwOnError: true,
     });
+
+    if (!sessionId) {
+      console.log('This will not end well');
+    }
 
     // Get recipeConfig directly here
     const recipeConfig = window.appConfig?.get?.('recipe');

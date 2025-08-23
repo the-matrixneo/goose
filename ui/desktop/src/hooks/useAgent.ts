@@ -6,7 +6,6 @@ import { initializeSystem } from '../utils/providerUtils';
 import { initializeCostDatabase } from '../utils/costDatabase';
 import {
   backupConfig,
-  //  extendPrompt,
   initConfig,
   Message as ApiMessage,
   readAllConfig,
@@ -17,7 +16,7 @@ import {
 } from '../api';
 import { COST_TRACKING_ENABLED } from '../updates';
 import { convertApiMessageToFrontendMessage } from '../components/context_management';
-import { SessionDetails } from '../sessions';
+import { SessionDetails, fetchSessionDetails } from '../sessions';
 
 export enum AgentState {
   UNINITIALIZED = 'uninitialized',
@@ -28,28 +27,46 @@ export enum AgentState {
 }
 
 export interface InitializationContext {
-  recipeConfig?: Recipe | null;
-  resumedSession?: SessionDetails | null;
-  initialMessage?: string | null;
+  recipeConfig?: Recipe;
+  resumedSession?: SessionDetails;
+  initialMessage?: string;
   setAgentWaitingMessage: (msg: string | null) => void;
   resetChat?: boolean;
 }
 
 interface UseAgentReturn {
   agentState: AgentState;
-  initializeAgentIfNeeded: (context: InitializationContext) => Promise<void>;
+  loadCurrentChat: (context: InitializationContext) => Promise<ChatType>;
 }
 
-export function useAgent(setChat: (chat: ChatType) => void): UseAgentReturn {
+export function useAgent(): UseAgentReturn {
+  console.log('useAgent instance created:', Math.random().toString(36));
+
   const [agentState, setAgentState] = useState<AgentState>(AgentState.UNINITIALIZED);
-  const initPromiseRef = useRef<Promise<void> | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const initPromiseRef = useRef<Promise<ChatType> | null>(null);
 
   const { getExtensions, addExtension, read } = useConfig();
 
-  const initializeAgentIfNeeded = useCallback(
-    async (initContext: InitializationContext) => {
-      if (agentState === AgentState.INITIALIZED) {
-        return;
+  const currentChat = useCallback(
+    async (initContext: InitializationContext): Promise<ChatType> => {
+      if (agentState === AgentState.INITIALIZED && sessionId) {
+        const sessionDetails = await fetchSessionDetails(sessionId);
+
+        const chat: ChatType = {
+          sessionId: sessionDetails.sessionId,
+          title: sessionDetails.metadata.description || 'Chat Session',
+          messageHistoryIndex: 0,
+          messages: sessionDetails.messages,
+        };
+
+        // TODO(Douwe): we should store the recipe config on the server so not needed here:
+        if (initContext.recipeConfig) {
+          chat.title = initContext.recipeConfig.title || chat.title;
+          chat.recipeConfig = initContext.recipeConfig;
+        }
+
+        return chat;
       }
 
       if (initPromiseRef.current) {
@@ -58,7 +75,8 @@ export function useAgent(setChat: (chat: ChatType) => void): UseAgentReturn {
 
       const initPromise = (async () => {
         setAgentState(AgentState.INITIALIZING);
-        initContext.setAgentWaitingMessage('Agent is initializing');
+        const agentWaitingMessage = initContext.setAgentWaitingMessage;
+        agentWaitingMessage('Agent is initializing');
 
         try {
           const config = window.electron.getConfig();
@@ -67,7 +85,7 @@ export function useAgent(setChat: (chat: ChatType) => void): UseAgentReturn {
 
           if (!provider || !model) {
             setAgentState(AgentState.NO_PROVIDER);
-            return;
+            throw new Error('No provider or model configured');
           }
 
           const agentResponse = initContext.resumedSession
@@ -83,32 +101,14 @@ export function useAgent(setChat: (chat: ChatType) => void): UseAgentReturn {
                 },
                 throwOnError: true,
               });
+
           const agentSessionInfo = agentResponse.data;
           if (!agentSessionInfo) {
             throw Error('Failed to get session info');
           }
+          setSessionId(agentSessionInfo.session_id);
 
-          let initChat: ChatType = {
-            sessionId: agentSessionInfo.session_id,
-            title: agentSessionInfo.metadata.description,
-            messageHistoryIndex: 0,
-            messages: agentSessionInfo.messages.map((message: ApiMessage) =>
-              convertApiMessageToFrontendMessage(message, true, true)
-            ),
-          };
-          // TODO(Douwe): do this on the server:
-          if (initContext.recipeConfig) {
-            initChat.title = initContext.recipeConfig.title || initChat.title;
-            initChat.recipeConfig = initContext.recipeConfig;
-          }
-
-          setChat(initChat);
-
-          const costDbPromise = COST_TRACKING_ENABLED
-            ? initializeCostDatabase().catch((error) => {
-                console.error('Failed to initialize cost database:', error);
-              })
-            : Promise.resolve();
+          agentWaitingMessage('Agent is loading config');
 
           await initConfig();
 
@@ -119,33 +119,47 @@ export function useAgent(setChat: (chat: ChatType) => void): UseAgentReturn {
             await handleConfigRecovery();
           }
 
-          const initPromises = [
-            initializeSystem(initChat.sessionId, provider as string, model as string, {
-              getExtensions,
-              addExtension,
-            }),
-          ];
+          agentWaitingMessage('Extensions are loading');
+          console.log(`calling initializeSystem with sessionId: ${agentSessionInfo.session_id}`);
+          await initializeSystem(agentSessionInfo.session_id, provider as string, model as string, {
+            getExtensions,
+            addExtension,
+          });
+          console.log('init system done!!');
 
-          if (COST_TRACKING_ENABLED && costDbPromise) {
-            initPromises.push(costDbPromise);
+          if (COST_TRACKING_ENABLED) {
+            try {
+              await initializeCostDatabase();
+            } catch (error) {
+              console.error('Failed to initialize cost database:', error);
+            }
           }
 
-          initContext.setAgentWaitingMessage('Extensions are loading');
-          await Promise.all(initPromises);
-          console.log('Agent core initialization completed successfully');
+          let initChat: ChatType = {
+            sessionId: agentSessionInfo.session_id,
+            title: agentSessionInfo.metadata.description,
+            messageHistoryIndex: 0,
+            messages: agentSessionInfo.messages.map((message: ApiMessage) =>
+              convertApiMessageToFrontendMessage(message, true, true)
+            ),
+          };
 
+          if (initContext.recipeConfig) {
+            initChat.title = initContext.recipeConfig.title || initChat.title;
+            initChat.recipeConfig = initContext.recipeConfig;
+          }
           setAgentState(AgentState.INITIALIZED);
+
+          return initChat;
         } catch (error) {
           if ((error + '').includes('Failed to create provider')) {
-            // This is not ideal, but otherwise we end up showing a fatal error instead of
-            // allowing the user to fix their config:
             setAgentState(AgentState.NO_PROVIDER);
-            return;
+          } else {
+            setAgentState(AgentState.ERROR);
           }
-          setAgentState(AgentState.ERROR);
           throw error;
         } finally {
-          initContext.setAgentWaitingMessage(null);
+          agentWaitingMessage(null);
           initPromiseRef.current = null;
         }
       })();
@@ -153,12 +167,12 @@ export function useAgent(setChat: (chat: ChatType) => void): UseAgentReturn {
       initPromiseRef.current = initPromise;
       return initPromise;
     },
-    [agentState, getExtensions, addExtension, read, setChat]
+    [getExtensions, addExtension, read]
   );
 
   return {
     agentState,
-    initializeAgentIfNeeded,
+    loadCurrentChat: currentChat,
   };
 }
 

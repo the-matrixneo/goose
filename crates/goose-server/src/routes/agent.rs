@@ -23,6 +23,7 @@ use goose::{
 use goose::{config::Config, recipe::SubRecipe};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use tracing::error;
 
@@ -83,7 +84,6 @@ pub struct StartAgentRequest {
     working_dir: String,
 }
 
-// This is the same as SessionHistoryResponse
 #[derive(Deserialize, utoipa::ToSchema)]
 pub struct ResumeAgentRequest {
     session_id: String,
@@ -117,18 +117,22 @@ async fn start_agent(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Json(payload): Json<StartAgentRequest>,
-) -> Result<Json<StartAgentResponse>, Json<ErrorResponse>> {
+) -> Result<Json<StartAgentResponse>, (StatusCode, Json<ErrorResponse>)> {
     verify_secret_key(&headers, &state).map_err(|_| {
-        Json(ErrorResponse {
-            error: "Unauthorized - Invalid or missing API key".to_string(),
-        })
+        (
+            StatusCode::UNAUTHORIZED,
+            Json(ErrorResponse {
+                error: "Unauthorized - Invalid or missing API key".to_string(),
+            }),
+        )
     })?;
 
     let session_id = session::generate_session_id();
+    let counter = state.session_counter.fetch_add(1, Ordering::SeqCst) + 1;
 
     let metadata = SessionMetadata {
         working_dir: PathBuf::from(&payload.working_dir),
-        description: "New session".to_string(),
+        description: format!("New session {}", counter),
         schedule_id: None,
         message_count: 0,
         total_tokens: Some(0),
@@ -145,17 +149,26 @@ async fn start_agent(
     let session_path = match session::get_path(session::Identifier::Name(session_id.clone())) {
         Ok(path) => path,
         Err(e) => {
-            return Err(Json(ErrorResponse {
-                error: format!("Failed to get session path: {}", e),
-            }));
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse {
+                    error: format!("Failed to get session path: {}", e),
+                }),
+            ));
         }
     };
 
-    save_messages_with_metadata(&session_path, &metadata, &conversation).map_err(|e| {
-        Json(ErrorResponse {
-            error: format!("Failed to save initial messages: {}", e),
-        })
-    })?;
+    match save_messages_with_metadata(&session_path, &metadata, &conversation) {
+        Ok(_) => {}
+        Err(e) => {
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse {
+                    error: format!("Failed to save initial messages: {}", e),
+                }),
+            ));
+        }
+    }
 
     Ok(Json(StartAgentResponse {
         session_id,

@@ -35,17 +35,32 @@ export default function Pair({
   const [shouldAutoSubmit, setShouldAutoSubmit] = useState(false);
   const [initialMessage, setInitialMessage] = useState<string | null>(null);
   const [isTransitioningFromHub, setIsTransitioningFromHub] = useState(false);
-  const chatRef = useRef(chat);
 
-  useEffect(() => {
-    chatRef.current = chat;
-  }, [chat]);
-
-  const { agentState, initializeAgentIfNeeded } = useAgent(setChat);
+  const { agentState, loadCurrentChat } = useAgent();
 
   const { initialPrompt: recipeInitialPrompt } = useRecipeManager(chat, location.state);
 
+  const prevDeps = useRef<any[]>([]);
   useEffect(() => {
+    const currentDeps = [
+      location.state,
+      hasProcessedInitialInput,
+      initialMessage,
+      setChat,
+      setFatalError,
+      setAgentWaitingMessage,
+      setView,
+      loadCurrentChat,
+    ];
+
+    if (prevDeps.current) {
+      currentDeps.forEach((dep, i) => {
+        if (prevDeps.current[i] !== dep) {
+          console.log(`Dependency ${i} changed:`, prevDeps.current[i], '→', dep);
+        }
+      });
+    }
+    prevDeps.current = currentDeps;
     const initializeFromState = async () => {
       const appConfig = window.appConfig?.get('recipe');
       const resumedSession = location.state?.resumedSession as SessionDetails | undefined;
@@ -54,13 +69,14 @@ export default function Pair({
       const messageFromHub = location.state?.initialMessage;
       let shouldClearState = false;
       try {
-        await initializeAgentIfNeeded({
+        const chat = await loadCurrentChat({
           recipeConfig: recipeConfig || (appConfig as Recipe) || null,
           resumedSession: resumedSession,
           setAgentWaitingMessage,
           initialMessage: messageFromHub || null,
           resetChat,
         });
+        setChat(chat);
       } catch (error) {
         setFatalError(`Agent init failure: ${error instanceof Error ? error.message : '' + error}`);
       }
@@ -88,56 +104,19 @@ export default function Pair({
     location.state,
     hasProcessedInitialInput,
     initialMessage,
-    initializeAgentIfNeeded,
     setChat,
     setFatalError,
     setAgentWaitingMessage,
     setView,
+    loadCurrentChat,
   ]);
 
   useEffect(() => {
     if (agentState === AgentState.NO_PROVIDER) {
       setView('welcome');
-      return;
     }
-    if (shouldAutoSubmit && initialMessage && agentState === AgentState.INITIALIZED) {
-      const timer = setTimeout(() => {
-        const textarea = document.querySelector(
-          'textarea[data-testid="chat-input"]'
-        ) as HTMLTextAreaElement;
-        const form = textarea?.closest('form');
+  }, [agentState, setView]);
 
-        if (textarea && form) {
-          textarea.value = initialMessage;
-          // eslint-disable-next-line no-undef
-          textarea.dispatchEvent(new Event('input', { bubbles: true }));
-          textarea.focus();
-
-          const enterEvent = new KeyboardEvent('keydown', {
-            key: 'Enter',
-            code: 'Enter',
-            keyCode: 13,
-            which: 13,
-            bubbles: true,
-          });
-          textarea.dispatchEvent(enterEvent);
-
-          setShouldAutoSubmit(false);
-        }
-      }, 500);
-
-      return () => clearTimeout(timer);
-    }
-
-    return undefined;
-  }, [shouldAutoSubmit, initialMessage, agentState, setView]);
-
-  if (agentState == AgentState.NO_PROVIDER) {
-    setView('welcome');
-    return;
-  }
-
-  // Custom message submit handler;
   const handleMessageSubmit = (message: string) => {
     // This is called after a message is submitted
     setShouldAutoSubmit(false);
@@ -145,14 +124,6 @@ export default function Pair({
     console.log('Message submitted:', message);
   };
 
-  // Custom message stream finish handler to handle recipe auto-execution
-  const handleMessageStreamFinish = () => {
-    // This will be called with the proper append function from BaseChat
-    // For now, we'll handle auto-execution in the BaseChat component
-  };
-
-  // Determine the initial value for the chat input
-  // Priority: Hub message > Recipe prompt > empty
   const initialValue = initialMessage || recipeInitialPrompt || undefined;
 
   // Custom chat input props for Pair-specific behavior
@@ -170,7 +141,6 @@ export default function Pair({
       setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
       enableLocalStorage={true} // Enable local storage for Pair mode
       onMessageSubmit={handleMessageSubmit}
-      onMessageStreamFinish={handleMessageStreamFinish}
       customChatInputProps={customChatInputProps}
       contentClassName={cn('pr-1 pb-10', (isMobile || sidebarState === 'collapsed') && 'pt-11')} // Use dynamic content class with mobile margin and sidebar state
       showPopularTopics={!isTransitioningFromHub} // Don't show popular topics while transitioning from Hub

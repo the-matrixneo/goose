@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { IpcRendererEvent } from 'electron';
 import { HashRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { ErrorUI } from './components/ErrorBoundary';
@@ -44,7 +44,7 @@ const HubRouteWrapper = ({
   setIsGoosehintsModalOpen: (isOpen: boolean) => void;
 }) => {
   const navigate = useNavigate();
-  const setView = createNavigationHandler(navigate);
+  const setView = useMemo(() => createNavigationHandler(navigate), [navigate]);
 
   return (
     <Hub
@@ -66,13 +66,12 @@ const PairRouteWrapper = ({
 }: {
   chat: ChatType;
   setChat: (chat: ChatType) => void;
-  setchat: (chat: ChatType) => void;
   setIsGoosehintsModalOpen: (isOpen: boolean) => void;
   setAgentWaitingMessage: (msg: string | null) => void;
   setFatalError: (value: ((prevState: string | null) => string | null) | string | null) => void;
 }) => {
   const navigate = useNavigate();
-  const setView = createNavigationHandler(navigate);
+  const setView = useMemo(() => createNavigationHandler(navigate), [navigate]);
 
   return (
     <Pair
@@ -89,7 +88,7 @@ const PairRouteWrapper = ({
 const SettingsRoute = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const setView = createNavigationHandler(navigate);
+  const setView = useMemo(() => createNavigationHandler(navigate), [navigate]);
 
   // Get viewOptions from location.state or history.state
   const viewOptions =
@@ -99,7 +98,7 @@ const SettingsRoute = () => {
 
 const SessionsRoute = () => {
   const navigate = useNavigate();
-  const setView = createNavigationHandler(navigate);
+  const setView = useMemo(() => createNavigationHandler(navigate), [navigate]);
 
   return <SessionsView setView={setView} />;
 };
@@ -261,13 +260,21 @@ export default function App() {
   const [isGoosehintsModalOpen, setIsGoosehintsModalOpen] = useState(false);
   const [agentWaitingMessage, setAgentWaitingMessage] = useState<string | null>(null);
 
-  const [chat, setChat] = useState<ChatType>({
+  const [chat, _setChat] = useState<ChatType>({
     sessionId: generateSessionId(),
     title: 'Pair Chat',
     messages: [],
     messageHistoryIndex: 0,
     recipeConfig: null,
   });
+
+  const setChat = useCallback<typeof _setChat>(
+    (update) => {
+      console.log('setChat called with:', update);
+      _setChat(update);
+    },
+    [_setChat]
+  );
 
   const { addExtension } = useConfig();
 
@@ -715,7 +722,6 @@ export default function App() {
                         <PairRouteWrapper
                           chat={chat}
                           setChat={setChat}
-                          setchat={setChat}
                           setFatalError={setFatalError}
                           setAgentWaitingMessage={setAgentWaitingMessage}
                           setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
