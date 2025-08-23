@@ -481,7 +481,7 @@ export default function App() {
     return () => {
       window.electron.off('fatal-error', handleFatalError);
     };
-  });
+  }, []);
 
   useEffect(() => {
     const handleSetView = (_event: IpcRendererEvent, ...args: unknown[]) => {
