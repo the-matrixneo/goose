@@ -60,7 +60,10 @@ impl SubAgent {
         // Create a new extension manager for this subagent
         let extension_manager = ExtensionManager::new();
 
-        // Get all enabled extensions once
+        // Add extensions based on task_type:
+        // 1. If executing dynamic task (task_type = 'text_instruction'), default to using all enabled extensions
+        //    unless extension_filter is specified
+        // 2. (TODO) If executing a sub-recipe task, only use recipe extensions
         let all_enabled_extensions: Vec<ExtensionConfig> = ExtensionConfigManager::get_all()
             .unwrap_or_default()
             .into_iter()
