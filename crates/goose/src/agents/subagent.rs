@@ -60,23 +60,22 @@ impl SubAgent {
         // Create a new extension manager for this subagent
         let extension_manager = ExtensionManager::new();
 
-        // Get extensions based on filter
+        // Get all enabled extensions once
+        let all_enabled_extensions: Vec<ExtensionConfig> = ExtensionConfigManager::get_all()
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|ext| ext.enabled)
+            .map(|ext| ext.config)
+            .collect();
+
         let extensions_to_load = match &task_config.extension_filter {
             Some(ExtensionFilter::Include { extensions }) => {
                 // Validate that all requested extensions exist
-                let all_extensions = ExtensionConfigManager::get_all()
-                    .unwrap_or_default()
-                    .into_iter()
-                    .filter(|ext| ext.enabled)
-                    .map(|ext| ext.config)
-                    .collect::<Vec<ExtensionConfig>>();
-
-                let available_names: Vec<String> = all_extensions
+                let available_names: Vec<String> = all_enabled_extensions
                     .iter()
                     .map(|ext| crate::agents::extension_manager::normalize(ext.name()))
                     .collect();
 
-                // Check for invalid extension names
                 let invalid_names: Vec<String> = extensions
                     .iter()
                     .filter(|name| {
@@ -96,7 +95,7 @@ impl SubAgent {
                 }
 
                 // Filter to only the requested extensions
-                all_extensions
+                all_enabled_extensions
                     .into_iter()
                     .filter(|ext| {
                         let normalized_name =
@@ -108,35 +107,18 @@ impl SubAgent {
                     })
                     .collect()
             }
-            Some(ExtensionFilter::Exclude { extensions }) => ExtensionConfigManager::get_all()
-                .unwrap_or_default()
+            Some(ExtensionFilter::Exclude { extensions }) => all_enabled_extensions
                 .into_iter()
                 .filter(|ext| {
-                    if !ext.enabled {
-                        return false;
-                    }
-                    let normalized_name =
-                        crate::agents::extension_manager::normalize(ext.config.name());
+                    let normalized_name = crate::agents::extension_manager::normalize(ext.name());
                     !extensions.iter().any(|excluded| {
                         crate::agents::extension_manager::normalize(excluded.to_string())
                             == normalized_name
                     })
                 })
-                .map(|ext| ext.config)
                 .collect(),
-            Some(ExtensionFilter::None) => {
-                // No extensions
-                vec![]
-            }
-            None => {
-                // Default: load all enabled extensions (current behavior)
-                ExtensionConfigManager::get_all()
-                    .unwrap_or_default()
-                    .into_iter()
-                    .filter(|ext| ext.enabled)
-                    .map(|ext| ext.config)
-                    .collect()
-            }
+            Some(ExtensionFilter::None) => vec![],
+            None => all_enabled_extensions,
         };
 
         // Add filtered extensions to the subagent's extension manager
