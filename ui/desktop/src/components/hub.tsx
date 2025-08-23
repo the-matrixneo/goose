@@ -19,8 +19,6 @@ import ChatInput from './ChatInput';
 import { ChatState } from '../types/chatState';
 import { ChatContextManagerProvider } from './context_management/ChatContextManager';
 import 'react-toastify/dist/ReactToastify.css';
-
-import { ChatType } from '../types/chat';
 import { View, ViewOptions } from '../utils/navigationUtils';
 
 export default function Hub({
@@ -28,8 +26,6 @@ export default function Hub({
   setIsGoosehintsModalOpen,
 }: {
   readyForAutoUserPrompt: boolean;
-  chat: ChatType;
-  setChat: (chat: ChatType) => void;
   setView: (view: View, viewOptions?: ViewOptions) => void;
   setIsGoosehintsModalOpen: (isOpen: boolean) => void;
 }) {

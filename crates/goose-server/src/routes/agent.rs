@@ -145,31 +145,6 @@ async fn start_agent(
     };
 
     let conversation = Conversation::empty();
-
-    let session_path = match session::get_path(session::Identifier::Name(session_id.clone())) {
-        Ok(path) => path,
-        Err(e) => {
-            return Err((
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ErrorResponse {
-                    error: format!("Failed to get session path: {}", e),
-                }),
-            ));
-        }
-    };
-
-    match save_messages_with_metadata(&session_path, &metadata, &conversation) {
-        Ok(_) => {}
-        Err(e) => {
-            return Err((
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ErrorResponse {
-                    error: format!("Failed to save initial messages: {}", e),
-                }),
-            ));
-        }
-    }
-
     Ok(Json(StartAgentResponse {
         session_id,
         metadata,

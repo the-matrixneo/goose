@@ -35,12 +35,8 @@ import { createNavigationHandler, View, ViewOptions } from './utils/navigationUt
 
 // Route Components
 const HubRouteWrapper = ({
-  chat,
-  setChat,
   setIsGoosehintsModalOpen,
 }: {
-  chat: ChatType;
-  setChat: (chat: ChatType) => void;
   setIsGoosehintsModalOpen: (isOpen: boolean) => void;
 }) => {
   const navigate = useNavigate();
@@ -49,8 +45,6 @@ const HubRouteWrapper = ({
   return (
     <Hub
       readyForAutoUserPrompt={true}
-      chat={chat}
-      setChat={setChat}
       setView={setView}
       setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
     />
@@ -700,11 +694,7 @@ export default function App() {
                   index
                   element={
                     <ProviderGuard>
-                      <HubRouteWrapper
-                        chat={chat}
-                        setChat={setChat}
-                        setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
-                      />
+                      <HubRouteWrapper setIsGoosehintsModalOpen={setIsGoosehintsModalOpen} />
                     </ProviderGuard>
                   }
                 />
@@ -712,21 +702,13 @@ export default function App() {
                   path="pair"
                   element={
                     <ProviderGuard>
-                      <ChatProvider
+                      <PairRouteWrapper
                         chat={chat}
                         setChat={setChat}
-                        contextKey={`pair-${chat.sessionId}`}
-                        agentWaitingMessage={agentWaitingMessage}
-                        key={chat.sessionId}
-                      >
-                        <PairRouteWrapper
-                          chat={chat}
-                          setChat={setChat}
-                          setFatalError={setFatalError}
-                          setAgentWaitingMessage={setAgentWaitingMessage}
-                          setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
-                        />
-                      </ChatProvider>
+                        setFatalError={setFatalError}
+                        setAgentWaitingMessage={setAgentWaitingMessage}
+                        setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
+                      />
                     </ProviderGuard>
                   }
                 />

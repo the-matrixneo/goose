@@ -28,16 +28,6 @@ export default function Pair({
   setFatalError: (value: ((prevState: string | null) => string | null) | string | null) => void;
   setAgentWaitingMessage: (msg: string | null) => void;
 }) {
-  const pairInstanceId = useRef(Math.random().toString(36).substr(2, 9));
-  console.log(`🎯 Pair component ${pairInstanceId.current} MOUNTING`);
-
-  useEffect(() => {
-    console.log(`🎯 Pair component ${pairInstanceId.current} MOUNTED`);
-    return () => {
-      console.log(`🎯 Pair component ${pairInstanceId.current} UNMOUNTING`);
-    };
-  }, []);
-
   const location = useLocation();
   const isMobile = useIsMobile();
   const { state: sidebarState } = useSidebar();
@@ -50,7 +40,7 @@ export default function Pair({
 
   const { initialPrompt: recipeInitialPrompt } = useRecipeManager(chat, location.state);
 
-  const prevDeps = useRef<any[]>([]);
+  const prevDeps = useRef<unknown[]>([]);
   useEffect(() => {
     const currentDeps = [
       location.state,
