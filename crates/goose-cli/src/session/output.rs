@@ -774,10 +774,9 @@ pub fn display_context_usage(
             let subagent_percentage =
                 ((subagent_tokens as f64 / total_session_tokens as f64) * 100.0).round() as usize;
             println!(
-                "Session: {} subagent tokens ({}% of {} total session tokens)",
+                "Delegated: {} tokens handled by subagents ({}% of total tokens)",
                 style(subagent_tokens.to_string()).cyan(),
-                style(subagent_percentage.to_string()).cyan(),
-                total_session_tokens
+                style(subagent_percentage.to_string()).cyan()
             );
         }
     }
