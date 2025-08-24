@@ -4,7 +4,9 @@ use tracing;
 
 use crate::agents::extension_manager::ExtensionManager;
 use crate::agents::platform_tools;
+use crate::agents::recipe_tools::dynamic_task_tools::create_dynamic_task_tool;
 use crate::agents::router_tool_selector::RouterToolSelector;
+use crate::agents::subagent_execution_tool::subagent_execute_task_tool;
 
 /// Manages tool indexing operations for the router when LLM routing is enabled
 pub struct ToolRouterIndexManager;
@@ -91,6 +93,12 @@ impl ToolRouterIndexManager {
             tools.push(platform_tools::read_resource_tool());
             tools.push(platform_tools::list_resources_tool());
         }
+
+        // Add subagent execution tool - critical for subagent functionality
+        tools.push(subagent_execute_task_tool::create_subagent_execute_task_tool());
+
+        // Add dynamic task tool
+        tools.push(create_dynamic_task_tool());
 
         // Index all platform tools at once
         selector
