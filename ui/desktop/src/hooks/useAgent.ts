@@ -165,7 +165,7 @@ export function useAgent(): UseAgentReturn {
       initPromiseRef.current = initPromise;
       return initPromise;
     },
-    [getExtensions, addExtension, read]
+    [getExtensions, addExtension, read, agentState, sessionId]
   );
 
   return {

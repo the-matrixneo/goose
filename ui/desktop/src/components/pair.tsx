@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { View, ViewOptions } from '../utils/navigationUtils';
 import BaseChat from './BaseChat';
@@ -42,30 +42,11 @@ export default function Pair({
 
   const { initialPrompt: recipeInitialPrompt } = useRecipeManager(chat, location.state);
 
-  const prevDeps = useRef<unknown[]>([]);
   useEffect(() => {
-    const currentDeps = [
-      location.state,
-      hasProcessedInitialInput,
-      initialMessage,
-      setChat,
-      setFatalError,
-      setAgentWaitingMessage,
-      setView,
-      loadCurrentChat,
-    ];
-
-    if (prevDeps.current) {
-      currentDeps.forEach((dep, i) => {
-        if (prevDeps.current[i] !== dep) {
-          console.log(`Dependency ${i} changed:`, prevDeps.current[i], '→', dep);
-        }
-      });
-    }
-    prevDeps.current = currentDeps;
     const initializeFromState = async () => {
       const appConfig = window.appConfig?.get('recipe');
       const resumedSession = location.state?.resumedSession as SessionDetails | undefined;
+      console.log('resumed', resumedSession);
       const recipeConfig = location.state?.recipeConfig as Recipe | undefined;
       const resetChat = location.state?.resetChat as boolean | undefined;
       const messageFromHub = location.state?.initialMessage;

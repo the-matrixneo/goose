@@ -271,7 +271,7 @@ export default function App() {
 
   const setChat = useCallback<typeof _setChat>(
     (update) => {
-      console.log('setChat called with:', update);
+      //console.log('setChat called with:', update); // TODO(Douwe): Undo
       _setChat(update);
     },
     [_setChat]
