@@ -16,7 +16,7 @@ import {
 } from '../api';
 import { COST_TRACKING_ENABLED } from '../updates';
 import { convertApiMessageToFrontendMessage } from '../components/context_management';
-import { SessionDetails, fetchSessionDetails } from '../sessions';
+import { fetchSessionDetails } from '../sessions';
 
 export enum AgentState {
   UNINITIALIZED = 'uninitialized',
@@ -28,7 +28,7 @@ export enum AgentState {
 
 export interface InitializationContext {
   recipeConfig?: Recipe;
-  resumedSession?: SessionDetails;
+  resumeSessionId?: string;
   initialMessage?: string;
   setAgentWaitingMessage: (msg: string | null) => void;
   resetChat?: boolean;
@@ -49,6 +49,7 @@ export function useAgent(): UseAgentReturn {
   const currentChat = useCallback(
     async (initContext: InitializationContext): Promise<ChatType> => {
       if (agentState === AgentState.INITIALIZED && sessionId) {
+        // && !initContext.resetChat
         const sessionDetails = await fetchSessionDetails(sessionId);
 
         const chat: ChatType = {
@@ -86,10 +87,10 @@ export function useAgent(): UseAgentReturn {
             throw new Error('No provider or model configured');
           }
 
-          const agentResponse = initContext.resumedSession
+          const agentResponse = initContext.resumeSessionId
             ? await resumeAgent({
                 body: {
-                  session_id: initContext.resumedSession?.sessionId,
+                  session_id: initContext.resumeSessionId,
                 },
                 throwOnError: true,
               })

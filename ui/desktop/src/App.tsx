@@ -52,6 +52,13 @@ const HubRouteWrapper = ({
   );
 };
 
+interface PairRouteState {
+  resumeSessionId?: string;
+  recipeConfig?: Recipe;
+  resetChat: boolean;
+  initialMessage?: string;
+}
+
 const PairRouteWrapper = ({
   chat,
   setChat,
@@ -70,7 +77,12 @@ const PairRouteWrapper = ({
   loadCurrentChat: (context: InitializationContext) => Promise<ChatType>;
 }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const setView = useMemo(() => createNavigationHandler(navigate), [navigate]);
+
+  const routeState =
+    (location.state as PairRouteState) || (window.history.state as PairRouteState) || {};
+  const { resumeSessionId, recipeConfig, resetChat } = routeState;
 
   return (
     <Pair
@@ -82,6 +94,9 @@ const PairRouteWrapper = ({
       setFatalError={setFatalError}
       setAgentWaitingMessage={setAgentWaitingMessage}
       setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
+      resumeSessionId={resumeSessionId}
+      recipeConfig={recipeConfig}
+      resetChat={resetChat}
     />
   );
 };
@@ -116,12 +131,12 @@ const RecipesRoute = () => {
     <RecipesView
       onLoadRecipe={(recipe) => {
         // Navigate to pair view with the recipe configuration in state
+        const stateData: PairRouteState = {
+          recipeConfig: recipe,
+          resetChat: true,
+        };
         navigate('/pair', {
-          state: {
-            recipeConfig: recipe,
-            // Reset the pair chat to start fresh with the recipe
-            resetChat: true,
-          },
+          state: stateData,
         });
       }}
     />
@@ -307,13 +322,18 @@ export default function App() {
   // Handle URL parameters and deeplinks on app startup
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    const viewType = urlParams.get('view');
-    const resumeSessionId = urlParams.get('resumeSessionId');
-    const recipeConfig = window.appConfig?.get('recipe');
+    const viewType = urlParams.get('view') || undefined;
+    const resumeSessionId = urlParams.get('resumeSessionId') || undefined;
+    const recipeConfig = (window.appConfig?.get('recipe') || undefined) as Recipe;
 
     if (resumeSessionId || (recipeConfig && typeof recipeConfig === 'object')) {
+      const stateData: PairRouteState = {
+        resumeSessionId: resumeSessionId,
+        recipeConfig: recipeConfig,
+        resetChat: !!recipeConfig,
+      };
       window.location.hash = '#/pair';
-      window.history.replaceState({ resumeSessionId: resumeSessionId }, '', '#/pair');
+      window.history.replaceState(stateData, '', '#/pair');
       return;
     }
 

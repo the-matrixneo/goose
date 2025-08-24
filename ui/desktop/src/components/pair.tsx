@@ -11,7 +11,6 @@ import { cn } from '../utils';
 
 import { ChatType } from '../types/chat';
 import { Recipe } from '../recipe';
-import { SessionDetails } from '../sessions';
 
 export default function Pair({
   chat,
@@ -22,6 +21,9 @@ export default function Pair({
   setAgentWaitingMessage,
   agentState,
   loadCurrentChat,
+  resumeSessionId,
+  recipeConfig,
+  resetChat,
 }: {
   chat: ChatType;
   setChat: (chat: ChatType) => void;
@@ -31,6 +33,9 @@ export default function Pair({
   setAgentWaitingMessage: (msg: string | null) => void;
   agentState: AgentState;
   loadCurrentChat: (context: InitializationContext) => Promise<ChatType>;
+  resumeSessionId?: string;
+  recipeConfig?: Recipe;
+  resetChat: boolean;
 }) {
   const location = useLocation();
   const isMobile = useIsMobile();
@@ -44,17 +49,12 @@ export default function Pair({
 
   useEffect(() => {
     const initializeFromState = async () => {
-      const appConfig = window.appConfig?.get('recipe');
-      const resumedSession = location.state?.resumedSession as SessionDetails | undefined;
-      console.log('resumed', resumedSession);
-      const recipeConfig = location.state?.recipeConfig as Recipe | undefined;
-      const resetChat = location.state?.resetChat as boolean | undefined;
       const messageFromHub = location.state?.initialMessage;
       let shouldClearState = false;
       try {
         const chat = await loadCurrentChat({
-          recipeConfig: recipeConfig || (appConfig as Recipe) || null,
-          resumedSession: resumedSession,
+          recipeConfig: recipeConfig,
+          resumeSessionId: resumeSessionId,
           setAgentWaitingMessage,
           initialMessage: messageFromHub || null,
           resetChat,
@@ -109,7 +109,6 @@ export default function Pair({
 
   const initialValue = initialMessage || recipeInitialPrompt || undefined;
 
-  // Custom chat input props for Pair-specific behavior
   const customChatInputProps = {
     // Pass initial message from Hub or recipe prompt
     initialValue,
