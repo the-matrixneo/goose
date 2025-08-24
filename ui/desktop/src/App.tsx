@@ -32,6 +32,7 @@ import { Recipe } from './recipe';
 import RecipesView from './components/RecipesView';
 import RecipeEditor from './components/RecipeEditor';
 import { createNavigationHandler, View, ViewOptions } from './utils/navigationUtils';
+import { AgentState, InitializationContext, useAgent } from './hooks/useAgent';
 
 // Route Components
 const HubRouteWrapper = ({
@@ -57,12 +58,16 @@ const PairRouteWrapper = ({
   setIsGoosehintsModalOpen,
   setAgentWaitingMessage,
   setFatalError,
+  agentState,
+  loadCurrentChat,
 }: {
   chat: ChatType;
   setChat: (chat: ChatType) => void;
   setIsGoosehintsModalOpen: (isOpen: boolean) => void;
   setAgentWaitingMessage: (msg: string | null) => void;
   setFatalError: (value: ((prevState: string | null) => string | null) | string | null) => void;
+  agentState: AgentState;
+  loadCurrentChat: (context: InitializationContext) => Promise<ChatType>;
 }) => {
   const navigate = useNavigate();
   const setView = useMemo(() => createNavigationHandler(navigate), [navigate]);
@@ -72,6 +77,8 @@ const PairRouteWrapper = ({
       chat={chat}
       setChat={setChat}
       setView={setView}
+      agentState={agentState}
+      loadCurrentChat={loadCurrentChat}
       setFatalError={setFatalError}
       setAgentWaitingMessage={setAgentWaitingMessage}
       setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
@@ -271,6 +278,7 @@ export default function App() {
   );
 
   const { addExtension } = useConfig();
+  const { agentState, loadCurrentChat } = useAgent();
 
   function extractCommand(link: string): string {
     const url = new URL(link);
@@ -705,6 +713,8 @@ export default function App() {
                       <PairRouteWrapper
                         chat={chat}
                         setChat={setChat}
+                        agentState={agentState}
+                        loadCurrentChat={loadCurrentChat}
                         setFatalError={setFatalError}
                         setAgentWaitingMessage={setAgentWaitingMessage}
                         setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}

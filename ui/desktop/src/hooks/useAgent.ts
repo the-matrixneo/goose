@@ -40,8 +40,6 @@ interface UseAgentReturn {
 }
 
 export function useAgent(): UseAgentReturn {
-  console.log('useAgent instance created:', Math.random().toString(36));
-
   const [agentState, setAgentState] = useState<AgentState>(AgentState.UNINITIALIZED);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const initPromiseRef = useRef<Promise<ChatType> | null>(null);

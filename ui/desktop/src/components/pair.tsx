@@ -5,7 +5,7 @@ import BaseChat from './BaseChat';
 import { useRecipeManager } from '../hooks/useRecipeManager';
 import { useIsMobile } from '../hooks/use-mobile';
 import { useSidebar } from './ui/sidebar';
-import { AgentState, useAgent } from '../hooks/useAgent';
+import { AgentState, InitializationContext } from '../hooks/useAgent';
 import 'react-toastify/dist/ReactToastify.css';
 import { cn } from '../utils';
 
@@ -20,6 +20,8 @@ export default function Pair({
   setIsGoosehintsModalOpen,
   setFatalError,
   setAgentWaitingMessage,
+  agentState,
+  loadCurrentChat,
 }: {
   chat: ChatType;
   setChat: (chat: ChatType) => void;
@@ -27,6 +29,8 @@ export default function Pair({
   setIsGoosehintsModalOpen: (isOpen: boolean) => void;
   setFatalError: (value: ((prevState: string | null) => string | null) | string | null) => void;
   setAgentWaitingMessage: (msg: string | null) => void;
+  agentState: AgentState;
+  loadCurrentChat: (context: InitializationContext) => Promise<ChatType>;
 }) {
   const location = useLocation();
   const isMobile = useIsMobile();
@@ -35,8 +39,6 @@ export default function Pair({
   const [shouldAutoSubmit, setShouldAutoSubmit] = useState(false);
   const [initialMessage, setInitialMessage] = useState<string | null>(null);
   const [isTransitioningFromHub, setIsTransitioningFromHub] = useState(false);
-
-  const { agentState, loadCurrentChat } = useAgent();
 
   const { initialPrompt: recipeInitialPrompt } = useRecipeManager(chat, location.state);
 
