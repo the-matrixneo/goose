@@ -12,6 +12,12 @@ import { cn } from '../utils';
 import { ChatType } from '../types/chat';
 import { Recipe } from '../recipe';
 
+export interface PairRouteState {
+  resumeSessionId?: string;
+  recipeConfig?: Recipe;
+  initialMessage?: string;
+}
+
 export default function Pair({
   chat,
   setChat,
@@ -21,9 +27,7 @@ export default function Pair({
   setAgentWaitingMessage,
   agentState,
   loadCurrentChat,
-  resumeSessionId,
-  recipeConfig,
-  resetChat,
+  routeState,
 }: {
   chat: ChatType;
   setChat: (chat: ChatType) => void;
@@ -33,66 +37,61 @@ export default function Pair({
   setAgentWaitingMessage: (msg: string | null) => void;
   agentState: AgentState;
   loadCurrentChat: (context: InitializationContext) => Promise<ChatType>;
-  resumeSessionId?: string;
-  recipeConfig?: Recipe;
-  resetChat: boolean;
+  routeState: PairRouteState;
 }) {
   const location = useLocation();
   const isMobile = useIsMobile();
   const { state: sidebarState } = useSidebar();
   const [hasProcessedInitialInput, setHasProcessedInitialInput] = useState(false);
   const [shouldAutoSubmit, setShouldAutoSubmit] = useState(false);
-  const [initialMessage, setInitialMessage] = useState<string | null>(null);
+  const [messageToSubmit, setMessageToSubmit] = useState<string | null>(null);
   const [isTransitioningFromHub, setIsTransitioningFromHub] = useState(false);
 
   const { initialPrompt: recipeInitialPrompt } = useRecipeManager(chat, location.state);
 
+  const recipeJson = JSON.stringify(routeState.recipeConfig);
+
   useEffect(() => {
     const initializeFromState = async () => {
-      const messageFromHub = location.state?.initialMessage;
-      let shouldClearState = false;
       try {
         const chat = await loadCurrentChat({
-          recipeConfig: recipeConfig,
-          resumeSessionId: resumeSessionId,
+          recipeConfig: routeState.recipeConfig,
+          resumeSessionId: routeState.resumeSessionId,
           setAgentWaitingMessage,
-          initialMessage: messageFromHub || null,
-          resetChat,
         });
         setChat(chat);
       } catch (error) {
         setFatalError(`Agent init failure: ${error instanceof Error ? error.message : '' + error}`);
       }
-
-      if (messageFromHub) {
-        setIsTransitioningFromHub(true);
-        if (messageFromHub !== initialMessage) {
-          setHasProcessedInitialInput(false);
-        }
-        if (!hasProcessedInitialInput) {
-          setHasProcessedInitialInput(true);
-          setInitialMessage(messageFromHub);
-          setShouldAutoSubmit(true);
-        }
-        shouldClearState = true;
-      }
-
-      if (shouldClearState && location.state) {
-        window.history.replaceState({}, document.title);
-      }
     };
 
     initializeFromState();
   }, [
-    location.state,
-    hasProcessedInitialInput,
-    initialMessage,
     setChat,
     setFatalError,
     setAgentWaitingMessage,
-    setView,
     loadCurrentChat,
+    routeState.resumeSessionId,
+    routeState.recipeConfig,
+    recipeJson, // TODO: Hacky object comparison, but works for now
   ]);
+
+  // Followed by sending the initialMessage if we have one. This will happen
+  // only once, unless we reset the chat in step one.
+  useEffect(() => {
+    if (
+      agentState !== AgentState.INITIALIZED ||
+      !routeState.initialMessage ||
+      hasProcessedInitialInput
+    ) {
+      return;
+    }
+
+    setIsTransitioningFromHub(true);
+    setHasProcessedInitialInput(true);
+    setMessageToSubmit(routeState.initialMessage);
+    setShouldAutoSubmit(true);
+  }, [agentState, routeState.initialMessage, hasProcessedInitialInput]);
 
   useEffect(() => {
     if (agentState === AgentState.NO_PROVIDER) {
@@ -101,13 +100,14 @@ export default function Pair({
   }, [agentState, setView]);
 
   const handleMessageSubmit = (message: string) => {
-    // This is called after a message is submitted
+    // Clean up any auto submit state:
     setShouldAutoSubmit(false);
-    setIsTransitioningFromHub(false); // Clear transitioning state once message is submitted
+    setIsTransitioningFromHub(false);
+    setMessageToSubmit(null);
     console.log('Message submitted:', message);
   };
 
-  const initialValue = initialMessage || recipeInitialPrompt || undefined;
+  const initialValue = messageToSubmit || recipeInitialPrompt || undefined;
 
   const customChatInputProps = {
     // Pass initial message from Hub or recipe prompt
@@ -121,7 +121,6 @@ export default function Pair({
       setChat={setChat}
       setView={setView}
       setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
-      enableLocalStorage={true} // Enable local storage for Pair mode
       onMessageSubmit={handleMessageSubmit}
       customChatInputProps={customChatInputProps}
       contentClassName={cn('pr-1 pb-10', (isMobile || sidebarState === 'collapsed') && 'pt-11')} // Use dynamic content class with mobile margin and sidebar state

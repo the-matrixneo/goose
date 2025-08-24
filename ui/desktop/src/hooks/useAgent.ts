@@ -29,13 +29,12 @@ export enum AgentState {
 export interface InitializationContext {
   recipeConfig?: Recipe;
   resumeSessionId?: string;
-  initialMessage?: string;
   setAgentWaitingMessage: (msg: string | null) => void;
-  resetChat?: boolean;
 }
 
 interface UseAgentReturn {
   agentState: AgentState;
+  resetChat: () => void;
   loadCurrentChat: (context: InitializationContext) => Promise<ChatType>;
 }
 
@@ -46,10 +45,14 @@ export function useAgent(): UseAgentReturn {
 
   const { getExtensions, addExtension, read } = useConfig();
 
+  const resetChat = useCallback(() => {
+    setSessionId(null);
+    setAgentState(AgentState.UNINITIALIZED);
+  }, []);
+
   const currentChat = useCallback(
     async (initContext: InitializationContext): Promise<ChatType> => {
       if (agentState === AgentState.INITIALIZED && sessionId) {
-        // && !initContext.resetChat
         const sessionDetails = await fetchSessionDetails(sessionId);
 
         const chat: ChatType = {
@@ -171,6 +174,7 @@ export function useAgent(): UseAgentReturn {
 
   return {
     agentState,
+    resetChat,
     loadCurrentChat: currentChat,
   };
 }

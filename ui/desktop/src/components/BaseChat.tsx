@@ -81,7 +81,6 @@ interface BaseChatProps {
   setChat: (chat: ChatType) => void;
   setView: (view: View, viewOptions?: ViewOptions) => void;
   setIsGoosehintsModalOpen?: (isOpen: boolean) => void;
-  enableLocalStorage?: boolean;
   onMessageStreamFinish?: () => void;
   onMessageSubmit?: (message: string) => void; // Callback after message is submitted
   renderHeader?: () => React.ReactNode;
@@ -101,7 +100,6 @@ function BaseChatContent({
   setChat,
   setView,
   setIsGoosehintsModalOpen,
-  enableLocalStorage = false,
   onMessageStreamFinish,
   onMessageSubmit,
   renderHeader,
@@ -176,7 +174,6 @@ function BaseChatContent({
       // Create new session after message is sent if needed
       createNewSessionIfNeeded();
     },
-    enableLocalStorage,
   });
 
   // Use shared recipe manager

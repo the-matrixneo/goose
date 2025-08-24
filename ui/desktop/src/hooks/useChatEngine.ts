@@ -30,7 +30,6 @@ interface UseChatEngineProps {
   setChat: (chat: ChatType) => void;
   onMessageStreamFinish?: () => void;
   onMessageSent?: () => void; // Add callback for when message is sent
-  enableLocalStorage?: boolean;
 }
 
 export const useChatEngine = ({
@@ -38,7 +37,6 @@ export const useChatEngine = ({
   setChat,
   onMessageStreamFinish,
   onMessageSent,
-  enableLocalStorage = false,
 }: UseChatEngineProps) => {
   const [lastInteractionTime, setLastInteractionTime] = useState<number>(Date.now());
   const [sessionTokenCount, setSessionTokenCount] = useState<number>(0);
@@ -52,18 +50,15 @@ export const useChatEngine = ({
   // Track pending edited message
   const [pendingEdit, setPendingEdit] = useState<{ id: string; content: string } | null>(null);
 
-  // Store message in global history when it's added (if enabled)
-  const storeMessageInHistory = useCallback(
-    (message: Message) => {
-      if (enableLocalStorage && isUserMessage(message)) {
-        const text = getTextContent(message);
-        if (text) {
-          LocalMessageStorage.addMessage(text);
-        }
+  // Store message in global history when it's added
+  const storeMessageInHistory = useCallback((message: Message) => {
+    if (isUserMessage(message)) {
+      const text = getTextContent(message);
+      if (text) {
+        LocalMessageStorage.addMessage(text);
       }
-    },
-    [enableLocalStorage]
-  );
+    }
+  }, []);
 
   const stopPowerSaveBlocker = useCallback(() => {
     try {
@@ -148,7 +143,7 @@ export const useChatEngine = ({
     },
   });
 
-  // Wrap append to store messages in global history (if enabled)
+  // Wrap append to store messages in global history
   const append = useCallback(
     (messageOrString: Message | string) => {
       const message =
@@ -313,7 +308,7 @@ export const useChatEngine = ({
       _setInput(textValue);
 
       // Also add to local storage history as a backup so cmd+up can retrieve it
-      if (enableLocalStorage && textValue.trim()) {
+      if (textValue.trim()) {
         LocalMessageStorage.addMessage(textValue.trim());
       }
 
@@ -378,7 +373,7 @@ export const useChatEngine = ({
         setMessages([...messages, responseMessage]);
       }
     }
-  }, [stop, messages, _setInput, setMessages, stopPowerSaveBlocker, enableLocalStorage]);
+  }, [stop, messages, _setInput, setMessages, stopPowerSaveBlocker]);
 
   const filteredMessages = useMemo(() => {
     return [...ancestorMessages, ...messages].filter((message) => message.display ?? true);

@@ -24,10 +24,11 @@ import { View, ViewOptions } from '../utils/navigationUtils';
 export default function Hub({
   setView,
   setIsGoosehintsModalOpen,
+  resetChat,
 }: {
-  readyForAutoUserPrompt: boolean;
   setView: (view: View, viewOptions?: ViewOptions) => void;
   setIsGoosehintsModalOpen: (isOpen: boolean) => void;
+  resetChat: () => void;
 }) {
   // Handle chat input submission - create new chat and navigate to pair
   const handleSubmit = (e: React.FormEvent) => {
@@ -37,10 +38,10 @@ export default function Hub({
     if (combinedTextFromInput.trim()) {
       // Navigate to pair page with the message to be submitted
       // Pair will handle creating the new chat session
+      resetChat();
       setView('pair', {
         disableAnimation: true,
         initialMessage: combinedTextFromInput,
-        resetChat: true,
       });
     }
 

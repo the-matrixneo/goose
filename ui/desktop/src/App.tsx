@@ -12,7 +12,7 @@ import ProviderGuard from './components/ProviderGuard';
 
 import { ChatType } from './types/chat';
 import Hub from './components/hub';
-import Pair from './components/pair';
+import Pair, { PairRouteState } from './components/pair';
 import SettingsView, { SettingsViewOptions } from './components/settings/SettingsView';
 import SessionsView from './components/sessions/SessionsView';
 import SchedulesView from './components/schedule/SchedulesView';
@@ -24,7 +24,7 @@ import { DraftProvider } from './contexts/DraftContext';
 import 'react-toastify/dist/ReactToastify.css';
 import { useConfig } from './components/ConfigContext';
 import { ModelAndProviderProvider } from './components/ModelAndProviderContext';
-import { addExtensionFromDeepLink as addExtensionFromDeepLinkV2 } from './components/settings/extensions';
+import { addExtensionFromDeepLink } from './components/settings/extensions';
 import PermissionSettingsView from './components/settings/permission/PermissionSetting';
 
 import ExtensionsView, { ExtensionsViewOptions } from './components/extensions/ExtensionsView';
@@ -37,27 +37,22 @@ import { AgentState, InitializationContext, useAgent } from './hooks/useAgent';
 // Route Components
 const HubRouteWrapper = ({
   setIsGoosehintsModalOpen,
+  resetChat,
 }: {
   setIsGoosehintsModalOpen: (isOpen: boolean) => void;
+  resetChat: () => void;
 }) => {
   const navigate = useNavigate();
   const setView = useMemo(() => createNavigationHandler(navigate), [navigate]);
 
   return (
     <Hub
-      readyForAutoUserPrompt={true}
       setView={setView}
       setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
+      resetChat={resetChat}
     />
   );
 };
-
-interface PairRouteState {
-  resumeSessionId?: string;
-  recipeConfig?: Recipe;
-  resetChat: boolean;
-  initialMessage?: string;
-}
 
 const PairRouteWrapper = ({
   chat,
@@ -76,13 +71,11 @@ const PairRouteWrapper = ({
   agentState: AgentState;
   loadCurrentChat: (context: InitializationContext) => Promise<ChatType>;
 }) => {
-  const navigate = useNavigate();
   const location = useLocation();
+  const navigate = useNavigate();
   const setView = useMemo(() => createNavigationHandler(navigate), [navigate]);
-
   const routeState =
     (location.state as PairRouteState) || (window.history.state as PairRouteState) || {};
-  const { resumeSessionId, recipeConfig, resetChat } = routeState;
 
   return (
     <Pair
@@ -94,9 +87,7 @@ const PairRouteWrapper = ({
       setFatalError={setFatalError}
       setAgentWaitingMessage={setAgentWaitingMessage}
       setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
-      resumeSessionId={resumeSessionId}
-      recipeConfig={recipeConfig}
-      resetChat={resetChat}
+      routeState={routeState}
     />
   );
 };
@@ -124,16 +115,16 @@ const SchedulesRoute = () => {
   return <SchedulesView onClose={() => navigate('/')} />;
 };
 
-const RecipesRoute = () => {
+const RecipesRoute = ({ resetChat }: { resetChat: () => void }) => {
   const navigate = useNavigate();
 
   return (
     <RecipesView
       onLoadRecipe={(recipe) => {
         // Navigate to pair view with the recipe configuration in state
+        resetChat();
         const stateData: PairRouteState = {
           recipeConfig: recipe,
-          resetChat: true,
         };
         navigate('/pair', {
           state: stateData,
@@ -293,7 +284,7 @@ export default function App() {
   );
 
   const { addExtension } = useConfig();
-  const { agentState, loadCurrentChat } = useAgent();
+  const { agentState, loadCurrentChat, resetChat } = useAgent();
 
   function extractCommand(link: string): string {
     const url = new URL(link);
@@ -330,8 +321,10 @@ export default function App() {
       const stateData: PairRouteState = {
         resumeSessionId: resumeSessionId,
         recipeConfig: recipeConfig,
-        resetChat: !!recipeConfig,
       };
+      if (recipeConfig) {
+        resetChat();
+      }
       window.location.hash = '#/pair';
       window.history.replaceState(stateData, '', '#/pair');
       return;
@@ -368,7 +361,7 @@ export default function App() {
         }
       }
     }
-  }, []);
+  }, [resetChat]);
 
   // Handle recipe decode events from main process
   useEffect(() => {
@@ -392,7 +385,6 @@ export default function App() {
     const handleRecipeDecoded = (_event: IpcRendererEvent, ...args: unknown[]) => {
       const decodedRecipe = args[0] as Recipe;
 
-      // Update the pair chat with the decoded recipe
       setChat((prevChat) => ({
         ...prevChat,
         recipeConfig: decodedRecipe,
@@ -401,10 +393,17 @@ export default function App() {
         messageHistoryIndex: 0,
       }));
 
+      const stateData: PairRouteState = {
+        recipeConfig: decodedRecipe,
+      };
+
+      resetChat();
+
       // Navigate to pair view if not already there
       if (window.location.hash !== '#/pair') {
         window.location.hash = '#/pair';
       }
+      window.history.replaceState(stateData, '', '#/pair');
     };
 
     const handleRecipeDecodeError = (_event: IpcRendererEvent, ...args: unknown[]) => {
@@ -425,7 +424,7 @@ export default function App() {
       window.electron.off('recipe-decoded', handleRecipeDecoded);
       window.electron.off('recipe-decode-error', handleRecipeDecodeError);
     };
-  }, [setChat, chat.sessionId]);
+  }, [setChat, resetChat]);
 
   useEffect(() => {
     console.log('Setting up keyboard shortcuts');
@@ -637,7 +636,7 @@ export default function App() {
       console.log(`Confirming installation of extension from: ${pendingLink}`);
       setModalVisible(false);
       try {
-        await addExtensionFromDeepLinkV2(pendingLink, addExtension, (view: string, options) => {
+        await addExtensionFromDeepLink(pendingLink, addExtension, (view: string, options) => {
           console.log('Extension deep link handler called with view:', view, 'options:', options);
           switch (view) {
             case 'settings':
@@ -650,8 +649,6 @@ export default function App() {
           }
         });
         console.log('Extension installation successful');
-      } catch (error) {
-        console.error('Failed to add extension:', error);
       } finally {
         setPendingLink(null);
       }
@@ -722,7 +719,10 @@ export default function App() {
                   index
                   element={
                     <ProviderGuard>
-                      <HubRouteWrapper setIsGoosehintsModalOpen={setIsGoosehintsModalOpen} />
+                      <HubRouteWrapper
+                        setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
+                        resetChat={resetChat}
+                      />
                     </ProviderGuard>
                   }
                 />
@@ -778,7 +778,7 @@ export default function App() {
                   path="recipes"
                   element={
                     <ProviderGuard>
-                      <RecipesRoute />
+                      <RecipesRoute resetChat={resetChat} />
                     </ProviderGuard>
                   }
                 />
