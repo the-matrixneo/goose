@@ -1,6 +1,8 @@
 use crate::agents::extension_manager::ExtensionManager;
+use crate::agents::recipe_tools::dynamic_task_tools::create_dynamic_task_tool;
 use crate::agents::router_tool_selector::{create_tool_selector, RouterToolSelector};
 use crate::agents::router_tools::{self};
+use crate::agents::subagent_execution_tool::subagent_execute_task_tool;
 use crate::agents::tool_execution::ToolCallResult;
 use crate::agents::tool_router_index_manager::ToolRouterIndexManager;
 use crate::config::Config;
@@ -153,6 +155,12 @@ impl ToolRouteManager {
             return prefixed_tools;
         }
         prefixed_tools.push(router_tools::llm_search_tool());
+
+        // Add subagent execution tool - critical for subagent functionality
+        prefixed_tools.push(subagent_execute_task_tool::create_subagent_execute_task_tool());
+
+        // Add dynamic task tool
+        prefixed_tools.push(create_dynamic_task_tool());
 
         // Get recent tool calls from router tool selector
         let selector = self.router_tool_selector.lock().await.clone();
