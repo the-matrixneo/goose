@@ -402,11 +402,19 @@ export default function App() {
     console.trace('setView called from:'); // This will show the call stack
 
     // Use React Router navigation if available, otherwise fallback to hash manipulation
+    // navigateRef.current may not be available during:
+    // - Initial app startup before React Router is fully initialized
+    // - Component unmounting/remounting cycles
+    // - Error boundary scenarios where React Router context is lost
+    // - When rendered outside of Router context (though this shouldn't happen in our app)
+    // - Race conditions during rapid navigation or window creation
     if (navigateRef.current) {
       const navigationHandler = createNavigationHandler(navigateRef.current);
       navigationHandler(view, viewOptions);
     } else {
       // Fallback to hash manipulation for cases where navigate isn't available yet
+      // This is a legacy implementation that directly manipulates the URL hash
+      // as a backup when React Router navigation is not available
       console.warn('Navigate function not available, using hash fallback');
       switch (view) {
         case 'chat':

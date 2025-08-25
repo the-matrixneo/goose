@@ -655,6 +655,15 @@ const createChat = async (
   // We need to wait for the window to load before we can access localStorage
   mainWindow.webContents.on('did-finish-load', () => {
     const configStr = JSON.stringify(windowConfig).replace(/'/g, "\\'");
+
+    // This JavaScript is injected into the renderer process to set localStorage with retry logic.
+    // The retry mechanism is necessary because localStorage may not be immediately available
+    // during Electron renderer initialization, especially on slower systems or during heavy load.
+    // We use executeJavaScript from the main process because:
+    // 1. The main process needs to pass configuration data to the renderer process
+    // 2. This happens during window initialization before the renderer's React app is ready
+    // 3. The timing is critical - we need to set config before React components try to read it
+    // 4. Direct IPC communication would require the renderer to be fully loaded first
     mainWindow.webContents
       .executeJavaScript(
         `
