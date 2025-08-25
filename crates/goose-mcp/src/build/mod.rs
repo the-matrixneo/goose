@@ -197,7 +197,64 @@ impl Router for BuildRouter {
             open_world_hint: Some(false),
         });
 
+        let wrangler_tool = Tool::new(
+            "wrangler",
+            indoc! {
+                r#"
+                Execute Wrangler CLI commands for Cloudflare D1 database operations and local development.
+
+                This tool wraps bash commands with Wrangler-specific guidelines and best practices. Command must start with `wrangler`.
+
+                Common D1 Commands:
+                - Create database: wrangler d1 create YOUR_DATABASE_NAME
+                - Execute SQL: wrangler d1 execute YOUR_DATABASE_NAME --local --command "CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT);"
+                - Apply migrations: wrangler d1 migrations apply YOUR_DATABASE_NAME --local
+                - List migrations: wrangler d1 migrations list YOUR_DATABASE_NAME --local
+                - Query database: wrangler d1 execute YOUR_DATABASE_NAME --local --command "SELECT * FROM users;"
+                - Create migration files: wrangler d1 migrations create YOUR_DATABASE_NAME "migration-name"
+
+                Development Commands:
+                - Start dev server: wrangler dev --persist-to=.wrangler/state/v3/d1/
+                - Start with specific port: wrangler dev --port 8787
+                - Deploy to Cloudflare: wrangler deploy
+
+                Guidelines:
+                - Always use --local flag for local development
+                - Use --persist-to flag to persist data across dev sessions
+                - Migration files are automatically numbered and placed in migrations/ directory
+                - Use proper SQL syntax for D1 (SQLite-compatible)
+                - Test migrations locally before applying to production
+
+                Parameters:
+                - command: The wrangler command to execute
+                - timeout: Optional timeout in milliseconds (default: 120000ms)
+                "#
+            },
+            object!({
+                "type": "object",
+                "required": ["command"],
+                "properties": {
+                    "command": {
+                        "type": "string",
+                        "description": "The wrangler command to execute"
+                    },
+                    "timeout": {
+                        "type": "number",
+                        "description": "Optional timeout in milliseconds (max 600000)"
+                    }
+                }
+            }),
+        )
+        .annotate(ToolAnnotations {
+            title: Some("Wrangler CLI Tool".to_string()),
+            read_only_hint: Some(false),
+            destructive_hint: Some(false),
+            idempotent_hint: Some(false),
+            open_world_hint: Some(false),
+        });
+
         tools.push(manage_server_tool);
+        tools.push(wrangler_tool);
         tools
     }
 
@@ -218,6 +275,7 @@ impl Router for BuildRouter {
         Box::pin(async move {
             match tool_name.as_str() {
                 "manage_server" => this.manage_server(_notifier, arguments).await,
+                "wrangler" => this.wrangler(arguments).await,
                 _ => this.inner.call_tool(&tool_name, arguments, _notifier).await,
             }
         })
@@ -251,6 +309,74 @@ impl Router for BuildRouter {
 }
 
 impl BuildRouter {
+    async fn wrangler(&self, params: Value) -> Result<Vec<Content>, ToolError> {
+        let command = params
+            .get("command")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| ToolError::InvalidParameters("Missing 'command' parameter".to_string()))?;
+
+        let timeout_ms = params
+            .get("timeout")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(120000); // Default 2 minutes
+
+        let project_path = std::env::current_dir()
+            .map_err(|e| ToolError::ExecutionError(format!("Failed to get current directory: {}", e)))?;
+
+        // Split the command into parts for proper execution
+        let parts: Vec<&str> = command.split_whitespace().collect();
+        if parts.is_empty() || parts[0] != "wrangler" {
+            return Err(ToolError::InvalidParameters(
+                "Command must start with 'wrangler'".to_string()
+            ));
+        }
+
+        let mut cmd = Command::new("wrangler");
+        for arg in &parts[1..] {
+            cmd.arg(arg);
+        }
+
+        // Apply timeout using tokio::time::timeout
+        let timeout_future = tokio::time::timeout(
+            std::time::Duration::from_millis(timeout_ms),
+            cmd
+                .current_dir(&project_path)
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .output()
+        );
+
+        let output = timeout_future
+            .await
+            .map_err(|_| ToolError::ExecutionError("Wrangler command timed out".to_string()))?
+            .map_err(|e| ToolError::ExecutionError(format!("Failed to execute wrangler command: {}", e)))?;
+
+        let mut result = String::new();
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+
+        if !stdout.is_empty() {
+            result.push_str(&stdout);
+        }
+        if !stderr.is_empty() {
+            if !result.is_empty() {
+                result.push('\n');
+            }
+            result.push_str(&stderr);
+        }
+
+        if !output.status.success() {
+            return Err(ToolError::ExecutionError(format!(
+                "Wrangler command failed with exit code {:?}:\n{}",
+                output.status.code(),
+                result
+            )));
+        }
+
+        Ok(vec![Content::text(result)])
+    }
+
+
     async fn get_port(&self) -> Result<Vec<Content>, ToolError> {
         // Return the port we determined when starting the server
         let port = {

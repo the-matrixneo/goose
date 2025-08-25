@@ -2402,6 +2402,25 @@ ipcMain.handle('create-app', async (event, appName: string, subdomain?: string) 
         // Ignore if missing
       }
     }
+
+    // Create D1 database schema template
+    try {
+      const dbSchemaTemplate = `-- Database schema for ${appName}
+-- Add your CREATE TABLE statements here
+-- Database will be created automatically when you run:
+-- npx wrangler d1 execute my-database --local --file=./schema.sql
+`;
+
+      // Write the database schema template
+      await writeFileSafe('schema.sql', dbSchemaTemplate);
+
+      console.log(`[Main] Created D1 schema template: schema.sql`);
+    } catch (schemaError) {
+      console.warn(`[Main] Failed to create D1 schema template:`, schemaError);
+      // Don't fail the whole operation if schema creation fails
+    }
+
+    // Note: D1 database bindings should be manually added to wrangler.jsonc if needed
   };
 
   return new Promise((resolve, reject) => {
