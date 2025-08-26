@@ -87,10 +87,7 @@ async fn create_recipe(
         recipe: None,
         error: Some("Missing agent".to_string()),
     };
-    let agent = state
-        .get_agent()
-        .await
-        .map_err(|_| (StatusCode::PRECONDITION_FAILED, Json(error_response)))?;
+    let agent = state.get_agent().await;
 
     // Create base recipe from agent state and messages
     let recipe_result = agent
