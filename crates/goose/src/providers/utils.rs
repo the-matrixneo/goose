@@ -151,6 +151,19 @@ pub async fn handle_status_openai_compat(response: Response) -> Result<Response,
     if matches!(status, StatusCode::BAD_REQUEST | StatusCode::NOT_FOUND) {
         if let Ok(err_resp) = serde_json::from_str::<OpenAIErrorResponse>(&body_str) {
             let err = err_resp.error;
+
+            // Check for model not found error
+            if let Some(code) = &err.code {
+                if code == "model_not_found" || code == "invalid_model" {
+                    return Err(ProviderError::ConfigurationError(format!(
+                        "Model not found: {}",
+                        err.message
+                            .unwrap_or_else(|| "Unknown model error".to_string())
+                    )));
+                }
+            }
+
+            // Check for context length exceeded
             if err.is_context_length_exceeded() {
                 return Err(ProviderError::ContextLengthExceeded(
                     err.message.unwrap_or("Unknown error".to_string()),
@@ -859,7 +872,7 @@ mod tests {
                     "This model's maximum context length is 4096 tokens.".to_string(),
                 )),
             ),
-            // 404 Not Found with OpenAI-formatted error (directly handled like 400)
+            // 404 Not Found with OpenAI-formatted error (model_not_found)
             (
                 404,
                 Some(json!({
@@ -869,8 +882,8 @@ mod tests {
                     "type": "invalid_request_error"
                 }
             })),
-                Err(ProviderError::RequestFailed(
-                    "The model 'gpt-5' does not exist (code: model_not_found, type: invalid_request_error) (status 404)".to_string(),
+                Err(ProviderError::ConfigurationError(
+                    "Model not found: The model 'gpt-5' does not exist".to_string(),
                 )),
             ),
             // Non-JSON body error (tests parse failure path)

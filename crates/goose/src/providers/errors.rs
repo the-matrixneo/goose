@@ -6,6 +6,9 @@ pub enum ProviderError {
     #[error("Authentication error: {0}")]
     Authentication(String),
 
+    #[error("Configuration error: {0}")]
+    ConfigurationError(String),
+
     #[error("Context length exceeded: {0}")]
     ContextLengthExceeded(String),
 

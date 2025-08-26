@@ -383,6 +383,23 @@ pub trait Provider: Send + Sync {
         Ok(None)
     }
 
+    /// Validate that a model exists and is available for use
+    /// Returns Ok(()) if the model is valid, or ConfigurationError if not found
+    async fn validate_model(&self, model_name: &str) -> Result<(), ProviderError> {
+        // Default implementation: try to fetch supported models if available
+        if let Ok(Some(models)) = self.fetch_supported_models().await {
+            if !models.iter().any(|m| m == model_name) {
+                return Err(ProviderError::ConfigurationError(format!(
+                    "Model '{}' not found. Available models: {}",
+                    model_name,
+                    models.join(", ")
+                )));
+            }
+        }
+        // If we can't fetch models, assume it's valid (backward compatibility)
+        Ok(())
+    }
+
     /// Check if this provider supports embeddings
     fn supports_embeddings(&self) -> bool {
         false
@@ -518,6 +535,74 @@ mod tests {
 
     use serde_json::json;
 
+    // Mock provider for testing model validation
+    struct MockProviderWithValidation {
+        model_config: ModelConfig,
+        supported_models: Option<Vec<String>>,
+    }
+
+    #[async_trait::async_trait]
+    impl Provider for MockProviderWithValidation {
+        fn metadata() -> ProviderMetadata {
+            ProviderMetadata::empty()
+        }
+
+        fn get_model_config(&self) -> ModelConfig {
+            self.model_config.clone()
+        }
+
+        async fn fetch_supported_models(&self) -> Result<Option<Vec<String>>, ProviderError> {
+            Ok(self.supported_models.clone())
+        }
+
+        async fn complete_with_model(
+            &self,
+            model_config: &ModelConfig,
+            _system: &str,
+            _messages: &[Message],
+            _tools: &[Tool],
+        ) -> Result<(Message, ProviderUsage), ProviderError> {
+            // Validate model before completing
+            self.validate_model(&model_config.model_name).await?;
+
+            Ok((
+                Message::assistant()
+                    .with_text(&format!("Response from {}", model_config.model_name)),
+                ProviderUsage::new(
+                    model_config.model_name.clone(),
+                    Usage::new(Some(10), Some(20), Some(30)),
+                ),
+            ))
+        }
+    }
+
+    #[tokio::test]
+    async fn test_validate_model_with_supported_models() {
+        let provider = MockProviderWithValidation {
+            model_config: ModelConfig::new_or_fail("gpt-4"),
+            supported_models: Some(vec![
+                "gpt-4".to_string(),
+                "gpt-3.5-turbo".to_string(),
+                "text-davinci-003".to_string(),
+            ]),
+        };
+
+        // Test valid model
+        assert!(provider.validate_model("gpt-4").await.is_ok());
+        assert!(provider.validate_model("gpt-3.5-turbo").await.is_ok());
+
+        // Test invalid model
+        let result = provider.validate_model("gpt-5").await;
+        assert!(result.is_err());
+        if let Err(ProviderError::ConfigurationError(msg)) = result {
+            assert!(msg.contains("Model 'gpt-5' not found"));
+            assert!(msg.contains("Available models:"));
+            assert!(msg.contains("gpt-4"));
+        } else {
+            panic!("Expected ConfigurationError");
+        }
+    }
+
     // Mock provider for testing fallback behavior
     struct MockProviderWithFallback {
         model_config: ModelConfig,
@@ -559,6 +644,44 @@ mod tests {
                     Usage::new(Some(10), Some(20), Some(30)),
                 ),
             ))
+        }
+    }
+    #[tokio::test]
+    async fn test_validate_model_without_supported_models() {
+        let provider = MockProviderWithValidation {
+            model_config: ModelConfig::new_or_fail("any-model"),
+            supported_models: None,
+        };
+
+        // When no supported models list is available, all models should be considered valid
+        assert!(provider.validate_model("any-model").await.is_ok());
+        assert!(provider.validate_model("non-existent-model").await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_complete_with_model_validation() {
+        let provider = MockProviderWithValidation {
+            model_config: ModelConfig::new_or_fail("gpt-4"),
+            supported_models: Some(vec!["gpt-4".to_string(), "gpt-3.5-turbo".to_string()]),
+        };
+
+        // Test completion with valid model
+        let valid_model = ModelConfig::new_or_fail("gpt-4");
+        let result = provider
+            .complete_with_model(&valid_model, "system", &[], &[])
+            .await;
+        assert!(result.is_ok());
+
+        // Test completion with invalid model
+        let invalid_model = ModelConfig::new_or_fail("gpt-5");
+        let result = provider
+            .complete_with_model(&invalid_model, "system", &[], &[])
+            .await;
+        assert!(result.is_err());
+        if let Err(ProviderError::ConfigurationError(msg)) = result {
+            assert!(msg.contains("Model 'gpt-5' not found"));
+        } else {
+            panic!("Expected ConfigurationError");
         }
     }
 
