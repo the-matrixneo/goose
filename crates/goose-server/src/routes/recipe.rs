@@ -83,13 +83,7 @@ async fn create_recipe(
     State(state): State<Arc<AppState>>,
     Json(request): Json<CreateRecipeRequest>,
 ) -> Result<Json<CreateRecipeResponse>, (StatusCode, Json<CreateRecipeResponse>)> {
-    let error_response = CreateRecipeResponse {
-        recipe: None,
-        error: Some("Missing agent".to_string()),
-    };
     let agent = state.get_agent().await;
-
-    // Create base recipe from agent state and messages
     let recipe_result = agent
         .create_recipe(Conversation::new_unvalidated(request.messages))
         .await;
