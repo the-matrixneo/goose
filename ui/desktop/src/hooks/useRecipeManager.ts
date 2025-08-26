@@ -5,7 +5,7 @@ import { updateSystemPromptWithParameters, substituteParameters } from '../utils
 import { useChatContext } from '../contexts/ChatContext';
 import { ChatType } from '../types/chat';
 
-export const useRecipeManager = (chat: ChatType, recipeConfig?: Recipe) => {
+export const useRecipeManager = (chat: ChatType, recipeConfig?: Recipe | null) => {
   const [isGeneratingRecipe, setIsGeneratingRecipe] = useState(false);
   const [isParameterModalOpen, setIsParameterModalOpen] = useState(false);
   const [readyForAutoUserPrompt, setReadyForAutoUserPrompt] = useState(false);
@@ -33,7 +33,7 @@ export const useRecipeManager = (chat: ChatType, recipeConfig?: Recipe) => {
       return chatContext.chat.recipeConfig;
     }
 
-    if (recipeConfig) {
+    if (recipeConfig !== undefined) {
       return recipeConfig;
     }
 

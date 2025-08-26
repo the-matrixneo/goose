@@ -45,11 +45,6 @@ export default function Pair({
   const [messageToSubmit, setMessageToSubmit] = useState<string | null>(null);
   const [isTransitioningFromHub, setIsTransitioningFromHub] = useState(false);
 
-  const { initialPrompt: recipeInitialPrompt, resetRecipe } = useRecipeManager(
-    chat,
-    routeState.recipeConfig
-  );
-
   const recipeJson = JSON.stringify(routeState.recipeConfig);
 
   useEffect(() => {
@@ -59,18 +54,16 @@ export default function Pair({
           recipeConfig: routeState.recipeConfig,
           resumeSessionId: routeState.resumeSessionId,
           setAgentWaitingMessage,
-          resetRecipe,
         });
         setChat(chat);
       } catch (error) {
+        console.log(error);
         setFatalError(`Agent init failure: ${error instanceof Error ? error.message : '' + error}`);
       }
     };
-
     initializeFromState();
   }, [
     setChat,
-    resetRecipe,
     setFatalError,
     setAgentWaitingMessage,
     loadCurrentChat,
@@ -102,6 +95,8 @@ export default function Pair({
     }
   }, [agentState, setView]);
 
+  const { initialPrompt: recipeInitialPrompt } = useRecipeManager(chat, chat.recipeConfig || null);
+
   const handleMessageSubmit = (message: string) => {
     // Clean up any auto submit state:
     setShouldAutoSubmit(false);
@@ -110,7 +105,10 @@ export default function Pair({
     console.log('Message submitted:', message);
   };
 
-  const initialValue = messageToSubmit || recipeInitialPrompt || undefined;
+  const initialValue =
+    messageToSubmit ||
+    (agentState === 'initialized' ? recipeInitialPrompt : undefined) ||
+    undefined;
 
   const customChatInputProps = {
     // Pass initial message from Hub or recipe prompt
