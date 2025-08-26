@@ -205,8 +205,9 @@ async fn update_agent_provider(
 
     let model_config = ModelConfig::new(&model).map_err(|_| StatusCode::BAD_REQUEST)?;
 
-    let new_provider =
-        create(&payload.provider, model_config).map_err(|_| StatusCode::BAD_REQUEST)?;
+    let new_provider = create(&payload.provider, model_config)
+        .await
+        .map_err(|_| StatusCode::BAD_REQUEST)?;
     agent
         .update_provider(new_provider)
         .await

@@ -1147,13 +1147,16 @@ async fn run_scheduled_job_internal(
                 error: format!("Model config error: {}", e),
             })?;
 
-        agent_provider = create(&provider_name, model_config).map_err(|e| JobExecutionError {
-            job_id: job.id.clone(),
-            error: format!(
-                "Failed to create provider instance '{}': {}",
-                provider_name, e
-            ),
-        })?;
+        agent_provider =
+            create(&provider_name, model_config)
+                .await
+                .map_err(|e| JobExecutionError {
+                    job_id: job.id.clone(),
+                    error: format!(
+                        "Failed to create provider instance '{}': {}",
+                        provider_name, e
+                    ),
+                })?;
     }
     if let Some(recipe_extensions) = recipe.extensions {
         for extension in recipe_extensions {

@@ -104,7 +104,7 @@ pub async fn handle_web(port: u16, host: String, open: bool) -> Result<()> {
 
     // Create the agent
     let agent = Agent::new();
-    let provider = goose::providers::create(&provider_name, model_config)?;
+    let provider = goose::providers::create(&provider_name, model_config).await?;
     agent.update_provider(provider).await?;
 
     // Load and enable extensions from config

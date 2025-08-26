@@ -91,15 +91,71 @@ pub fn refresh_custom_providers() -> Result<()> {
     Ok(())
 }
 
-pub fn create(name: &str, model: ModelConfig) -> Result<Arc<dyn Provider>> {
+/// Creates a provider with pre-validation of models.
+/// If the fast_model is invalid, it will be cleared and the provider recreated without it.
+pub async fn create(name: &str, mut model: ModelConfig) -> Result<Arc<dyn Provider>> {
     let config = crate::config::Config::global();
 
+    // Check for lead/worker configuration first
     if let Ok(lead_model_name) = config.get_param::<String>("GOOSE_LEAD_MODEL") {
         tracing::info!("Creating lead/worker provider from environment variables");
         return create_lead_worker_from_env(name, &model, &lead_model_name);
     }
 
-    REGISTRY.read().unwrap().create(name, model)
+    // Create the provider with the original config
+    let provider = REGISTRY.read().unwrap().create(name, model.clone())?;
+
+    // Validate the main model
+    match provider.validate_model(&model.model_name).await {
+        Ok(()) => {
+            tracing::debug!("Main model '{}' validated successfully", model.model_name);
+        }
+        Err(super::errors::ProviderError::ConfigurationError(msg)) => {
+            return Err(anyhow::anyhow!(
+                "Model '{}' is not available for provider '{}': {}",
+                model.model_name,
+                name,
+                msg
+            ));
+        }
+        Err(e) => {
+            tracing::warn!(
+                "Could not validate main model '{}': {}",
+                model.model_name,
+                e
+            );
+            // Continue anyway - provider might not support validation
+        }
+    }
+
+    // Validate fast_model if present
+    if let Some(ref fast_model_name) = model.fast_model {
+        match provider.validate_model(fast_model_name).await {
+            Ok(()) => {
+                tracing::debug!("Fast model '{}' validated successfully", fast_model_name);
+                Ok(provider)
+            }
+            Err(super::errors::ProviderError::ConfigurationError(msg)) => {
+                tracing::warn!(
+                    "Fast model '{}' is not available for provider '{}': {}. Disabling fast model.",
+                    fast_model_name,
+                    name,
+                    msg
+                );
+                // Clear the fast_model and recreate the provider without validation
+                // (to avoid infinite recursion)
+                model.fast_model = None;
+                Ok(REGISTRY.read().unwrap().create(name, model)?)
+            }
+            Err(e) => {
+                tracing::warn!("Could not validate fast model '{}': {}", fast_model_name, e);
+                // Continue with fast_model - provider might not support validation
+                Ok(provider)
+            }
+        }
+    } else {
+        Ok(provider)
+    }
 }
 
 fn create_lead_worker_from_env(
@@ -264,8 +320,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_create_lead_worker_provider() {
+    #[tokio::test]
+    async fn test_create_lead_worker_provider() {
         let _guard = EnvVarGuard::new(&[
             "GOOSE_LEAD_MODEL",
             "GOOSE_LEAD_PROVIDER",
@@ -275,7 +331,7 @@ mod tests {
         _guard.set("GOOSE_LEAD_MODEL", "gpt-4o");
 
         let gpt4mini_config = ModelConfig::new_or_fail("gpt-4o-mini");
-        let result = create("openai", gpt4mini_config.clone());
+        let result = create("openai", gpt4mini_config.clone()).await;
 
         match result {
             Ok(_) => {}
@@ -288,11 +344,11 @@ mod tests {
         _guard.set("GOOSE_LEAD_PROVIDER", "anthropic");
         _guard.set("GOOSE_LEAD_TURNS", "5");
 
-        let _result = create("openai", gpt4mini_config);
+        let _result = create("openai", gpt4mini_config).await;
     }
 
-    #[test]
-    fn test_lead_model_env_vars_with_defaults() {
+    #[tokio::test]
+    async fn test_lead_model_env_vars_with_defaults() {
         let _guard = EnvVarGuard::new(&[
             "GOOSE_LEAD_MODEL",
             "GOOSE_LEAD_PROVIDER",
@@ -303,7 +359,7 @@ mod tests {
 
         _guard.set("GOOSE_LEAD_MODEL", "grok-3");
 
-        let result = create("openai", ModelConfig::new_or_fail("gpt-4o-mini"));
+        let result = create("openai", ModelConfig::new_or_fail("gpt-4o-mini")).await;
 
         match result {
             Ok(_) => {}
@@ -317,11 +373,11 @@ mod tests {
         _guard.set("GOOSE_LEAD_FAILURE_THRESHOLD", "4");
         _guard.set("GOOSE_LEAD_FALLBACK_TURNS", "3");
 
-        let _result = create("openai", ModelConfig::new_or_fail("gpt-4o-mini"));
+        let _result = create("openai", ModelConfig::new_or_fail("gpt-4o-mini")).await;
     }
 
-    #[test]
-    fn test_create_regular_provider_without_lead_config() {
+    #[tokio::test]
+    async fn test_create_regular_provider_without_lead_config() {
         let _guard = EnvVarGuard::new(&[
             "GOOSE_LEAD_MODEL",
             "GOOSE_LEAD_PROVIDER",
@@ -330,7 +386,7 @@ mod tests {
             "GOOSE_LEAD_FALLBACK_TURNS",
         ]);
 
-        let result = create("openai", ModelConfig::new_or_fail("gpt-4o-mini"));
+        let result = create("openai", ModelConfig::new_or_fail("gpt-4o-mini")).await;
 
         match result {
             Ok(_) => {}
@@ -365,6 +421,130 @@ mod tests {
         match result {
             Ok(_) => {}
             Err(_) => {}
+        }
+    }
+
+    #[tokio::test]
+    async fn test_fast_model_validation() {
+        // Test with a mock provider that simulates validation failures
+        struct MockValidatingProvider {
+            model_config: ModelConfig,
+            valid_models: Vec<String>,
+        }
+
+        #[async_trait::async_trait]
+        impl Provider for MockValidatingProvider {
+            fn metadata() -> ProviderMetadata {
+                ProviderMetadata::new(
+                    "mock_validating",
+                    "Mock Validating Provider",
+                    "A mock provider for testing model validation",
+                    "valid-model",
+                    vec!["valid-model", "another-valid-model"],
+                    "",
+                    vec![],
+                )
+            }
+
+            fn get_model_config(&self) -> ModelConfig {
+                self.model_config.clone()
+            }
+
+            async fn validate_model(&self, model_name: &str) -> Result<(), ProviderError> {
+                if self.valid_models.contains(&model_name.to_string()) {
+                    Ok(())
+                } else {
+                    Err(ProviderError::ConfigurationError(format!(
+                        "Model '{}' is not available",
+                        model_name
+                    )))
+                }
+            }
+
+            async fn complete_with_model(
+                &self,
+                _model_config: &ModelConfig,
+                _system: &str,
+                _messages: &[Message],
+                _tools: &[Tool],
+            ) -> Result<(Message, ProviderUsage), ProviderError> {
+                Ok((
+                    Message::new(
+                        Role::Assistant,
+                        Utc::now().timestamp(),
+                        vec![MessageContent::Text(
+                            RawTextContent {
+                                text: "Mock response".to_string(),
+                            }
+                            .no_annotation(),
+                        )],
+                    ),
+                    ProviderUsage::new(self.model_config.model_name.clone(), Usage::default()),
+                ))
+            }
+        }
+
+        // Register the mock provider temporarily
+        {
+            let mut registry = REGISTRY.write().unwrap();
+            registry.register::<MockValidatingProvider, _>(|model: ModelConfig| {
+                Ok(MockValidatingProvider {
+                    model_config: model,
+                    valid_models: vec![
+                        "valid-model".to_string(),
+                        "another-valid-model".to_string(),
+                    ],
+                })
+            });
+        }
+
+        // Test 1: Valid main model with invalid fast model - fast model should be cleared
+        let model_config =
+            ModelConfig::new_or_fail("valid-model").with_fast("invalid-fast-model".to_string());
+
+        let result = create("mock_validating", model_config).await;
+        assert!(result.is_ok(), "Should succeed with cleared fast model");
+
+        let provider = result.unwrap();
+        let config = provider.get_model_config();
+        assert!(
+            config.fast_model.is_none(),
+            "Fast model should be cleared when invalid"
+        );
+
+        // Test 2: Valid main model with valid fast model - both should be preserved
+        let model_config =
+            ModelConfig::new_or_fail("valid-model").with_fast("another-valid-model".to_string());
+
+        let result = create("mock_validating", model_config).await;
+        assert!(result.is_ok(), "Should succeed with valid fast model");
+
+        let provider = result.unwrap();
+        let config = provider.get_model_config();
+        assert_eq!(
+            config.fast_model,
+            Some("another-valid-model".to_string()),
+            "Valid fast model should be preserved"
+        );
+
+        // Test 3: Invalid main model - should fail
+        let model_config = ModelConfig::new_or_fail("invalid-main-model");
+
+        let result = create("mock_validating", model_config).await;
+        assert!(result.is_err(), "Should fail with invalid main model");
+        if let Err(e) = result {
+            let error_msg = e.to_string();
+            assert!(
+                error_msg.contains("not available"),
+                "Error should mention model not available, got: {}",
+                error_msg
+            );
+        }
+
+        // Clean up - remove the mock provider
+        {
+            let mut registry = REGISTRY.write().unwrap();
+            registry.remove_custom_providers();
         }
     }
 }

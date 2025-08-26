@@ -209,18 +209,8 @@ pub async fn build_session(session_config: SessionBuilderConfig) -> Session {
         })
         .with_temperature(temperature);
 
-    // Create the agent
-    let agent: Agent = Agent::new();
-
-    if let Some(sub_recipes) = session_config.sub_recipes {
-        agent.add_sub_recipes(sub_recipes).await;
-    }
-
-    if let Some(final_output_response) = session_config.final_output_response {
-        agent.add_final_output_tool(final_output_response).await;
-    }
-
-    let new_provider = match create(&provider_name, model_config) {
+    // Create provider with validation
+    let new_provider = match create(&provider_name, model_config).await {
         Ok(provider) => provider,
         Err(e) => {
             output::render_error(&format!(
@@ -233,8 +223,20 @@ pub async fn build_session(session_config: SessionBuilderConfig) -> Session {
             process::exit(1);
         }
     };
+
     // Keep a reference to the provider for display_session_info
     let provider_for_display = Arc::clone(&new_provider);
+
+    // Create the agent
+    let agent: Agent = Agent::new();
+
+    if let Some(sub_recipes) = session_config.sub_recipes {
+        agent.add_sub_recipes(sub_recipes).await;
+    }
+
+    if let Some(final_output_response) = session_config.final_output_response {
+        agent.add_final_output_tool(final_output_response).await;
+    }
 
     // Log model information at startup
     if let Some(lead_worker) = new_provider.as_lead_worker() {
