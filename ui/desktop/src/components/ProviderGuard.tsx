@@ -430,52 +430,53 @@ export default function ProviderGuard({ children }: ProviderGuardProps) {
                 </div>
 
                 {/* Ollama Card - outline style */}
-                <div className="relative">
-                  {/* Detected badge - similar to recommended but green */}
-                  {ollamaDetected && (
+                {ollamaDetected && (
+                  <div className="relative">
+                    {/* Detected badge - similar to recommended but green */}
+
                     <div className="absolute -top-2 -right-2 sm:-top-3 sm:-right-3 z-20">
                       <span className="inline-block px-2 py-1 text-xs font-medium bg-green-600 text-white rounded-full">
                         Detected
                       </span>
                     </div>
-                  )}
 
-                  <div
-                    onClick={() => {
-                      setShowFirstTimeSetup(false);
-                      setShowOllamaSetup(true);
-                    }}
-                    className="w-full p-4 sm:p-6 bg-transparent border border-background-hover rounded-xl hover:border-text-muted transition-all duration-200 cursor-pointer group"
-                  >
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1">
-                        <Ollama className="w-5 h-5 sm:w-6 sm:h-6 mb-12 text-text-standard" />
-                        <h3 className="font-medium text-text-standard text-sm sm:text-base">
-                          Ollama
-                        </h3>
+                    <div
+                      onClick={() => {
+                        setShowFirstTimeSetup(false);
+                        setShowOllamaSetup(true);
+                      }}
+                      className="w-full p-4 sm:p-6 bg-transparent border border-background-hover rounded-xl hover:border-text-muted transition-all duration-200 cursor-pointer group"
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <Ollama className="w-5 h-5 sm:w-6 sm:h-6 mb-12 text-text-standard" />
+                          <h3 className="font-medium text-text-standard text-sm sm:text-base">
+                            Ollama
+                          </h3>
+                        </div>
+                        <div className="text-text-muted group-hover:text-text-standard transition-colors flex-shrink-0">
+                          <svg
+                            className="w-4 h-4 sm:w-5 sm:h-5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M9 5l7 7-7 7"
+                            />
+                          </svg>
+                        </div>
                       </div>
-                      <div className="text-text-muted group-hover:text-text-standard transition-colors flex-shrink-0">
-                        <svg
-                          className="w-4 h-4 sm:w-5 sm:h-5"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M9 5l7 7-7 7"
-                          />
-                        </svg>
-                      </div>
+                      <p className="text-text-muted text-sm sm:text-base">
+                        Run AI models locally on your computer. Completely free and private with no
+                        internet required.
+                      </p>
                     </div>
-                    <p className="text-text-muted text-sm sm:text-base">
-                      Advanced: Run AI models locally on your computer. Completely free and private
-                      with no internet required. (Does require significant hardware)
-                    </p>
                   </div>
-                </div>
+                )}
               </div>
             </div>
           </div>
