@@ -348,8 +348,27 @@ pub trait Provider: Send + Sync {
     ) -> Result<(Message, ProviderUsage), ProviderError> {
         let model_config = self.get_model_config();
         let fast_config = model_config.use_fast_model();
-        self.complete_with_model(&fast_config, system, messages, tools)
+
+        // Try with fast model first
+        match self
+            .complete_with_model(&fast_config, system, messages, tools)
             .await
+        {
+            Ok(result) => Ok(result),
+            Err(e) => {
+                // Log warning and fall back to regular complete()
+                tracing::warn!(
+                    "complete_fast() failed with fast model '{}': {}. Falling back to regular model '{}'",
+                    fast_config.model_name,
+                    e,
+                    model_config.model_name
+                );
+
+                // Fall back to regular model
+                self.complete_with_model(&model_config, system, messages, tools)
+                    .await
+            }
+        }
     }
 
     /// Get the model config from the provider
@@ -494,8 +513,120 @@ pub fn stream_from_single_message(message: Message, usage: ProviderUsage) -> Mes
 mod tests {
     use super::*;
     use std::collections::HashMap;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
 
     use serde_json::json;
+
+    // Mock provider for testing fallback behavior
+    struct MockProviderWithFallback {
+        model_config: ModelConfig,
+        fail_fast_model: Arc<AtomicBool>,
+    }
+
+    #[async_trait::async_trait]
+    impl Provider for MockProviderWithFallback {
+        fn metadata() -> ProviderMetadata {
+            ProviderMetadata::empty()
+        }
+
+        fn get_model_config(&self) -> ModelConfig {
+            self.model_config.clone()
+        }
+
+        async fn complete_with_model(
+            &self,
+            model_config: &ModelConfig,
+            _system: &str,
+            _messages: &[Message],
+            _tools: &[Tool],
+        ) -> Result<(Message, ProviderUsage), ProviderError> {
+            // Check if this is the fast model and if we should fail
+            if model_config.model_name.contains("fast")
+                && self.fail_fast_model.load(Ordering::Relaxed)
+            {
+                return Err(ProviderError::ExecutionError(
+                    "Fast model failed intentionally".to_string(),
+                ));
+            }
+
+            // Return success with model name in message
+            Ok((
+                Message::assistant()
+                    .with_text(&format!("Response from {}", model_config.model_name)),
+                ProviderUsage::new(
+                    model_config.model_name.clone(),
+                    Usage::new(Some(10), Some(20), Some(30)),
+                ),
+            ))
+        }
+    }
+
+    #[tokio::test]
+    async fn test_complete_fast_fallback() {
+        // Create a provider with a fast model that will fail
+        let model_config =
+            ModelConfig::new_or_fail("main-model").with_fast("fast-model".to_string());
+
+        let provider = MockProviderWithFallback {
+            model_config,
+            fail_fast_model: Arc::new(AtomicBool::new(true)),
+        };
+
+        // Call complete_fast - should fail with fast model and fall back to main model
+        let result = provider.complete_fast("system", &[], &[]).await;
+
+        assert!(result.is_ok(), "Should succeed after fallback");
+        let (message, usage) = result.unwrap();
+
+        // Verify we got the response from the main model (fallback)
+        assert_eq!(message.as_concat_text(), "Response from main-model");
+        assert_eq!(usage.model, "main-model");
+    }
+
+    #[tokio::test]
+    async fn test_complete_fast_success() {
+        // Create a provider with a fast model that will succeed
+        let model_config =
+            ModelConfig::new_or_fail("main-model").with_fast("fast-model".to_string());
+
+        let provider = MockProviderWithFallback {
+            model_config,
+            fail_fast_model: Arc::new(AtomicBool::new(false)),
+        };
+
+        // Call complete_fast - should succeed with fast model
+        let result = provider.complete_fast("system", &[], &[]).await;
+
+        assert!(result.is_ok(), "Should succeed with fast model");
+        let (message, usage) = result.unwrap();
+
+        // Verify we got the response from the fast model
+        assert_eq!(message.as_concat_text(), "Response from fast-model");
+        assert_eq!(usage.model, "fast-model");
+    }
+
+    #[tokio::test]
+    async fn test_complete_fast_no_fast_model() {
+        // Create a provider without a fast model configured
+        let model_config = ModelConfig::new_or_fail("main-model");
+
+        let provider = MockProviderWithFallback {
+            model_config,
+            fail_fast_model: Arc::new(AtomicBool::new(false)),
+        };
+
+        // Call complete_fast - should use main model since no fast model is configured
+        let result = provider.complete_fast("system", &[], &[]).await;
+
+        assert!(result.is_ok(), "Should succeed with main model");
+        let (message, usage) = result.unwrap();
+
+        // Verify we got the response from the main model
+        assert_eq!(message.as_concat_text(), "Response from main-model");
+        assert_eq!(usage.model, "main-model");
+    }
+
     #[test]
     fn test_usage_creation() {
         let usage = Usage::new(Some(10), Some(20), Some(30));
