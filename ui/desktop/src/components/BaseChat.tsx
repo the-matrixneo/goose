@@ -82,17 +82,18 @@ interface BaseChatProps {
   setView: (view: View, viewOptions?: ViewOptions) => void;
   setIsGoosehintsModalOpen?: (isOpen: boolean) => void;
   onMessageStreamFinish?: () => void;
-  onMessageSubmit?: (message: string) => void; // Callback after message is submitted
+  onMessageSubmit?: (message: string) => void;
   renderHeader?: () => React.ReactNode;
   renderBeforeMessages?: () => React.ReactNode;
   renderAfterMessages?: () => React.ReactNode;
   customChatInputProps?: Record<string, unknown>;
   customMainLayoutProps?: Record<string, unknown>;
-  contentClassName?: string; // Add custom class for content area
-  disableSearch?: boolean; // Disable search functionality (for Hub)
-  showPopularTopics?: boolean; // Show popular chat topics in empty state (for Pair)
-  suppressEmptyState?: boolean; // Suppress empty state content (for transitions)
+  contentClassName?: string;
+  disableSearch?: boolean;
+  showPopularTopics?: boolean;
+  suppressEmptyState?: boolean;
   autoSubmit?: boolean;
+  forceCloseParameters: boolean;
 }
 
 function BaseChatContent({
@@ -111,6 +112,7 @@ function BaseChatContent({
   disableSearch = false,
   showPopularTopics = false,
   suppressEmptyState = false,
+  forceCloseParameters,
   autoSubmit = false,
 }: BaseChatProps) {
   const location = useLocation();
@@ -569,7 +571,7 @@ function BaseChatContent({
       />
 
       {/* Recipe Parameter Modal */}
-      {isParameterModalOpen && recipeConfig?.parameters && (
+      {isParameterModalOpen && recipeConfig?.parameters && !forceCloseParameters && (
         <ParameterInputModal
           parameters={recipeConfig.parameters}
           onSubmit={handleParameterSubmit}

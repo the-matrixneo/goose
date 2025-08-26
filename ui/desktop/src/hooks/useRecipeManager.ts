@@ -89,6 +89,9 @@ export const useRecipeManager = (chat: ChatType, recipeConfig?: Recipe | null) =
     checkRecipeAcceptance();
   }, [finalRecipeConfig]);
 
+  if (finalRecipeConfig) {
+    console.log(finalRecipeConfig);
+  }
   useEffect(() => {
     // If we have parameters and they haven't been set yet, open the modal.
     if (
