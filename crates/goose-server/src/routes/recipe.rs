@@ -66,6 +66,16 @@ pub struct ScanRecipeResponse {
     has_security_warnings: bool,
 }
 
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct ListRecipeRequest {
+    recipe_dir: String,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct ListRecipeResponse {
+    recipes: Vec<Recipe>
+}
+
 #[utoipa::path(
     post,
     path = "/recipes/create",
@@ -209,12 +219,33 @@ async fn scan_recipe(
     }))
 }
 
+#[utoipa::path(
+    get,
+    path = "/recipes/list",
+    params(
+        ListRecipeRequest
+    ),
+    responses(
+        (status = 200, description = "Get recipe list successfully", body = ListRecipeResponse),
+    ),
+    tag = "Recipe Management"
+)]
+async fn list_recipes(
+    Query(request): Query<ListRecipeRequest>,
+) -> Result<Json<ListRecipeResponse>, StatusCode> {
+    Ok(Json(ListRecipeResponse {
+        recipes: vec![],
+    }))
+}
+
+
 pub fn routes(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/recipes/create", post(create_recipe))
         .route("/recipes/encode", post(encode_recipe))
         .route("/recipes/decode", post(decode_recipe))
         .route("/recipes/scan", post(scan_recipe))
+        .route("/recipes/list", get(list_recipes))
         .with_state(state)
 }
 

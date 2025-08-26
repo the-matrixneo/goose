@@ -13,6 +13,7 @@ use utoipa::ToSchema;
 pub mod build_recipe;
 pub mod read_recipe_file_content;
 pub mod template_recipe;
+pub mod list_recipes;
 
 pub const BUILT_IN_RECIPE_DIR_PARAM: &str = "recipe_dir";
 
