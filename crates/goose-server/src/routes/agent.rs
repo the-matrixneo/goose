@@ -127,6 +127,8 @@ async fn start_agent(
         )
     })?;
 
+    state.reset().await;
+
     let session_id = session::generate_session_id();
     let counter = state.session_counter.fetch_add(1, Ordering::SeqCst) + 1;
 

@@ -5,13 +5,7 @@ import { updateSystemPromptWithParameters, substituteParameters } from '../utils
 import { useChatContext } from '../contexts/ChatContext';
 import { ChatType } from '../types/chat';
 
-interface LocationState {
-  recipeConfig?: Recipe;
-  disableAnimation?: boolean;
-  reset?: boolean;
-}
-
-export const useRecipeManager = (chat: ChatType, locationState?: LocationState) => {
+export const useRecipeManager = (chat: ChatType, recipeConfig?: Recipe) => {
   const [isGeneratingRecipe, setIsGeneratingRecipe] = useState(false);
   const [isParameterModalOpen, setIsParameterModalOpen] = useState(false);
   const [readyForAutoUserPrompt, setReadyForAutoUserPrompt] = useState(false);
@@ -20,76 +14,62 @@ export const useRecipeManager = (chat: ChatType, locationState?: LocationState) 
   const [recipeAccepted, setRecipeAccepted] = useState(false);
   const [hasSecurityWarnings, setHasSecurityWarnings] = useState(false);
 
-  // Get chat context to access persisted recipe and parameters
   const chatContext = useChatContext();
   const messages = chat.messages;
 
-  // Use a ref to capture the current messages for the event handler
   const messagesRef = useRef(messages);
   const isCreatingRecipeRef = useRef(false);
 
-  // Update the ref when messages change
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
 
   // Get recipeConfig from multiple sources with priority:
   // 1. Chat context (persisted recipe)
-  // 2. Navigation state (from recipes view)
+  // 2. Passed recipeConfig parameter
   // 3. App config (from deeplinks)
-  const recipeConfig = useMemo(() => {
-    // First check if we have a persisted recipe in chat context
-    // We need to distinguish between null (explicitly cleared) and undefined (not set)
+  const finalRecipeConfig = useMemo(() => {
     if (chatContext?.chat.recipeConfig !== undefined) {
-      return chatContext.chat.recipeConfig; // This could be null or a Recipe
+      return chatContext.chat.recipeConfig;
     }
 
-    // Then check if recipe config is passed via navigation state
-    if (locationState?.recipeConfig) {
-      return locationState.recipeConfig as Recipe;
+    if (recipeConfig) {
+      return recipeConfig;
     }
 
-    // Fallback to app config (from deeplinks)
     const appRecipeConfig = window.appConfig.get('recipe') as Recipe | null;
     if (appRecipeConfig) {
       return appRecipeConfig;
     }
     return null;
-  }, [chatContext, locationState]);
+  }, [chatContext, recipeConfig]);
 
-  // Get recipe parameters from chat context
   const recipeParameters = useMemo(() => {
     return chatContext?.chat.recipeParameters || null;
   }, [chatContext?.chat.recipeParameters]);
 
-  // Effect to persist recipe config to chat context when it changes
   useEffect(() => {
     if (!chatContext?.setRecipeConfig) return;
 
-    // If we have a recipe from navigation state, persist it
-    if (locationState?.recipeConfig && !chatContext.chat.recipeConfig) {
-      chatContext.setRecipeConfig(locationState.recipeConfig);
+    if (recipeConfig && !chatContext.chat.recipeConfig) {
+      chatContext.setRecipeConfig(recipeConfig);
       return;
     }
 
-    // If we have a recipe from app config (deeplink), persist it
-    // But only if the chat context doesn't explicitly have null (which indicates it was cleared)
     const appRecipeConfig = window.appConfig.get('recipe') as Recipe | null;
     if (appRecipeConfig && chatContext.chat.recipeConfig === undefined) {
-      // Only set if recipeConfig is undefined, not if it's explicitly null
       chatContext.setRecipeConfig(appRecipeConfig);
     }
-  }, [chatContext, locationState]);
+  }, [chatContext, recipeConfig]);
 
-  // Check if recipe has been accepted before and scan for security warnings
   useEffect(() => {
     const checkRecipeAcceptance = async () => {
-      if (recipeConfig) {
+      if (finalRecipeConfig) {
         try {
-          const hasAccepted = await window.electron.hasAcceptedRecipeBefore(recipeConfig);
+          const hasAccepted = await window.electron.hasAcceptedRecipeBefore(finalRecipeConfig);
 
           if (!hasAccepted) {
-            const securityScanResult = await scanRecipe(recipeConfig);
+            const securityScanResult = await scanRecipe(finalRecipeConfig);
             setHasSecurityWarnings(securityScanResult.has_security_warnings);
 
             setIsRecipeWarningModalOpen(true);
@@ -104,104 +84,95 @@ export const useRecipeManager = (chat: ChatType, locationState?: LocationState) 
     };
 
     checkRecipeAcceptance();
-  }, [recipeConfig]);
+  }, [finalRecipeConfig]);
 
-  // Show parameter modal if recipe has parameters and they haven't been set yet
   useEffect(() => {
-    if (recipeConfig?.parameters && recipeConfig.parameters.length > 0 && recipeAccepted) {
-      // If we have parameters and they haven't been set yet, open the modal.
+    if (
+      finalRecipeConfig?.parameters &&
+      finalRecipeConfig.parameters.length > 0 &&
+      recipeAccepted
+    ) {
       if (!recipeParameters) {
         setIsParameterModalOpen(true);
       }
     }
-  }, [recipeConfig, recipeParameters, recipeAccepted]);
+  }, [finalRecipeConfig, recipeParameters, recipeAccepted]);
 
-  // Set ready for auto user prompt after component initialization
   useEffect(() => {
     setReadyForAutoUserPrompt(true);
   }, []);
 
-  // Get the recipe's initial prompt (always return the actual prompt, don't modify based on conversation state)
   const initialPrompt = useMemo(() => {
-    if (!recipeConfig?.prompt || !recipeAccepted || recipeConfig?.isScheduledExecution) {
+    if (!finalRecipeConfig?.prompt || !recipeAccepted || finalRecipeConfig?.isScheduledExecution) {
       return '';
     }
 
-    const hasRequiredParams = recipeConfig.parameters && recipeConfig.parameters.length > 0;
+    const hasRequiredParams =
+      finalRecipeConfig.parameters && finalRecipeConfig.parameters.length > 0;
 
-    // If params are required and have been collected, substitute them into the prompt.
     if (hasRequiredParams && recipeParameters) {
-      return substituteParameters(recipeConfig.prompt, recipeParameters);
+      return substituteParameters(finalRecipeConfig.prompt, recipeParameters);
     }
 
-    // Always return the original prompt, whether it has parameters or not
-    // The user should see the prompt with parameter placeholders before filling them in
-    return recipeConfig.prompt;
-  }, [recipeConfig, recipeParameters, recipeAccepted]);
+    return finalRecipeConfig.prompt;
+  }, [finalRecipeConfig, recipeParameters, recipeAccepted]);
 
-  // Handle parameter submission
   const handleParameterSubmit = async (inputValues: Record<string, string>) => {
-    // Store parameters in chat context instead of local state
     if (chatContext?.setRecipeParameters) {
       chatContext.setRecipeParameters(inputValues);
     }
     setIsParameterModalOpen(false);
 
-    // Update the system prompt with parameter-substituted instructions
     try {
       await updateSystemPromptWithParameters(
         chat.sessionId,
         inputValues,
-        recipeConfig || undefined
+        finalRecipeConfig || undefined
       );
     } catch (error) {
       console.error('Failed to update system prompt with parameters:', error);
     }
   };
 
-  // Handle recipe acceptance
   const handleRecipeAccept = async () => {
     try {
-      if (recipeConfig) {
-        await window.electron.recordRecipeHash(recipeConfig);
+      if (finalRecipeConfig) {
+        await window.electron.recordRecipeHash(finalRecipeConfig);
         setRecipeAccepted(true);
         setIsRecipeWarningModalOpen(false);
       }
     } catch (error) {
       console.error('Error recording recipe hash:', error);
-      // Even if recording fails, we should still allow the user to proceed
       setRecipeAccepted(true);
       setIsRecipeWarningModalOpen(false);
     }
   };
 
-  // Handle recipe cancellation
   const handleRecipeCancel = () => {
     setIsRecipeWarningModalOpen(false);
     window.electron.closeWindow();
   };
 
-  // Auto-execution handler for scheduled recipes
   const handleAutoExecution = (
     append: (message: Message) => void,
     isLoading: boolean,
     onAutoExecute?: () => void
   ) => {
-    const hasRequiredParams = recipeConfig?.parameters && recipeConfig.parameters.length > 0;
+    const hasRequiredParams =
+      finalRecipeConfig?.parameters && finalRecipeConfig.parameters.length > 0;
 
     if (
-      recipeConfig?.isScheduledExecution &&
-      recipeConfig?.prompt &&
+      finalRecipeConfig?.isScheduledExecution &&
+      finalRecipeConfig?.prompt &&
       (!hasRequiredParams || recipeParameters) &&
       messages.length === 0 &&
       !isLoading &&
       readyForAutoUserPrompt &&
       recipeAccepted
     ) {
-      // Substitute parameters if they exist
       const finalPrompt = recipeParameters
-        ? substituteParameters(recipeConfig.prompt, recipeParameters)
-        : recipeConfig.prompt;
+        ? substituteParameters(finalRecipeConfig.prompt, recipeParameters)
+        : finalRecipeConfig.prompt;
 
       console.log('Auto-sending substituted prompt for scheduled execution:', finalPrompt);
 
@@ -211,28 +182,23 @@ export const useRecipeManager = (chat: ChatType, locationState?: LocationState) 
     }
   };
 
-  // Listen for make-agent-from-chat event
   useEffect(() => {
     const handleMakeAgent = async () => {
-      // Prevent duplicate calls using global flag
       if (window.isCreatingRecipe) {
         return;
       }
 
-      // Prevent duplicate calls using local ref
       if (isCreatingRecipeRef.current) {
         return;
       }
 
       window.electron.logInfo('Making recipe from chat...');
 
-      // Set both local and global flags
       isCreatingRecipeRef.current = true;
       window.isCreatingRecipe = true;
       setIsGeneratingRecipe(true);
 
       try {
-        // Create recipe directly from chat messages using the ref to get current messages
         const createRecipeRequest = {
           messages: messagesRef.current,
           title: '',
@@ -247,28 +213,23 @@ export const useRecipeManager = (chat: ChatType, locationState?: LocationState) 
 
         window.electron.logInfo('Created recipe successfully');
 
-        // Verify the recipe data
         if (!response.recipe) {
           throw new Error('No recipe data received');
         }
 
-        // Set a flag to prevent the current window from reacting to recipe config changes
-        // This prevents navigation conflicts when creating new windows
         window.sessionStorage.setItem('ignoreRecipeConfigChanges', 'true');
 
-        // Create the new window
         window.electron.createChatWindow(
-          undefined, // query
-          undefined, // dir
-          undefined, // version
-          undefined, // resumeSessionId
-          response.recipe, // recipe config
-          'recipeEditor' // view type
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          response.recipe,
+          'recipeEditor'
         );
 
         window.electron.logInfo('Opening recipe editor window');
 
-        // Clear the ignore flag after a short delay
         setTimeout(() => {
           window.sessionStorage.removeItem('ignoreRecipeConfigChanges');
         }, 1000);
@@ -277,7 +238,6 @@ export const useRecipeManager = (chat: ChatType, locationState?: LocationState) 
         const errorMessage = error instanceof Error ? error.message : String(error);
         window.electron.logInfo(errorMessage);
 
-        // Set the error state to show in modal
         setRecipeError(errorMessage);
       } finally {
         isCreatingRecipeRef.current = false;
@@ -293,8 +253,18 @@ export const useRecipeManager = (chat: ChatType, locationState?: LocationState) 
     };
   }, []);
 
+  const resetRecipe = () => {
+    chatContext?.setRecipeConfig(null);
+    chatContext?.setRecipeParameters(null);
+    setRecipeAccepted(false);
+    setIsParameterModalOpen(false);
+    setIsRecipeWarningModalOpen(false);
+    setRecipeError(null);
+    setHasSecurityWarnings(false);
+  };
+
   return {
-    recipeConfig,
+    recipeConfig: finalRecipeConfig,
     initialPrompt,
     isGeneratingRecipe,
     isParameterModalOpen,
@@ -310,5 +280,6 @@ export const useRecipeManager = (chat: ChatType, locationState?: LocationState) 
     handleRecipeAccept,
     handleRecipeCancel,
     hasSecurityWarnings,
+    resetRecipe,
   };
 };

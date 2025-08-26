@@ -192,7 +192,7 @@ function BaseChatContent({
     handleRecipeAccept,
     handleRecipeCancel,
     hasSecurityWarnings,
-  } = useRecipeManager(chat, location.state);
+  } = useRecipeManager(chat, location.state?.recipeConfig);
 
   // Reset recipe usage tracking when recipe changes
   useEffect(() => {

@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { useLocation } from 'react-router-dom';
 import { View, ViewOptions } from '../utils/navigationUtils';
 import BaseChat from './BaseChat';
 import { useRecipeManager } from '../hooks/useRecipeManager';
@@ -39,7 +38,6 @@ export default function Pair({
   loadCurrentChat: (context: InitializationContext) => Promise<ChatType>;
   routeState: PairRouteState;
 }) {
-  const location = useLocation();
   const isMobile = useIsMobile();
   const { state: sidebarState } = useSidebar();
   const [hasProcessedInitialInput, setHasProcessedInitialInput] = useState(false);
@@ -47,7 +45,10 @@ export default function Pair({
   const [messageToSubmit, setMessageToSubmit] = useState<string | null>(null);
   const [isTransitioningFromHub, setIsTransitioningFromHub] = useState(false);
 
-  const { initialPrompt: recipeInitialPrompt } = useRecipeManager(chat, location.state);
+  const { initialPrompt: recipeInitialPrompt, resetRecipe } = useRecipeManager(
+    chat,
+    routeState.recipeConfig
+  );
 
   const recipeJson = JSON.stringify(routeState.recipeConfig);
 
@@ -58,6 +59,7 @@ export default function Pair({
           recipeConfig: routeState.recipeConfig,
           resumeSessionId: routeState.resumeSessionId,
           setAgentWaitingMessage,
+          resetRecipe,
         });
         setChat(chat);
       } catch (error) {
@@ -68,6 +70,7 @@ export default function Pair({
     initializeFromState();
   }, [
     setChat,
+    resetRecipe,
     setFatalError,
     setAgentWaitingMessage,
     loadCurrentChat,

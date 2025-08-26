@@ -30,6 +30,7 @@ export interface InitializationContext {
   recipeConfig?: Recipe;
   resumeSessionId?: string;
   setAgentWaitingMessage: (msg: string | null) => void;
+  resetRecipe: () => void; // TODO(Douwe): integrate recipes more tightly
 }
 
 interface UseAgentReturn {
@@ -76,6 +77,7 @@ export function useAgent(): UseAgentReturn {
       }
 
       const initPromise = (async () => {
+        initContext.resetRecipe();
         setAgentState(AgentState.INITIALIZING);
         const agentWaitingMessage = initContext.setAgentWaitingMessage;
         agentWaitingMessage('Agent is initializing');
