@@ -51,11 +51,14 @@ export const useRecipeManager = (chat: ChatType, recipeConfig?: Recipe) => {
   useEffect(() => {
     if (!chatContext?.setRecipeConfig) return;
 
+    // If we have a recipe from navigation state, persist it
     if (recipeConfig && !chatContext.chat.recipeConfig) {
       chatContext.setRecipeConfig(recipeConfig);
       return;
     }
 
+    // If we have a recipe from app config (deeplink), persist it
+    // But only if the chat context doesn't explicitly have null (which indicates it was cleared)
     const appRecipeConfig = window.appConfig.get('recipe') as Recipe | null;
     if (appRecipeConfig && chatContext.chat.recipeConfig === undefined) {
       chatContext.setRecipeConfig(appRecipeConfig);
@@ -87,6 +90,7 @@ export const useRecipeManager = (chat: ChatType, recipeConfig?: Recipe) => {
   }, [finalRecipeConfig]);
 
   useEffect(() => {
+    // If we have parameters and they haven't been set yet, open the modal.
     if (
       finalRecipeConfig?.parameters &&
       finalRecipeConfig.parameters.length > 0 &&
