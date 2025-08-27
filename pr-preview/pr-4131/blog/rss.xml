@@ -4,10 +4,66 @@
         <title>codename goose Blog</title>
         <link>https://block.github.io/goose/pr-preview/pr-4131/blog</link>
         <description>codename goose Blog</description>
-        <lastBuildDate>Wed, 27 Aug 2025 00:00:00 GMT</lastBuildDate>
+        <lastBuildDate>Thu, 28 Aug 2025 00:00:00 GMT</lastBuildDate>
         <docs>https://validator.w3.org/feed/docs/rss2.html</docs>
         <generator>https://github.com/jpmonette/feed</generator>
         <language>en</language>
+        <item>
+            <title><![CDATA[When AI Becomes Your New Team Member: The Story of Goose Janitor]]></title>
+            <link>https://block.github.io/goose/pr-preview/pr-4131/blog/2025/08/28/ai-teammate</link>
+            <guid>https://block.github.io/goose/pr-preview/pr-4131/blog/2025/08/28/ai-teammate</guid>
+            <pubDate>Thu, 28 Aug 2025 00:00:00 GMT</pubDate>
+            <description><![CDATA[How an engineering team is trialling autonomous AI-powered technical debt cleanup]]></description>
+            <content:encoded><![CDATA[<p><img decoding="async" loading="lazy" alt="blog banner" src="https://block.github.io/goose/pr-preview/pr-4131/assets/images/goose-janitor-129889884d9265d001fe12cbfde03d57.png" width="1200" height="630" class="img_ev3q"></p>
+<p>Over the years, Block's iOS engineers have felt the pain of technical debt accumulating. Feature flags are a specific example of this. Even when successfully rolled out, they tend to linger in the codebase, each one a small weight slowing down development.</p>
+<p>In the early stages of 2025, with a renewed focus on developer acceleration, the Foundation iOS team decided to organize 'Feature Flag Removal Month' - an opportunity for teams in the large iOS monorepo to come together and delete <em>possibly hundreds of thousands of lines of code of dead code</em>.</p>
+<p>With the serendipitous launch of Goose recipes around the same time, the team wondered could a dedicated recipe aid this effort? <a href="https://www.linkedin.com/in/gemmakbarlow/" target="_blank" rel="noopener noreferrer">Gemma Barlow</a>, a newer iOS engineer on the team, wanted to find out.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="phase-1-making-knowledge-ai-accessible">Phase 1: Making Knowledge AI-Accessible<a href="https://block.github.io/goose/pr-preview/pr-4131/blog/2025/08/28/ai-teammate#phase-1-making-knowledge-ai-accessible" class="hash-link" aria-label="Direct link to Phase 1: Making Knowledge AI-Accessible" title="Direct link to Phase 1: Making Knowledge AI-Accessible">​</a></h2>
+<p>Gemma's first move was to utilize an existing system of <code>.mdc</code>, <code>.goosehints</code> and other symlinked context documents to capture how to safely remove feature flags from the repository.</p>
+<p>She created documentation that allows AI agents to glean enough context to perform their work accurately.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="phase-2-validation-across-generations">Phase 2: Validation Across Generations<a href="https://block.github.io/goose/pr-preview/pr-4131/blog/2025/08/28/ai-teammate#phase-2-validation-across-generations" class="hash-link" aria-label="Direct link to Phase 2: Validation Across Generations" title="Direct link to Phase 2: Validation Across Generations">​</a></h2>
+<p>Given AI documentation is designed to work with a variety of AI tools in use at Block, Gemma then iterated to add to these basic instructions. This validated the approach worked across the three different generations of feature flag implementations that had accumulated:</p>
+<ul>
+<li>super legacy flags the team used way back yonder</li>
+<li>legacy flags that were newer but are now old</li>
+<li>current implementation of feature flags</li>
+</ul>
+<p>This documentation alone would help teams clean up faster. But now, AI could also understand and safely navigate the complexity of real world legacy systems in most scenarios, a win for developer velocity! 🎉</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="phase-3-building-an-ai-team-member">Phase 3: Building an AI Team Member<a href="https://block.github.io/goose/pr-preview/pr-4131/blog/2025/08/28/ai-teammate#phase-3-building-an-ai-team-member" class="hash-link" aria-label="Direct link to Phase 3: Building an AI Team Member" title="Direct link to Phase 3: Building an AI Team Member">​</a></h2>
+<p>This was great progress. Gemma could have stopped here.</p>
+<p>But instead, she utilized Goose recipes to create <strong>Goose Janitor</strong>.</p>
+<p>Goose Janitor acts as new AI team member whose responsibility is to tidy up the code after we're done experimenting. Gemma drew inspiration from existing <a href="https://block.github.io/goose/pr-preview/pr-4131/recipes/detail/?id=clean-up-feature-flag">Goose recipes</a> and internal talks from other departments to create it. Here's how it works:</p>
+<div class="language-bash codeBlockContainer_Ckt0 theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_biex"><pre tabindex="0" class="prism-code language-bash codeBlock_bY9V thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_e6Vv"><span class="token-line" style="color:#393A34"><span class="token plain">goose run \</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain">--recipe .goose/recipes/goose-janitor-flag-removal.yaml \</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain">--params feature_flag_key=log-observer-is-enabled \</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain">--params variant_to_remain=true \</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain">--params create_pr=false</span><br></span></code></pre><div class="buttonGroup__atx"><button type="button" aria-label="Copy code to clipboard" title="Copy" class="clean-btn"><span class="copyButtonIcons_eSgA" aria-hidden="true"><svg viewBox="0 0 24 24" class="copyButtonIcon_y97N"><path fill="currentColor" d="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z"></path></svg><svg viewBox="0 0 24 24" class="copyButtonSuccessIcon_LjdS"><path fill="currentColor" d="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z"></path></svg></span></button></div></div></div>
+<p>The recipe:</p>
+<ul>
+<li>Runs completely autonomously (no human intervention needed)</li>
+<li>Handles simple and complex flags</li>
+<li>Attempts refactoring for outdated code paths</li>
+<li>Can automatically create draft pull requests</li>
+<li>Integrates with <a href="https://github.com/block/xcode-index-mcp" target="_blank" rel="noopener noreferrer">Xcode Index MCP</a> for deep iOS project understanding</li>
+</ul>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="the-bigger-picture-ai-first-development">The Bigger Picture: AI-First Development<a href="https://block.github.io/goose/pr-preview/pr-4131/blog/2025/08/28/ai-teammate#the-bigger-picture-ai-first-development" class="hash-link" aria-label="Direct link to The Bigger Picture: AI-First Development" title="Direct link to The Bigger Picture: AI-First Development">​</a></h2>
+<p>Recipes like Goose Janitor represent a fundamental shift in how we think about AI in software development. They can be deployed to:</p>
+<ul>
+<li>Understand complex legacy codebases</li>
+<li>Make safe refactoring decisions</li>
+<li>Integrate seamlessly with existing development workflows</li>
+<li>Provide developer velocity improvements</li>
+<li>Scale across large codebases</li>
+</ul>
+<p>Teams at Block are confident that Goose Janitor will be of assistance in production scale cleanup work.</p>
+<p>This is exactly the kind of work AI should handle: tedious, repetitive, but requiring deep codebase knowledge. By automating portions of their work, developers can focus on what they do best, which is building new features and solving novel problems while AI keeps the codebase clean and maintainable.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="the-ai-first-mindset">The AI-First Mindset<a href="https://block.github.io/goose/pr-preview/pr-4131/blog/2025/08/28/ai-teammate#the-ai-first-mindset" class="hash-link" aria-label="Direct link to The AI-First Mindset" title="Direct link to The AI-First Mindset">​</a></h2>
+<p>This story illustrates what an AI-first approach to legacy codebases looks like in practice.</p>
+<p>Start by making tribal knowledge AI-accessible. Test and validate that AI can actually handle the complexity with enough accuracy to prove useful. Even if manual intervention is required for complex cases, a first pass performed by AI can be a useful boost to productivity. Build automation that scales across teams and focus human energy on high value creative work.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="whats-next">What's Next?<a href="https://block.github.io/goose/pr-preview/pr-4131/blog/2025/08/28/ai-teammate#whats-next" class="hash-link" aria-label="Direct link to What's Next?" title="Direct link to What's Next?">​</a></h2>
+<p>The success of Goose Janitor opens up fascinating possibilities. What other forms of technical debt could benefit from this approach? What other "AI team members" could we build to handle routine but knowledge intensive work?</p>
+<p>As we move toward an AI-first future, stories like Gemma's show us the path. Not just using AI tools, but thinking systematically about how to make our codebases and processes AI-ready.</p>
+<p>The future of software development is mixed teams where AI agents are autonomous contributors, handling the maintenance work that keeps our systems healthy while humans focus on building the future.</p>
+<hr>
+<p>Want the tweak the base recipe for your own needs? Check out <a href="https://block.github.io/goose/pr-preview/pr-4131/recipes/detail/?id=clean-up-feature-flag">Clean up feature flag</a> in our Recipe Cookbook!</p>
+]]></content:encoded>
+        </item>
         <item>
             <title><![CDATA[Your First Goose Experience Is On Us]]></title>
             <link>https://block.github.io/goose/pr-preview/pr-4131/blog/2025/08/27/get-started-for-free-with-tetrate</link>
@@ -226,67 +282,6 @@
 <p><em>Want to see MCP-UI in action? Check out the full Wild Goose Chase episode below and join our community to start building the future of agentic interfaces.</em></p>
 <iframe src="https://www.youtube.com/embed/GS-kmreZDgU" title="MCP-UI: The Future of Agentic Interfaces" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" class="aspect-ratio"></iframe>
 <p><em>Join the conversation on <a href="https://discord.gg/block-opensource" target="_blank" rel="noopener noreferrer">Discord</a> and follow our progress as we continue pushing the boundaries of what's possible with AI agents.</em></p>
-]]></content:encoded>
-        </item>
-        <item>
-            <title><![CDATA[When AI Becomes Your New Team Member: The Story of Goose Janitor]]></title>
-            <link>https://block.github.io/goose/pr-preview/pr-4131/blog/2025/08/18/ai-teammate</link>
-            <guid>https://block.github.io/goose/pr-preview/pr-4131/blog/2025/08/18/ai-teammate</guid>
-            <pubDate>Mon, 18 Aug 2025 00:00:00 GMT</pubDate>
-            <description><![CDATA[How an engineering team is trialling autonomous AI-powered technical debt cleanup]]></description>
-            <content:encoded><![CDATA[<p><img decoding="async" loading="lazy" alt="blog banner" src="https://block.github.io/goose/pr-preview/pr-4131/assets/images/goose-janitor-129889884d9265d001fe12cbfde03d57.png" width="1200" height="630" class="img_ev3q"></p>
-<p>Over the years, Block's iOS engineers have felt the pain of technical debt accumulating. Feature flags are a specific example of this - even when successfully rolled out, they tend to linger in the codebase, each one a small weight slowing down development.</p>
-<p>In the early stages of 2025, with a renewed focus on Developer Acceleration, Square's Foundation iOS team decided to organize 'Feature Flag Removal Month' - an opportunity for teams in the large iOS monorepo to come together and delete <em>possibly hundreds of thousands of lines of code of dead code</em>.</p>
-<p>With the serendipitous launch of Goose recipes around the same time, the team wondered; could a dedicated recipe aid this effort ? <a href="https://www.linkedin.com/in/gemmakbarlow/" target="_blank" rel="noopener noreferrer">Gemma Barlow</a>, a newer iOS engineer on the team, wanted to find out.</p>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="phase-1-making-knowledge-ai-accessible">Phase 1: Making Knowledge AI-Accessible<a href="https://block.github.io/goose/pr-preview/pr-4131/blog/2025/08/18/ai-teammate#phase-1-making-knowledge-ai-accessible" class="hash-link" aria-label="Direct link to Phase 1: Making Knowledge AI-Accessible" title="Direct link to Phase 1: Making Knowledge AI-Accessible">​</a></h2>
-<p>Gemma's first move was to utilize an existing system of .mdc, .goosehints and other symlinked context documents to capture how to safely remove feature flags from the repository.</p>
-<p>This wasn't just another README file. This type of documentation allows AI agents to glean enough context to perform their work accurately.</p>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="phase-2-validation-across-generations">Phase 2: Validation Across Generations<a href="https://block.github.io/goose/pr-preview/pr-4131/blog/2025/08/18/ai-teammate#phase-2-validation-across-generations" class="hash-link" aria-label="Direct link to Phase 2: Validation Across Generations" title="Direct link to Phase 2: Validation Across Generations">​</a></h2>
-<p>Given AI documentation is designed to work with a <strong>variety</strong> of AI tools in use at Block, Gemma then iterated with a variety of AI tooling to add to these basic instructions. This validated the approach worked across the three different generations of feature flag implementations that had accumulated:</p>
-<ul>
-<li>super legacy flags the team used way back yonder</li>
-<li>legacy flags that were newer but are now old</li>
-<li>current implementation of feature flags</li>
-</ul>
-<p>AI could understand and safely navigate the complexity of real world legacy systems in most scenarios, a win for Developer Velocity.</p>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="phase-3-building-an-ai-team-member">Phase 3: Building an AI Team Member<a href="https://block.github.io/goose/pr-preview/pr-4131/blog/2025/08/18/ai-teammate#phase-3-building-an-ai-team-member" class="hash-link" aria-label="Direct link to Phase 3: Building an AI Team Member" title="Direct link to Phase 3: Building an AI Team Member">​</a></h2>
-<p>This was great progress. The documentation alone would help teams clean up faster. Gemma could have stopped here.</p>
-<p>But instead, she utilized Goose recipes to create <strong>Goose Janitor</strong>.</p>
-<p>Goose Janitor acts as new AI team member whose responsibility is to tidy up the code after we're done experimenting. Gemma drew inspiration from existing <a href="https://block.github.io/goose/pr-preview/pr-4131/recipes/detail/?id=clean-up-feature-flag">Goose recipes</a> and internal talks from other departments to create it. Here's how it works:</p>
-<div class="language-bash codeBlockContainer_Ckt0 theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_biex"><pre tabindex="0" class="prism-code language-bash codeBlock_bY9V thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_e6Vv"><span class="token-line" style="color:#393A34"><span class="token plain">goose run \</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain">--recipe .goose/recipes/goose-janitor-flag-removal.yaml \</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain">--params feature_flag_key=log-observer-is-enabled \</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain">--params variant_to_remain=true \</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain">--params create_pr=false</span><br></span></code></pre><div class="buttonGroup__atx"><button type="button" aria-label="Copy code to clipboard" title="Copy" class="clean-btn"><span class="copyButtonIcons_eSgA" aria-hidden="true"><svg viewBox="0 0 24 24" class="copyButtonIcon_y97N"><path fill="currentColor" d="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z"></path></svg><svg viewBox="0 0 24 24" class="copyButtonSuccessIcon_LjdS"><path fill="currentColor" d="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z"></path></svg></span></button></div></div></div>
-<p>The recipe:</p>
-<ul>
-<li>Runs completely autonomously (no human intervention needed)</li>
-<li>Handles simple and complex flags</li>
-<li>Attempts refactoring for outdated code paths</li>
-<li>Can automatically create draft pull requests</li>
-<li>Integrates with <a href="https://github.com/block/xcode-index-mcp" target="_blank" rel="noopener noreferrer">Xcode Index MCP</a> for deep iOS project understanding</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="the-bigger-picture-ai-first-development">The Bigger Picture: AI-First Development<a href="https://block.github.io/goose/pr-preview/pr-4131/blog/2025/08/18/ai-teammate#the-bigger-picture-ai-first-development" class="hash-link" aria-label="Direct link to The Bigger Picture: AI-First Development" title="Direct link to The Bigger Picture: AI-First Development">​</a></h2>
-<p>Recipes like Goose Janitor represent a fundamental shift in how we think about AI in software development. They can be useful deployed to:</p>
-<ul>
-<li>Understand complex legacy codebases</li>
-<li>Make safe refactoring decisions</li>
-<li>Integrate seamlessly with existing development workflows</li>
-<li>Provide developer velocity improvements</li>
-<li>Scales across large codebases</li>
-</ul>
-<p>Teams at Block are confident that Goose Janitor will be of assistance in production scale cleanup work.</p>
-<p>This is exactly the kind of work AI should handle: tedious, repetitive, but requiring deep codebase knowledge. By automating portions of their work, developers can focus on what they do best: building new features and solving novel problems while AI keeps the codebase clean and maintainable.</p>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="the-ai-first-mindset">The AI-First Mindset<a href="https://block.github.io/goose/pr-preview/pr-4131/blog/2025/08/18/ai-teammate#the-ai-first-mindset" class="hash-link" aria-label="Direct link to The AI-First Mindset" title="Direct link to The AI-First Mindset">​</a></h2>
-<p>This story illustrates what an AI-first approach to legacy codebases looks like in practice:</p>
-<ul>
-<li>Start by making tribal knowledge AI-accessible</li>
-<li>Test and validate that AI can actually handle the complexity with enough accuracy to prove useful. Even if manual intervention is required for complex cases, a 'first pass' performed by AI can be a useful boost to productivity.</li>
-<li>Build automation that scales across teams</li>
-<li>Focus human energy on high value creative work</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="whats-next">What's Next?<a href="https://block.github.io/goose/pr-preview/pr-4131/blog/2025/08/18/ai-teammate#whats-next" class="hash-link" aria-label="Direct link to What's Next?" title="Direct link to What's Next?">​</a></h2>
-<p>The success of Goose Janitor opens up fascinating possibilities. What other forms of technical debt could benefit from this approach? What other "AI team members" could we build to handle routine but knowledge intensive work?</p>
-<p>As we move toward an AI-first future, stories like Gemma's show us the path - not just using AI tools, but thinking systematically about how to make our codebases and processes AI-ready.</p>
-<p>The future of software development is mixed teams where AI agents are autonomous contributors, handling the maintenance work that keeps our systems healthy while humans focus on building the future.</p>
-<hr>
-<p>Want the try the recipe yourself? Check out <a href="https://block.github.io/goose/pr-preview/pr-4131/recipes/detail/?id=clean-up-feature-flag">Clean up feature flag</a> in our Recipe Cookbook!</p>
 ]]></content:encoded>
         </item>
         <item>
