@@ -44,7 +44,7 @@ export default function Pair({
   const [shouldAutoSubmit, setShouldAutoSubmit] = useState(false);
   const [messageToSubmit, setMessageToSubmit] = useState<string | null>(null);
   const [isTransitioningFromHub, setIsTransitioningFromHub] = useState(false);
-  const [forceCloseParameters, setForceCloseParameters] = useState(false);
+  const [recipeResetOverride, setRecipeResetOverride] = useState(false);
 
   const recipeJson = JSON.stringify(routeState.recipeConfig);
 
@@ -57,7 +57,7 @@ export default function Pair({
           setAgentWaitingMessage,
         });
         if (!chat.recipeConfig) {
-          setForceCloseParameters(true);
+          setRecipeResetOverride(true);
         }
         setChat(chat);
       } catch (error) {
@@ -131,7 +131,7 @@ export default function Pair({
       contentClassName={cn('pr-1 pb-10', (isMobile || sidebarState === 'collapsed') && 'pt-11')} // Use dynamic content class with mobile margin and sidebar state
       showPopularTopics={!isTransitioningFromHub} // Don't show popular topics while transitioning from Hub
       suppressEmptyState={isTransitioningFromHub} // Suppress all empty state content while transitioning from Hub
-      forceCloseParameters={forceCloseParameters}
+      recipeResetOverride={recipeResetOverride}
     />
   );
 }
