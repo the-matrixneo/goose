@@ -58,7 +58,7 @@ export default function Pair({
           resumeSessionId: routeState.resumeSessionId,
           setAgentWaitingMessage,
         });
-        if (!chat.recipeConfig) {
+        if (!chat.recipeConfig && agentState === 'initialized') {
           setRecipeResetOverride(true);
         }
         setChat(chat);
@@ -71,6 +71,7 @@ export default function Pair({
     };
     initializeFromState();
   }, [
+    agentState,
     setChat,
     setFatalError,
     setAgentWaitingMessage,
