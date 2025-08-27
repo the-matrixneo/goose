@@ -126,6 +126,8 @@ async fn start_agent(
         )
     })?;
 
+    state.reset().await;
+
     let session_id = session::generate_session_id();
     let counter = state.session_counter.fetch_add(1, Ordering::SeqCst) + 1;
 
@@ -209,10 +211,7 @@ async fn add_sub_recipes(
 ) -> Result<Json<AddSubRecipesResponse>, StatusCode> {
     verify_secret_key(&headers, &state)?;
 
-    let agent = state
-        .get_agent()
-        .await
-        .map_err(|_| StatusCode::PRECONDITION_FAILED)?;
+    let agent = state.get_agent().await;
     agent.add_sub_recipes(payload.sub_recipes.clone()).await;
     Ok(Json(AddSubRecipesResponse { success: true }))
 }
@@ -234,10 +233,7 @@ async fn extend_prompt(
 ) -> Result<Json<ExtendPromptResponse>, StatusCode> {
     verify_secret_key(&headers, &state)?;
 
-    let agent = state
-        .get_agent()
-        .await
-        .map_err(|_| StatusCode::PRECONDITION_FAILED)?;
+    let agent = state.get_agent().await;
     agent.extend_system_prompt(payload.extension.clone()).await;
     Ok(Json(ExtendPromptResponse { success: true }))
 }
@@ -265,10 +261,7 @@ async fn get_tools(
 
     let config = Config::global();
     let goose_mode = config.get_param("GOOSE_MODE").unwrap_or("auto".to_string());
-    let agent = state
-        .get_agent()
-        .await
-        .map_err(|_| StatusCode::PRECONDITION_FAILED)?;
+    let agent = state.get_agent().await;
     let permission_manager = PermissionManager::default();
 
     let mut tools: Vec<ToolInfo> = agent
@@ -323,11 +316,7 @@ async fn update_agent_provider(
 ) -> Result<StatusCode, impl IntoResponse> {
     verify_secret_key(&headers, &state).map_err(|e| (e, String::new()))?;
 
-    let agent = state
-        .get_agent()
-        .await
-        .map_err(|_e| (StatusCode::PRECONDITION_FAILED, String::new()))?;
-
+    let agent = state.get_agent().await;
     let config = Config::global();
     let model = match payload
         .model
@@ -381,13 +370,7 @@ async fn update_router_tool_selector(
         })
     })?;
 
-    let agent = state.get_agent().await.map_err(|e| {
-        tracing::error!("Failed to get agent: {}", e);
-        Json(ErrorResponse {
-            error: format!("Failed to get agent: {}", e),
-        })
-    })?;
-
+    let agent = state.get_agent().await;
     agent
         .update_router_tool_selector(None, Some(true))
         .await
@@ -425,13 +408,7 @@ async fn update_session_config(
         })
     })?;
 
-    let agent = state.get_agent().await.map_err(|e| {
-        tracing::error!("Failed to get agent: {}", e);
-        Json(ErrorResponse {
-            error: format!("Failed to get agent: {}", e),
-        })
-    })?;
-
+    let agent = state.get_agent().await;
     if let Some(response) = payload.response {
         agent.add_final_output_tool(response).await;
 

@@ -194,21 +194,8 @@ async fn reply_handler(
     let task_cancel = cancel_token.clone();
     let task_tx = tx.clone();
 
-    std::mem::drop(tokio::spawn(async move {
-        let agent = match state.get_agent().await {
-            Ok(agent) => agent,
-            Err(_) => {
-                let _ = stream_event(
-                    MessageEvent::Error {
-                        error: "No agent configured".to_string(),
-                    },
-                    &task_tx,
-                    &cancel_token,
-                )
-                .await;
-                return;
-            }
-        };
+    drop(tokio::spawn(async move {
+        let agent = state.get_agent().await;
 
         // Load session metadata to get the working directory and other config
         let session_path = match session::get_path(session::Identifier::Name(session_id.clone())) {
@@ -469,11 +456,7 @@ pub async fn confirm_permission(
 ) -> Result<Json<Value>, StatusCode> {
     verify_secret_key(&headers, &state)?;
 
-    let agent = state
-        .get_agent()
-        .await
-        .map_err(|_| StatusCode::PRECONDITION_FAILED)?;
-
+    let agent = state.get_agent().await;
     let permission = match request.action.as_str() {
         "always_allow" => Permission::AlwaysAllow,
         "allow_once" => Permission::AllowOnce,
@@ -525,10 +508,7 @@ async fn submit_tool_result(
         }
     };
 
-    let agent = state
-        .get_agent()
-        .await
-        .map_err(|_| StatusCode::PRECONDITION_FAILED)?;
+    let agent = state.get_agent().await;
     agent.handle_tool_result(payload.id, payload.result).await;
     Ok(Json(json!({"status": "ok"})))
 }

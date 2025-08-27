@@ -150,6 +150,7 @@ export function useAgent(): UseAgentReturn {
             initChat.title = initContext.recipeConfig.title || initChat.title;
             initChat.recipeConfig = initContext.recipeConfig;
           }
+
           setAgentState(AgentState.INITIALIZED);
 
           return initChat;

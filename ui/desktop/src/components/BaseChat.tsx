@@ -76,17 +76,18 @@ interface BaseChatProps {
   setView: (view: View, viewOptions?: ViewOptions) => void;
   setIsGoosehintsModalOpen?: (isOpen: boolean) => void;
   onMessageStreamFinish?: () => void;
-  onMessageSubmit?: (message: string) => void; // Callback after message is submitted
+  onMessageSubmit?: (message: string) => void;
   renderHeader?: () => React.ReactNode;
   renderBeforeMessages?: () => React.ReactNode;
   renderAfterMessages?: () => React.ReactNode;
   customChatInputProps?: Record<string, unknown>;
   customMainLayoutProps?: Record<string, unknown>;
-  contentClassName?: string; // Add custom class for content area
-  disableSearch?: boolean; // Disable search functionality (for Hub)
-  showPopularTopics?: boolean; // Show popular chat topics in empty state (for Pair)
-  suppressEmptyState?: boolean; // Suppress empty state content (for transitions)
+  contentClassName?: string;
+  disableSearch?: boolean;
+  showPopularTopics?: boolean;
+  suppressEmptyState?: boolean;
   autoSubmit?: boolean;
+  recipeResetOverride: boolean;
   loadingChat: boolean;
 }
 
@@ -106,6 +107,7 @@ function BaseChatContent({
   disableSearch = false,
   showPopularTopics = false,
   suppressEmptyState = false,
+  recipeResetOverride,
   autoSubmit = false,
   loadingChat = false,
 }: BaseChatProps) {
@@ -175,7 +177,7 @@ function BaseChatContent({
     handleRecipeAccept,
     handleRecipeCancel,
     hasSecurityWarnings,
-  } = useRecipeManager(chat, location.state);
+  } = useRecipeManager(chat, location.state?.recipeConfig);
 
   // Reset recipe usage tracking when recipe changes
   useEffect(() => {
@@ -301,7 +303,7 @@ function BaseChatContent({
             paddingY={0}
           >
             {/* Recipe agent header - sticky at top of chat container */}
-            {recipeConfig?.title && (
+            {recipeConfig?.title && !recipeResetOverride && (
               <div className="sticky top-0 z-10 bg-background-default px-0 -mx-6 mb-6 pt-6">
                 <AgentHeader
                   title={recipeConfig.title}
@@ -495,7 +497,7 @@ function BaseChatContent({
       />
 
       {/* Recipe Parameter Modal */}
-      {isParameterModalOpen && recipeConfig?.parameters && (
+      {isParameterModalOpen && recipeConfig?.parameters && !recipeResetOverride && (
         <ParameterInputModal
           parameters={recipeConfig.parameters}
           onSubmit={handleParameterSubmit}
@@ -504,7 +506,7 @@ function BaseChatContent({
       )}
 
       {/* Recipe Error Modal */}
-      {recipeError && (
+      {recipeError && !recipeResetOverride && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/50">
           <div className="bg-background-default border border-borderSubtle rounded-lg p-6 w-96 max-w-[90vw]">
             <h3 className="text-lg font-medium text-textProminent mb-4">Recipe Creation Failed</h3>
