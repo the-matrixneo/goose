@@ -14,7 +14,6 @@ use goose::model::ModelConfig;
 use goose::providers::create;
 use goose::recipe::Response;
 use goose::session;
-use goose::session::storage::save_messages_with_metadata;
 use goose::session::SessionMetadata;
 use goose::{
     agents::{extension::ToolInfo, extension_manager::get_parameter_names},
