@@ -83,21 +83,26 @@ async fn create_recipe(
     State(state): State<Arc<AppState>>,
     Json(request): Json<CreateRecipeRequest>,
 ) -> Result<Json<CreateRecipeResponse>, (StatusCode, Json<CreateRecipeResponse>)> {
+    tracing::info!(
+        "Recipe creation request received with {} messages",
+        request.messages.len()
+    );
+
     let agent = state.get_agent().await;
+
+    // Create base recipe from agent state and messages
     let recipe_result = agent
         .create_recipe(Conversation::new_unvalidated(request.messages))
         .await;
 
     match recipe_result {
         Ok(mut recipe) => {
-            // Update with user-provided metadata
             recipe.title = request.title;
             recipe.description = request.description;
             if request.activities.is_some() {
                 recipe.activities = request.activities
             };
 
-            // Add author if provided
             if let Some(author_req) = request.author {
                 recipe.author = Some(goose::recipe::Author {
                     contact: author_req.contact,
@@ -111,10 +116,11 @@ async fn create_recipe(
             }))
         }
         Err(e) => {
-            // Return 400 Bad Request with error message
+            tracing::error!("Error details: {:?}", e);
+            let error_message = format!("Recipe creation failed: {}", e);
             let error_response = CreateRecipeResponse {
                 recipe: None,
-                error: Some(e.to_string()),
+                error: Some(error_message),
             };
             Err((StatusCode::BAD_REQUEST, Json(error_response)))
         }

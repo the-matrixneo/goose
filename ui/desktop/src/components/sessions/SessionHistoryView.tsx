@@ -16,7 +16,7 @@ import { ScrollArea } from '../ui/scroll-area';
 import { formatMessageTimestamp } from '../../utils/timeUtils';
 import ProgressiveMessageList from '../ProgressiveMessageList';
 import { SearchView } from '../conversation/SearchView';
-import { ChatContextManagerProvider } from '../context_management/ChatContextManager';
+import { ContextManagerProvider } from '../context_management/ContextManager';
 import { Message } from '../../types/message';
 import BackButton from '../ui/BackButton';
 
@@ -90,7 +90,7 @@ const SessionMessages: React.FC<{
               </Button>
             </div>
           ) : filteredMessages?.length > 0 ? (
-            <ChatContextManagerProvider>
+            <ContextManagerProvider>
               <div className="max-w-4xl mx-auto w-full">
                 <SearchView>
                   <ProgressiveMessageList
@@ -112,7 +112,7 @@ const SessionMessages: React.FC<{
                   />
                 </SearchView>
               </div>
-            </ChatContextManagerProvider>
+            </ContextManagerProvider>
           ) : (
             <div className="flex flex-col items-center justify-center py-8 text-textSubtle">
               <MessageSquareText className="w-12 h-12 mb-4" />
