@@ -294,7 +294,7 @@
 <p>This story illustrates what an AI-first approach to legacy codebases looks like in practice:</p>
 <ul>
 <li>Start by making tribal knowledge AI-accessible</li>
-<li>Test and validate that AI can actually handle the complexity</li>
+<li>Test and validate that AI can actually handle the complexity with enough accuracy to prove useful. Even if manual intervention is required for complex cases, a 'first pass' performed by AI can be a useful boost to productivity.</li>
 <li>Build automation that scales across teams</li>
 <li>Focus human energy on high value creative work</li>
 </ul>
