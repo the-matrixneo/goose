@@ -250,12 +250,11 @@
         <id>https://block.github.io/goose/pr-preview/pr-4131/blog/2025/08/18/ai-teammate</id>
         <link href="https://block.github.io/goose/pr-preview/pr-4131/blog/2025/08/18/ai-teammate"/>
         <updated>2025-08-18T00:00:00.000Z</updated>
-        <summary type="html"><![CDATA[How one team is trialling autonomous AI-powered technical debt cleanup]]></summary>
+        <summary type="html"><![CDATA[How an engineering team is trialling autonomous AI-powered technical debt cleanup]]></summary>
         <content type="html"><![CDATA[<p><img decoding="async" loading="lazy" alt="blog banner" src="https://block.github.io/goose/pr-preview/pr-4131/assets/images/goose-janitor-129889884d9265d001fe12cbfde03d57.png" width="1200" height="630" class="img_ev3q"></p>
 <p>Over the years, Block's iOS engineers have felt the pain of technical debt accumulating. Feature flags are a specific example of this - even when successfully rolled out, they tend to linger in the codebase, each one a small weight slowing down development.</p>
 <p>In the early stages of 2025, with a renewed focus on Developer Acceleration, Square's Foundation iOS team decided to organize 'Feature Flag Removal Month' - an opportunity for teams in the large iOS monorepo to come together and delete <em>possibly hundreds of thousands of lines of code of dead code</em>.</p>
 <p>With the serendipitous launch of Goose recipes around the same time, the team wondered; could a dedicated recipe aid this effort ? <a href="https://www.linkedin.com/in/gemmakbarlow/" target="_blank" rel="noopener noreferrer">Gemma Barlow</a>, a newer iOS engineer on the team, wanted to find out.</p>
-<p>But instead of just nodding along, Gemma was inspired to act.</p>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="phase-1-making-knowledge-ai-accessible">Phase 1: Making Knowledge AI-Accessible<a href="https://block.github.io/goose/pr-preview/pr-4131/blog/2025/08/18/ai-teammate#phase-1-making-knowledge-ai-accessible" class="hash-link" aria-label="Direct link to Phase 1: Making Knowledge AI-Accessible" title="Direct link to Phase 1: Making Knowledge AI-Accessible">​</a></h2>
 <p>Gemma's first move was brilliant in its simplicity. She documented how to safely remove feature flags from the repository. She also structured the documentation so AI agents could follow it too!</p>
 <p>This wasn't just another README file. This was documentation designed for both human and AI to understand and act upon.</p>
