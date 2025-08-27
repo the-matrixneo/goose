@@ -14,12 +14,10 @@
             <guid>https://block.github.io/goose/pr-preview/pr-4313/blog/2025/08/25/get-started-for-free-with-tetrate</guid>
             <pubDate>Mon, 25 Aug 2025 00:00:00 GMT</pubDate>
             <description><![CDATA[New Goose users receive $10 in Tetrate Agent Router credits for instant access to multiple models including GPT-5 and Sonnet-4.]]></description>
-            <content:encoded><![CDATA[<p>Let's be honest: while Goose is completely free to use, the reality is that most performant LLMs aren't. You want to experience that agentic goodness without breaking the bank or jumping through hoops. We've been thinking about how to make that first step easier for newcomers to AI development.</p>
+            <content:encoded><![CDATA[<p>Let's be honest: while Goose is completely free to use, the reality is that most performant LLMs aren't. You want to experience that agentic goodness without breaking the bank or jumping through hoops. We've been thinking about how to make that first step easier for newcomers to Goose.</p>
 <p>That's why we're thrilled about our newest provider integration: Tetrate's Agent Router Service. From August 27th through October 2nd, new Goose users can get $10 in credits to use Goose with any model on the Tetrate platform.</p>
-<p>If you are brand new to Goose, or start with a fresh install, you will notice a new getting started experience:</p>
+<p>We've upgraded the onboarding flow. Tetrate Agent Router now appears as a recommended setup option for new users. Selecting Tetrate takes you through OAuth account creation, then drops you back into Goose with your $10 credits ready to go.</p>
 <p><img decoding="async" loading="lazy" alt="fresh install" src="https://block.github.io/goose/pr-preview/pr-4313/assets/images/welcome-759e755b4c027705f64202aad2ae75b6.png" width="955" height="1072" class="img_ev3q"></p>
-<p>You can click on the Tetrate Agent router service and then quickly create an account, and Tetrate will give you $10 in credits to get started with immediately.</p>
-<p><img decoding="async" loading="lazy" alt="startup" src="https://block.github.io/goose/pr-preview/pr-4313/assets/images/startup-6acd6220f17e593ba3c91ac2e0b4c93f.png" width="1551" height="1041" class="img_ev3q"></p>
 <p>For Goose users, this means:</p>
 <ul>
 <li><strong>Simple setup</strong> in a few clicks</li>
