@@ -25,12 +25,11 @@ type SwitchModelModalProps = {
   setView: (view: View) => void;
 };
 export const SwitchModelModal = ({ sessionId, onClose, setView }: SwitchModelModalProps) => {
-  const { getProviders, read } = useConfig();
+  const { getProviders, getProviderModels, read } = useConfig();
   const { changeModel } = useModelAndProvider();
   const [providerOptions, setProviderOptions] = useState<{ value: string; label: string }[]>([]);
-  const [modelOptions, setModelOptions] = useState<
-    { options: { value: string; label: string; provider: string }[] }[]
-  >([]);
+  type ModelOption = { value: string; label: string; provider: string; isDisabled?: boolean };
+  const [modelOptions, setModelOptions] = useState<{ options: ModelOption[] }[]>([]);
   const [provider, setProvider] = useState<string | null>(null);
   const [model, setModel] = useState<string>('');
   const [isCustomModel, setIsCustomModel] = useState(false);
@@ -43,6 +42,7 @@ export const SwitchModelModal = ({ sessionId, onClose, setView }: SwitchModelMod
   const [usePredefinedModels] = useState(shouldShowPredefinedModels());
   const [selectedPredefinedModel, setSelectedPredefinedModel] = useState<Model | null>(null);
   const [predefinedModels, setPredefinedModels] = useState<Model[]>([]);
+  const [loadingModels, setLoadingModels] = useState<boolean>(false);
 
   // Validate form data
   const validateForm = useCallback(() => {
@@ -142,24 +142,60 @@ export const SwitchModelModal = ({ sessionId, onClose, setView }: SwitchModelMod
           },
         ]);
 
-        // Format model options by provider
-        const formattedModelOptions: {
-          options: { value: string; label: string; provider: string }[];
-        }[] = [];
-        activeProviders.forEach(({ metadata, name }) => {
-          if (metadata.known_models && metadata.known_models.length > 0) {
-            formattedModelOptions.push({
-              options: metadata.known_models.map(({ name: modelName }) => ({
-                value: modelName,
-                label: modelName,
-                provider: name,
-              })),
+        setLoadingModels(true);
+
+        // Fetching models for all providers
+        const modelPromises = activeProviders.map(async (p) => {
+          const providerName = p.name;
+          try {
+            let models = await getProviderModels(providerName);
+            // Fallback to known_models if server returned none
+            if ((!models || models.length === 0) && p.metadata.known_models?.length) {
+              models = p.metadata.known_models.map((m) => m.name);
+            }
+            return { provider: p, models, error: null };
+          } catch (e: unknown) {
+            return {
+              provider: p,
+              models: null,
+              error: `Failed to fetch models for ${providerName}${e instanceof Error ? `: ${e.message}` : ''}`,
+            };
+          }
+        });
+        const results = await Promise.all(modelPromises);
+
+        // Process results and build grouped options
+        const groupedOptions: { options: { value: string; label: string; provider: string }[] }[] =
+          [];
+        const errors: string[] = [];
+
+        results.forEach(({ provider: p, models, error }) => {
+          if (error) {
+            errors.push(error);
+            // Fallback to metadata known_models on error
+            if (p.metadata.known_models && p.metadata.known_models.length > 0) {
+              groupedOptions.push({
+                options: p.metadata.known_models.map(({ name }) => ({
+                  value: name,
+                  label: name,
+                  provider: p.name,
+                })),
+              });
+            }
+          } else if (models && models.length > 0) {
+            groupedOptions.push({
+              options: models.map((m) => ({ value: m, label: m, provider: p.name })),
             });
           }
         });
 
+        // Log errors if any providers failed (don't show to user)
+        if (errors.length > 0) {
+          console.error('Provider model fetch errors:', errors);
+        }
+
         // Add the "Custom model" option to each provider group
-        formattedModelOptions.forEach((group) => {
+        groupedOptions.forEach((group) => {
           const providerName = group.options[0]?.provider;
           if (providerName && !providerName.startsWith('custom_')) {
             group.options.push({
@@ -170,13 +206,15 @@ export const SwitchModelModal = ({ sessionId, onClose, setView }: SwitchModelMod
           }
         });
 
-        setModelOptions(formattedModelOptions);
-        setOriginalModelOptions(formattedModelOptions);
-      } catch (error) {
-        console.error('Failed to load providers:', error);
+        setModelOptions(groupedOptions);
+        setOriginalModelOptions(groupedOptions);
+      } catch (error: unknown) {
+        console.error('Failed to query providers:', error);
+      } finally {
+        setLoadingModels(false);
       }
     })();
-  }, [getProviders, usePredefinedModels, read]);
+  }, [getProviders, getProviderModels, usePredefinedModels, read]);
 
   // Filter model options based on selected provider
   const filteredModelOptions = provider
@@ -348,7 +386,7 @@ export const SwitchModelModal = ({ sessionId, onClose, setView }: SwitchModelMod
                       setIsCustomModel(false);
                     }
                   }}
-                  placeholder="Provider"
+                  placeholder="Provider, type to search"
                   isClearable
                 />
                 {attemptedSubmit && validationErrors.provider && (
@@ -361,12 +399,30 @@ export const SwitchModelModal = ({ sessionId, onClose, setView }: SwitchModelMod
                   {!isCustomModel ? (
                     <div>
                       <Select
-                        options={filteredModelOptions}
+                        options={
+                          loadingModels
+                            ? [
+                                {
+                                  options: [
+                                    {
+                                      value: '__loading__',
+                                      label: 'Loading models…',
+                                      provider: provider || '',
+                                      isDisabled: true,
+                                    },
+                                  ],
+                                },
+                              ]
+                            : filteredModelOptions.length > 0
+                              ? filteredModelOptions
+                              : []
+                        }
                         onChange={handleModelChange}
                         onInputChange={handleInputChange} // Added for input handling
                         value={model ? { value: model, label: model } : null}
-                        placeholder="Select a model"
+                        placeholder="Select a model, type to search"
                       />
+
                       {attemptedSubmit && validationErrors.model && (
                         <div className="text-red-500 text-sm mt-1">{validationErrors.model}</div>
                       )}

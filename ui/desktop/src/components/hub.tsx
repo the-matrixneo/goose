@@ -17,7 +17,7 @@
 import { SessionInsights } from './sessions/SessionsInsights';
 import ChatInput from './ChatInput';
 import { ChatState } from '../types/chatState';
-import { ChatContextManagerProvider } from './context_management/ChatContextManager';
+import { ContextManagerProvider } from './context_management/ContextManager';
 import 'react-toastify/dist/ReactToastify.css';
 import { View, ViewOptions } from '../utils/navigationUtils';
 
@@ -49,7 +49,7 @@ export default function Hub({
   };
 
   return (
-    <ChatContextManagerProvider>
+    <ContextManagerProvider>
       <div className="flex flex-col h-full bg-background-muted">
         <div className="flex-1 flex flex-col mb-0.5">
           <SessionInsights />
@@ -77,6 +77,6 @@ export default function Hub({
           toolCount={0}
         />
       </div>
-    </ChatContextManagerProvider>
+    </ContextManagerProvider>
   );
 }
