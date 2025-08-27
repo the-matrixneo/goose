@@ -1,9 +1,14 @@
 use anyhow::Result;
+use async_stream::try_stream;
 use async_trait::async_trait;
+use futures::TryStreamExt;
 use serde_json::Value;
+use std::io;
+use tokio::pin;
+use tokio_util::io::StreamReader;
 
 use super::api_client::{ApiClient, AuthMethod};
-use super::base::{ConfigKey, Provider, ProviderMetadata, ProviderUsage, Usage};
+use super::base::{ConfigKey, MessageStream, Provider, ProviderMetadata, ProviderUsage, Usage};
 use super::errors::ProviderError;
 use super::retry::ProviderRetry;
 use super::utils::{
@@ -14,7 +19,7 @@ use crate::config::signup_tetrate::TETRATE_DEFAULT_MODEL;
 use crate::conversation::message::Message;
 use crate::impl_provider_default;
 use crate::model::ModelConfig;
-use crate::providers::formats::openai::{create_request, get_usage, response_to_message};
+use crate::providers::formats::openai::{create_request, get_usage, response_to_message, response_to_streaming_message};
 use rmcp::model::Tool;
 
 // Tetrate Agent Router Service can run many models, we suggest the default
@@ -250,5 +255,59 @@ impl Provider for TetrateProvider {
 
         models.sort();
         Ok(Some(models))
+    }
+
+    async fn stream(
+        &self,
+        system: &str,
+        messages: &[Message],
+        tools: &[Tool],
+    ) -> Result<MessageStream, ProviderError> {
+        let mut payload = create_request(
+            &self.model,
+            system,
+            messages,
+            tools,
+            &super::utils::ImageFormat::OpenAi,
+        )?;
+        
+        payload
+            .as_object_mut()
+            .unwrap()
+            .insert("stream".to_string(), Value::Bool(true));
+
+        let response = self
+            .with_retry(|| async {
+                let resp = self.api_client.response_post("v1/chat/completions", &payload).await?;
+                if !resp.status().is_success() {
+                    return Err(ProviderError::RequestFailed(format!(
+                        "HTTP {}: {}",
+                        resp.status(),
+                        resp.text().await.unwrap_or_default()
+                    )));
+                }
+                Ok(resp)
+            })
+            .await?;
+
+        let stream = response.bytes_stream().map_err(io::Error::other);
+
+        let model = self.model.clone();
+        Ok(Box::pin(try_stream! {
+            let stream_reader = StreamReader::new(stream);
+            let framed = tokio_util::codec::FramedRead::new(stream_reader, tokio_util::codec::LinesCodec::new()).map_err(anyhow::Error::from);
+
+            let message_stream = response_to_streaming_message(framed);
+            pin!(message_stream);
+            while let Some(message) = futures::StreamExt::next(&mut message_stream).await {
+                let (message, usage) = message.map_err(|e| ProviderError::RequestFailed(format!("Stream decode error: {}", e)))?;
+                emit_debug_trace(&model, &payload, &message, &usage.as_ref().map(|f| f.usage).unwrap_or_default());
+                yield (message, usage);
+            }
+        }))
+    }
+
+    fn supports_streaming(&self) -> bool {
+        true
     }
 }
