@@ -260,20 +260,21 @@
 <li>Handles simple and complex flags</li>
 <li>Attempts refactoring for outdated code paths</li>
 <li>Can automatically create draft pull requests</li>
-<li>Integrates with a custom Xcode MCP server for deep iOS understanding</li>
+<li>Integrates with <a href="https://github.com/block/xcode-index-mcp" target="_blank" rel="noopener noreferrer">Xcode Index MCP</a> for deep iOS project understanding</li>
 </ul>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="the-bigger-picture-ai-first-development">The Bigger Picture: AI-First Development<a href="https://block.github.io/goose/pr-preview/pr-4131/blog/2025/08/18/ai-teammate#the-bigger-picture-ai-first-development" class="hash-link" aria-label="Direct link to The Bigger Picture: AI-First Development" title="Direct link to The Bigger Picture: AI-First Development">​</a></h2>
-<p>What Gemma built represents a fundamental shift in how we think about AI in software development. She's gone beyond AI as a coding assistant, and is now using Goose as an autonomous contributor that:</p>
+<p>Recipes like Goose Janitor represent a fundamental shift in how we think about AI in software development. They can be useful deployed to:</p>
 <ul>
-<li>Understands complex legacy codebases</li>
-<li>Makes safe refactoring decisions</li>
-<li>Integrates seamlessly with existing development workflows</li>
-<li>Scales across entire organizations</li>
+<li>Understand complex legacy codebases</li>
+<li>Make safe refactoring decisions</li>
+<li>Integrate seamlessly with existing development workflows</li>
+<li>Provide developer velocity improvements</li>
+<li>Scales across large codebases</li>
 </ul>
-<p>Teams at Block are now planning "Feature Flag Removal Month," confident that Goose Janitor can handle production scale cleanup work.</p>
-<p>This is exactly the kind of work AI should handle: tedious, repetitive, but requiring deep codebase knowledge. By delegating this to AI, developers can focus on what they do best: building new features and solving novel problems while AI keeps the codebase clean and maintainable.</p>
+<p>Teams at Block are confident that Goose Janitor will be of assistance in production scale cleanup work.</p>
+<p>This is exactly the kind of work AI should handle: tedious, repetitive, but requiring deep codebase knowledge. By automating portions of their work, developers can focus on what they do best: building new features and solving novel problems while AI keeps the codebase clean and maintainable.</p>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="the-ai-first-mindset">The AI-First Mindset<a href="https://block.github.io/goose/pr-preview/pr-4131/blog/2025/08/18/ai-teammate#the-ai-first-mindset" class="hash-link" aria-label="Direct link to The AI-First Mindset" title="Direct link to The AI-First Mindset">​</a></h2>
-<p>Gemma's story illustrates what an AI-first approach to legacy codebases looks like in practice:</p>
+<p>This story illustrates what an AI-first approach to legacy codebases looks like in practice:</p>
 <ul>
 <li>Start by making tribal knowledge AI-accessible</li>
 <li>Test and validate that AI can actually handle the complexity</li>
