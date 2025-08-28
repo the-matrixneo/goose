@@ -264,11 +264,12 @@ export const MainPanelLayout: React.FC<{
       const sidecarWidth = sidecarRect.width;
       const mousePercentage = (mouseX / sidecarWidth) * 100;
 
-      // Update right container size
+      // Update all right container sizes to stay in sync for width calculation
+      const newRightWidth = Math.max(20, Math.min(80, mousePercentage));
       setContainers(prev => {
         return prev.map(container => {
           if (container.position.startsWith('right-')) {
-            return { ...container, size: Math.max(20, Math.min(80, 100 - mousePercentage)) };
+            return { ...container, size: newRightWidth };
           }
           return container;
         });
@@ -552,11 +553,30 @@ export const MainPanelLayout: React.FC<{
   const hasLeftColumnContent = mainSidecarVisible || topContainer || bottomContainer;
   const hasRightColumnContent = rightMainContainer || rightTopContainer || rightBottomContainer;
   
-  // Dynamic width calculation based on content presence
-  const leftColumnWidth = hasLeftColumnContent && hasRightColumnContent ? '50%' : 
-                          hasLeftColumnContent && !hasRightColumnContent ? '100%' : '0%';
-  const rightColumnWidth = hasRightColumnContent && hasLeftColumnContent ? '50%' :
-                           hasRightColumnContent && !hasLeftColumnContent ? '100%' : '0%';
+  // Get the size from any right container (they should all have the same width size)
+  const rightContainerSize = rightMainContainer?.size || rightTopContainer?.size || rightBottomContainer?.size || 50;
+  
+  // Dynamic width calculation based on content presence and container sizes
+  let leftColumnWidth: string;
+  let rightColumnWidth: string;
+  
+  if (hasLeftColumnContent && hasRightColumnContent) {
+    // Both columns present - use container size for resizing
+    rightColumnWidth = `${rightContainerSize}%`;
+    leftColumnWidth = `${100 - rightContainerSize}%`;
+  } else if (hasLeftColumnContent && !hasRightColumnContent) {
+    // Only left column
+    leftColumnWidth = '100%';
+    rightColumnWidth = '0%';
+  } else if (!hasLeftColumnContent && hasRightColumnContent) {
+    // Only right column
+    leftColumnWidth = '0%';
+    rightColumnWidth = '100%';
+  } else {
+    // No columns
+    leftColumnWidth = '0%';
+    rightColumnWidth = '0%';
+  }
 
   return (
     <div className={`h-dvh`}>
