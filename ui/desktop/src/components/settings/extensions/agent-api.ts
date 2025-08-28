@@ -58,7 +58,7 @@ export async function extensionApiCall(
     if (result.error) {
       const errorMsg = `API error: ${(result.error as any)?.message || 'Unknown error'}`;
       console.error(errorMsg);
-      
+
       toastService.dismiss(toastId);
       toastService.error({
         title: extensionName,
@@ -69,7 +69,12 @@ export async function extensionApiCall(
     }
 
     // Step 4: Check for errors in the response data
-    if (result.data && typeof result.data === 'object' && 'error' in result.data && (result.data as any).error) {
+    if (
+      result.data &&
+      typeof result.data === 'object' &&
+      'error' in result.data &&
+      (result.data as any).error
+    ) {
       const errorMessage = `Error ${action.type} extension: ${(result.data as any).message || 'Unknown error'}`;
       toastService.dismiss(toastId);
       throw new Error(errorMessage);
@@ -98,42 +103,7 @@ export async function extensionApiCall(
   }
 }
 
-// Helper function to handle API errors with proper 428 status handling (kept for potential future use)
-// function handleErrorResponse(
-//   response: Response,
-//   extensionName: string,
-//   action: { type: string; verb: string },
-//   toastId: string | number | undefined
-// ): never {
-//   const errorMsg = `Server returned ${response.status}: ${response.statusText}`;
-//   console.error(errorMsg);
-
-//   // Special case: Agent not initialized (status 428)
-//   if (response.status === 428 && action.type === 'activating') {
-//     toastService.dismiss(toastId);
-//     toastService.error({
-//       title: extensionName,
-//       msg: 'Failed to add extension. Goose Agent was still starting up. Please try again.',
-//       traceback: errorMsg,
-//     });
-//     throw new Error('Agent is not initialized. Please initialize the agent first.');
-//   }
-
-//   // General error case
-//   const msg = `Failed to ${action.type === 'activating' ? 'add' : action.type === 'removing' ? 'remove' : 'deactivate'} ${extensionName} extension: ${errorMsg}`;
-//   toastService.dismiss(toastId);
-//   toastService.error({
-//     title: extensionName,
-//     msg: msg,
-//     traceback: errorMsg,
-//   });
-//   throw new Error(msg);
-// }
-
-/**
- * Add an extension to the agent
- */
-export async function addToAgent(
+export async function addExtensionToAgent(
   extension: ExtensionConfig,
   options: ToastServiceOptions = {}
 ): Promise<any> {

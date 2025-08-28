@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { extensionApiCall, addToAgent, removeFromAgent, sanitizeName } from './agent-api';
+import { extensionApiCall, addExtensionToAgent, removeFromAgent, sanitizeName } from './agent-api';
 import * as toasts from '../../../toasts';
-import { ExtensionConfig } from '../../../api/types.gen';
+import { ExtensionConfig } from '../../../api';
 
 // Mock dependencies
 vi.mock('../../../toasts');
@@ -41,11 +41,11 @@ describe('Agent API', () => {
 
     it('should make successful API call for adding extension', async () => {
       const { addExtension } = await import('../../../api');
-      const mockResponse = { 
-        data: '{"success": true}', 
+      const mockResponse = {
+        data: '{"success": true}',
         error: undefined,
         request: {} as Request,
-        response: {} as Response
+        response: {} as Response,
       };
       vi.mocked(addExtension).mockResolvedValue(mockResponse);
 
@@ -74,11 +74,11 @@ describe('Agent API', () => {
 
     it('should make successful API call for removing extension', async () => {
       const { removeExtension } = await import('../../../api');
-      const mockResponse = { 
-        data: '{"success": true}', 
+      const mockResponse = {
+        data: '{"success": true}',
         error: undefined,
         request: {} as Request,
-        response: {} as Response
+        response: {} as Response,
       };
       vi.mocked(removeExtension).mockResolvedValue(mockResponse);
 
@@ -103,7 +103,7 @@ describe('Agent API', () => {
         data: undefined,
         error: { message: 'Extension not found' },
         request: {} as Request,
-        response: {} as Response
+        response: {} as Response,
       };
       vi.mocked(addExtension).mockResolvedValue(mockResponse);
 
@@ -120,11 +120,11 @@ describe('Agent API', () => {
 
     it('should configure toast service with options', async () => {
       const { addExtension } = await import('../../../api');
-      const mockResponse = { 
-        data: '{"success": true}', 
+      const mockResponse = {
+        data: '{"success": true}',
         error: undefined,
         request: {} as Request,
-        response: {} as Response
+        response: {} as Response,
       };
       vi.mocked(addExtension).mockResolvedValue(mockResponse);
 
@@ -138,9 +138,7 @@ describe('Agent API', () => {
       const networkError = new Error('Network error');
       vi.mocked(addExtension).mockRejectedValue(networkError);
 
-      await expect(extensionApiCall(true, mockExtensionConfig)).rejects.toThrow(
-        'Network error'
-      );
+      await expect(extensionApiCall(true, mockExtensionConfig)).rejects.toThrow('Network error');
 
       expect(mockToastService.error).toHaveBeenCalledWith({
         title: 'test-extension',
@@ -161,17 +159,17 @@ describe('Agent API', () => {
     it('should add stdio extension to agent with shim replacement', async () => {
       const { addExtension } = await import('../../../api');
       const { replaceWithShims } = await import('./utils');
-      
-      const mockResponse = { 
-        data: '{"success": true}', 
+
+      const mockResponse = {
+        data: '{"success": true}',
         error: undefined,
         request: {} as Request,
-        response: {} as Response
+        response: {} as Response,
       };
       vi.mocked(addExtension).mockResolvedValue(mockResponse);
       vi.mocked(replaceWithShims).mockResolvedValue('/path/to/python');
 
-      await addToAgent(mockExtensionConfig);
+      await addExtensionToAgent(mockExtensionConfig);
 
       expect(addExtension).toHaveBeenCalledWith({
         body: {
@@ -194,15 +192,15 @@ describe('Agent API', () => {
       };
 
       const { addExtension } = await import('../../../api');
-      const mockResponse = { 
-        data: '{"success": true}', 
+      const mockResponse = {
+        data: '{"success": true}',
         error: undefined,
         request: {} as Request,
-        response: {} as Response
+        response: {} as Response,
       };
       vi.mocked(addExtension).mockResolvedValue(mockResponse);
 
-      await addToAgent(sseConfig);
+      await addExtensionToAgent(sseConfig);
 
       expect(addExtension).toHaveBeenCalledWith({
         body: {
@@ -221,18 +219,18 @@ describe('Agent API', () => {
       const error = new Error('Some API error');
       vi.mocked(addExtension).mockRejectedValue(error);
 
-      await expect(addToAgent(mockExtensionConfig)).rejects.toThrow('Some API error');
+      await expect(addExtensionToAgent(mockExtensionConfig)).rejects.toThrow('Some API error');
     });
   });
 
   describe('removeFromAgent', () => {
     it('should remove extension from agent', async () => {
       const { removeExtension } = await import('../../../api');
-      const mockResponse = { 
-        data: '{"success": true}', 
+      const mockResponse = {
+        data: '{"success": true}',
         error: undefined,
         request: {} as Request,
-        response: {} as Response
+        response: {} as Response,
       };
       vi.mocked(removeExtension).mockResolvedValue(mockResponse);
 
@@ -255,11 +253,11 @@ describe('Agent API', () => {
 
     it('should handle delete option', async () => {
       const { removeExtension } = await import('../../../api');
-      const mockResponse = { 
-        data: '{"success": true}', 
+      const mockResponse = {
+        data: '{"success": true}',
         error: undefined,
         request: {} as Request,
-        response: {} as Response
+        response: {} as Response,
       };
       vi.mocked(removeExtension).mockResolvedValue(mockResponse);
 
