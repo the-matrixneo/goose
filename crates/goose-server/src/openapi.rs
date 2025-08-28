@@ -393,7 +393,8 @@ impl<'__s> ToSchema<'__s> for AnnotatedSchema {
         super::routes::recipe::create_recipe,
         super::routes::recipe::encode_recipe,
         super::routes::recipe::decode_recipe,
-        super::routes::recipe::scan_recipe
+        super::routes::recipe::scan_recipe,
+        super::routes::recipe::list_recipes,
     ),
     components(schemas(
         super::routes::config_management::UpsertConfigQuery,
@@ -463,6 +464,8 @@ impl<'__s> ToSchema<'__s> for AnnotatedSchema {
         super::routes::recipe::DecodeRecipeResponse,
         super::routes::recipe::ScanRecipeRequest,
         super::routes::recipe::ScanRecipeResponse,
+        super::routes::recipe::ListRecipeRequest,
+        super::routes::recipe::ListRecipeResponse,
         goose::recipe::Recipe,
         goose::recipe::Author,
         goose::recipe::Settings,
@@ -471,6 +474,7 @@ impl<'__s> ToSchema<'__s> for AnnotatedSchema {
         goose::recipe::RecipeParameterRequirement,
         goose::recipe::Response,
         goose::recipe::SubRecipe,
+        goose::recipe::recipe_manifest::RecipeManifest,
         goose::agents::types::RetryConfig,
         goose::agents::types::SuccessCheck,
         super::routes::agent::AddSubRecipesRequest,

@@ -14,6 +14,7 @@ pub mod build_recipe;
 pub mod read_recipe_file_content;
 pub mod template_recipe;
 pub mod list_recipes;
+pub mod recipe_manifest;
 
 pub const BUILT_IN_RECIPE_DIR_PARAM: &str = "recipe_dir";
 

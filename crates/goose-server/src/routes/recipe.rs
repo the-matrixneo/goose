@@ -1,12 +1,18 @@
 use std::sync::Arc;
 
+use axum::extract::Query;
+use axum::routing::get;
 use axum::{extract::State, http::StatusCode, routing::post, Json, Router};
 use goose::conversation::{message::Message, Conversation};
+use goose::recipe::list_recipes::list_sorted_recipe_manifests;
+use goose::recipe::recipe_manifest::RecipeManifest;
 use goose::recipe::Recipe;
 use goose::recipe_deeplink;
+use http::HeaderMap;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+use crate::routes::utils::verify_secret_key;
 use crate::state::AppState;
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -66,14 +72,14 @@ pub struct ScanRecipeResponse {
     has_security_warnings: bool,
 }
 
-#[derive(Debug, Deserialize, ToSchema)]
+#[derive(Debug, Deserialize, ToSchema, utoipa::IntoParams)]
 pub struct ListRecipeRequest {
-    recipe_dir: String,
+    include_archived: bool,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct ListRecipeResponse {
-    recipes: Vec<Recipe>
+    recipe_manifests: Vec<RecipeManifest>
 }
 
 #[utoipa::path(
@@ -227,14 +233,19 @@ async fn scan_recipe(
     ),
     responses(
         (status = 200, description = "Get recipe list successfully", body = ListRecipeResponse),
+        (status = 401, description = "Unauthorized - Invalid or missing API key"),
+        (status = 500, description = "Internal server error")
     ),
     tag = "Recipe Management"
 )]
 async fn list_recipes(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     Query(request): Query<ListRecipeRequest>,
 ) -> Result<Json<ListRecipeResponse>, StatusCode> {
+    verify_secret_key(&headers, &state)?;
     Ok(Json(ListRecipeResponse {
-        recipes: vec![],
+        recipe_manifests: list_sorted_recipe_manifests(request.include_archived).unwrap(),
     }))
 }
 
