@@ -127,14 +127,20 @@ const electronAPI: ElectronAPI = {
     // Add fallback to localStorage if config from preload is empty or missing
     if (!config || Object.keys(config).length === 0) {
       try {
-        if (window.localStorage) {
+        // Check for localStorage availability with additional safety checks
+        if (typeof Storage !== 'undefined' && window.localStorage) {
           const storedConfig = localStorage.getItem('gooseConfig');
           if (storedConfig) {
             return JSON.parse(storedConfig);
           }
         }
       } catch (e) {
-        console.warn('Failed to parse stored config from localStorage:', e);
+        // Handle SecurityError and other localStorage access errors gracefully
+        if (e instanceof Error && e.name === 'SecurityError') {
+          console.warn('localStorage access denied (SecurityError). Using in-memory config only.');
+        } else {
+          console.warn('Failed to parse stored config from localStorage:', e);
+        }
       }
     }
     return config;
