@@ -895,6 +895,42 @@
         }
       }
     },
+    "/recipes/list": {
+      "get": {
+        "tags": [
+          "Recipe Management"
+        ],
+        "operationId": "list_recipes",
+        "parameters": [
+          {
+            "name": "include_archived",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Get recipe list successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListRecipeResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Invalid or missing API key"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
     "/recipes/scan": {
       "post": {
         "tags": [
@@ -2252,6 +2288,31 @@
           }
         }
       },
+      "ListRecipeRequest": {
+        "type": "object",
+        "required": [
+          "include_archived"
+        ],
+        "properties": {
+          "include_archived": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ListRecipeResponse": {
+        "type": "object",
+        "required": [
+          "recipe_manifests"
+        ],
+        "properties": {
+          "recipe_manifests": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecipeManifest"
+            }
+          }
+        }
+      },
       "ListSchedulesResponse": {
         "type": "object",
         "required": [
@@ -2796,6 +2857,33 @@
           },
           "version": {
             "type": "string"
+          }
+        }
+      },
+      "RecipeManifest": {
+        "type": "object",
+        "required": [
+          "name",
+          "recipes",
+          "isGlobal",
+          "lastModified",
+          "isArchived"
+        ],
+        "properties": {
+          "isArchived": {
+            "type": "boolean"
+          },
+          "isGlobal": {
+            "type": "boolean"
+          },
+          "lastModified": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "recipes": {
+            "$ref": "#/components/schemas/Recipe"
           }
         }
       },

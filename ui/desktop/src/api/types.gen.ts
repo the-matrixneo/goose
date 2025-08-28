@@ -324,6 +324,14 @@ export type KillJobResponse = {
     message: string;
 };
 
+export type ListRecipeRequest = {
+    include_archived: boolean;
+};
+
+export type ListRecipeResponse = {
+    recipe_manifests: Array<RecipeManifest>;
+};
+
 export type ListSchedulesResponse = {
     jobs: Array<ScheduledJob>;
 };
@@ -532,6 +540,14 @@ export type Recipe = {
     sub_recipes?: Array<SubRecipe> | null;
     title: string;
     version?: string;
+};
+
+export type RecipeManifest = {
+    isArchived: boolean;
+    isGlobal: boolean;
+    lastModified: string;
+    name: string;
+    recipes: Recipe;
 };
 
 export type RecipeParameter = {
@@ -1546,6 +1562,35 @@ export type EncodeRecipeResponses = {
 };
 
 export type EncodeRecipeResponse2 = EncodeRecipeResponses[keyof EncodeRecipeResponses];
+
+export type ListRecipesData = {
+    body?: never;
+    path?: never;
+    query: {
+        include_archived: boolean;
+    };
+    url: '/recipes/list';
+};
+
+export type ListRecipesErrors = {
+    /**
+     * Unauthorized - Invalid or missing API key
+     */
+    401: unknown;
+    /**
+     * Internal server error
+     */
+    500: unknown;
+};
+
+export type ListRecipesResponses = {
+    /**
+     * Get recipe list successfully
+     */
+    200: ListRecipeResponse;
+};
+
+export type ListRecipesResponse = ListRecipesResponses[keyof ListRecipesResponses];
 
 export type ScanRecipeData = {
     body: ScanRecipeRequest;
