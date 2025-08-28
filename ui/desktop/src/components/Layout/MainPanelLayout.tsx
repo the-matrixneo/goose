@@ -551,9 +551,12 @@ export const MainPanelLayout: React.FC<{
   // Calculate widths for horizontal split
   const hasLeftColumnContent = mainSidecarVisible || topContainer || bottomContainer;
   const hasRightColumnContent = rightMainContainer || rightTopContainer || rightBottomContainer;
-  const rightColumnWidth = hasRightColumnContent ? '50%' : '0%'; // Default 50% when right column has content
-  const leftColumnWidth = hasRightColumnContent && hasLeftColumnContent ? '50%' : 
-                          hasRightColumnContent && !hasLeftColumnContent ? '0%' : '100%';
+  
+  // Dynamic width calculation based on content presence
+  const leftColumnWidth = hasLeftColumnContent && hasRightColumnContent ? '50%' : 
+                          hasLeftColumnContent && !hasRightColumnContent ? '100%' : '0%';
+  const rightColumnWidth = hasRightColumnContent && hasLeftColumnContent ? '50%' :
+                           hasRightColumnContent && !hasLeftColumnContent ? '100%' : '0%';
 
   return (
     <div className={`h-dvh`}>
