@@ -692,13 +692,22 @@ export default function App() {
                     />
                   }
                 />
-
                 <Route path="settings" element={<SettingsRoute />} />
                 <Route path="extensions" element={<ExtensionsRoute />} />
                 <Route path="sessions" element={<SessionsRoute />} />
                 <Route path="schedules" element={<SchedulesRoute />} />
                 <Route path="recipes" element={<RecipesRoute resetChat={resetChat} />} />
                 <Route path="recipe-editor" element={<RecipeEditorRoute />} />
+                <Route
+                  path="shared-session"
+                  element={
+                    <SharedSessionRouteWrapper
+                      isLoadingSharedSession={isLoadingSharedSession}
+                      setIsLoadingSharedSession={setIsLoadingSharedSession}
+                      sharedSessionError={sharedSessionError}
+                    />
+                  }
+                />
                 <Route path="permission" element={<PermissionRoute />} />
               </Route>
             </Routes>
