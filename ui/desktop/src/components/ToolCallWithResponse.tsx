@@ -39,12 +39,41 @@ export default function ToolCallWithResponse({
   // Always mount the component to keep hooks order consistent. Render nothing if no toolCall.
   const shouldRender = !!toolCall;
 
-  // Manual open via per-result action; no auto-open to allow selection
+  // Find UI resource in tool response
+  const ui = (toolResponse?.toolResult?.value || []).find((c) => isUIResource(c));
+
+  // Track if we've already auto-opened for this tool call to prevent double-firing
+  const hasAutoOpened = React.useRef(false);
+
+  // Auto-open sidecar when tool finishes and contains UI resource
+  React.useEffect(() => {
+    // Reset flag when streaming starts (new tool call)
+    if (isStreamingMessage) {
+      hasAutoOpened.current = false;
+      return;
+    }
+
+    // Auto-open when tool finishes with UI resource
+    if (ui && isUIResource(ui) && !hasAutoOpened.current) {
+      hasAutoOpened.current = true;
+      // Small delay to ensure the tool response is fully processed
+      const timer = setTimeout(() => {
+        sidecar.openWithMCPUI({
+          resource: ui as ResourceContent,
+          appendPromptToChat: append,
+        });
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+
+    // Explicit return for TypeScript when no conditions are met
+    return undefined;
+  }, [ui, isStreamingMessage, append, sidecar]);
 
   return (
     <>
       {shouldRender && (
-        <div className="relative">
+        <div className="relative ">
           <div
             className={cn(
               'w-full text-sm font-sans rounded-lg overflow-hidden border-borderSubtle border bg-background-default p-3'
@@ -58,33 +87,25 @@ export default function ToolCallWithResponse({
                 notifications,
                 isStreamingMessage,
                 openInSidecar: (resource: ResourceContent) =>
-                  sidecar.toggleMCPUI({ resource, appendPromptToChat: append }),
+                  sidecar.openWithMCPUI({ resource, appendPromptToChat: append }),
               }}
             />
           </div>
-          {(() => {
-            const ui = (toolResponse?.toolResult?.value || []).find((c) => isUIResource(c));
-            return ui && isUIResource(ui) ? (
-              <button
-                className="absolute z-10 rounded bg-background-default/95 border border-borderSubtle shadow hover:bg-bgSubtle"
-                title={sidecar.isOpen ? 'Close side panel' : 'Open in side panel'}
-                aria-label={sidecar.isOpen ? 'Close side panel' : 'Open in side panel'}
-                onClick={() =>
-                  sidecar.toggleMCPUI({
-                    resource: ui as ResourceContent,
-                    appendPromptToChat: append,
-                  })
-                }
-                style={{
-                  right: 'calc(var(--spacing) * -21)',
-                  top: 'calc(var(--spacing) * 1)',
-                  padding: '6px',
-                }}
-              >
-                <SquareArrowOutUpRight size={14} />
-              </button>
-            ) : null;
-          })()}
+          {ui && isUIResource(ui) ? (
+            <button
+              className="absolute right-[-40px] top-0 z-10 p-2 rounded bg-background-default/95 border border-borderSubtle shadow hover:bg-bgSubtle cursor-pointer"
+              title="Open in side panel"
+              aria-label="Open in side panel"
+              onClick={() => {
+                sidecar.openWithMCPUI({
+                  resource: ui as ResourceContent,
+                  appendPromptToChat: append,
+                });
+              }}
+            >
+              <SquareArrowOutUpRight size={14} />
+            </button>
+          ) : null}
         </div>
       )}
     </>

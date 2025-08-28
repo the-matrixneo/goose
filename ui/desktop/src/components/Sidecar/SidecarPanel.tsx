@@ -24,12 +24,12 @@ export default function SidecarPanel() {
     >
       {isOpen && (
         <div className="h-full flex flex-col">
-          <div className="sticky top-0 z-10 flex items-center justify-between px-3 py-2 border-b border-borderSubtle bg-background-default/95 backdrop-blur supports-[backdrop-filter]:bg-background-default/70">
+          <div className="sticky top-0 z-100 flex items-center justify-between px-3 py-2 border-b border-borderSubtle bg-background-default/95 backdrop-blur supports-[backdrop-filter]:bg-background-default/70">
             <div className="text-xs font-sans text-textSubtle uppercase tracking-wide">
               MCP‑UI sidecar
             </div>
             <button
-              className="inline-flex items-center justify-center w-6 h-6 rounded hover:bg-bgSubtle text-textSubtle hover:text-textStandard"
+              className="no-drag inline-flex items-center justify-center w-6 h-6 cursor-pointer rounded hover:bg-bgSubtle text-textSubtle hover:text-textStandard relative z-50 pointer-events-auto"
               onClick={close}
               aria-label="Close side panel"
               title="Close"

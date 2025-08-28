@@ -76,14 +76,16 @@ export function SidecarProvider({ children }: { children: React.ReactNode }) {
         resource: payload.resource,
         appendPromptToChat: payload.appendPromptToChat,
       });
-      setIsOpen(true);
-      if (window?.electron && 'setSidecarOpen' in window.electron) {
+      // Only resize window if sidecar wasn't already open
+      if (!isOpen && window?.electron && 'setSidecarOpen' in window.electron) {
+        console.log('Resizing window for sidecar open');
         // notify main process to enlarge window
         // @ts-expect-error exposed in preload
         window.electron.setSidecarOpen(true);
       }
+      setIsOpen(true);
     },
-    []
+    [isOpen]
   );
 
   const toggleMCPUI = useCallback(
