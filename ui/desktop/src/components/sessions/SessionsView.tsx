@@ -97,7 +97,7 @@ const SessionsView: React.FC<SessionsViewProps> = ({ setView }) => {
     <SessionListView
       setView={setView}
       onSelectSession={handleSelectSession}
-      selectedSessionId={selectedSession?.session_id ?? null}
+      selectedSessionId={selectedSession?.sessionId ?? null}
     />
   );
 };

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { IpcRendererEvent } from 'electron';
 import { HashRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
-import { openSharedSessionFromDeepLink, type SessionLinksViewOptions } from './sessionLinks';
+import { openSharedSessionFromDeepLink } from './sessionLinks';
 import { type SharedSessionDetails } from './sharedSessions';
 import { ErrorUI } from './components/ErrorBoundary';
 import { ExtensionInstallModal } from './components/ExtensionInstallModal';
@@ -404,16 +404,13 @@ export default function App() {
       setIsLoadingSharedSession(true);
       setSharedSessionError(null);
       try {
-        await openSharedSessionFromDeepLink(
-          link,
-          (_view: View, _options?: SessionLinksViewOptions) => {
-            // Navigate to shared session view with the session data
-            window.location.hash = '#/shared-session';
-            if (_options) {
-              window.history.replaceState(_options, '', '#/shared-session');
-            }
+        await openSharedSessionFromDeepLink(link, (_view: View, _options?: ViewOptions) => {
+          // Navigate to shared session view with the session data
+          window.location.hash = '#/shared-session';
+          if (_options) {
+            window.history.replaceState(_options, '', '#/shared-session');
           }
-        );
+        });
       } catch (error) {
         console.error('Unexpected error opening shared session:', error);
         // Navigate to shared session view with error

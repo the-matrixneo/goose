@@ -31,8 +31,9 @@ export type ViewOptions = {
   parentView?: View;
   parentViewOptions?: ViewOptions;
   disableAnimation?: boolean;
-  initialMessage: string;
+  initialMessage?: string;
   resetChat?: boolean;
+  shareToken?: string;
 };
 
 export const createNavigationHandler = (navigate: NavigateFunction) => {
