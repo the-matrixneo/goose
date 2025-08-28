@@ -72,7 +72,7 @@ export const useCurrentModelInfo = () => useContext(CurrentModelContext);
 
 interface BaseChatProps {
   chat: ChatType;
-  setChat: (chat: ChatType) => void;
+  setChatMessages: (chat: Message[]) => void;
   setView: (view: View, viewOptions?: ViewOptions) => void;
   setIsGoosehintsModalOpen?: (isOpen: boolean) => void;
   onMessageStreamFinish?: () => void;
@@ -93,7 +93,7 @@ interface BaseChatProps {
 
 function BaseChatContent({
   chat,
-  setChat,
+  setChatMessages,
   setView,
   setIsGoosehintsModalOpen,
   onMessageStreamFinish,
@@ -148,7 +148,7 @@ function BaseChatContent({
     onMessageUpdate,
   } = useChatEngine({
     chat,
-    setChat,
+    setChatMessages,
     onMessageStreamFinish: () => {
       // Call the original callback if provided
       onMessageStreamFinish?.();

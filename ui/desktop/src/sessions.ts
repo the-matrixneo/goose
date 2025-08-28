@@ -98,9 +98,13 @@ export async function fetchSessions(): Promise<Session[]> {
  * @param sessionId The ID of the session to fetch
  * @returns Promise with session details
  */
-export async function fetchSessionDetails(sessionId: string): Promise<SessionDetails> {
+export async function fetchSessionDetails(
+  sessionId: string,
+  signal?: AbortController['signal']
+): Promise<SessionDetails> {
   const response = await getSessionHistory<true>({
     path: { session_id: sessionId },
+    signal,
   });
 
   // Convert the SessionHistoryResponse to a SessionDetails object

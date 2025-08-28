@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useConfig } from '../components/ConfigContext';
 import { ChatType } from '../types/chat';
 import { Recipe } from '../recipe';
@@ -29,19 +29,32 @@ export enum AgentState {
 export interface InitializationContext {
   recipeConfig?: Recipe;
   resumeSessionId?: string;
-  setAgentWaitingMessage: (msg: string | null) => void;
 }
 
 interface UseAgentReturn {
   agentState: AgentState;
+  agentStateMessage: string | null;
   resetChat: () => void;
-  loadCurrentChat: (context: InitializationContext) => Promise<ChatType>;
+  chat: ChatType | null;
 }
 
-export function useAgent(): UseAgentReturn {
+function wrapWithAbortSignal<T extends Array<unknown>, U>(
+  func: (...args: T) => U,
+  signal: AbortController['signal']
+) {
+  return (...args: T): U => {
+    if (signal.aborted) {
+      throw new Error('Aborted');
+    }
+    return func(...args);
+  };
+}
+
+export function useAgent({ recipeConfig, resumeSessionId }: InitializationContext): UseAgentReturn {
   const [agentState, setAgentState] = useState<AgentState>(AgentState.UNINITIALIZED);
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const initPromiseRef = useRef<Promise<ChatType> | null>(null);
+  const [chat, setChat] = useState<ChatType | null>(null);
+  const [agentStateMessage, setAgentStateMessage] = useState<string | null>(null);
 
   const { getExtensions, addExtension, read } = useConfig();
 
@@ -51,133 +64,137 @@ export function useAgent(): UseAgentReturn {
   }, []);
 
   const agentIsInitialized = agentState === AgentState.INITIALIZED;
-  const currentChat = useCallback(
-    async (initContext: InitializationContext): Promise<ChatType> => {
-      if (agentIsInitialized && sessionId) {
-        const sessionDetails = await fetchSessionDetails(sessionId);
+  const recipeTitle = recipeConfig?.title;
 
-        const chat: ChatType = {
-          sessionId: sessionDetails.sessionId,
-          title: sessionDetails.metadata.description || 'Chat Session',
-          messageHistoryIndex: 0,
-          messages: sessionDetails.messages,
-        };
-
-        // TODO(Douwe): we should store the recipe config on the server so not needed here:
-        if (initContext.recipeConfig) {
-          chat.title = initContext.recipeConfig.title || chat.title;
-          chat.recipeConfig = initContext.recipeConfig;
-        }
-
-        return chat;
-      }
-
-      if (initPromiseRef.current) {
-        return initPromiseRef.current;
-      }
-
-      const initPromise = (async () => {
-        setAgentState(AgentState.INITIALIZING);
-        const agentWaitingMessage = initContext.setAgentWaitingMessage;
-        agentWaitingMessage('Agent is initializing');
-
-        try {
-          const config = window.electron.getConfig();
-          const provider = (await read('GOOSE_PROVIDER', false)) ?? config.GOOSE_DEFAULT_PROVIDER;
-          const model = (await read('GOOSE_MODEL', false)) ?? config.GOOSE_DEFAULT_MODEL;
-
-          if (!provider || !model) {
-            setAgentState(AgentState.NO_PROVIDER);
-            throw new Error('No provider or model configured');
-          }
-
-          const agentResponse = initContext.resumeSessionId
-            ? await resumeAgent({
-                body: {
-                  session_id: initContext.resumeSessionId,
-                },
-                throwOnError: true,
-              })
-            : await startAgent({
-                body: {
-                  working_dir: window.appConfig.get('GOOSE_WORKING_DIR') as string,
-                },
-                throwOnError: true,
-              });
-
-          const agentSessionInfo = agentResponse.data;
-          if (!agentSessionInfo) {
-            throw Error('Failed to get session info');
-          }
-          setSessionId(agentSessionInfo.session_id);
-
-          agentWaitingMessage('Agent is loading config');
-
-          await initConfig();
-
-          try {
-            await readAllConfig({ throwOnError: true });
-          } catch (error) {
-            console.warn('Initial config read failed, attempting recovery:', error);
-            await handleConfigRecovery();
-          }
-
-          agentWaitingMessage('Extensions are loading');
-          console.log(`calling initializeSystem with sessionId: ${agentSessionInfo.session_id}`);
-          await initializeSystem(agentSessionInfo.session_id, provider as string, model as string, {
-            getExtensions,
-            addExtension,
-          });
-          console.log('init system done!!');
-
-          if (COST_TRACKING_ENABLED) {
-            try {
-              await initializeCostDatabase();
-            } catch (error) {
-              console.error('Failed to initialize cost database:', error);
-            }
-          }
-
-          let initChat: ChatType = {
-            sessionId: agentSessionInfo.session_id,
-            title: agentSessionInfo.metadata.description,
+  useEffect(() => {
+    const abortController = new AbortController();
+    (async function () {
+      try {
+        if (agentIsInitialized && sessionId) {
+          const sessionDetails = await fetchSessionDetails(sessionId, abortController.signal);
+          const chat: ChatType = {
+            sessionId: sessionDetails.sessionId,
+            title: sessionDetails.metadata.description || 'Chat Session',
             messageHistoryIndex: 0,
-            messages: agentSessionInfo.messages.map((message: ApiMessage) =>
-              convertApiMessageToFrontendMessage(message, true, true)
-            ),
+            messages: sessionDetails.messages,
           };
 
-          if (initContext.recipeConfig) {
-            initChat.title = initContext.recipeConfig.title || initChat.title;
-            initChat.recipeConfig = initContext.recipeConfig;
-          }
-
-          setAgentState(AgentState.INITIALIZED);
-
-          return initChat;
-        } catch (error) {
-          if ((error + '').includes('Failed to create provider')) {
-            setAgentState(AgentState.NO_PROVIDER);
-          } else {
-            setAgentState(AgentState.ERROR);
-          }
-          throw error;
-        } finally {
-          agentWaitingMessage(null);
-          initPromiseRef.current = null;
+          chat.title = recipeTitle || chat.title;
+          setChat(chat);
+          return;
         }
-      })();
 
-      initPromiseRef.current = initPromise;
-      return initPromise;
-    },
-    [getExtensions, addExtension, read, agentIsInitialized, sessionId]
-  );
+        setAgentState(AgentState.INITIALIZING);
+        setAgentStateMessage('Agent is initializing');
+
+        const config = window.electron.getConfig();
+        const provider = (await read('GOOSE_PROVIDER', false)) ?? config.GOOSE_DEFAULT_PROVIDER;
+        const model = (await read('GOOSE_MODEL', false)) ?? config.GOOSE_DEFAULT_MODEL;
+
+        if (!provider || !model) {
+          setAgentState(AgentState.NO_PROVIDER);
+          throw new Error('No provider or model configured');
+        }
+
+        const agentResponse = resumeSessionId
+          ? await resumeAgent({
+              body: {
+                session_id: resumeSessionId,
+              },
+              throwOnError: true,
+              signal: abortController.signal,
+            })
+          : await startAgent({
+              body: {
+                working_dir: window.appConfig.get('GOOSE_WORKING_DIR') as string,
+              },
+              throwOnError: true,
+              signal: abortController.signal,
+            });
+
+        const agentSessionInfo = agentResponse.data;
+        if (!agentSessionInfo) {
+          throw Error('Failed to get session info');
+        }
+        setSessionId(agentSessionInfo.session_id);
+
+        setAgentStateMessage('Agent is loading config');
+
+        await initConfig();
+
+        try {
+          await readAllConfig({ throwOnError: true });
+        } catch (error) {
+          console.warn('Initial config read failed, attempting recovery:', error);
+          await handleConfigRecovery();
+        }
+
+        setAgentStateMessage('Extensions are loading');
+        console.log(`calling initializeSystem with sessionId: ${agentSessionInfo.session_id}`);
+        await initializeSystem(agentSessionInfo.session_id, provider as string, model as string, {
+          getExtensions,
+          addExtension: wrapWithAbortSignal(addExtension, abortController.signal),
+        });
+        console.log('init system done!!');
+
+        if (COST_TRACKING_ENABLED) {
+          try {
+            await initializeCostDatabase();
+          } catch (error) {
+            console.error('Failed to initialize cost database:', error);
+          }
+        }
+
+        let initChat: ChatType = {
+          sessionId: agentSessionInfo.session_id,
+          title: recipeTitle ?? agentSessionInfo.metadata.description,
+          messageHistoryIndex: 0,
+          messages: agentSessionInfo.messages.map((message: ApiMessage) =>
+            convertApiMessageToFrontendMessage(message, true, true)
+          ),
+        };
+        setAgentState(AgentState.INITIALIZED);
+
+        setChat(initChat);
+      } catch (error) {
+        if ((error + '').startsWith('Abort')) {
+          // react aborted this effect
+        } else if ((error + '').includes('Failed to create provider')) {
+          setAgentState(AgentState.NO_PROVIDER);
+          throw error;
+        } else {
+          setAgentState(AgentState.ERROR);
+          throw error;
+        }
+      } finally {
+        setAgentStateMessage(null);
+      }
+    })();
+
+    return () => {
+      abortController.abort('Aborted: useEffect cleanup');
+    };
+  }, [
+    getExtensions,
+    addExtension,
+    read,
+    agentIsInitialized,
+    sessionId,
+    resumeSessionId,
+    recipeTitle,
+  ]);
+
+  // TODO(Douwe/Jack): we should store the recipe config on the server so not needed here:
+  const chatWithRecipe: ChatType | null = chat && {
+    ...chat,
+    recipeConfig,
+  };
 
   return {
     agentState,
+    agentStateMessage,
     resetChat,
-    loadCurrentChat: currentChat,
+    chat: chatWithRecipe,
   };
 }
 

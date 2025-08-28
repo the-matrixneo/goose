@@ -1,16 +1,11 @@
 import React, { createContext, useContext, ReactNode } from 'react';
 import { ChatType } from '../types/chat';
-import { generateSessionId } from '../sessions';
 import { Recipe } from '../recipe';
 import { useDraftContext } from './DraftContext';
-
-// TODO(Douwe): We should not need this anymore
-export const DEFAULT_CHAT_TITLE = 'New Chat';
 
 interface ChatContextType {
   chat: ChatType;
   setChat: (chat: ChatType) => void;
-  resetChat: () => void;
   hasActiveSession: boolean;
   setRecipeConfig: (recipe: Recipe | null) => void;
   clearRecipeConfig: () => void;
@@ -55,20 +50,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     draftContext.clearDraft(contextKey);
   };
 
-  const resetChat = () => {
-    const newSessionId = generateSessionId();
-    setChat({
-      sessionId: newSessionId,
-      title: DEFAULT_CHAT_TITLE,
-      messages: [],
-      messageHistoryIndex: 0,
-      recipeConfig: null, // Clear recipe when resetting chat
-      recipeParameters: null, // Clear parameters when resetting chat
-    });
-    // Clear draft when resetting chat
-    clearDraft();
-  };
-
   const setRecipeConfig = (recipe: Recipe | null) => {
     setChat({
       ...chat,
@@ -102,7 +83,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
   const value: ChatContextType = {
     chat,
     setChat,
-    resetChat,
     hasActiveSession,
     setRecipeConfig,
     clearRecipeConfig,

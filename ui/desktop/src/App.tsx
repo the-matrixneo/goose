@@ -30,7 +30,8 @@ import { Recipe } from './recipe';
 import RecipesView from './components/RecipesView';
 import RecipeEditor from './components/RecipeEditor';
 import { createNavigationHandler, View, ViewOptions } from './utils/navigationUtils';
-import { AgentState, InitializationContext, useAgent } from './hooks/useAgent';
+import { AgentState, useAgent } from './hooks/useAgent';
+import { Message } from './types/message';
 
 // Route Components
 const HubRouteWrapper = ({
@@ -54,20 +55,14 @@ const HubRouteWrapper = ({
 
 const PairRouteWrapper = ({
   chat,
-  setChat,
+  setChatMessages,
   setIsGoosehintsModalOpen,
-  setAgentWaitingMessage,
-  setFatalError,
   agentState,
-  loadCurrentChat,
 }: {
   chat: ChatType;
-  setChat: (chat: ChatType) => void;
+  setChatMessages: (messages: Message[]) => void;
   setIsGoosehintsModalOpen: (isOpen: boolean) => void;
-  setAgentWaitingMessage: (msg: string | null) => void;
-  setFatalError: (value: ((prevState: string | null) => string | null) | string | null) => void;
   agentState: AgentState;
-  loadCurrentChat: (context: InitializationContext) => Promise<ChatType>;
 }) => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -78,12 +73,9 @@ const PairRouteWrapper = ({
   return (
     <Pair
       chat={chat}
-      setChat={setChat}
+      setChatMessages={setChatMessages}
       setView={setView}
       agentState={agentState}
-      loadCurrentChat={loadCurrentChat}
-      setFatalError={setFatalError}
-      setAgentWaitingMessage={setAgentWaitingMessage}
       setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
       routeState={routeState}
     />
@@ -258,31 +250,63 @@ const ExtensionsRoute = () => {
 export default function App() {
   const [fatalError, setFatalError] = useState<string | null>(null);
   const [isGoosehintsModalOpen, setIsGoosehintsModalOpen] = useState(false);
-  const [agentWaitingMessage, setAgentWaitingMessage] = useState<string | null>(null);
+  const [recipeConfig, setRecipeConfig] = useState<Recipe | null>(null);
+  const [resumeSessionId, setResumeSessionId] = useState<string | null>(null);
 
-  const [chat, _setChat] = useState<ChatType>({
+  const [chatFromState, setChat] = useState<ChatType | null>(null);
+
+  const setChatMessages = useCallback(
+    (messages: Message[]) => {
+      setChat((prevChat: ChatType | null) => {
+        if (prevChat) {
+          return {
+            ...prevChat,
+            messages,
+          };
+        } else {
+          return prevChat;
+        }
+      });
+    },
+    [setChat]
+  );
+
+  const { addExtension } = useConfig();
+  const {
+    agentState,
+    agentStateMessage,
+    resetChat,
+    chat: chatFromServer,
+  } = useAgent({
+    resumeSessionId: resumeSessionId || undefined,
+    recipeConfig: recipeConfig || undefined,
+  });
+
+  const chatIsUnUnitialized = chatFromState === null;
+  useEffect(() => {
+    if (chatIsUnUnitialized && chatFromServer !== null) {
+      setChat(chatFromServer);
+    }
+  }, [chatFromServer, chatIsUnUnitialized]);
+
+  const chat = chatFromState || {
     sessionId: generateSessionId(),
     title: 'Pair Chat',
     messages: [],
     messageHistoryIndex: 0,
     recipeConfig: null,
-  });
+  };
 
-  const setChat = useCallback<typeof _setChat>(
-    (update) => {
-      //console.log('setChat called with:', update); // TODO(Douwe): Undo
-      _setChat(update);
-    },
-    [_setChat]
-  );
+  if (chat && !chat.sessionId) {
+    console.error('No session id', chatFromState, chatFromServer);
+  }
 
-  const { addExtension } = useConfig();
-  const { agentState, loadCurrentChat, resetChat } = useAgent();
   const resetChatIfNecessary = useCallback(() => {
     if (chat.messages.length > 0) {
+      setChat(null);
       resetChat();
     }
-  }, [resetChat, chat.messages.length]);
+  }, [resetChat, chat.messages.length, setChat]);
 
   useEffect(() => {
     console.log('Sending reactReady signal to Electron');
@@ -303,17 +327,23 @@ export default function App() {
     const resumeSessionId = urlParams.get('resumeSessionId') || undefined;
     const recipeConfig = (window.appConfig?.get('recipe') || undefined) as Recipe;
 
-    const stateData: PairRouteState = {
-      resumeSessionId: resumeSessionId,
-      recipeConfig: recipeConfig,
-    };
-    (async () => {
-      await loadCurrentChat({ setAgentWaitingMessage, ...stateData });
-    })();
+    if (resumeSessionId) {
+      setResumeSessionId(resumeSessionId);
+    }
+    if (recipeConfig) {
+      setRecipeConfig(recipeConfig);
+    }
 
     if (resumeSessionId || (recipeConfig && typeof recipeConfig === 'object')) {
       window.location.hash = '#/pair';
-      window.history.replaceState(stateData, '', '#/pair');
+      window.history.replaceState(
+        {
+          recipeConfig,
+          resumeSessionId,
+        },
+        '',
+        '#/pair'
+      );
       return;
     }
 
@@ -348,7 +378,7 @@ export default function App() {
         }
       }
     }
-  }, [resetChat, loadCurrentChat, setAgentWaitingMessage]);
+  }, []);
 
   // Handle recipe decode events from main process
   useEffect(() => {
@@ -372,13 +402,13 @@ export default function App() {
     const handleRecipeDecoded = (_event: IpcRendererEvent, ...args: unknown[]) => {
       const decodedRecipe = args[0] as Recipe;
 
-      setChat((prevChat) => ({
-        ...prevChat,
+      setChat({
+        sessionId: generateSessionId(),
         recipeConfig: decodedRecipe,
         title: decodedRecipe.title || 'Recipe Chat',
-        messages: [], // Start fresh for recipe
+        messages: [],
         messageHistoryIndex: 0,
-      }));
+      });
 
       const stateData: PairRouteState = {
         recipeConfig: decodedRecipe,
@@ -577,7 +607,7 @@ export default function App() {
                       chat={chat}
                       setChat={setChat}
                       contextKey="hub"
-                      agentWaitingMessage={agentWaitingMessage}
+                      agentWaitingMessage={agentStateMessage}
                     >
                       <AppLayout setIsGoosehintsModalOpen={setIsGoosehintsModalOpen} />
                     </ChatProvider>
@@ -598,11 +628,8 @@ export default function App() {
                   element={
                     <PairRouteWrapper
                       chat={chat}
-                      setChat={setChat}
+                      setChatMessages={setChatMessages}
                       agentState={agentState}
-                      loadCurrentChat={loadCurrentChat}
-                      setFatalError={setFatalError}
-                      setAgentWaitingMessage={setAgentWaitingMessage}
                       setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
                     />
                   }

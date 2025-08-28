@@ -27,14 +27,14 @@ const isUserMessage = (message: Message): boolean => {
 
 interface UseChatEngineProps {
   chat: ChatType;
-  setChat: (chat: ChatType) => void;
+  setChatMessages: (messages: Message[]) => void;
   onMessageStreamFinish?: () => void;
   onMessageSent?: () => void; // Add callback for when message is sent
 }
 
 export const useChatEngine = ({
   chat,
-  setChat,
+  setChatMessages,
   onMessageStreamFinish,
   onMessageSent,
 }: UseChatEngineProps) => {
@@ -188,11 +188,10 @@ export const useChatEngine = ({
     setLocalOutputTokens(outputTokens);
   }, [messages]);
 
-  // Update chat messages when they change
+  // TODO(jack): this is an anti-pattern: https://react.dev/learn/you-might-not-need-an-effect#passing-data-to-the-parent
   useEffect(() => {
-    // @ts-expect-error - TypeScript being overly strict about the return type
-    setChat((prevChat: ChatType) => ({ ...prevChat, messages }));
-  }, [messages, setChat]);
+    setChatMessages(messages);
+  }, [messages, setChatMessages]);
 
   // Fetch session metadata to get token count
   useEffect(() => {

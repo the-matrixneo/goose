@@ -124,7 +124,7 @@ describe('useChatEngine', () => {
       const { result } = renderHook(() =>
         useChatEngine({
           chat: mockChat,
-          setChat: vi.fn(),
+          setChatMessages: vi.fn(),
         })
       );
 

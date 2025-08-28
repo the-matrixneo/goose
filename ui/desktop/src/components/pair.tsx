@@ -4,12 +4,13 @@ import BaseChat from './BaseChat';
 import { useRecipeManager } from '../hooks/useRecipeManager';
 import { useIsMobile } from '../hooks/use-mobile';
 import { useSidebar } from './ui/sidebar';
-import { AgentState, InitializationContext } from '../hooks/useAgent';
+import { AgentState } from '../hooks/useAgent';
 import 'react-toastify/dist/ReactToastify.css';
 import { cn } from '../utils';
 
 import { ChatType } from '../types/chat';
 import { Recipe } from '../recipe';
+import { Message } from '../types/message';
 
 export interface PairRouteState {
   resumeSessionId?: string;
@@ -19,23 +20,17 @@ export interface PairRouteState {
 
 export default function Pair({
   chat,
-  setChat,
+  setChatMessages,
   setView,
   setIsGoosehintsModalOpen,
-  setFatalError,
-  setAgentWaitingMessage,
   agentState,
-  loadCurrentChat,
   routeState,
 }: {
   chat: ChatType;
-  setChat: (chat: ChatType) => void;
+  setChatMessages: (messages: Message[]) => void;
   setView: (view: View, viewOptions?: ViewOptions) => void;
   setIsGoosehintsModalOpen: (isOpen: boolean) => void;
-  setFatalError: (value: ((prevState: string | null) => string | null) | string | null) => void;
-  setAgentWaitingMessage: (msg: string | null) => void;
   agentState: AgentState;
-  loadCurrentChat: (context: InitializationContext) => Promise<ChatType>;
   routeState: PairRouteState;
 }) {
   const isMobile = useIsMobile();
@@ -44,42 +39,8 @@ export default function Pair({
   const [shouldAutoSubmit, setShouldAutoSubmit] = useState(false);
   const [messageToSubmit, setMessageToSubmit] = useState<string | null>(null);
   const [isTransitioningFromHub, setIsTransitioningFromHub] = useState(false);
-  const [recipeResetOverride, setRecipeResetOverride] = useState(false);
-  const [loadingChat, setLoadingChat] = useState(false);
-
-  const recipeJson = JSON.stringify(routeState.recipeConfig);
-
-  useEffect(() => {
-    const initializeFromState = async () => {
-      setLoadingChat(true);
-      try {
-        const chat = await loadCurrentChat({
-          recipeConfig: routeState.recipeConfig,
-          resumeSessionId: routeState.resumeSessionId,
-          setAgentWaitingMessage,
-        });
-        if (!chat.recipeConfig && agentState === 'initialized') {
-          setRecipeResetOverride(true);
-        }
-        setChat(chat);
-      } catch (error) {
-        console.log(error);
-        setFatalError(`Agent init failure: ${error instanceof Error ? error.message : '' + error}`);
-      } finally {
-        setLoadingChat(false);
-      }
-    };
-    initializeFromState();
-  }, [
-    agentState,
-    setChat,
-    setFatalError,
-    setAgentWaitingMessage,
-    loadCurrentChat,
-    routeState.resumeSessionId,
-    routeState.recipeConfig,
-    recipeJson, // TODO: Hacky object comparison, but works for now
-  ]);
+  const [recipeResetOverride, _setRecipeResetOverride] = useState(false);
+  const [loadingChat, _setLoadingChat] = useState(false);
 
   // Followed by sending the initialMessage if we have one. This will happen
   // only once, unless we reset the chat in step one.
@@ -129,7 +90,7 @@ export default function Pair({
       chat={chat}
       loadingChat={loadingChat}
       autoSubmit={shouldAutoSubmit}
-      setChat={setChat}
+      setChatMessages={setChatMessages}
       setView={setView}
       setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
       onMessageSubmit={handleMessageSubmit}
