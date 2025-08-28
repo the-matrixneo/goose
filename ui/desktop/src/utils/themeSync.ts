@@ -54,15 +54,11 @@ export function broadcastThemeChange(themeState: ThemeState): void {
   try {
     // Store the current state for other windows to read
     localStorage.setItem(THEME_SYNC_KEY, JSON.stringify(themeState));
-
-    // Dispatch a custom event for immediate synchronization
     window.dispatchEvent(
       new CustomEvent(THEME_SYNC_EVENT, {
         detail: themeState,
       })
     );
-
-    console.log('[Theme Sync] Broadcasted theme change:', themeState);
   } catch (error) {
     console.warn('[Theme Sync] Failed to broadcast theme change:', error);
   }
@@ -112,7 +108,6 @@ export function initializeThemeSync(onThemeChange?: (themeState: ThemeState) => 
   const cleanup = listenForThemeChanges((themeState) => {
     console.log('[Theme Sync] Received theme change from another window:', themeState);
 
-    // Apply the theme
     applyTheme(themeState.isDarkMode);
 
     // Update localStorage to match
