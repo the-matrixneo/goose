@@ -8,7 +8,7 @@ use crate::recipe::Recipe;
 #[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct RecipeManifest {
     pub name: String,
-    pub recipes: Recipe,
+    pub recipe: Recipe,
     #[serde(rename = "isGlobal")]
     pub is_global: bool,
     #[serde(rename = "lastModified")]

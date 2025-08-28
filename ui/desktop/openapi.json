@@ -2864,7 +2864,7 @@
         "type": "object",
         "required": [
           "name",
-          "recipes",
+          "recipe",
           "isGlobal",
           "lastModified",
           "isArchived"
@@ -2882,7 +2882,7 @@
           "name": {
             "type": "string"
           },
-          "recipes": {
+          "recipe": {
             "$ref": "#/components/schemas/Recipe"
           }
         }

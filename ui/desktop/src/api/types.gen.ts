@@ -547,7 +547,7 @@ export type RecipeManifest = {
     isGlobal: boolean;
     lastModified: string;
     name: string;
-    recipes: Recipe;
+    recipe: Recipe;
 };
 
 export type RecipeParameter = {
