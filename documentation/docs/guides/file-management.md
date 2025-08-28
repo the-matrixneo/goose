@@ -48,7 +48,7 @@ Implement validation and testing steps before and after Goose modifies any files
 
 ### Change Review
 
-Manually review or use automated code reviews to ensure the quality of generated code or changes. Integrate tools such as diff tools to visualize changes made by Goose. Implement a review process with team members or CI/CD pipelines.
+Manually review or use automated code reviews to ensure the quality of generated code or changes. Integrate tools such as diff tools to visualise changes made by Goose. Implement a review process with team members or CI/CD pipelines.
 
 ### Codebase Organization
 

@@ -256,6 +256,7 @@ When the keyring is disabled, secrets are stored here:
 * Windows: `%APPDATA%\Block\goose\config\secrets.yaml`
 :::
 
+
 ## Langfuse Integration
 
 These variables configure the [Langfuse integration for observability](/docs/tutorials/langfuse).
