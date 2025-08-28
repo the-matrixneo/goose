@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription } from '../ui/card';
-import { listSessions } from '../../api';
 import { getApiUrl } from '../../config';
 import { Greeting } from '../common/Greeting';
-import { fetchSessionDetails, type Session } from '../../sessions';
+import { fetchSessions, fetchSessionDetails, type Session } from '../../sessions';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../ui/button';
 import { ChatSmart } from '../icons/';
@@ -64,22 +63,8 @@ export function SessionInsights() {
 
     const loadRecentSessions = async () => {
       try {
-        const result = await listSessions();
-        if (result.data && result.data.sessions) {
-          // Convert API response to Session format - SessionInfo from API -> Session format
-          const sessions = result.data.sessions.map((sessionInfo: any) => ({
-            id: sessionInfo.id,
-            path: sessionInfo.path || sessionInfo.id, // Use path if available, otherwise use id
-            modified: sessionInfo.modified,
-            metadata: sessionInfo.metadata || { 
-              description: sessionInfo.id,
-              message_count: 0,
-              total_tokens: null,
-              working_dir: ''
-            }
-          }));
-          setRecentSessions(sessions.slice(0, 3));
-        }
+        const sessions = await fetchSessions();
+        setRecentSessions(sessions.slice(0, 3));
       } catch (error) {
         console.error('Failed to load recent sessions:', error);
       } finally {
