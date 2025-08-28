@@ -17,7 +17,7 @@ interface ContainerContent {
 
 interface SidecarContainer {
   id: string;
-  position: 'main' | 'top' | 'bottom' | 'right';
+  position: 'main' | 'top' | 'bottom' | 'right-main' | 'right-top' | 'right-bottom';
   content: ContainerContent | null;
   size: number; // Height percentage for vertical containers, width percentage for horizontal
 }
@@ -267,7 +267,7 @@ export const MainPanelLayout: React.FC<{
       // Update right container size
       setContainers(prev => {
         return prev.map(container => {
-          if (container.position === 'right') {
+          if (container.position.startsWith('right-')) {
             return { ...container, size: Math.max(20, Math.min(80, 100 - mousePercentage)) };
           }
           return container;
@@ -285,13 +285,15 @@ export const MainPanelLayout: React.FC<{
     document.addEventListener('mouseup', handleMouseUp);
   }, []);
 
-  const addContainer = (position: 'top' | 'right' | 'bottom') => {
+  const addContainer = (position: 'top' | 'bottom' | 'right-main' | 'right-top' | 'right-bottom') => {
     console.log('Adding container at position:', position);
     const newContainer: SidecarContainer = {
       id: `${position}-${Date.now()}`,
       position,
       content: null,
-      size: position === 'right' ? 50 : 33, // 50% width for right, 33% height for top/bottom
+      size: position.startsWith('right-') ? 
+      (position === 'right-main' ? 50 : 33) : // 50% width for right-main, 33% height for right-top/bottom
+      33, // 33% height for top/bottom
     };
 
     setContainers(prev => [...prev, newContainer]);
@@ -381,7 +383,9 @@ export const MainPanelLayout: React.FC<{
   // Get containers by position
   const topContainer = containers.find(c => c.position === 'top');
   const bottomContainer = containers.find(c => c.position === 'bottom');
-  const rightContainer = containers.find(c => c.position === 'right');
+  const rightMainContainer = containers.find(c => c.position === 'right-main');
+  const rightTopContainer = containers.find(c => c.position === 'right-top');
+  const rightBottomContainer = containers.find(c => c.position === 'right-bottom');
 
   // Calculate heights for vertical containers
   const calculateHeights = () => {
@@ -474,9 +478,82 @@ export const MainPanelLayout: React.FC<{
 
   const heights = calculateHeights();
 
+  // Calculate heights for right column containers
+  const calculateRightColumnHeights = () => {
+    const hasRightTop = !!rightTopContainer;
+    const hasRightBottom = !!rightBottomContainer;
+    const hasRightMain = !!rightMainContainer;
+    
+    if (!hasRightMain && !hasRightTop && !hasRightBottom) {
+      return { rightTopHeight: '0%', rightMainHeight: '0%', rightBottomHeight: '0%' };
+    }
+    
+    if (hasRightTop && hasRightMain && hasRightBottom) {
+      return {
+        rightTopHeight: `${rightTopContainer.size}%`,
+        rightMainHeight: `${100 - rightTopContainer.size - rightBottomContainer.size}%`,
+        rightBottomHeight: `${rightBottomContainer.size}%`,
+      };
+    }
+    
+    if (hasRightTop && hasRightMain) {
+      return {
+        rightTopHeight: `${rightTopContainer.size}%`,
+        rightMainHeight: `${100 - rightTopContainer.size}%`,
+        rightBottomHeight: '0%',
+      };
+    }
+    
+    if (hasRightMain && hasRightBottom) {
+      return {
+        rightTopHeight: '0%',
+        rightMainHeight: `${100 - rightBottomContainer.size}%`,
+        rightBottomHeight: `${rightBottomContainer.size}%`,
+      };
+    }
+    
+    if (hasRightMain) {
+      return {
+        rightTopHeight: '0%',
+        rightMainHeight: '100%',
+        rightBottomHeight: '0%',
+      };
+    }
+    
+    if (hasRightTop && hasRightBottom) {
+      return {
+        rightTopHeight: '50%',
+        rightMainHeight: '0%',
+        rightBottomHeight: '50%',
+      };
+    }
+    
+    if (hasRightTop) {
+      return {
+        rightTopHeight: '100%',
+        rightMainHeight: '0%',
+        rightBottomHeight: '0%',
+      };
+    }
+    
+    if (hasRightBottom) {
+      return {
+        rightTopHeight: '0%',
+        rightMainHeight: '0%',
+        rightBottomHeight: '100%',
+      };
+    }
+    
+    return { rightTopHeight: '0%', rightMainHeight: '0%', rightBottomHeight: '0%' };
+  };
+  const rightColumnHeights = calculateRightColumnHeights();
+
   // Calculate widths for horizontal split
-  const leftColumnWidth = rightContainer ? `${100 - rightContainer.size}%` : '100%';
-  const rightColumnWidth = rightContainer ? `${rightContainer.size}%` : '0%';
+  const hasLeftColumnContent = mainSidecarVisible || topContainer || bottomContainer;
+  const hasRightColumnContent = rightMainContainer || rightTopContainer || rightBottomContainer;
+  const rightColumnWidth = hasRightColumnContent ? '50%' : '0%'; // Default 50% when right column has content
+  const leftColumnWidth = hasRightColumnContent && hasLeftColumnContent ? '50%' : 
+                          hasRightColumnContent && !hasLeftColumnContent ? '0%' : '100%';
 
   return (
     <div className={`h-dvh`}>
@@ -522,14 +599,15 @@ export const MainPanelLayout: React.FC<{
             }}
             data-sidecar-area
           >
-            {/* Left Column (Main + Top/Bottom containers) */}
-            <div 
-              className="flex flex-col"
-              style={{ 
-                width: leftColumnWidth,
-                transition: isHorizontalResizing ? 'none' : 'width 300ms ease-out',
-              }}
-            >
+            {/* Left Column (Main + Top/Bottom containers) - Only render if has content */}
+            {(mainSidecarVisible || topContainer || bottomContainer) && (
+              <div 
+                className="flex flex-col"
+                style={{ 
+                  width: leftColumnWidth,
+                  transition: isHorizontalResizing ? 'none' : 'width 300ms ease-out',
+                }}
+              >
               {/* Top Container */}
               {topContainer && (
                 <div 
@@ -589,7 +667,7 @@ export const MainPanelLayout: React.FC<{
                   </div>
                 )}
 
-                {mainSidecarVisible && !rightContainer && (
+                {mainSidecarVisible && !rightMainContainer && (
                   <div
                     className="absolute top-0 right-0 bottom-0 w-4 z-20 pointer-events-auto"
                     onMouseEnter={() => setHoveredEdge('right')}
@@ -598,7 +676,7 @@ export const MainPanelLayout: React.FC<{
                     {hoveredEdge === 'right' && (
                       <div className="absolute right-1 top-1/2 transform -translate-y-1/2">
                         <Button
-                          onClick={() => addContainer('right')}
+                          onClick={() => addContainer('right-main')}
                           className="w-6 h-6 rounded-full bg-background-default border border-border-subtle shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-200"
                           variant="ghost"
                           size="sm"
@@ -661,10 +739,11 @@ export const MainPanelLayout: React.FC<{
                   />
                 </div>
               )}
-            </div>
+              </div>
+            )}
 
             {/* Vertical Resize Handle (between left and right columns) */}
-            {rightContainer && (
+            {(rightMainContainer || rightTopContainer || rightBottomContainer) && (
               <div 
                 className={`w-1 cursor-col-resize hover:bg-borderSubtle transition-colors group ${
                   isHorizontalResizing ? 'bg-borderProminent' : ''
@@ -680,7 +759,7 @@ export const MainPanelLayout: React.FC<{
             )}
 
             {/* Right Column */}
-            {rightContainer && (
+            {(rightMainContainer || rightTopContainer || rightBottomContainer) && (
               <div 
                 className="flex flex-col"
                 style={{ 
@@ -688,11 +767,165 @@ export const MainPanelLayout: React.FC<{
                   transition: isHorizontalResizing ? 'none' : 'width 300ms ease-out',
                 }}
               >
-                <IndividualContainer
-                  container={rightContainer}
-                  onRemove={removeContainer}
-                  onSetContent={setContainerContent}
-                />
+                {/* Right Top Container */}
+                {rightTopContainer && (
+                  <div 
+                    className="relative"
+                    style={{ height: rightColumnHeights.rightTopHeight }}
+                  >
+                    <IndividualContainer
+                      container={rightTopContainer}
+                      onRemove={removeContainer}
+                      onSetContent={setContainerContent}
+                    />
+                  </div>
+                )}
+
+                {/* Right Top-Main Resize Handle */}
+                {rightTopContainer && rightMainContainer && (
+                  <div 
+                    className={`h-1 cursor-row-resize hover:bg-borderSubtle transition-colors group ${
+                      isVerticalResizing ? 'bg-borderProminent' : ''
+                    }`}
+                    onMouseDown={(e) => handleVerticalMouseDown(e, 'right-top-main')}
+                  >
+                    <div 
+                      className={`w-8 h-0.5 bg-border-subtle group-hover:bg-border-strong rounded-full transition-colors mx-auto mt-0.5 ${
+                        isVerticalResizing ? 'bg-border-strong' : ''
+                      }`} 
+                    />
+                  </div>
+                )}
+
+                {/* Right Main Container */}
+                {rightMainContainer && (
+                  <div 
+                    className="relative flex-1"
+                    style={{ height: rightColumnHeights.rightMainHeight }}
+                  >
+                    <IndividualContainer
+                      container={rightMainContainer}
+                      onRemove={removeContainer}
+                      onSetContent={setContainerContent}
+                    />
+                    
+                    {/* Right Column Hover Zones */}
+                    {!rightTopContainer && (
+                      <div
+                        className="absolute top-0 left-0 right-0 h-4 z-20 pointer-events-auto"
+                        onMouseEnter={() => setHoveredEdge('right-top')}
+                        onMouseLeave={() => setHoveredEdge(null)}
+                      >
+                        {hoveredEdge === 'right-top' && (
+                          <div className="absolute left-1/2 top-1 transform -translate-x-1/2">
+                            <Button
+                              onClick={() => addContainer('right-top')}
+                              className="w-6 h-6 rounded-full bg-background-default border border-border-subtle shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-200"
+                              variant="ghost"
+                              size="sm"
+                            >
+                              <Plus className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {!rightBottomContainer && (
+                      <div
+                        className="absolute bottom-0 left-0 right-0 h-4 z-20 pointer-events-auto"
+                        onMouseEnter={() => setHoveredEdge('right-bottom')}
+                        onMouseLeave={() => setHoveredEdge(null)}
+                      >
+                        {hoveredEdge === 'right-bottom' && (
+                          <div className="absolute left-1/2 bottom-1 transform -translate-x-1/2">
+                            <Button
+                              onClick={() => addContainer('right-bottom')}
+                              className="w-6 h-6 rounded-full bg-background-default border border-border-subtle shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-200"
+                              variant="ghost"
+                              size="sm"
+                            >
+                              <Plus className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Right-only container hover zones when no main sidecar */}
+                    {!rightTopContainer && !mainSidecarVisible && (
+                      <div
+                        className="absolute top-0 left-0 right-0 h-4 z-20 pointer-events-auto"
+                        onMouseEnter={() => setHoveredEdge('right-top')}
+                        onMouseLeave={() => setHoveredEdge(null)}
+                      >
+                        {hoveredEdge === 'right-top' && (
+                          <div className="absolute left-1/2 top-1 transform -translate-x-1/2">
+                            <Button
+                              onClick={() => addContainer('right-top')}
+                              className="w-6 h-6 rounded-full bg-background-default border border-border-subtle shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-200"
+                              variant="ghost"
+                              size="sm"
+                            >
+                              <Plus className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {!rightBottomContainer && !mainSidecarVisible && (
+                      <div
+                        className="absolute bottom-0 left-0 right-0 h-4 z-20 pointer-events-auto"
+                        onMouseEnter={() => setHoveredEdge('right-bottom')}
+                        onMouseLeave={() => setHoveredEdge(null)}
+                      >
+                        {hoveredEdge === 'right-bottom' && (
+                          <div className="absolute left-1/2 bottom-1 transform -translate-x-1/2">
+                            <Button
+                              onClick={() => addContainer('right-bottom')}
+                              className="w-6 h-6 rounded-full bg-background-default border border-border-subtle shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-200"
+                              variant="ghost"
+                              size="sm"
+                            >
+                              <Plus className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Right Main-Bottom Resize Handle */}
+                {rightMainContainer && rightBottomContainer && (
+                  <div 
+                    className={`h-1 cursor-row-resize hover:bg-borderSubtle transition-colors group ${
+                      isVerticalResizing ? 'bg-borderProminent' : ''
+                    }`}
+                    onMouseDown={(e) => handleVerticalMouseDown(e, 'right-main-bottom')}
+                  >
+                    <div 
+                      className={`w-8 h-0.5 bg-border-subtle group-hover:bg-border-strong rounded-full transition-colors mx-auto mt-0.5 ${
+                        isVerticalResizing ? 'bg-border-strong' : ''
+                      }`} 
+                    />
+                  </div>
+                )}
+
+                {/* Right Bottom Container */}
+                {rightBottomContainer && (
+                  <div 
+                    className="relative"
+                    style={{ height: rightColumnHeights.rightBottomHeight }}
+                  >
+                    <IndividualContainer
+                      container={rightBottomContainer}
+                      onRemove={removeContainer}
+                      onSetContent={setContainerContent}
+                    />
+                  </div>
+                )}
               </div>
             )}
           </div>
