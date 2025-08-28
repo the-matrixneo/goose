@@ -285,12 +285,6 @@ export default function App() {
   }, [resetChat, chat.messages.length]);
 
   useEffect(() => {
-    (async () => {
-      await loadCurrentChat({ setAgentWaitingMessage });
-    })();
-  }, [loadCurrentChat, setAgentWaitingMessage]);
-
-  useEffect(() => {
     console.log('Sending reactReady signal to Electron');
     try {
       window.electron.reactReady();
@@ -309,14 +303,15 @@ export default function App() {
     const resumeSessionId = urlParams.get('resumeSessionId') || undefined;
     const recipeConfig = (window.appConfig?.get('recipe') || undefined) as Recipe;
 
+    const stateData: PairRouteState = {
+      resumeSessionId: resumeSessionId,
+      recipeConfig: recipeConfig,
+    };
+    (async () => {
+      await loadCurrentChat({ setAgentWaitingMessage, ...stateData });
+    })();
+
     if (resumeSessionId || (recipeConfig && typeof recipeConfig === 'object')) {
-      const stateData: PairRouteState = {
-        resumeSessionId: resumeSessionId,
-        recipeConfig: recipeConfig,
-      };
-      if (recipeConfig) {
-        resetChat();
-      }
       window.location.hash = '#/pair';
       window.history.replaceState(stateData, '', '#/pair');
       return;
@@ -353,7 +348,7 @@ export default function App() {
         }
       }
     }
-  }, [resetChat]);
+  }, [resetChat, loadCurrentChat, setAgentWaitingMessage]);
 
   // Handle recipe decode events from main process
   useEffect(() => {
