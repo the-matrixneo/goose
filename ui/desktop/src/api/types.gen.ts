@@ -16,6 +16,10 @@ export type Annotations = {
     timestamp?: string;
 };
 
+export type ArchiveRecipeRequest = {
+    id: string;
+};
+
 export type Author = {
     contact?: string | null;
     metadata?: string | null;
@@ -1490,6 +1494,33 @@ export type ManageContextResponses = {
 };
 
 export type ManageContextResponse = ManageContextResponses[keyof ManageContextResponses];
+
+export type ArchiveRecipeData = {
+    body: ArchiveRecipeRequest;
+    path?: never;
+    query?: never;
+    url: '/recipes/archive';
+};
+
+export type ArchiveRecipeErrors = {
+    /**
+     * Unauthorized - Invalid or missing API key
+     */
+    401: unknown;
+    /**
+     * Internal server error
+     */
+    500: unknown;
+};
+
+export type ArchiveRecipeResponses = {
+    /**
+     * Recipe archived successfully
+     */
+    204: void;
+};
+
+export type ArchiveRecipeResponse = ArchiveRecipeResponses[keyof ArchiveRecipeResponses];
 
 export type CreateRecipeData = {
     body: CreateRecipeRequest;

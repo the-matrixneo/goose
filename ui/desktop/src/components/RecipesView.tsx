@@ -1,10 +1,5 @@
 import { useState, useEffect } from 'react';
-import {
-  listSavedRecipes,
-  archiveRecipe,
-  saveRecipe,
-  generateRecipeFilename,
-} from '../recipe/recipeStorage';
+import { listSavedRecipes, saveRecipe, generateRecipeFilename } from '../recipe/recipeStorage';
 import {
   FileText,
   Trash2,
@@ -23,7 +18,7 @@ import { MainPanelLayout } from './Layout/MainPanelLayout';
 import { Recipe, decodeRecipe, generateDeepLink } from '../recipe';
 import { toastSuccess, toastError } from '../toasts';
 import { useEscapeKey } from '../hooks/useEscapeKey';
-import { RecipeManifest, RecipeManifestResponse } from '../api';
+import { archiveRecipe, RecipeManifest, RecipeManifestResponse } from '../api';
 
 interface RecipesViewProps {
   onLoadRecipe?: (recipe: Recipe) => void;
@@ -135,7 +130,7 @@ export default function RecipesView({ _onLoadRecipe }: RecipesViewProps = {}) {
     }
   };
 
-  const handleDeleteRecipe = async (recipeManifest: RecipeManifest) => {
+  const handleDeleteRecipe = async (recipeManifest: RecipeManifest, id: string) => {
     // TODO: Use Electron's dialog API for confirmation
     const result = await window.electron.showMessageBox({
       type: 'warning',
@@ -151,9 +146,12 @@ export default function RecipesView({ _onLoadRecipe }: RecipesViewProps = {}) {
     }
 
     try {
-      await archiveRecipe(recipeManifest.name, recipeManifest.isGlobal);
-      // Reload the recipes list
+      await await archiveRecipe({ body: { id } });
       await loadSavedRecipes();
+      toastSuccess({
+        title: recipeManifest.name,
+        msg: 'Recipe archived successfully',
+      });
     } catch (err) {
       console.error('Failed to archive recipe:', err);
       setError(err instanceof Error ? err.message : 'Failed to archive recipe');
@@ -374,7 +372,7 @@ Parameters you can use:
 
   // Render a recipe item
   const RecipeItem = ({
-    recipeManifestResponse: { manifest },
+    recipeManifestResponse: { manifest, id },
   }: {
     recipeManifestResponse: RecipeManifestResponse;
   }) => (
@@ -423,7 +421,7 @@ Parameters you can use:
           <Button
             onClick={(e) => {
               e.stopPropagation();
-              handleDeleteRecipe(manifest);
+              handleDeleteRecipe(manifest, id);
             }}
             variant="ghost"
             size="sm"

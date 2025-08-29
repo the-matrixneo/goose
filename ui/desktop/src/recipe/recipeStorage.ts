@@ -176,41 +176,6 @@ export async function listSavedRecipes(
 }
 
 /**
- * Archive a recipe.
- *
- * @param recipeName The name of the recipe to archive
- * @param isGlobal Whether the recipe is in global or local storage
- */
-export async function archiveRecipe(recipeName: string, isGlobal: boolean): Promise<void> {
-  try {
-    const savedRecipe = await loadRecipeFromFile(recipeName, isGlobal);
-
-    if (!savedRecipe) {
-      throw new Error('Recipe not found');
-    }
-
-    if (savedRecipe.isArchived) {
-      throw new Error('Recipe is already archived');
-    }
-
-    // Mark as archived
-    savedRecipe.isArchived = true;
-    savedRecipe.lastModified = new Date();
-
-    // Save back to file
-    const success = await saveRecipeToFile(savedRecipe);
-
-    if (!success) {
-      throw new Error('Failed to save updated recipe');
-    }
-  } catch (error) {
-    throw new Error(
-      `Failed to archive recipe: ${error instanceof Error ? error.message : 'Unknown error'}`
-    );
-  }
-}
-
-/**
  * Generate a suggested filename for a recipe based on its title.
  *
  * @param recipe The recipe to generate a filename for
