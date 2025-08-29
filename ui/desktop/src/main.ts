@@ -675,58 +675,37 @@ const createChat = async (
     mainWindow.webContents
       .executeJavaScript(
         `
-        (function() {
-          const setConfigWithRetry = async (config, maxRetries = 5, delay = 100) => {
-            for (let attempt = 1; attempt <= maxRetries; attempt++) {
-              try {
-                // Wait for DOM to be fully ready
-                if (document.readyState !== 'complete') {
-                  await new Promise(resolve => {
-                    if (document.readyState === 'complete') {
-                      resolve();
-                    } else {
-                      window.addEventListener('load', resolve, { once: true });
-                    }
-                  });
-                }
-                
-                // Additional safety check for localStorage availability
-                if (typeof Storage === 'undefined' || !window.localStorage) {
-                  throw new Error('localStorage not available');
-                }
-                
-                // Test localStorage access first
-                const testKey = 'goose_test_' + Date.now();
-                localStorage.setItem(testKey, 'test');
-                localStorage.removeItem(testKey);
-                
-                // If test succeeds, set the actual config
-                localStorage.setItem('gooseConfig', config);
-                console.log('[Renderer] Successfully set localStorage config on attempt', attempt);
-                return true;
-                
-              } catch (error) {
-                console.warn('[Renderer] localStorage access failed on attempt', attempt, ':', error);
-                
-                if (attempt === maxRetries) {
-                  console.error('[Renderer] Failed to set localStorage after', maxRetries, 'attempts. Config will only be available in memory.');
-                  return false;
-                }
-                
-                // Wait before retrying, with exponential backoff
-                await new Promise(resolve => setTimeout(resolve, delay * attempt));
-              }
+      (function() {
+        function setConfig() {
+          try {
+            if (document.readyState === 'complete' && window.localStorage) {
+              localStorage.setItem('gooseConfig', '${configStr}');
+              return true;
             }
-            return false;
-          };
-          
-          // Execute the retry logic
-          setConfigWithRetry('${configStr}');
-        })();
-      `
+          } catch (e) {
+            console.warn('[Renderer] localStorage access failed:', e);
+          }
+          return false;
+        }
+
+        // If document is already complete, try immediately
+        if (document.readyState === 'complete') {
+          if (!setConfig()) {
+            console.error('[Renderer] Failed to set localStorage config despite document being ready');
+          }
+        } else {
+          // Wait for document to be fully ready
+          document.addEventListener('DOMContentLoaded', () => {
+            if (!setConfig()) {
+              console.error('[Renderer] Failed to set localStorage config after DOMContentLoaded');
+            }
+          });
+        }
+      })();
+    `
       )
       .catch((error) => {
-        console.error('Failed to execute localStorage config script:', error);
+        console.error('Failed to execute localStorage script:', error);
       });
   });
 
