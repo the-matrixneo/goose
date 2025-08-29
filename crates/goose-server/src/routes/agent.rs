@@ -142,7 +142,7 @@ async fn start_agent(
         accumulated_total_tokens: Some(0),
         accumulated_input_tokens: Some(0),
         accumulated_output_tokens: Some(0),
-        todo_content: None,
+        extension_data: Default::default(),
     };
 
     let conversation = Conversation::empty();

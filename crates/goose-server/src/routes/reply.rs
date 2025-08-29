@@ -88,6 +88,8 @@ fn track_tool_telemetry(content: &MessageContent, all_messages: &[Message]) {
 struct ChatRequest {
     messages: Vec<Message>,
     session_id: Option<String>,
+    recipe_name: Option<String>,
+    recipe_version: Option<String>,
 }
 
 pub struct SseResponse {
@@ -179,6 +181,19 @@ async fn reply_handler(
         interface = "ui",
         "Session started"
     );
+
+    if let Some(recipe_name) = &request.recipe_name {
+        let recipe_version = request.recipe_version.as_deref().unwrap_or("unknown");
+
+        tracing::info!(
+            counter.goose.recipe_runs = 1,
+            recipe_name = %recipe_name,
+            recipe_version = %recipe_version,
+            session_type = "app",
+            interface = "ui",
+            "Recipe execution started"
+        );
+    }
 
     let (tx, rx) = mpsc::channel(100);
     let stream = ReceiverStream::new(rx);
@@ -597,6 +612,8 @@ mod tests {
                     serde_json::to_string(&ChatRequest {
                         messages: vec![Message::user().with_text("test message")],
                         session_id: Some("test-session".to_string()),
+                        recipe_name: None,
+                        recipe_version: None,
                     })
                     .unwrap(),
                 ))
