@@ -1,4 +1,4 @@
-import { listRecipes, RecipeManifest } from '../api';
+import { listRecipes, RecipeManifestResponse } from '../api';
 import { Recipe } from './index';
 import * as yaml from 'yaml';
 
@@ -165,10 +165,10 @@ export async function loadRecipe(recipeName: string, isGlobal: boolean): Promise
 
 export async function listSavedRecipes(
   includeArchived: boolean = false
-): Promise<RecipeManifest[]> {
+): Promise<RecipeManifestResponse[]> {
   try {
-    const recipes = await listRecipes({ query: { include_archived: includeArchived } });
-    return recipes?.data?.recipe_manifests ?? [];
+    const listRecipeResponse = await listRecipes({ query: { include_archived: includeArchived } });
+    return listRecipeResponse?.data?.recipe_manifest_responses ?? [];
   } catch (error) {
     console.warn('Failed to list saved recipes:', error);
     return [];

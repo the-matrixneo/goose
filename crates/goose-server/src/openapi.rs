@@ -465,6 +465,7 @@ impl<'__s> ToSchema<'__s> for AnnotatedSchema {
         super::routes::recipe::ScanRecipeRequest,
         super::routes::recipe::ScanRecipeResponse,
         super::routes::recipe::ListRecipeRequest,
+        super::routes::recipe::RecipeManifestResponse,
         super::routes::recipe::ListRecipeResponse,
         goose::recipe::Recipe,
         goose::recipe::Author,

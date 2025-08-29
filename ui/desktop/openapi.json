@@ -2302,13 +2302,13 @@
       "ListRecipeResponse": {
         "type": "object",
         "required": [
-          "recipe_manifests"
+          "recipe_manifest_responses"
         ],
         "properties": {
-          "recipe_manifests": {
+          "recipe_manifest_responses": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/RecipeManifest"
+              "$ref": "#/components/schemas/RecipeManifestResponse"
             }
           }
         }
@@ -2884,6 +2884,21 @@
           },
           "recipe": {
             "$ref": "#/components/schemas/Recipe"
+          }
+        }
+      },
+      "RecipeManifestResponse": {
+        "type": "object",
+        "required": [
+          "manifest",
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "manifest": {
+            "$ref": "#/components/schemas/RecipeManifest"
           }
         }
       },

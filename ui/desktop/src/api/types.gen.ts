@@ -329,7 +329,7 @@ export type ListRecipeRequest = {
 };
 
 export type ListRecipeResponse = {
-    recipe_manifests: Array<RecipeManifest>;
+    recipe_manifest_responses: Array<RecipeManifestResponse>;
 };
 
 export type ListSchedulesResponse = {
@@ -548,6 +548,11 @@ export type RecipeManifest = {
     lastModified: string;
     name: string;
     recipe: Recipe;
+};
+
+export type RecipeManifestResponse = {
+    id: string;
+    manifest: RecipeManifest;
 };
 
 export type RecipeParameter = {

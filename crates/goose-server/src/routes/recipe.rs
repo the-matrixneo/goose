@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use axum::extract::Query;
@@ -78,8 +79,14 @@ pub struct ListRecipeRequest {
 }
 
 #[derive(Debug, Serialize, ToSchema)]
+pub struct RecipeManifestResponse {
+    manifest: RecipeManifest,
+    id: String,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
 pub struct ListRecipeResponse {
-    recipe_manifests: Vec<RecipeManifest>
+    recipe_manifest_responses: Vec<RecipeManifestResponse>,
 }
 
 #[utoipa::path(
@@ -244,11 +251,27 @@ async fn list_recipes(
     Query(request): Query<ListRecipeRequest>,
 ) -> Result<Json<ListRecipeResponse>, StatusCode> {
     verify_secret_key(&headers, &state)?;
+    let recipe_manifest_with_paths =
+        list_sorted_recipe_manifests(request.include_archived).unwrap();
+    let mut recipe_file_hash_map = HashMap::new();
+    let recipe_manifest_responses = recipe_manifest_with_paths
+        .iter()
+        .map(|recipe_manifest_with_path| {
+            let id = &recipe_manifest_with_path.id;
+            let file_path = recipe_manifest_with_path.file_path.clone();
+            recipe_file_hash_map.insert(id.clone(), file_path);
+            RecipeManifestResponse {
+                manifest: recipe_manifest_with_path.manifest.clone(),
+                id: id.clone(),
+            }
+        })
+        .collect::<Vec<RecipeManifestResponse>>();
+    state.set_recipe_file_hash_map(recipe_file_hash_map).await;
+
     Ok(Json(ListRecipeResponse {
-        recipe_manifests: list_sorted_recipe_manifests(request.include_archived).unwrap(),
+        recipe_manifest_responses,
     }))
 }
-
 
 pub fn routes(state: Arc<AppState>) -> Router {
     Router::new()

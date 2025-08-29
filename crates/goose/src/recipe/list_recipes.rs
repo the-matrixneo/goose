@@ -1,5 +1,6 @@
 use std::fs;
 use std::path::PathBuf;
+use xxhash_rust::xxh3::xxh3_64;
 
 use anyhow::Result;
 use etcetera::{choose_app_strategy, AppStrategy};
@@ -7,42 +8,61 @@ use etcetera::{choose_app_strategy, AppStrategy};
 use crate::config::APP_STRATEGY;
 use crate::recipe::recipe_manifest::RecipeManifest;
 
-fn load_recipes_from_path(path: &PathBuf) -> Result<Vec<RecipeManifest>> {
-    let mut recipe_manifests = Vec::new();
+pub struct RecipeManifestWithPath {
+    pub id: String,
+    pub manifest: RecipeManifest,
+    pub file_path: PathBuf,
+}
+
+fn short_id_from_path(path: &str) -> String {
+    let hash = xxh3_64(path.as_bytes());
+    format!("{:016x}", hash)
+}
+
+fn load_recipes_from_path(path: &PathBuf) -> Result<Vec<RecipeManifestWithPath>> {
+    let mut recipe_manifests_with_path = Vec::new();
     if path.exists() {
         for entry in fs::read_dir(path)? {
             let path = entry?.path();
             if path.extension() == Some("yaml".as_ref()) {
+                let absolute_path = path.canonicalize()?;
                 if let Ok(recipe_manifest) = RecipeManifest::from_yaml_file(&path) {
-                    recipe_manifests.push(recipe_manifest);
+                    let manifest_with_path = RecipeManifestWithPath {
+                        id: short_id_from_path(&absolute_path.to_string_lossy()),
+                        manifest: recipe_manifest,
+                        file_path: absolute_path,
+                    };
+                    recipe_manifests_with_path.push(manifest_with_path);
                 }
             }
         }
     }
-    Ok(recipe_manifests)
+    Ok(recipe_manifests_with_path)
 }
 
-fn get_all_recipes_manifests() -> Result<Vec<RecipeManifest>> {
+fn get_all_recipes_manifests() -> Result<Vec<RecipeManifestWithPath>> {
     let current_dir = std::env::current_dir()?;
     let local_recipe_path = current_dir.join(".goose/recipes");
-    
+
     let global_recipe_path = choose_app_strategy(APP_STRATEGY.clone())
-            .map(|strategy| strategy.in_config_dir("recipes"))
-            .unwrap_or_else(|_| PathBuf::from("~/.config/goose/recipes"));
-    
-    let mut recipe_manifests = Vec::new();
-    
-    recipe_manifests.extend(load_recipes_from_path(&local_recipe_path)?);
-    recipe_manifests.extend(load_recipes_from_path(&global_recipe_path)?);
-    
-    Ok(recipe_manifests)
+        .map(|strategy| strategy.in_config_dir("recipes"))
+        .unwrap_or_else(|_| PathBuf::from("~/.config/goose/recipes"));
+
+    let mut recipe_manifests_with_path = Vec::new();
+
+    recipe_manifests_with_path.extend(load_recipes_from_path(&local_recipe_path)?);
+    recipe_manifests_with_path.extend(load_recipes_from_path(&global_recipe_path)?);
+
+    Ok(recipe_manifests_with_path)
 }
 
-pub fn list_sorted_recipe_manifests(include_archived: bool) -> Result<Vec<RecipeManifest>> {
-    let mut recipe_manifests = get_all_recipes_manifests()?;
+pub fn list_sorted_recipe_manifests(include_archived: bool) -> Result<Vec<RecipeManifestWithPath>> {
+    let mut recipe_manifests_with_path = get_all_recipes_manifests()?;
     if !include_archived {
-        recipe_manifests.retain(|manifest| !manifest.is_archived);
+        recipe_manifests_with_path
+            .retain(|manifest_with_path| !manifest_with_path.manifest.is_archived);
     }
-    recipe_manifests.sort_by(|a, b| b.last_modified.cmp(&a.last_modified));
-    Ok(recipe_manifests)
+    recipe_manifests_with_path
+        .sort_by(|a, b| b.manifest.last_modified.cmp(&a.manifest.last_modified));
+    Ok(recipe_manifests_with_path)
 }

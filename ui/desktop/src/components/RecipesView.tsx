@@ -23,7 +23,7 @@ import { MainPanelLayout } from './Layout/MainPanelLayout';
 import { Recipe, decodeRecipe, generateDeepLink } from '../recipe';
 import { toastSuccess, toastError } from '../toasts';
 import { useEscapeKey } from '../hooks/useEscapeKey';
-import { RecipeManifest } from '../api';
+import { RecipeManifest, RecipeManifestResponse } from '../api';
 
 interface RecipesViewProps {
   onLoadRecipe?: (recipe: Recipe) => void;
@@ -31,7 +31,7 @@ interface RecipesViewProps {
 
 // @ts-expect-error until we make onLoadRecipe work for loading recipes in the same window
 export default function RecipesView({ _onLoadRecipe }: RecipesViewProps = {}) {
-  const [savedRecipes, setSavedRecipes] = useState<RecipeManifest[]>([]);
+  const [savedRecipes, setSavedRecipes] = useState<RecipeManifestResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [showSkeleton, setShowSkeleton] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -99,8 +99,8 @@ export default function RecipesView({ _onLoadRecipe }: RecipesViewProps = {}) {
       setShowSkeleton(true);
       setShowContent(false);
       setError(null);
-      const recipeManifests = await listSavedRecipes();
-      setSavedRecipes(recipeManifests);
+      const recipeManifestResponses = await listSavedRecipes();
+      setSavedRecipes(recipeManifestResponses);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load recipes');
       console.error('Failed to load saved recipes:', err);
@@ -373,24 +373,26 @@ Parameters you can use:
   };
 
   // Render a recipe item
-  const RecipeItem = ({ recipeManifest }: { recipeManifest: RecipeManifest }) => (
+  const RecipeItem = ({
+    recipeManifestResponse: { manifest },
+  }: {
+    recipeManifestResponse: RecipeManifestResponse;
+  }) => (
     <Card className="py-2 px-4 mb-2 bg-background-default border-none hover:bg-background-muted cursor-pointer transition-all duration-150">
       <div className="flex justify-between items-start gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-1">
-            <h3 className="text-base truncate max-w-[50vw]">{recipeManifest.recipe.title}</h3>
-            {recipeManifest.isGlobal ? (
+            <h3 className="text-base truncate max-w-[50vw]">{manifest.recipe.title}</h3>
+            {manifest.isGlobal ? (
               <Globe className="w-4 h-4 text-text-muted flex-shrink-0" />
             ) : (
               <Folder className="w-4 h-4 text-text-muted flex-shrink-0" />
             )}
           </div>
-          <p className="text-text-muted text-sm mb-2 line-clamp-2">
-            {recipeManifest.recipe.description}
-          </p>
+          <p className="text-text-muted text-sm mb-2 line-clamp-2">{manifest.recipe.description}</p>
           <div className="flex items-center text-xs text-text-muted">
             <Calendar className="w-3 h-3 mr-1" />
-            {recipeManifest.lastModified}
+            {manifest.lastModified}
           </div>
         </div>
 
@@ -398,7 +400,7 @@ Parameters you can use:
           <Button
             onClick={(e) => {
               e.stopPropagation();
-              handleLoadRecipe(recipeManifest);
+              handleLoadRecipe(manifest);
             }}
             size="sm"
             className="h-8"
@@ -409,7 +411,7 @@ Parameters you can use:
           <Button
             onClick={(e) => {
               e.stopPropagation();
-              handlePreviewRecipe(recipeManifest);
+              handlePreviewRecipe(manifest);
             }}
             variant="outline"
             size="sm"
@@ -421,7 +423,7 @@ Parameters you can use:
           <Button
             onClick={(e) => {
               e.stopPropagation();
-              handleDeleteRecipe(recipeManifest);
+              handleDeleteRecipe(manifest);
             }}
             variant="ghost"
             size="sm"
@@ -492,10 +494,10 @@ Parameters you can use:
 
     return (
       <div className="space-y-2">
-        {savedRecipes.map((recipeManifest: RecipeManifest) => (
+        {savedRecipes.map((recipeManifestResponse: RecipeManifestResponse) => (
           <RecipeItem
-            key={`${recipeManifest.isGlobal ? 'global' : 'local'}-${recipeManifest.name}`}
-            recipeManifest={recipeManifest}
+            key={recipeManifestResponse.id}
+            recipeManifestResponse={recipeManifestResponse}
           />
         ))}
       </div>
