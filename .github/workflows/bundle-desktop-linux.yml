@@ -75,8 +75,7 @@ jobs:
             libasound2t64 \
             rpm \
             fakeroot \
-            dpkg-dev \
-            protobuf-compiler
+            dpkg-dev
 
       - name: Activate hermit and set CARGO_HOME
         run: |

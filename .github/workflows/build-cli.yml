@@ -157,7 +157,7 @@ jobs:
               
               echo '=== Setting up build dependencies ==='
               apt-get update
-              apt-get install -y mingw-w64 protobuf-compiler cmake time
+              apt-get install -y mingw-w64 cmake time
               
               echo '=== Setting up cross-compilation environment ==='
               export CC_x86_64_pc_windows_gnu=x86_64-w64-mingw32-gcc

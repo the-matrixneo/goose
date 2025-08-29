@@ -25,7 +25,7 @@ release-windows:
             rust:latest \
             sh -c "rustup target add x86_64-pc-windows-gnu && \
                 apt-get update && \
-                apt-get install -y mingw-w64 protobuf-compiler cmake && \
+                apt-get install -y mingw-w64 cmake && \
                 export CC_x86_64_pc_windows_gnu=x86_64-w64-mingw32-gcc && \
                 export CXX_x86_64_pc_windows_gnu=x86_64-w64-mingw32-g++ && \
                 export AR_x86_64_pc_windows_gnu=x86_64-w64-mingw32-ar && \
