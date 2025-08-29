@@ -44,10 +44,5 @@ impl AppState {
     pub async fn reset(&self) {
         let mut agent = self.agent.write().await;
         *agent = Arc::new(Agent::new());
-
-        {
-            let mut scheduler = self.scheduler.write().await;
-            *scheduler = None;
-        }
     }
 }
