@@ -176,41 +176,6 @@ export async function listSavedRecipes(
 }
 
 /**
- * Restore an archived recipe.
- *
- * @param recipeName The name of the recipe to restore
- * @param isGlobal Whether the recipe is in global or local storage
- */
-export async function restoreRecipe(recipeName: string, isGlobal: boolean): Promise<void> {
-  try {
-    const savedRecipe = await loadRecipeFromFile(recipeName, isGlobal);
-
-    if (!savedRecipe) {
-      throw new Error('Archived recipe not found');
-    }
-
-    if (!savedRecipe.isArchived) {
-      throw new Error('Recipe is not archived');
-    }
-
-    // Mark as not archived
-    savedRecipe.isArchived = false;
-    savedRecipe.lastModified = new Date();
-
-    // Save back to file
-    const success = await saveRecipeToFile(savedRecipe);
-
-    if (!success) {
-      throw new Error('Failed to save updated recipe');
-    }
-  } catch (error) {
-    throw new Error(
-      `Failed to restore recipe: ${error instanceof Error ? error.message : 'Unknown error'}`
-    );
-  }
-}
-
-/**
  * Archive a recipe.
  *
  * @param recipeName The name of the recipe to archive
@@ -243,53 +208,6 @@ export async function archiveRecipe(recipeName: string, isGlobal: boolean): Prom
       `Failed to archive recipe: ${error instanceof Error ? error.message : 'Unknown error'}`
     );
   }
-}
-
-/**
- * Permanently delete a recipe file.
- *
- * @param recipeName The name of the recipe to permanently delete
- * @param isGlobal Whether the recipe is in global or local storage
- */
-export async function permanentlyDeleteRecipe(
-  recipeName: string,
-  isGlobal: boolean
-): Promise<void> {
-  try {
-    // TODO: Implement file deletion when available in the API
-    // For now, we'll just mark it as archived as a fallback
-    const savedRecipe = await loadRecipeFromFile(recipeName, isGlobal);
-
-    if (!savedRecipe) {
-      throw new Error('Recipe not found');
-    }
-
-    // Mark as archived with special flag
-    savedRecipe.isArchived = true;
-    savedRecipe.lastModified = new Date();
-
-    // Save back to file
-    const success = await saveRecipeToFile(savedRecipe);
-
-    if (!success) {
-      throw new Error('Failed to mark recipe as deleted');
-    }
-  } catch (error) {
-    throw new Error(
-      `Failed to delete recipe: ${error instanceof Error ? error.message : 'Unknown error'}`
-    );
-  }
-}
-
-/**
- * Delete a recipe (archives it by default for backward compatibility).
- *
- * @deprecated Use archiveRecipe instead
- * @param recipeName The name of the recipe to delete/archive
- * @param isGlobal Whether the recipe is in global or local storage
- */
-export async function deleteRecipe(recipeName: string, isGlobal: boolean): Promise<void> {
-  return archiveRecipe(recipeName, isGlobal);
 }
 
 /**
