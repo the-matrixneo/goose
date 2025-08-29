@@ -1,3 +1,4 @@
+import { listRecipes, RecipeManifest } from '../api';
 import { Recipe } from './index';
 import * as yaml from 'yaml';
 
@@ -162,60 +163,12 @@ export async function loadRecipe(recipeName: string, isGlobal: boolean): Promise
   }
 }
 
-/**
- * List all saved recipes from the recipes directories.
- *
- * Uses the listFiles API to find available recipe files.
- */
-export async function listSavedRecipes(includeArchived: boolean = false): Promise<SavedRecipe[]> {
+export async function listSavedRecipes(
+  includeArchived: boolean = false
+): Promise<RecipeManifest[]> {
   try {
-    // Check for global and local recipe directories
-    const globalDir = getStorageDirectory(true);
-    const localDir = getStorageDirectory(false);
-
-    // Ensure directories exist
-    await window.electron.ensureDirectory(globalDir);
-    await window.electron.ensureDirectory(localDir);
-
-    // Get list of recipe files with .yaml extension
-    const globalFiles = await window.electron.listFiles(globalDir, 'yaml');
-    const localFiles = await window.electron.listFiles(localDir, 'yaml');
-
-    // Process global recipes in parallel
-    const globalRecipePromises = globalFiles.map(async (file) => {
-      const recipeName = file.replace(/\.yaml$/, '');
-      return await loadRecipeFromFile(recipeName, true);
-    });
-
-    // Process local recipes in parallel
-    const localRecipePromises = localFiles.map(async (file) => {
-      const recipeName = file.replace(/\.yaml$/, '');
-      return await loadRecipeFromFile(recipeName, false);
-    });
-
-    // Wait for all recipes to load in parallel
-    const [globalRecipes, localRecipes] = await Promise.all([
-      Promise.all(globalRecipePromises),
-      Promise.all(localRecipePromises),
-    ]);
-
-    // Filter out null results and apply archived filter
-    const recipes: SavedRecipe[] = [];
-
-    for (const recipe of globalRecipes) {
-      if (recipe && (includeArchived || !recipe.isArchived)) {
-        recipes.push(recipe);
-      }
-    }
-
-    for (const recipe of localRecipes) {
-      if (recipe && (includeArchived || !recipe.isArchived)) {
-        recipes.push(recipe);
-      }
-    }
-
-    // Sort by last modified (newest first)
-    return recipes.sort((a, b) => b.lastModified.getTime() - a.lastModified.getTime());
+    const recipes = await listRecipes({ query: { include_archived: includeArchived } });
+    return recipes?.data?.recipe_manifests ?? [];
   } catch (error) {
     console.warn('Failed to list saved recipes:', error);
     return [];
