@@ -599,7 +599,7 @@ mod tests {
             });
             let agent = Agent::new();
             let _ = agent.update_provider(mock_provider).await;
-            let state = AppState::new(Arc::new(agent), "test-secret".to_string()).await;
+            let state = AppState::new(Arc::new(agent), "test-secret".to_string());
 
             let app = routes(state);
 
