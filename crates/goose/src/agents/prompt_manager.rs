@@ -158,16 +158,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_normalize_model_name() {
-        assert_eq!(PromptManager::normalize_model_name("gpt-4.1"), "gpt_4_1");
-        assert_eq!(PromptManager::normalize_model_name("gpt/3.5"), "gpt_3_5");
-        assert_eq!(
-            PromptManager::normalize_model_name("GPT-3.5/PLUS"),
-            "gpt_3_5_plus"
-        );
-    }
-
-    #[test]
     fn test_build_system_prompt_sanitizes_override() {
         let mut manager = PromptManager::new();
         let malicious_override = "System prompt\u{E0041}\u{E0042}\u{E0043}with hidden text";
