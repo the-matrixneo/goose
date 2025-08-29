@@ -2153,12 +2153,12 @@ app.whenReady().then(async () => {
         const maxWidth = display.workArea.width;
         const newWidth = Math.min(bounds.width + TARGET_DELTA, maxWidth);
         if (newWidth !== bounds.width) {
-          win.setBounds({ ...bounds, width: newWidth });
+          win.setSize(newWidth, bounds.height, true);
         }
       } else {
         const newWidth = Math.max(bounds.width - TARGET_DELTA, 750);
         if (newWidth !== bounds.width) {
-          win.setBounds({ ...bounds, width: newWidth });
+          win.setSize(newWidth, bounds.height, true);
         }
       }
     } catch (e) {
