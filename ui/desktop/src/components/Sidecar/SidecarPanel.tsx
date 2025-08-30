@@ -1,36 +1,26 @@
-import React, { useMemo } from 'react';
 import { useSidecar } from './SidecarContext';
 import MCPUIResourceRenderer from '../MCPUIResourceRenderer';
 
 export default function SidecarPanel() {
-  const { isOpen, content, close, widthPct } = useSidecar();
-
-  const style = useMemo(() => {
-    return isOpen
-      ? {
-          width: `${Math.min(75, Math.max(10, widthPct * 100))}%`,
-          minWidth: 320,
-        }
-      : { width: 0 };
-  }, [isOpen, widthPct]);
+  const { isOpen, content, close } = useSidecar();
 
   return (
     <div
-      className={`transition-[width,opacity] duration-200 ease-in-out bg-background-default border-l border-borderSubtle h-full ${
-        isOpen ? 'opacity-100' : 'opacity-0'
-      } overflow-hidden flex-shrink-0`}
-      style={style as React.CSSProperties}
+      className={`bg-background-default border-l border-borderSubtle h-full overflow-hidden flex-shrink-0 pointer-events-auto`}
       aria-hidden={!isOpen}
     >
       {isOpen && (
-        <div className="h-full flex flex-col">
-          <div className="sticky top-0 z-100 flex items-center justify-between px-3 py-2 border-b border-borderSubtle bg-background-default/95 backdrop-blur supports-[backdrop-filter]:bg-background-default/70">
+        <div className="h-full flex flex-col pointer-events-auto">
+          <div className="sticky top-0 z-[200] flex items-center justify-between px-3 py-2 border-b border-borderSubtle bg-background-default/95 backdrop-blur supports-[backdrop-filter]:bg-background-default/70 pointer-events-auto">
             <div className="text-xs font-sans text-textSubtle uppercase tracking-wide">
               MCP‑UI sidecar
             </div>
             <button
-              className="no-drag inline-flex items-center justify-center w-6 h-6 cursor-pointer rounded hover:bg-bgSubtle text-textSubtle hover:text-textStandard relative z-50 pointer-events-auto"
-              onClick={close}
+              className="no-drag inline-flex items-center justify-center w-6 h-6 cursor-pointer rounded hover:bg-bgSubtle text-textSubtle hover:text-textStandard relative z-[250] pointer-events-auto"
+              onClick={() => {
+                console.log('Close button clicked!');
+                close();
+              }}
               aria-label="Close side panel"
               title="Close"
             >

@@ -115,6 +115,8 @@ type ElectronAPI = {
   openDirectoryInExplorer: (directoryPath: string) => Promise<boolean>;
   // Sidecar sizing
   setSidecarOpen?: (isOpen: boolean) => void;
+  setSidecarTransitioning?: (isTransitioning: boolean) => void;
+  setWindowMinimumSize?: (width: number, height: number) => void;
 };
 
 type AppConfigAPI = {
@@ -248,6 +250,12 @@ const electronAPI: ElectronAPI = {
     ipcRenderer.invoke('open-directory-in-explorer', directoryPath),
   setSidecarOpen: (isOpen: boolean) => {
     ipcRenderer.send('sidecar-toggled', isOpen);
+  },
+  setSidecarTransitioning: (isTransitioning: boolean) => {
+    ipcRenderer.send('sidecar-transitioning', isTransitioning);
+  },
+  setWindowMinimumSize: (width: number, height: number) => {
+    ipcRenderer.send('set-window-minimum-size', width, height);
   },
 };
 

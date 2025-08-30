@@ -512,7 +512,6 @@ body {
   position: fixed;
   top: 0;
   left: 0;
-  z-index: 50;
 }
 
 .no-drag {
@@ -741,9 +740,6 @@ p > code.bg-inline-code {
 [data-state='collapsed'] [data-slot='sidebar-gap'] {
   will-change: width;
 }
-
-
-
 
 /* Subtle back-and-forth shimmer animation for onboarding card */
 @keyframes shimmer {

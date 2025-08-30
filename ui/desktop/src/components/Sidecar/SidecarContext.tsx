@@ -8,8 +8,6 @@ export type SidecarContent =
 type SidecarContextValue = {
   isOpen: boolean;
   content: SidecarContent;
-  widthPct: number;
-  setWidthPct: (pct: number) => void;
   open: () => void;
   openWithMCPUI: (payload: {
     resource: ResourceContent;
@@ -33,23 +31,6 @@ export function useSidecar() {
 export function SidecarProvider({ children }: { children: React.ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
   const [content, setContent] = useState<SidecarContent>({ kind: 'none' });
-  const [widthPct, _setWidthPct] = useState<number>(() => {
-    const stored = localStorage.getItem('sidecar_width_pct');
-    const value = stored ? parseFloat(stored) : 0.5;
-    if (Number.isFinite(value) && value > 0 && value < 1) return value;
-    return 0.5; // initial 50%
-  });
-
-  const setWidthPct = useCallback((pct: number) => {
-    // clamp between 0.1 and 0.75 (min enforced in panel by minWidth too)
-    const clamped = Math.max(0.1, Math.min(0.75, pct));
-    _setWidthPct(clamped);
-    try {
-      localStorage.setItem('sidecar_width_pct', String(clamped));
-    } catch {
-      /* ignore storage failures (private mode, etc.) */
-    }
-  }, []);
 
   const close = useCallback(() => {
     setIsOpen(false);
@@ -102,8 +83,8 @@ export function SidecarProvider({ children }: { children: React.ReactNode }) {
   );
 
   const value = useMemo<SidecarContextValue>(
-    () => ({ isOpen, content, widthPct, setWidthPct, open, openWithMCPUI, toggleMCPUI, close }),
-    [isOpen, content, widthPct, setWidthPct, open, openWithMCPUI, toggleMCPUI, close]
+    () => ({ isOpen, content, open, openWithMCPUI, toggleMCPUI, close }),
+    [isOpen, content, open, openWithMCPUI, toggleMCPUI, close]
   );
 
   return <SidecarContext.Provider value={value}>{children}</SidecarContext.Provider>;

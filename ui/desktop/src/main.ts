@@ -439,6 +439,14 @@ declare var MAIN_WINDOW_VITE_NAME: string;
 // State for environment variable toggles
 let envToggles: EnvToggles = loadSettings().envToggles;
 
+// Track sidecar transitioning state to prevent sidebar auto-show
+let sidecarTransitioning = false;
+
+// Export for use in window creation and other handlers
+export function isSidecarTransitioning(): boolean {
+  return sidecarTransitioning;
+}
+
 // Parse command line arguments
 const parseArgs = () => {
   const args = process.argv.slice(2); // Remove first two elements (electron and script path)
@@ -2169,25 +2177,75 @@ app.whenReady().then(async () => {
     app.exit(0);
   });
 
+  // Handle sidecar transitioning state
+  ipcMain.on('sidecar-transitioning', (_event, isTransitioning: boolean) => {
+    sidecarTransitioning = isTransitioning;
+  });
+
+  // Handle window minimum size updates
+  ipcMain.on('set-window-minimum-size', (event, width: number, height: number) => {
+    try {
+      const win = BrowserWindow.fromWebContents(event.sender);
+      if (win) {
+        win.setMinimumSize(width, height);
+        console.log(`[Main] Updated window minimum size to ${width}x${height}`);
+      }
+    } catch (error) {
+      console.error('[Main] Failed to set window minimum size:', error);
+    }
+  });
+
   // Handle sidecar toggling to resize window
   ipcMain.on('sidecar-toggled', (event, isOpen: boolean) => {
     try {
       const win = BrowserWindow.fromWebContents(event.sender);
       if (!win) return;
+
       const bounds = win.getBounds();
-      const TARGET_DELTA = 420; // pixels reserved for sidecar
+      const display = screen.getDisplayMatching(bounds);
+      const screenWidth = display.workArea.width;
+      const screenX = display.workArea.x;
+
+      // Constants
+      const SIDECAR_TARGET_WIDTH = 400; // Default sidecar width
+      const CHAT_MIN_WIDTH = 600;
+      const WINDOW_MIN_WIDTH = 750;
+
       if (isOpen) {
-        // Enlarge window width by TARGET_DELTA up to available screen
-        const display = screen.getDisplayMatching(bounds);
-        const maxWidth = display.workArea.width;
-        const newWidth = Math.min(bounds.width + TARGET_DELTA, maxWidth);
-        if (newWidth !== bounds.width) {
-          win.setSize(newWidth, bounds.height, true);
+        // Calculate available space to the right of the window
+        const availableRight = screenX + screenWidth - (bounds.x + bounds.width);
+
+        // Try to expand window to accommodate sidecar
+        if (availableRight >= SIDECAR_TARGET_WIDTH) {
+          // We have enough space to expand
+          win.setSize(bounds.width + SIDECAR_TARGET_WIDTH, bounds.height, true);
+        } else if (availableRight > 0) {
+          // Partial expansion possible
+          const expansion = Math.min(availableRight, SIDECAR_TARGET_WIDTH);
+          const newWidth = bounds.width + expansion;
+
+          // Check if we still maintain minimum chat width
+          const remainingForChat = newWidth - SIDECAR_TARGET_WIDTH;
+          if (remainingForChat >= CHAT_MIN_WIDTH) {
+            win.setSize(newWidth, bounds.height, true);
+          } else {
+            // Can't maintain minimums with available space
+            console.log('[Main] Not enough screen space to open sidecar with minimum widths');
+          }
+        } else {
+          // No space to expand, check if current window can accommodate sidecar
+          const availableForSidecar = bounds.width - CHAT_MIN_WIDTH;
+          if (availableForSidecar < 320) {
+            // Minimum sidecar width
+            console.log('[Main] Window too small to accommodate sidecar');
+          }
+          // Otherwise, let the renderer handle compression
         }
       } else {
-        const newWidth = Math.max(bounds.width - TARGET_DELTA, 750);
-        if (newWidth !== bounds.width) {
-          win.setSize(newWidth, bounds.height, true);
+        // Closing sidecar - restore previous width
+        const targetWidth = Math.max(bounds.width - SIDECAR_TARGET_WIDTH, WINDOW_MIN_WIDTH);
+        if (targetWidth !== bounds.width) {
+          win.setSize(targetWidth, bounds.height, true);
         }
       }
     } catch (e) {
