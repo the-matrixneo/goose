@@ -248,10 +248,11 @@ impl DeveloperRouter {
                 To use the write command, you must specify `file_text` which will become the new content of the file. Be careful with
                 existing files! This is a full overwrite, so you must include everything - not just sections you are modifying.
 
-                To use the str_replace command, you must specify both `old_str` and `new_str` - the `old_str` needs to exactly match one
-                unique section of the original file, including any whitespace. Make sure to include enough context that the match is not
-                ambiguous. The entire original string will be replaced with `new_str`.
-
+                To use the str_replace command, you must specify both `old_str` and `new_str` - the `old_str` needs to exactly match a 
+                section of the original file, including any whitespace.
+                If you provide the replace_all parameter with a true value, it will replace all occurrences.
+                If false (default) then you must ensure that old_str uniquely matches just one section (ensure to include enough context for this).
+                
                 To use the insert command, you must specify both `insert_line` (the line number after which to insert, 0 for beginning, -1 for end) 
                 and `new_str` (the text to insert).
             "#}.to_string(), "str_replace")
@@ -286,6 +287,11 @@ impl DeveloperRouter {
                     },
                     "old_str": {"type": "string"},
                     "new_str": {"type": "string"},
+                    "replace_all": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "If true, replace all occurrences of old_str. If false (default), require exactly one match."
+                    },
                     "file_text": {"type": "string"}
                 }
             }),
@@ -791,8 +797,13 @@ impl DeveloperRouter {
                             None,
                         )
                     })?;
+                let replace_all = params
+                    .get("replace_all")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
 
-                self.text_editor_replace(&path, old_str, new_str).await
+                self.text_editor_replace(&path, old_str, new_str, replace_all)
+                    .await
             }
             "insert" => {
                 let insert_line = params
@@ -1065,6 +1076,7 @@ impl DeveloperRouter {
         path: &PathBuf,
         old_str: &str,
         new_str: &str,
+        replace_all: bool,
     ) -> Result<Vec<Content>, ErrorData> {
         // Check if file exists and is active
         if !path.exists() {
@@ -1124,20 +1136,28 @@ impl DeveloperRouter {
         }
 
         // Traditional string replacement path (original logic)
-        // Ensure 'old_str' appears exactly once
-        if content.matches(old_str).count() > 1 {
-            return Err(ErrorData::new(
-                ErrorCode::INVALID_PARAMS,
-                "'old_str' must appear exactly once in the file, but it appears multiple times"
-                    .to_string(),
-                None,
-            ));
-        }
-        if content.matches(old_str).count() == 0 {
-            return Err(ErrorData::new(ErrorCode::INVALID_PARAMS, "'old_str' must appear exactly once in the file, but it does not appear in the file. Make sure the string exactly matches existing file content, including whitespace!".to_string(), None));
+        let match_count = content.matches(old_str).count();
+
+        if replace_all {
+            // When replace_all is true, we allow any number of matches (including 0)
+            if match_count == 0 {
+                return Err(ErrorData::new(ErrorCode::INVALID_PARAMS, "'old_str' does not appear in the file. Make sure the string exactly matches existing file content, including whitespace!".to_string(), None));
+            }
+        } else {
+            // When replace_all is false (default), ensure exactly one match
+            if match_count > 1 {
+                return Err(ErrorData::new(
+                    ErrorCode::INVALID_PARAMS,
+                    format!("'old_str' appears {} times in the file, but replace_all is false. Either set replace_all to true to replace all occurrences, or make the old_str more specific to match exactly one occurrence.", match_count),
+                    None,
+                ));
+            }
+            if match_count == 0 {
+                return Err(ErrorData::new(ErrorCode::INVALID_PARAMS, "'old_str' must appear exactly once in the file, but it does not appear in the file. Make sure the string exactly matches existing file content, including whitespace!".to_string(), None));
+            }
         }
 
-        // Save history for undo (original behavior - after validation)
+        // Save history for undo (after validation)
         self.save_file_history(path)?;
 
         let new_content = content.replace(old_str, new_str);

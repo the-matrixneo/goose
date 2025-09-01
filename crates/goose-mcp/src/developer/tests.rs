@@ -267,6 +267,232 @@ async fn test_text_editor_str_replace() {
 
 #[tokio::test]
 #[serial]
+async fn test_text_editor_str_replace_multiple_matches_error() {
+    let router = get_router().await;
+
+    let temp_dir = tempfile::tempdir().unwrap();
+    let file_path = temp_dir.path().join("test.txt");
+    let file_path_str = file_path.to_str().unwrap();
+    std::env::set_current_dir(&temp_dir).unwrap();
+
+    // Create a file with multiple occurrences of the same string
+    router
+        .call_tool(
+            "text_editor",
+            json!({
+                "command": "write",
+                "path": file_path_str,
+                "file_text": "Hello world! This world is a wonderful world."
+            }),
+            dummy_sender(),
+        )
+        .await
+        .unwrap();
+
+    // Try to replace "world" without replace_all (should fail)
+    let result = router
+        .call_tool(
+            "text_editor",
+            json!({
+                "command": "str_replace",
+                "path": file_path_str,
+                "old_str": "world",
+                "new_str": "universe"
+            }),
+            dummy_sender(),
+        )
+        .await;
+
+    assert!(result.is_err());
+    let err = result.err().unwrap();
+    assert_eq!(err.code, ErrorCode::INVALID_PARAMS);
+    assert!(err.to_string().contains("appears 3 times in the file"));
+    assert!(err.to_string().contains("replace_all to true"));
+
+    temp_dir.close().unwrap();
+}
+
+#[tokio::test]
+#[serial]
+async fn test_text_editor_str_replace_with_replace_all_true() {
+    let router = get_router().await;
+
+    let temp_dir = tempfile::tempdir().unwrap();
+    let file_path = temp_dir.path().join("test.txt");
+    let file_path_str = file_path.to_str().unwrap();
+    std::env::set_current_dir(&temp_dir).unwrap();
+
+    // Create a file with multiple occurrences of the same string
+    router
+        .call_tool(
+            "text_editor",
+            json!({
+                "command": "write",
+                "path": file_path_str,
+                "file_text": "Hello world! This world is a wonderful world."
+            }),
+            dummy_sender(),
+        )
+        .await
+        .unwrap();
+
+    // Replace all occurrences of "world" with replace_all=true
+    let replace_result = router
+        .call_tool(
+            "text_editor",
+            json!({
+                "command": "str_replace",
+                "path": file_path_str,
+                "old_str": "world",
+                "new_str": "universe",
+                "replace_all": true
+            }),
+            dummy_sender(),
+        )
+        .await
+        .unwrap();
+
+    let text = replace_result
+        .iter()
+        .find(|c| {
+            c.audience()
+                .is_some_and(|roles| roles.contains(&Role::Assistant))
+        })
+        .unwrap()
+        .as_text()
+        .unwrap();
+
+    assert!(text.text.contains("has been edited"));
+
+    // View the file to verify all occurrences were replaced
+    let view_result = router
+        .call_tool(
+            "text_editor",
+            json!({
+                "command": "view",
+                "path": file_path_str
+            }),
+            dummy_sender(),
+        )
+        .await
+        .unwrap();
+
+    let view_text = view_result
+        .iter()
+        .find(|c| {
+            c.audience()
+                .is_some_and(|roles| roles.contains(&Role::User))
+        })
+        .unwrap()
+        .as_text()
+        .unwrap();
+
+    // All "world" should be replaced with "universe"
+    assert!(view_text
+        .text
+        .contains("Hello universe! This universe is a wonderful universe."));
+    assert!(!view_text.text.contains("world"));
+
+    temp_dir.close().unwrap();
+}
+
+#[tokio::test]
+#[serial]
+async fn test_text_editor_str_replace_with_replace_all_false_explicit() {
+    let router = get_router().await;
+
+    let temp_dir = tempfile::tempdir().unwrap();
+    let file_path = temp_dir.path().join("test.txt");
+    let file_path_str = file_path.to_str().unwrap();
+    std::env::set_current_dir(&temp_dir).unwrap();
+
+    // Create a file with multiple occurrences of the same string
+    router
+        .call_tool(
+            "text_editor",
+            json!({
+                "command": "write",
+                "path": file_path_str,
+                "file_text": "Hello world! This world is a wonderful world."
+            }),
+            dummy_sender(),
+        )
+        .await
+        .unwrap();
+
+    // Try to replace with explicit replace_all=false (should fail)
+    let result = router
+        .call_tool(
+            "text_editor",
+            json!({
+                "command": "str_replace",
+                "path": file_path_str,
+                "old_str": "world",
+                "new_str": "universe",
+                "replace_all": false
+            }),
+            dummy_sender(),
+        )
+        .await;
+
+    assert!(result.is_err());
+    let err = result.err().unwrap();
+    assert_eq!(err.code, ErrorCode::INVALID_PARAMS);
+    assert!(err.to_string().contains("appears 3 times in the file"));
+    assert!(err.to_string().contains("replace_all to true"));
+
+    temp_dir.close().unwrap();
+}
+
+#[tokio::test]
+#[serial]
+async fn test_text_editor_str_replace_no_matches_with_replace_all() {
+    let router = get_router().await;
+
+    let temp_dir = tempfile::tempdir().unwrap();
+    let file_path = temp_dir.path().join("test.txt");
+    let file_path_str = file_path.to_str().unwrap();
+    std::env::set_current_dir(&temp_dir).unwrap();
+
+    // Create a file without the target string
+    router
+        .call_tool(
+            "text_editor",
+            json!({
+                "command": "write",
+                "path": file_path_str,
+                "file_text": "Hello universe! This is great."
+            }),
+            dummy_sender(),
+        )
+        .await
+        .unwrap();
+
+    // Try to replace a string that doesn't exist, even with replace_all=true
+    let result = router
+        .call_tool(
+            "text_editor",
+            json!({
+                "command": "str_replace",
+                "path": file_path_str,
+                "old_str": "world",
+                "new_str": "planet",
+                "replace_all": true
+            }),
+            dummy_sender(),
+        )
+        .await;
+
+    assert!(result.is_err());
+    let err = result.err().unwrap();
+    assert_eq!(err.code, ErrorCode::INVALID_PARAMS);
+    assert!(err.to_string().contains("does not appear in the file"));
+
+    temp_dir.close().unwrap();
+}
+
+#[tokio::test]
+#[serial]
 async fn test_text_editor_undo_edit() {
     let router = get_router().await;
 
