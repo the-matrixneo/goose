@@ -517,7 +517,8 @@ const createChat = async (
   recipe?: Recipe, // Recipe configuration when already loaded, takes precedence over deeplink
   viewType?: string,
   recipeDeeplink?: string, // Raw deeplink used as a fallback when recipe is not loaded. Required on new windows as we need to wait for the window to load before decoding.
-  scheduledJobId?: string // Scheduled job ID if applicable
+  scheduledJobId?: string, // Scheduled job ID if applicable
+  recipeId?: string // Recipe ID if applicable
 ) => {
   // Initialize variables for process and configuration
   let port = 0;
@@ -571,7 +572,7 @@ const createChat = async (
 
   // Create window config with loading state for recipe deeplinks
   let isLoadingRecipe = false;
-  if (!recipe && recipeDeeplink) {
+  if (!recipe && !recipeId && recipeDeeplink) {
     isLoadingRecipe = true;
     console.log('[Main] Creating window with recipe loading state for deeplink:', recipeDeeplink);
   }
@@ -611,6 +612,7 @@ const createChat = async (
           GOOSE_BASE_URL_SHARE: sharingUrl,
           GOOSE_VERSION: gooseVersion,
           recipe: recipe,
+          recipeId: recipeId,
         }),
       ],
       partition: 'persist:goose', // Add this line to ensure persistence
@@ -1983,18 +1985,32 @@ app.whenReady().then(async () => {
     }
   });
 
-  ipcMain.on('create-chat-window', (_, query, dir, version, resumeSessionId, recipe, viewType) => {
-    if (!dir?.trim()) {
-      const recentDirs = loadRecentDirs();
-      dir = recentDirs.length > 0 ? recentDirs[0] : undefined;
+  ipcMain.on(
+    'create-chat-window',
+    (_, query, dir, version, resumeSessionId, recipe, viewType, recipeId) => {
+      if (!dir?.trim()) {
+        const recentDirs = loadRecentDirs();
+        dir = recentDirs.length > 0 ? recentDirs[0] : undefined;
+      }
+
+      // Log the recipe for debugging
+      console.log('Creating chat window with recipe:', recipe);
+
+      // Pass recipe as part of viewOptions when viewType is recipeEditor
+      createChat(
+        app,
+        query,
+        dir,
+        version,
+        resumeSessionId,
+        recipe,
+        viewType,
+        undefined,
+        undefined,
+        recipeId
+      );
     }
-
-    // Log the recipe for debugging
-    console.log('Creating chat window with recipe:', recipe);
-
-    // Pass recipe as part of viewOptions when viewType is recipeEditor
-    createChat(app, query, dir, version, resumeSessionId, recipe, viewType);
-  });
+  );
 
   ipcMain.on('notify', (_event, data) => {
     try {

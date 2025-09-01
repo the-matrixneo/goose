@@ -122,7 +122,8 @@ export const initializeSystem = async (
     await initializeAgent({ provider, model });
 
     // Get recipeConfig directly here
-    const recipeConfig = window.appConfig?.get?.('recipe');
+    let recipeConfig = window.appConfig?.get?.('recipe');
+
     const recipe_instructions = (recipeConfig as { instructions?: string })?.instructions;
     const responseConfig = (recipeConfig as { response?: { json_schema?: unknown } })?.response;
     const subRecipes = (recipeConfig as { sub_recipes?: SubRecipe[] })?.sub_recipes;

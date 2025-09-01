@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::sync::Arc;
 
+use axum::extract::Query;
 use axum::routing::get;
 use axum::{extract::State, http::StatusCode, routing::post, Json, Router};
 use goose::conversation::{message::Message, Conversation};
@@ -95,7 +96,7 @@ pub struct ListRecipeResponse {
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
-pub struct LoadRecipeRequest {
+pub struct LoadRecipeQuery {
     id: String,
 }
 
@@ -329,9 +330,11 @@ async fn delete_recipe(
 #[utoipa::path(
     get,
     path = "/recipes/load",
-    request_body = LoadRecipeRequest,
+    params(
+        ("id", Query, description = "Recipe ID"),
+    ),
     responses(
-        (status = 204, description = "Recipe loaded successfully"),
+        (status = 200, description = "Recipe loaded successfully", body = LoadRecipeResponse),
         (status = 401, description = "Unauthorized - Invalid or missing API key"),
         (status = 404, description = "Recipe not found"),
         (status = 500, description = "Internal server error")
@@ -341,17 +344,30 @@ async fn delete_recipe(
 async fn load_recipe(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
-    Json(request): Json<LoadRecipeRequest>,
+    Query(query): Query<LoadRecipeQuery>,
 ) -> Result<Json<LoadRecipeResponse>, StatusCode> {
     verify_secret_key(&headers, &state)?;
-    let file_path = match find_recipe_file_path_by_id(&request.id) {
+    let file_path = match find_recipe_file_path_by_id(&query.id) {
         Ok(path) => path,
         Err(e) => {
             tracing::error!("Failed to find recipe file path: {}", e);
             return Err(StatusCode::NOT_FOUND);
         }
     };
-    let recipe = Recipe::from_content(file_path.to_str().unwrap()).unwrap();
+    let content = match fs::read_to_string(&file_path) {
+        Ok(content) => content,
+        Err(e) => {
+            tracing::error!("Failed to read recipe file: {}", e);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    };
+    let recipe = match Recipe::from_content(&content) {
+        Ok(recipe) => recipe,
+        Err(e) => {
+            tracing::error!("Failed to parse recipe: {}", e);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    };
     Ok(Json(LoadRecipeResponse { recipe }))
 }
 

@@ -953,6 +953,43 @@
         }
       }
     },
+    "/recipes/load": {
+      "get": {
+        "tags": [
+          "Recipe Management"
+        ],
+        "operationId": "load_recipe",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "description": "Recipe ID",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recipe loaded successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoadRecipeResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Invalid or missing API key"
+          },
+          "404": {
+            "description": "Recipe not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
     "/recipes/scan": {
       "post": {
         "tags": [
@@ -2351,6 +2388,28 @@
             "items": {
               "$ref": "#/components/schemas/ScheduledJob"
             }
+          }
+        }
+      },
+      "LoadRecipeQuery": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        }
+      },
+      "LoadRecipeResponse": {
+        "type": "object",
+        "required": [
+          "recipe"
+        ],
+        "properties": {
+          "recipe": {
+            "$ref": "#/components/schemas/Recipe"
           }
         }
       },

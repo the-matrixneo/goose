@@ -344,6 +344,14 @@ export type ListSchedulesResponse = {
     jobs: Array<ScheduledJob>;
 };
 
+export type LoadRecipeQuery = {
+    id: string;
+};
+
+export type LoadRecipeResponse = {
+    recipe: Recipe;
+};
+
 /**
  * A message to or from an LLM
  */
@@ -1625,6 +1633,42 @@ export type ListRecipesResponses = {
 };
 
 export type ListRecipesResponse = ListRecipesResponses[keyof ListRecipesResponses];
+
+export type LoadRecipeData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * Recipe ID
+         */
+        id: unknown;
+    };
+    url: '/recipes/load';
+};
+
+export type LoadRecipeErrors = {
+    /**
+     * Unauthorized - Invalid or missing API key
+     */
+    401: unknown;
+    /**
+     * Recipe not found
+     */
+    404: unknown;
+    /**
+     * Internal server error
+     */
+    500: unknown;
+};
+
+export type LoadRecipeResponses = {
+    /**
+     * Recipe loaded successfully
+     */
+    200: LoadRecipeResponse;
+};
+
+export type LoadRecipeResponse2 = LoadRecipeResponses[keyof LoadRecipeResponses];
 
 export type ScanRecipeData = {
     body: ScanRecipeRequest;

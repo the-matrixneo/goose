@@ -7,7 +7,14 @@ import {
   type FixedExtensionEntry,
   MalformedConfigError,
 } from '../components/ConfigContext';
-import { backupConfig, initConfig, readAllConfig, recoverConfig, validateConfig } from '../api';
+import {
+  backupConfig,
+  initConfig,
+  readAllConfig,
+  recoverConfig,
+  validateConfig,
+  loadRecipe,
+} from '../api';
 import { COST_TRACKING_ENABLED } from '../updates';
 
 interface InitializationDependencies {
@@ -33,6 +40,7 @@ export const initializeApp = async ({
   const viewType = urlParams.get('view');
   const resumeSessionId = urlParams.get('resumeSessionId');
   const recipeConfig = window.appConfig.get('recipe');
+  const recipeId = window.appConfig.get('recipeId');
 
   if (resumeSessionId) {
     console.log('Session resume detected, letting useChat hook handle navigation');
@@ -40,10 +48,14 @@ export const initializeApp = async ({
     return;
   }
 
-  if (recipeConfig && typeof recipeConfig === 'object') {
-    console.log('Recipe deeplink detected, initializing system for recipe');
+  if (
+    (recipeConfig && typeof recipeConfig === 'object') ||
+    (recipeId && typeof recipeId === 'string')
+  ) {
+    console.log('Recipe detected, initializing system for recipe');
     await initializeForRecipe({
       recipeConfig: recipeConfig as Recipe,
+      recipeId: recipeId as string,
       getExtensions,
       addExtension,
       setPairChat,
@@ -129,6 +141,7 @@ const initializeForSessionResume = async ({
 
 const initializeForRecipe = async ({
   recipeConfig,
+  recipeId,
   getExtensions,
   addExtension,
   setPairChat,
@@ -138,7 +151,8 @@ const initializeForRecipe = async ({
   InitializationDependencies,
   'getExtensions' | 'addExtension' | 'setPairChat' | 'provider' | 'model'
 > & {
-  recipeConfig: Recipe;
+  recipeConfig?: Recipe;
+  recipeId?: string;
 }) => {
   await initConfig();
   await readAllConfig({ throwOnError: true });
@@ -147,11 +161,38 @@ const initializeForRecipe = async ({
     getExtensions,
     addExtension,
   });
+  let finalRecipeConfig = recipeConfig;
+
+  if (recipeId) {
+    try {
+      const recipeResponse = await loadRecipe({ query: { id: recipeId } });
+      const recipe = recipeResponse.data?.recipe;
+
+      if (recipe) {
+        // window.appConfig.set('recipe', recipe);
+        finalRecipeConfig = recipe;
+      } else {
+        console.error('Failed to load recipe: No recipe data received');
+        window.location.hash = '#/';
+        return;
+      }
+    } catch (error) {
+      console.error('Failed to load recipe:', error);
+      window.location.hash = '#/';
+      return;
+    }
+  }
+
+  if (!finalRecipeConfig) {
+    console.error('No recipe config available');
+    window.location.hash = '#/';
+    return;
+  }
 
   setPairChat((prevChat) => ({
     ...prevChat,
-    recipeConfig: recipeConfig,
-    title: recipeConfig?.title || 'Recipe Chat',
+    recipeConfig: finalRecipeConfig,
+    title: finalRecipeConfig?.title || 'Recipe Chat',
     messages: [],
     messageHistoryIndex: 0,
   }));
@@ -159,7 +200,7 @@ const initializeForRecipe = async ({
   window.location.hash = '#/pair';
   window.history.replaceState(
     {
-      recipeConfig: recipeConfig,
+      recipeConfig: finalRecipeConfig,
       resetChat: true,
     },
     '',
