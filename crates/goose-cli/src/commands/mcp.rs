@@ -1,7 +1,6 @@
 use anyhow::{anyhow, Result};
 use goose_mcp::{
-    AutoVisualiserRouter, ComputerControllerRouter, DeveloperRouter, MemoryRouter, TodoRouter,
-    TutorialRouter,
+    AutoVisualiserRouter, ComputerControllerRouter, DeveloperRouter, MemoryRouter, TutorialRouter,
 };
 use mcp_server::router::RouterService;
 use mcp_server::{BoundedService, ByteTransport, Server};
@@ -33,7 +32,7 @@ pub async fn run_server(name: &str) -> Result<()> {
         "computercontroller" => Some(Box::new(RouterService(ComputerControllerRouter::new()))),
         "autovisualiser" => Some(Box::new(RouterService(AutoVisualiserRouter::new()))),
         "memory" => Some(Box::new(RouterService(MemoryRouter::new()))),
-        "todo" => Some(Box::new(RouterService(TodoRouter::new()))),
+
         "tutorial" => Some(Box::new(RouterService(TutorialRouter::new()))),
         _ => None,
     };

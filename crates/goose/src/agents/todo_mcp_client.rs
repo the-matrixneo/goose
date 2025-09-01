@@ -13,7 +13,7 @@ use tokio_util::sync::CancellationToken;
 use crate::agents::todo_tools::{todo_read_tool, todo_write_tool};
 use crate::agents::types::SessionConfig;
 use crate::session::extension_data::ExtensionState;
-use crate::session::{self, storage::Identifier, TodoState};
+use crate::session::{self, TodoState};
 
 /// Storage trait for TODO persistence
 #[async_trait]
@@ -24,11 +24,11 @@ pub trait TodoStorage: Send + Sync {
 
 /// Session-based TODO storage implementation
 pub struct SessionTodoStorage {
-    session_id: String,
+    session_id: session::Identifier,
 }
 
 impl SessionTodoStorage {
-    pub fn new(session_id: String) -> Self {
+    pub fn new(session_id: session::Identifier) -> Self {
         Self { session_id }
     }
 }
@@ -36,7 +36,7 @@ impl SessionTodoStorage {
 #[async_trait]
 impl TodoStorage for SessionTodoStorage {
     async fn read(&self) -> Result<String, String> {
-        let session_path = session::storage::get_path(Identifier::Name(self.session_id.clone()))
+        let session_path = session::storage::get_path(self.session_id.clone())
             .map_err(|e| format!("Failed to get session path: {}", e))?;
 
         let metadata = session::storage::read_metadata(&session_path)
@@ -64,7 +64,7 @@ impl TodoStorage for SessionTodoStorage {
             ));
         }
 
-        let session_path = session::storage::get_path(Identifier::Name(self.session_id.clone()))
+        let session_path = session::storage::get_path(self.session_id.clone())
             .map_err(|e| format!("Failed to get session path: {}", e))?;
 
         let mut metadata = session::storage::read_metadata(&session_path)
@@ -75,16 +75,9 @@ impl TodoStorage for SessionTodoStorage {
             .to_extension_data(&mut metadata.extension_data)
             .map_err(|e| format!("Failed to update extension data: {}", e))?;
 
-        // Use spawn_blocking for the async update
-        let path_clone = session_path.clone();
-        let metadata_clone = metadata.clone();
-        let update_result = tokio::task::spawn(async move {
-            session::storage::update_metadata(&path_clone, &metadata_clone).await
-        })
-        .await
-        .map_err(|e| format!("Failed to spawn update task: {}", e))?;
-
-        update_result.map_err(|e| format!("Failed to update session metadata: {}", e))?;
+        session::storage::update_metadata(&session_path, &metadata)
+            .await
+            .map_err(|e| format!("Failed to update session metadata: {}", e))?;
 
         Ok(format!("Updated ({} chars)", char_count))
     }
@@ -185,11 +178,8 @@ Example format:
     }
 
     pub fn with_session(session: &SessionConfig) -> Self {
-        let session_id = match &session.id {
-            session::Identifier::Name(name) => name.clone(),
-            session::Identifier::Path(path) => path.to_string_lossy().to_string(),
-        };
-        let storage = Arc::new(SessionTodoStorage::new(session_id));
+        // Use the session ID directly - the storage layer will handle it properly
+        let storage = Arc::new(SessionTodoStorage::new(session.id.clone()));
         Self::new(storage)
     }
 
