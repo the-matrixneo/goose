@@ -18,6 +18,7 @@ pub mod subagent;
 pub mod subagent_execution_tool;
 pub mod subagent_handler;
 mod subagent_task_config;
+pub mod todo_mcp_client;
 pub mod todo_tools;
 mod tool_execution;
 mod tool_route_manager;

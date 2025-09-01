@@ -1,6 +1,7 @@
 use anyhow::Result;
 use std::collections::HashSet;
 use std::sync::Arc;
+use tokio::sync::Mutex;
 
 use async_stream::try_stream;
 use futures::stream::StreamExt;
@@ -32,6 +33,50 @@ async fn toolshim_postprocess(
 }
 
 impl Agent {
+    /// Register TODO extension if session is available
+    pub async fn ensure_todo_extension(
+        &self,
+        session: &Option<crate::agents::types::SessionConfig>,
+    ) {
+        // Check if TODO extension is already registered
+        if self
+            .extension_manager
+            .list_extensions()
+            .await
+            .unwrap_or_default()
+            .contains(&"todo".to_string())
+        {
+            return;
+        }
+
+        // Register TODO extension if we have a session
+        if let Some(session_config) = session {
+            let todo_client = super::todo_mcp_client::TodoMcpClient::with_session(session_config);
+            let server_info = {
+                use mcp_client::client::McpClientTrait;
+                todo_client.get_info().cloned()
+            };
+            let config = crate::agents::extension::ExtensionConfig::Builtin {
+                name: "todo".to_string(),
+                display_name: Some("Task Management".to_string()),
+                description: Some("Persistent task tracking throughout your session".to_string()),
+                timeout: None,
+                bundled: Some(true),
+                available_tools: vec!["read".to_string(), "write".to_string()],
+            };
+
+            self.extension_manager
+                .add_client(
+                    "todo".to_string(),
+                    config,
+                    Arc::new(Mutex::new(Box::new(todo_client))),
+                    server_info,
+                    None,
+                )
+                .await;
+        }
+    }
+
     /// Prepares tools and system prompt for a provider request
     pub async fn prepare_tools_and_prompt(&self) -> anyhow::Result<(Vec<Tool>, Vec<Tool>, String)> {
         // Get router enabled status

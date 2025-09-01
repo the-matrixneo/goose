@@ -41,7 +41,6 @@ use crate::providers::errors::ProviderError;
 use crate::recipe::{Author, Recipe, Response, Settings, SubRecipe};
 use crate::scheduler_trait::SchedulerTrait;
 use crate::session;
-use crate::session::extension_data::ExtensionState;
 use crate::tool_monitor::{ToolCall, ToolMonitor};
 use crate::utils::is_token_cancelled;
 use mcp_core::ToolResult;
@@ -58,9 +57,7 @@ use super::final_output_tool::FinalOutputTool;
 use super::platform_tools;
 use super::tool_execution::{ToolCallResult, CHAT_MODE_TOOL_SKIPPED_RESPONSE, DECLINED_RESPONSE};
 use crate::agents::subagent_task_config::TaskConfig;
-use crate::agents::todo_tools::{
-    todo_read_tool, todo_write_tool, TODO_READ_TOOL_NAME, TODO_WRITE_TOOL_NAME,
-};
+
 use crate::conversation::message::{Message, ToolRequest};
 
 const DEFAULT_MAX_TURNS: u32 = 1000;
@@ -226,6 +223,9 @@ impl Agent {
         unfixed_conversation: Conversation,
         session: &Option<SessionConfig>,
     ) -> Result<ReplyContext> {
+        // Ensure TODO extension is registered if we have a session
+        self.ensure_todo_extension(session).await;
+
         let unfixed_messages = unfixed_conversation.messages().clone();
         let (conversation, issues) = fix_conversation(unfixed_conversation.clone());
         if !issues.is_empty() {
@@ -484,100 +484,6 @@ impl Agent {
                 "Frontend tool execution required".to_string(),
                 None,
             )))
-        } else if tool_call.name == TODO_READ_TOOL_NAME {
-            // Handle task planner read tool
-            let session_file_path = if let Some(session_config) = session {
-                session::storage::get_path(session_config.id.clone()).ok()
-            } else {
-                None
-            };
-
-            let todo_content = if let Some(path) = session_file_path {
-                session::storage::read_metadata(&path)
-                    .ok()
-                    .and_then(|m| {
-                        session::TodoState::from_extension_data(&m.extension_data)
-                            .map(|state| state.content)
-                    })
-                    .unwrap_or_default()
-            } else {
-                String::new()
-            };
-
-            ToolCallResult::from(Ok(vec![Content::text(todo_content)]))
-        } else if tool_call.name == TODO_WRITE_TOOL_NAME {
-            // Handle task planner write tool
-            let content = tool_call
-                .arguments
-                .get("content")
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .to_string();
-
-            // Character limit validation
-            let char_count = content.chars().count();
-            let max_chars = std::env::var("GOOSE_TODO_MAX_CHARS")
-                .ok()
-                .and_then(|s| s.parse().ok())
-                .unwrap_or(50_000);
-
-            if max_chars > 0 && char_count > max_chars {
-                ToolCallResult::from(Err(ErrorData::new(
-                    ErrorCode::INTERNAL_ERROR,
-                    format!(
-                        "Todo list too large: {} chars (max: {})",
-                        char_count, max_chars
-                    ),
-                    None,
-                )))
-            } else if let Some(session_config) = session {
-                // Update session metadata with new TODO content
-                match session::storage::get_path(session_config.id.clone()) {
-                    Ok(path) => match session::storage::read_metadata(&path) {
-                        Ok(mut metadata) => {
-                            let todo_state = session::TodoState::new(content);
-                            todo_state
-                                .to_extension_data(&mut metadata.extension_data)
-                                .ok();
-
-                            let path_clone = path.clone();
-                            let metadata_clone = metadata.clone();
-                            let update_result = tokio::task::spawn(async move {
-                                session::storage::update_metadata(&path_clone, &metadata_clone)
-                                    .await
-                            })
-                            .await;
-
-                            match update_result {
-                                Ok(Ok(_)) => ToolCallResult::from(Ok(vec![Content::text(
-                                    format!("Updated ({} chars)", char_count),
-                                )])),
-                                _ => ToolCallResult::from(Err(ErrorData::new(
-                                    ErrorCode::INTERNAL_ERROR,
-                                    "Failed to update session metadata".to_string(),
-                                    None,
-                                ))),
-                            }
-                        }
-                        Err(_) => ToolCallResult::from(Err(ErrorData::new(
-                            ErrorCode::INTERNAL_ERROR,
-                            "Failed to read session metadata".to_string(),
-                            None,
-                        ))),
-                    },
-                    Err(_) => ToolCallResult::from(Err(ErrorData::new(
-                        ErrorCode::INTERNAL_ERROR,
-                        "Failed to get session path".to_string(),
-                        None,
-                    ))),
-                }
-            } else {
-                ToolCallResult::from(Err(ErrorData::new(
-                    ErrorCode::INTERNAL_ERROR,
-                    "TODO tools require an active session to persist data".to_string(),
-                    None,
-                )))
-            }
         } else if tool_call.name == ROUTER_LLM_SEARCH_TOOL_NAME {
             match self
                 .tool_route_manager
@@ -802,9 +708,6 @@ impl Agent {
                 platform_tools::manage_extensions_tool(),
                 platform_tools::manage_schedule_tool(),
             ]);
-
-            // Add task planner tools
-            prefixed_tools.extend([todo_read_tool(), todo_write_tool()]);
 
             // Dynamic task tool
             prefixed_tools.push(create_dynamic_task_tool());
@@ -1613,11 +1516,24 @@ mod tests {
     async fn test_todo_tools_integration() -> Result<()> {
         let agent = Agent::new();
 
-        // Test that task planner tools are listed
+        // Create a mock session to trigger TODO extension registration
+        let session = SessionConfig {
+            id: session::Identifier::Name("test-session".to_string()),
+            working_dir: std::path::PathBuf::from("/tmp"),
+            schedule_id: None,
+            execution_mode: None,
+            max_turns: None,
+            retry_config: None,
+        };
+
+        // Ensure TODO extension is registered
+        agent.ensure_todo_extension(&Some(session)).await;
+
+        // Test that task planner tools are listed through the extension
         let tools = agent.list_tools(None).await;
 
-        let todo_read = tools.iter().find(|tool| tool.name == TODO_READ_TOOL_NAME);
-        let todo_write = tools.iter().find(|tool| tool.name == TODO_WRITE_TOOL_NAME);
+        let todo_read = tools.iter().find(|tool| tool.name == "todo__read");
+        let todo_write = tools.iter().find(|tool| tool.name == "todo__write");
 
         assert!(todo_read.is_some(), "TODO read tool should be present");
         assert!(todo_write.is_some(), "TODO write tool should be present");
