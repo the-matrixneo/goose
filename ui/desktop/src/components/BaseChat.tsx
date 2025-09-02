@@ -443,7 +443,13 @@ function BaseChatContent({
           {(chatState !== ChatState.Idle || loadingChat || isCompacting) && (
             <div className="absolute bottom-1 left-4 z-20 pointer-events-none">
               <LoadingGoose
-                message={isCompacting ? 'goose is compacting the conversation...' : undefined}
+                message={
+                  loadingChat
+                    ? 'loading conversation...'
+                    : isCompacting
+                      ? 'goose is compacting the conversation...'
+                      : undefined
+                }
                 chatState={chatState}
               />
             </div>
