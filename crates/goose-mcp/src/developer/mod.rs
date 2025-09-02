@@ -1704,24 +1704,6 @@ impl DeveloperRouter {
             let (notifier, _) = mpsc::channel(100);
 
             let task = tokio::spawn(async move {
-                // Helper function to log commands
-                async fn log_command(cmd_str: &str) {
-                    use chrono::Local;
-                    use tokio::fs::OpenOptions;
-                    use tokio::io::AsyncWriteExt;
-
-                    if let Ok(mut file) = OpenOptions::new()
-                        .create(true)
-                        .append(true)
-                        .open("/tmp/search.log")
-                        .await
-                    {
-                        let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S%.3f");
-                        let log_entry = format!("[{}] {}\n", timestamp, cmd_str);
-                        let _ = file.write_all(log_entry.as_bytes()).await;
-                    }
-                }
-
                 let cmd_str = match search_type.as_str() {
                     "files" => {
                         format!(
@@ -1752,8 +1734,6 @@ impl DeveloperRouter {
                         cmd
                     }
                 };
-
-                log_command(&cmd_str).await;
 
                 let bash_params = serde_json::json!({
                     "command": cmd_str
