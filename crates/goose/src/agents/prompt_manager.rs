@@ -48,6 +48,8 @@ impl PromptManager {
     fn model_prompt_map(model: &str) -> &'static str {
         let mut map = HashMap::new();
         map.insert("gpt_4_1", "system_gpt_4.1.md");
+        map.insert("tiny", "system_tiny.md");
+        map.insert("tinyagent", "system_tiny.md");
         // Add more mappings as needed
         let norm_model = Self::normalize_model_name(model);
         for (key, val) in &map {
@@ -211,6 +213,20 @@ mod tests {
         assert_eq!(
             PromptManager::model_prompt_map("gpt-4-1-huge"),
             "system_gpt_4.1.md"
+        );
+
+        // Test tinyagent models
+        assert_eq!(
+            PromptManager::model_prompt_map("tinyagent-7b"),
+            "system_tiny.md"
+        );
+        assert_eq!(
+            PromptManager::model_prompt_map("tinyagent-3b"),
+            "system_tiny.md"
+        );
+        assert_eq!(
+            PromptManager::model_prompt_map("local/tinyagent-7b"),
+            "system_tiny.md"
         );
     }
 

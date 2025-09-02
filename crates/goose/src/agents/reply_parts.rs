@@ -34,30 +34,60 @@ async fn toolshim_postprocess(
 impl Agent {
     /// Prepares tools and system prompt for a provider request
     pub async fn prepare_tools_and_prompt(&self) -> anyhow::Result<(Vec<Tool>, Vec<Tool>, String)> {
-        // Get router enabled status
-        let router_enabled = self.tool_route_manager.is_router_enabled().await;
+        // Check for tiny mode
+        let is_tiny_mode = std::env::var("GOOSE_TINY_MODE")
+            .map(|v| v.to_lowercase() == "true" || v == "1")
+            .unwrap_or(false);
 
-        // Get tools from extension manager
-        let mut tools = self.list_tools_for_router().await;
+        let mut tools = if is_tiny_mode {
+            // In tiny mode, only get the bash tool from developer extension
+            self.extension_manager
+                .get_prefixed_tools(Some("developer".to_string()))
+                .await
+                .unwrap_or_default()
+                .into_iter()
+                .filter(|tool| tool.name.contains("bash") || tool.name.contains("shell"))
+                .collect()
+        } else {
+            // Normal mode: Get router enabled status
+            let router_enabled = self.tool_route_manager.is_router_enabled().await;
 
-        // If router is disabled and no tools were returned, fall back to regular tools
-        if !router_enabled && tools.is_empty() {
-            tools = self.list_tools(None).await;
-        }
+            // Get tools from extension manager
+            let mut tools = self.list_tools_for_router().await;
 
-        // Add frontend tools
-        let frontend_tools = self.frontend_tools.lock().await;
-        for frontend_tool in frontend_tools.values() {
-            tools.push(frontend_tool.tool.clone());
-        }
+            // If router is disabled and no tools were returned, fall back to regular tools
+            if !router_enabled && tools.is_empty() {
+                tools = self.list_tools(None).await;
+            }
+
+            // Add frontend tools
+            let frontend_tools = self.frontend_tools.lock().await;
+            for frontend_tool in frontend_tools.values() {
+                tools.push(frontend_tool.tool.clone());
+            }
+
+            tools
+        };
 
         // Prepare system prompt
-        let extensions_info = self.extension_manager.get_extensions_info().await;
+        let extensions_info = if is_tiny_mode {
+            // In tiny mode, only include the developer extension info
+            vec![]
+        } else {
+            self.extension_manager.get_extensions_info().await
+        };
 
         // Get model name from provider
         let provider = self.provider().await?;
         let model_config = provider.get_model_config();
         let model_name = &model_config.model_name;
+
+        // Router is disabled in tiny mode
+        let router_enabled = if is_tiny_mode {
+            false
+        } else {
+            self.tool_route_manager.is_router_enabled().await
+        };
 
         let prompt_manager = self.prompt_manager.lock().await;
         let mut system_prompt = prompt_manager.build_system_prompt(

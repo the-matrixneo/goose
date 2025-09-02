@@ -1,0 +1,1 @@
+llama-server -m ~/.models/TinyAgent-7B-Q4_K_M.gguf --jinja --port 8080
