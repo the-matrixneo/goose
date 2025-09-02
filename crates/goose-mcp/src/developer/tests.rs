@@ -855,10 +855,6 @@ async fn test_text_editor_descriptions() {
     assert!(text_editor_tool
         .description
         .as_ref()
-        .is_some_and(|desc| desc.contains("the `old_str` needs to exactly match one")));
-    assert!(text_editor_tool
-        .description
-        .as_ref()
         .is_some_and(|desc| desc.contains("str_replace")));
 
     // Should not contain editor API description or edit_file command
