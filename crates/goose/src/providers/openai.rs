@@ -48,6 +48,8 @@ pub const OPEN_AI_DOC_URL: &str = "https://platform.openai.com/docs/models";
 pub struct OpenAiProvider {
     #[serde(skip)]
     api_client: ApiClient,
+    #[serde(skip)]
+    host: String,
     base_path: String,
     organization: Option<String>,
     project: Option<String>,
@@ -81,7 +83,7 @@ impl OpenAiProvider {
 
         let auth = AuthMethod::BearerToken(api_key);
         let mut api_client =
-            ApiClient::with_timeout(host, auth, std::time::Duration::from_secs(timeout_secs))?;
+            ApiClient::with_timeout(host.clone(), auth, std::time::Duration::from_secs(timeout_secs))?;
 
         if let Some(org) = &organization {
             api_client = api_client.with_header("OpenAI-Organization", org)?;
@@ -103,6 +105,7 @@ impl OpenAiProvider {
 
         Ok(Self {
             api_client,
+            host,
             base_path,
             organization,
             project,
@@ -141,7 +144,7 @@ impl OpenAiProvider {
         let timeout_secs = config.timeout_seconds.unwrap_or(600);
         let auth = AuthMethod::BearerToken(api_key);
         let mut api_client =
-            ApiClient::with_timeout(host, auth, std::time::Duration::from_secs(timeout_secs))?;
+            ApiClient::with_timeout(host.clone(), auth, std::time::Duration::from_secs(timeout_secs))?;
 
         // Add custom headers if present
         if let Some(headers) = &config.headers {
@@ -156,6 +159,7 @@ impl OpenAiProvider {
 
         Ok(Self {
             api_client,
+            host,
             base_path,
             organization: None,
             project: None,
@@ -166,11 +170,126 @@ impl OpenAiProvider {
     }
 
     async fn post(&self, payload: &Value) -> Result<Value, ProviderError> {
+        // Debug log the request details
+        println!("\n=== OpenAI API Request ===");
+        println!("URL: {}/{}", self.host, self.base_path);
+        
+        // Check if this is a description request or a real conversation
+        if let Some(messages) = payload.get("messages").and_then(|m| m.as_array()) {
+            if let Some(system_msg) = messages.get(0) {
+                if let Some(content) = system_msg.get("content").and_then(|c| c.as_str()) {
+                    if content.contains("four words or less") {
+                        println!("TYPE: Session description request");
+                    } else {
+                        println!("TYPE: Main conversation");
+                        println!("SYSTEM PROMPT: {}", content);
+                    }
+                }
+            }
+            
+            // Print all messages
+            println!("MESSAGE COUNT: {}", messages.len());
+            for (i, msg) in messages.iter().enumerate() {
+                if let (Some(role), Some(content)) = (
+                    msg.get("role").and_then(|r| r.as_str()),
+                    msg.get("content")
+                ) {
+                    // Handle both string content and array content (for multimodal)
+                    let content_str = if content.is_string() {
+                        content.as_str().unwrap_or("").to_string()
+                    } else {
+                        serde_json::to_string(content).unwrap_or_else(|_| "complex content".to_string())
+                    };
+                    
+                    // Truncate long messages for readability
+                    let display_content = if content_str.len() > 500 {
+                        format!("{}... [truncated, {} total chars]", &content_str[..500], content_str.len())
+                    } else {
+                        content_str
+                    };
+                    
+                    println!("  Message {}: role={}, content={}", i, role, display_content);
+                }
+            }
+        }
+        
+        // Also show if tools are included
+        if let Some(tools) = payload.get("tools").and_then(|t| t.as_array()) {
+            println!("TOOLS COUNT: {}", tools.len());
+            for tool in tools {
+                if let Some(name) = tool.get("function").and_then(|f| f.get("name")).and_then(|n| n.as_str()) {
+                    println!("  Tool: {}", name);
+                }
+            }
+        }
+        
+        println!("Full Payload: {}", serde_json::to_string_pretty(payload).unwrap_or_else(|e| format!("Failed to serialize: {}", e)));
+        
         let response = self
             .api_client
             .response_post(&self.base_path, payload)
             .await?;
-        handle_response_openai_compat(response).await
+        
+        // Debug log response status
+        println!("\n=== OpenAI API Response ===");
+        println!("Status: {}", response.status());
+        
+        // Handle and parse the response
+        let json_response = handle_response_openai_compat(response).await?;
+        
+        // Check what type of response this is
+        if let Some(choices) = json_response.get("choices").and_then(|c| c.as_array()) {
+            if let Some(first_choice) = choices.get(0) {
+                if let Some(message) = first_choice.get("message") {
+                    // Check for tool calls
+                    if let Some(tool_calls) = message.get("tool_calls").and_then(|t| t.as_array()) {
+                        println!("RESPONSE TYPE: Tool call response");
+                        println!("TOOL CALLS COUNT: {}", tool_calls.len());
+                        for (i, tool_call) in tool_calls.iter().enumerate() {
+                            if let Some(function) = tool_call.get("function") {
+                                let name = function.get("name").and_then(|n| n.as_str()).unwrap_or("unknown");
+                                let args = function.get("arguments").and_then(|a| a.as_str()).unwrap_or("{}");
+                                println!("  Tool Call {}: name={}", i, name);
+                                println!("    Arguments: {}", args);
+                            }
+                        }
+                    }
+                    // Check for regular content
+                    else if let Some(content) = message.get("content") {
+                        if content.is_string() {
+                            let content_str = content.as_str().unwrap_or("");
+                            if content_str.len() > 500 {
+                                println!("RESPONSE TYPE: Text response (truncated)");
+                                println!("CONTENT: {}... [truncated, {} total chars]", &content_str[..500], content_str.len());
+                            } else {
+                                println!("RESPONSE TYPE: Text response");
+                                println!("CONTENT: {}", content_str);
+                            }
+                        } else if content.is_null() {
+                            println!("RESPONSE TYPE: Empty content (possibly tool call or refusal)");
+                        } else {
+                            println!("RESPONSE TYPE: Complex content");
+                        }
+                    }
+                    
+                    // Check for refusal
+                    if let Some(refusal) = message.get("refusal").and_then(|r| r.as_str()) {
+                        println!("REFUSAL: {}", refusal);
+                    }
+                }
+                
+                // Check finish reason
+                if let Some(finish_reason) = first_choice.get("finish_reason").and_then(|f| f.as_str()) {
+                    println!("FINISH REASON: {}", finish_reason);
+                }
+            }
+        }
+        
+        // Debug log the full response body
+        println!("Full Response Body: {}", serde_json::to_string_pretty(&json_response).unwrap_or_else(|e| format!("Failed to serialize: {}", e)));
+        println!("=========================\n");
+        
+        Ok(json_response)
     }
 }
 
