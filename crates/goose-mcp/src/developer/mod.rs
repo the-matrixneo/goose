@@ -401,15 +401,16 @@ impl DeveloperRouter {
             let search_code_tool = Tool::new(
                 "search_code",
                 indoc! {r#"
-                    Search for code patterns and files using ripgrep.
+                    Search for code patterns
                     This tool supports multiple search modes and can search concurrently.
+                    Search terms are literal, you can provide similies and alternative spellings if needed to search wider (automatically concurrent).
 
                     Search types:
                     - File search: Find files by name pattern
                     - Content search: Search for terms/patterns within files
-                    - Regex search: Use Perl-compatible regex patterns
+                    - Regex search: Use Perl-compatible regex patterns                    
 
-                    The tool automatically respects .gitignore and .gooseignore files.
+                    Returns: either files, or file names + relevant content. Content always contains relevant line numbers.
                 "#},
                 object!({
                     "type": "object",
@@ -418,7 +419,7 @@ impl DeveloperRouter {
                         "search_terms": {
                             "type": "array",
                             "items": {"type": "string"},
-                            "description": "List of search terms/patterns to find. Each will be searched concurrently."
+                            "description": "List of search terms/patterns to find."
                         },
                         "search_type": {
                             "type": "string",
