@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::fs;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use axum::routing::get;
@@ -14,7 +15,8 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::routes::recipe_utils::{
-    find_recipe_file_path_by_id, get_all_recipes_manifests, save_recipe_file_hash_map,
+    create_temp_deeplink_recipe_file, find_recipe_file_path_by_id, get_all_recipes_manifests,
+    save_recipe_file_hash_map,
 };
 use crate::routes::utils::verify_secret_key;
 use crate::state::AppState;
@@ -348,12 +350,24 @@ async fn load_recipe(
     Json(request): Json<LoadRecipeRequest>,
 ) -> Result<Json<LoadRecipeResponse>, StatusCode> {
     verify_secret_key(&headers, &state)?;
-    let file_path = match find_recipe_file_path_by_id(&request.id) {
-        Ok(path) => path,
-        Err(e) => {
-            tracing::error!("Failed to find recipe file path: {}", e);
-            return Err(StatusCode::NOT_FOUND);
+    let file_path: PathBuf = match request.id.contains("deeplink_") {
+        true => {
+            let deeplink = request.id.strip_prefix("deeplink_").unwrap_or(&request.id);
+            let recipe_content =
+                recipe_deeplink::decode_deeplink_to_string(deeplink).map_err(|e| {
+                    tracing::error!("Failed to decode recipe deeplink: {}", e);
+                    StatusCode::INTERNAL_SERVER_ERROR
+                })?;
+
+            create_temp_deeplink_recipe_file(&recipe_content).map_err(|e| {
+                tracing::error!("Failed to create temp deeplink recipe file: {}", e);
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?
         }
+        false => find_recipe_file_path_by_id(&request.id).map_err(|e| {
+            tracing::error!("Failed to find recipe file path: {}", e);
+            StatusCode::NOT_FOUND
+        })?,
     };
     let recipe = match build_recipe_from_file(&file_path, request.parameters.unwrap_or_default()) {
         Ok(recipe) => recipe,

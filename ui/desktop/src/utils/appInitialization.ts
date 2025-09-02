@@ -41,6 +41,7 @@ export const initializeApp = async ({
   const resumeSessionId = urlParams.get('resumeSessionId');
   const recipeConfig = window.appConfig.get('recipe');
   const recipeId = window.appConfig.get('recipeId');
+  console.log("========recipeId", recipeId);
 
   if (resumeSessionId) {
     console.log('Session resume detected, letting useChat hook handle navigation');

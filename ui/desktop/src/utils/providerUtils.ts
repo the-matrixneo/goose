@@ -80,27 +80,19 @@ export const updateSystemPromptWithParameters = async (
   recipeId?: string | null
 ): Promise<Recipe | null> => {
   const subRecipes = recipeConfig?.sub_recipes;
+  if (!recipeId) {
+    return recipeConfig || null;
+  }
   let updatedRecipeConfig = recipeConfig;
   try {
-    if (recipeId) {
-      const recipeResponse = await loadRecipe({
-        body: {
-          id: recipeId,
-          parameters: Object.entries(recipeParameters).map(([key, value]) => [key, value]),
-        },
-      });
-      updatedRecipeConfig = recipeResponse.data?.recipe;
-    } else {
-      if (!recipeConfig?.instructions) {
-        return recipeConfig || null;
-      }
-      if (updatedRecipeConfig) {
-        updatedRecipeConfig.instructions = substituteParameters(
-          recipeConfig.instructions,
-          recipeParameters
-        );
-      }
-    }
+    const recipeResponse = await loadRecipe({
+      body: {
+        id: recipeId,
+        parameters: Object.entries(recipeParameters).map(([key, value]) => [key, value]),
+      },
+    });
+    updatedRecipeConfig = recipeResponse.data?.recipe;
+  
 
     // Update the system prompt with substituted instructions
     const response = await extendPrompt({
@@ -115,15 +107,6 @@ export const updateSystemPromptWithParameters = async (
     console.error('Error updating system prompt with parameters:', error);
   }
   if (subRecipes && subRecipes?.length > 0) {
-    if (!recipeId) {
-      for (const subRecipe of subRecipes) {
-        if (subRecipe.values) {
-          for (const key in subRecipe.values) {
-            subRecipe.values[key] = substituteParameters(subRecipe.values[key], recipeParameters);
-          }
-        }
-      }
-    }
     await addSubRecipesToAgent(subRecipes);
   }
   return updatedRecipeConfig || null;
@@ -143,6 +126,7 @@ export const initializeSystem = async (
 
     // Get recipeConfig directly here
     let recipeConfig = window.appConfig?.get?.('recipe');
+    
 
     const recipe_instructions = (recipeConfig as { instructions?: string })?.instructions;
     const responseConfig = (recipeConfig as { response?: { json_schema?: unknown } })?.response;

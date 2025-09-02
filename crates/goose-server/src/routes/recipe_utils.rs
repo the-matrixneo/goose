@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::hash::DefaultHasher;
 use std::hash::{Hash, Hasher};
+use std::io::Write;
 use std::path::PathBuf;
 
 use anyhow::Result;
@@ -120,6 +121,18 @@ pub fn find_recipe_file_path_by_id(recipe_id: &str) -> Result<PathBuf> {
         .get(recipe_id)
         .cloned()
         .ok_or_else(|| anyhow::anyhow!("Recipe not found with id: {}", recipe_id))
+}
+
+pub fn create_temp_deeplink_recipe_file(content: &str) -> Result<PathBuf> {
+    let temp_dir = std::env::temp_dir();
+    let file_name = format!("recipe_deeplink_{}.yaml", uuid::Uuid::new_v4());
+    let temp_path = temp_dir.join(file_name);
+
+    let mut file = std::fs::File::create(&temp_path)?;
+    file.write_all(content.as_bytes())?;
+    file.sync_all()?;
+
+    Ok(temp_path)
 }
 
 // this is a temporary struct to deserilize the UI recipe files. should not be used for other purposes.

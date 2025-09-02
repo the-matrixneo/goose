@@ -128,19 +128,6 @@ export const useRecipeManager = (messages: Message[], locationState?: LocationSt
     if (!recipeConfig?.prompt || !recipeAccepted || recipeConfig?.isScheduledExecution) {
       return '';
     }
-
-    const hasRequiredParams = recipeConfig.parameters && recipeConfig.parameters.length > 0;
-
-    // If params are required and have been collected, substitute them into the prompt.
-    if (hasRequiredParams && recipeParameters) {
-      if (recipeId) {
-        return recipeConfig.prompt;
-      }
-      return substituteParameters(recipeConfig.prompt, recipeParameters);
-    }
-
-    // Always return the original prompt, whether it has parameters or not
-    // The user should see the prompt with parameter placeholders before filling them in
     return recipeConfig.prompt;
   }, [recipeConfig, recipeParameters, recipeAccepted, recipeId]);
 
