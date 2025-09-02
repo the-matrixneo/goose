@@ -16,6 +16,8 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+const RECIPE_ID_HASH_SEED: u64 = 0x1234567890abcdef;
+
 pub struct RecipeManifestWithPath {
     pub id: String,
     pub name: String,
@@ -27,6 +29,7 @@ pub struct RecipeManifestWithPath {
 
 fn short_id_from_path(path: &str) -> String {
     let mut hasher = DefaultHasher::new();
+    hasher.write_u64(RECIPE_ID_HASH_SEED);
     path.hash(&mut hasher);
     let h = hasher.finish();
     format!("{:016x}", h)
