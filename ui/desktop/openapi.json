@@ -954,19 +954,21 @@
       }
     },
     "/recipes/load": {
-      "get": {
+      "post": {
         "tags": [
           "Recipe Management"
         ],
         "operationId": "load_recipe",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "query",
-            "description": "Recipe ID",
-            "required": true
-          }
-        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoadRecipeRequest"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "Recipe loaded successfully",
@@ -2391,7 +2393,7 @@
           }
         }
       },
-      "LoadRecipeQuery": {
+      "LoadRecipeRequest": {
         "type": "object",
         "required": [
           "id"
@@ -2399,6 +2401,23 @@
         "properties": {
           "id": {
             "type": "string"
+          },
+          "parameters": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "allOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ]
+              }
+            },
+            "nullable": true
           }
         }
       },

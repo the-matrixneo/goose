@@ -344,8 +344,9 @@ export type ListSchedulesResponse = {
     jobs: Array<ScheduledJob>;
 };
 
-export type LoadRecipeQuery = {
+export type LoadRecipeRequest = {
     id: string;
+    parameters?: Array<Array<string>> | null;
 };
 
 export type LoadRecipeResponse = {
@@ -1635,14 +1636,9 @@ export type ListRecipesResponses = {
 export type ListRecipesResponse = ListRecipesResponses[keyof ListRecipesResponses];
 
 export type LoadRecipeData = {
-    body?: never;
+    body: LoadRecipeRequest;
     path?: never;
-    query: {
-        /**
-         * Recipe ID
-         */
-        id: unknown;
-    };
+    query?: never;
     url: '/recipes/load';
 };
 

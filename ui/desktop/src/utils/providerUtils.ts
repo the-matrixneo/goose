@@ -7,7 +7,14 @@ import {
 } from '../components/settings/extensions';
 import { extractExtensionConfig } from '../components/settings/extensions/utils';
 import type { ExtensionConfig, FixedExtensionEntry } from '../components/ConfigContext';
-import { RecipeParameter, SubRecipe, updateSessionConfig, extendPrompt } from '../api';
+import {
+  RecipeParameter,
+  SubRecipe,
+  updateSessionConfig,
+  extendPrompt,
+  loadRecipe,
+  Recipe,
+} from '../api';
 import { addSubRecipesToAgent } from '../recipe/add_sub_recipe_on_agent';
 
 export interface Provider {
@@ -69,26 +76,36 @@ export const substituteParameters = (text: string, params: Record<string, string
  */
 export const updateSystemPromptWithParameters = async (
   recipeParameters: Record<string, string>,
-  recipeConfig?: {
-    instructions?: string | null;
-    sub_recipes?: SubRecipe[] | null;
-    parameters?: RecipeParameter[] | null;
-  }
-): Promise<void> => {
+  recipeConfig?: Recipe | null | undefined,
+  recipeId?: string | null
+): Promise<Recipe | null> => {
   const subRecipes = recipeConfig?.sub_recipes;
+  let updatedRecipeConfig = recipeConfig;
   try {
-    const originalInstructions = recipeConfig?.instructions;
-
-    if (!originalInstructions) {
-      return;
+    if (recipeId) {
+      const recipeResponse = await loadRecipe({
+        body: {
+          id: recipeId,
+          parameters: Object.entries(recipeParameters).map(([key, value]) => [key, value]),
+        },
+      });
+      updatedRecipeConfig = recipeResponse.data?.recipe;
+    } else {
+      if (!recipeConfig?.instructions) {
+        return recipeConfig || null;
+      }
+      if (updatedRecipeConfig) {
+        updatedRecipeConfig.instructions = substituteParameters(
+          recipeConfig.instructions,
+          recipeParameters
+        );
+      }
     }
-    // Substitute parameters in the instructions
-    const substitutedInstructions = substituteParameters(originalInstructions, recipeParameters);
 
     // Update the system prompt with substituted instructions
     const response = await extendPrompt({
       body: {
-        extension: `${desktopPromptBot}\nIMPORTANT instructions for you to operate as agent:\n${substitutedInstructions}`,
+        extension: `${desktopPromptBot}\nIMPORTANT instructions for you to operate as agent:\n${updatedRecipeConfig?.instructions}`,
       },
     });
     if (response.error) {
@@ -98,15 +115,18 @@ export const updateSystemPromptWithParameters = async (
     console.error('Error updating system prompt with parameters:', error);
   }
   if (subRecipes && subRecipes?.length > 0) {
-    for (const subRecipe of subRecipes) {
-      if (subRecipe.values) {
-        for (const key in subRecipe.values) {
-          subRecipe.values[key] = substituteParameters(subRecipe.values[key], recipeParameters);
+    if (!recipeId) {
+      for (const subRecipe of subRecipes) {
+        if (subRecipe.values) {
+          for (const key in subRecipe.values) {
+            subRecipe.values[key] = substituteParameters(subRecipe.values[key], recipeParameters);
+          }
         }
       }
     }
     await addSubRecipesToAgent(subRecipes);
   }
+  return updatedRecipeConfig || null;
 };
 
 export const initializeSystem = async (

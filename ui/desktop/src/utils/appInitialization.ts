@@ -165,11 +165,10 @@ const initializeForRecipe = async ({
 
   if (recipeId) {
     try {
-      const recipeResponse = await loadRecipe({ query: { id: recipeId } });
+      const recipeResponse = await loadRecipe({ body: { id: recipeId } });
       const recipe = recipeResponse.data?.recipe;
 
       if (recipe) {
-        // window.appConfig.set('recipe', recipe);
         finalRecipeConfig = recipe;
       } else {
         console.error('Failed to load recipe: No recipe data received');
@@ -195,6 +194,7 @@ const initializeForRecipe = async ({
     title: finalRecipeConfig?.title || 'Recipe Chat',
     messages: [],
     messageHistoryIndex: 0,
+    recipeId: recipeId,
   }));
 
   window.location.hash = '#/pair';

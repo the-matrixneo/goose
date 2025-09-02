@@ -289,9 +289,13 @@ export const listRecipes = <ThrowOnError extends boolean = false>(options?: Opti
 };
 
 export const loadRecipe = <ThrowOnError extends boolean = false>(options: Options<LoadRecipeData, ThrowOnError>) => {
-    return (options.client ?? _heyApiClient).get<LoadRecipeResponses, LoadRecipeErrors, ThrowOnError>({
+    return (options.client ?? _heyApiClient).post<LoadRecipeResponses, LoadRecipeErrors, ThrowOnError>({
         url: '/recipes/load',
-        ...options
+        ...options,
+        headers: {
+            'Content-Type': 'application/json',
+            ...options.headers
+        }
     });
 };
 

@@ -2,10 +2,10 @@ use std::collections::HashMap;
 use std::fs;
 use std::sync::Arc;
 
-use axum::extract::Query;
 use axum::routing::get;
 use axum::{extract::State, http::StatusCode, routing::post, Json, Router};
 use goose::conversation::{message::Message, Conversation};
+use goose::recipe::build_recipe::{build_recipe_from_file, RecipeError};
 use goose::recipe::Recipe;
 use goose::recipe_deeplink;
 
@@ -13,7 +13,9 @@ use http::HeaderMap;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::routes::recipe_utils::{get_all_recipes_manifests, save_recipe_file_hash_map, find_recipe_file_path_by_id};
+use crate::routes::recipe_utils::{
+    find_recipe_file_path_by_id, get_all_recipes_manifests, save_recipe_file_hash_map,
+};
 use crate::routes::utils::verify_secret_key;
 use crate::state::AppState;
 
@@ -96,8 +98,9 @@ pub struct ListRecipeResponse {
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
-pub struct LoadRecipeQuery {
+pub struct LoadRecipeRequest {
     id: String,
+    parameters: Option<Vec<(String, String)>>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -281,7 +284,7 @@ async fn list_recipes(
             }
         })
         .collect::<Vec<RecipeManifestResponse>>();
-    
+
     if let Err(e) = save_recipe_file_hash_map(&recipe_file_hash_map) {
         tracing::error!("Failed to save recipe file hash map to temp file: {}", e);
         return Err(StatusCode::INTERNAL_SERVER_ERROR);
@@ -328,11 +331,9 @@ async fn delete_recipe(
 }
 
 #[utoipa::path(
-    get,
+    post,
     path = "/recipes/load",
-    params(
-        ("id", Query, description = "Recipe ID"),
-    ),
+    request_body = LoadRecipeRequest,
     responses(
         (status = 200, description = "Recipe loaded successfully", body = LoadRecipeResponse),
         (status = 401, description = "Unauthorized - Invalid or missing API key"),
@@ -344,25 +345,19 @@ async fn delete_recipe(
 async fn load_recipe(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
-    Query(query): Query<LoadRecipeQuery>,
+    Json(request): Json<LoadRecipeRequest>,
 ) -> Result<Json<LoadRecipeResponse>, StatusCode> {
     verify_secret_key(&headers, &state)?;
-    let file_path = match find_recipe_file_path_by_id(&query.id) {
+    let file_path = match find_recipe_file_path_by_id(&request.id) {
         Ok(path) => path,
         Err(e) => {
             tracing::error!("Failed to find recipe file path: {}", e);
             return Err(StatusCode::NOT_FOUND);
         }
     };
-    let content = match fs::read_to_string(&file_path) {
-        Ok(content) => content,
-        Err(e) => {
-            tracing::error!("Failed to read recipe file: {}", e);
-            return Err(StatusCode::INTERNAL_SERVER_ERROR);
-        }
-    };
-    let recipe = match Recipe::from_content(&content) {
+    let recipe = match build_recipe_from_file(&file_path, request.parameters.unwrap_or_default()) {
         Ok(recipe) => recipe,
+        Err(RecipeError::MissingParams { raw_recipe, .. }) => *raw_recipe,
         Err(e) => {
             tracing::error!("Failed to parse recipe: {}", e);
             return Err(StatusCode::INTERNAL_SERVER_ERROR);
@@ -379,7 +374,7 @@ pub fn routes(state: Arc<AppState>) -> Router {
         .route("/recipes/scan", post(scan_recipe))
         .route("/recipes/list", get(list_recipes))
         .route("/recipes/delete", post(delete_recipe))
-        .route("/recipes/load", get(load_recipe))
+        .route("/recipes/load", post(load_recipe))
         .with_state(state)
 }
 

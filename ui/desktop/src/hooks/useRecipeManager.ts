@@ -60,6 +60,10 @@ export const useRecipeManager = (messages: Message[], locationState?: LocationSt
     return chatContext?.chat.recipeParameters || null;
   }, [chatContext?.chat.recipeParameters]);
 
+  const recipeId = useMemo(() => {
+    return chatContext?.chat.recipeId || null;
+  }, [chatContext?.chat.recipeId]);
+
   // Effect to persist recipe config to chat context when it changes
   useEffect(() => {
     if (!chatContext?.setRecipeConfig) return;
@@ -129,28 +133,32 @@ export const useRecipeManager = (messages: Message[], locationState?: LocationSt
 
     // If params are required and have been collected, substitute them into the prompt.
     if (hasRequiredParams && recipeParameters) {
+      if (recipeId) {
+        return recipeConfig.prompt;
+      }
       return substituteParameters(recipeConfig.prompt, recipeParameters);
     }
 
     // Always return the original prompt, whether it has parameters or not
     // The user should see the prompt with parameter placeholders before filling them in
     return recipeConfig.prompt;
-  }, [recipeConfig, recipeParameters, recipeAccepted]);
+  }, [recipeConfig, recipeParameters, recipeAccepted, recipeId]);
 
   // Handle parameter submission
   const handleParameterSubmit = async (inputValues: Record<string, string>) => {
-    // Store parameters in chat context instead of local state
-    if (chatContext?.setRecipeParameters) {
-      chatContext.setRecipeParameters(inputValues);
-    }
-    setIsParameterModalOpen(false);
-
-    // Update the system prompt with parameter-substituted instructions
     try {
-      await updateSystemPromptWithParameters(inputValues, recipeConfig || undefined);
+      let updatedRecipeConfig = await updateSystemPromptWithParameters(
+        inputValues,
+        recipeConfig || undefined,
+        recipeId
+      );
+      if (updatedRecipeConfig) {
+        chatContext?.setRecipeConfigAndParameters(updatedRecipeConfig, inputValues);
+      }
     } catch (error) {
       console.error('Failed to update system prompt with parameters:', error);
     }
+    setIsParameterModalOpen(false);
   };
 
   // Handle recipe acceptance
