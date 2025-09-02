@@ -1698,91 +1698,87 @@ impl DeveloperRouter {
         for term in search_terms {
             let search_path = search_path.clone();
             let search_type = search_type.to_string();
+            let this = self.clone();
+
+            // Create a dummy notifier for bash calls
+            let (notifier, _) = mpsc::channel(100);
 
             let task = tokio::spawn(async move {
-                let mut cmd = tokio::process::Command::new("rg");
+                // Helper function to log commands
+                async fn log_command(cmd_str: &str) {
+                    use chrono::Local;
+                    use tokio::fs::OpenOptions;
+                    use tokio::io::AsyncWriteExt;
 
-                match search_type.as_str() {
+                    if let Ok(mut file) = OpenOptions::new()
+                        .create(true)
+                        .append(true)
+                        .open("/tmp/search.log")
+                        .await
+                    {
+                        let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S%.3f");
+                        let log_entry = format!("[{}] {}\n", timestamp, cmd_str);
+                        let _ = file.write_all(log_entry.as_bytes()).await;
+                    }
+                }
+
+                let cmd_str = match search_type.as_str() {
                     "files" => {
-                        // Search for files by name: rg --files | rg <pattern>
-                        let output = tokio::process::Command::new("rg")
-                            .arg("--files")
-                            .current_dir(&search_path)
-                            .output()
-                            .await;
-
-                        match output {
-                            Ok(output) if output.status.success() => {
-                                let files = String::from_utf8_lossy(&output.stdout);
-                                let matching_files: Vec<&str> =
-                                    files.lines().filter(|line| line.contains(&term)).collect();
-
-                                if matching_files.is_empty() {
-                                    Ok(format!("No files found matching: {}", term))
-                                } else {
-                                    Ok(format!(
-                                        "Files matching '{}':\n{}",
-                                        term,
-                                        matching_files.join("\n")
-                                    ))
-                                }
-                            }
-                            _ => Err(format!("Failed to search for files matching: {}", term)),
-                        }
+                        format!(
+                            "cd {} && rg --files | grep '{}'",
+                            search_path.display(),
+                            term
+                        )
                     }
                     "regex" => {
-                        // Regex search with PCRE2
-                        cmd.arg("-P");
+                        let mut cmd = format!("cd {} && rg -P", search_path.display());
                         if files_only {
-                            cmd.arg("-l");
+                            cmd.push_str(" -l");
                         } else {
-                            cmd.arg(format!("-C{}", context_lines));
+                            cmd.push_str(&format!(" -C{}", context_lines));
                         }
-                        cmd.arg(&term);
-                        cmd.current_dir(&search_path);
-
-                        let output = cmd.output().await;
-                        match output {
-                            Ok(output) if output.status.success() => {
-                                let result = String::from_utf8_lossy(&output.stdout);
-                                if result.trim().is_empty() {
-                                    Ok(format!("No matches found for regex: {}", term))
-                                } else {
-                                    Ok(format!("Regex matches for '{}':\n{}", term, result))
-                                }
-                            }
-                            Ok(output) if !output.status.success() && output.stdout.is_empty() => {
-                                Ok(format!("No matches found for regex: {}", term))
-                            }
-                            _ => Err(format!("Failed to search for regex: {}", term)),
-                        }
+                        cmd.push_str(&format!(" '{}'", term));
+                        cmd
                     }
                     _ => {
                         // Default content search
+                        let mut cmd = format!("cd {} && rg", search_path.display());
                         if files_only {
-                            cmd.arg("-l");
+                            cmd.push_str(" -l");
                         } else {
-                            cmd.arg(format!("-C{}", context_lines));
+                            cmd.push_str(&format!(" -C{}", context_lines));
                         }
-                        cmd.arg(&term);
-                        cmd.current_dir(&search_path);
+                        cmd.push_str(&format!(" '{}'", term));
+                        cmd
+                    }
+                };
 
-                        let output = cmd.output().await;
-                        match output {
-                            Ok(output) if output.status.success() => {
-                                let result = String::from_utf8_lossy(&output.stdout);
-                                if result.trim().is_empty() {
-                                    Ok(format!("No matches found for: {}", term))
-                                } else {
-                                    Ok(format!("Matches for '{}':\n{}", term, result))
-                                }
-                            }
-                            Ok(output) if !output.status.success() && output.stdout.is_empty() => {
-                                Ok(format!("No matches found for: {}", term))
-                            }
-                            _ => Err(format!("Failed to search for: {}", term)),
+                log_command(&cmd_str).await;
+
+                let bash_params = serde_json::json!({
+                    "command": cmd_str
+                });
+
+                match this.bash(bash_params, notifier).await {
+                    Ok(content) => {
+                        let output = content
+                            .iter()
+                            .find(|c| {
+                                c.audience()
+                                    .as_ref()
+                                    .is_some_and(|a| a.contains(&Role::User))
+                            })
+                            .and_then(|c| c.as_text())
+                            .map(|t| t.text.clone())
+                            .unwrap_or_default();
+
+                        if output.trim().is_empty() {
+                            Ok(format!("No matches found for: {}", term))
+                        } else {
+                            Ok(format!("Matches for '{}':\n{}", term, output))
                         }
                     }
+                    Err(_) => Ok(format!("No matches found for: {}", term)),
                 }
             });
 
