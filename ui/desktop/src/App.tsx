@@ -82,6 +82,8 @@ const PairRouteWrapper = ({
   const setView = useMemo(() => createNavigationHandler(navigate), [navigate]);
   const routeState =
     (location.state as PairRouteState) || (window.history.state as PairRouteState) || {};
+  const [resumeSessionId] = useState(routeState.resumeSessionId);
+  const [initialMessage] = useState(routeState.initialMessage);
 
   return (
     <Pair
@@ -93,8 +95,8 @@ const PairRouteWrapper = ({
       setFatalError={setFatalError}
       setAgentWaitingMessage={setAgentWaitingMessage}
       setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
-      resumeSessionId={routeState.resumeSessionId}
-      initialMessage={routeState.initialMessage}
+      resumeSessionId={resumeSessionId}
+      initialMessage={initialMessage}
     />
   );
 };
