@@ -381,6 +381,78 @@ impl DeveloperRouter {
             open_world_hint: Some(false),
         });
 
+        // Check if ripgrep is available on the system
+        let has_ripgrep = std::process::Command::new("which")
+            .arg("rg")
+            .output()
+            .map(|output| output.status.success())
+            .unwrap_or(false);
+
+        let mut tools = vec![
+            bash_tool,
+            text_editor_tool,
+            list_windows_tool,
+            screen_capture_tool,
+            image_processor_tool,
+        ];
+
+        // Only add search_code tool if ripgrep is available
+        if has_ripgrep {
+            let search_code_tool = Tool::new(
+                "search_code",
+                indoc! {r#"
+                    Search for code patterns and files using ripgrep.
+                    This tool supports multiple search modes and can search concurrently.
+
+                    Search types:
+                    - File search: Find files by name pattern
+                    - Content search: Search for terms/patterns within files
+                    - Regex search: Use Perl-compatible regex patterns
+
+                    The tool automatically respects .gitignore and .gooseignore files.
+                "#},
+                object!({
+                    "type": "object",
+                    "required": ["search_terms"],
+                    "properties": {
+                        "search_terms": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "List of search terms/patterns to find. Each will be searched concurrently."
+                        },
+                        "search_type": {
+                            "type": "string",
+                            "enum": ["files", "content", "regex"],
+                            "default": "content",
+                            "description": "Type of search: 'files' to find filenames, 'content' to search within files, 'regex' for regex patterns"
+                        },
+                        "context_lines": {
+                            "type": "integer",
+                            "default": 3,
+                            "description": "Number of context lines to show around matches (for content/regex search)"
+                        },
+                        "files_only": {
+                            "type": "boolean",
+                            "default": false,
+                            "description": "Only show file paths, not the matching content (for content/regex search)"
+                        },
+                        "path": {
+                            "type": "string",
+                            "description": "Optional path to search within (defaults to current directory)"
+                        }
+                    }
+                }),
+            )
+            .annotate(ToolAnnotations {
+                title: Some("Search Code".to_string()),
+                read_only_hint: Some(true),
+                destructive_hint: Some(false),
+                idempotent_hint: Some(true),
+                open_world_hint: Some(false),
+            });
+            tools.push(search_code_tool);
+        }
+
         // Get base instructions and working directory
         let cwd = std::env::current_dir().expect("should have a current working dir");
         let os = std::env::consts::OS;
@@ -487,13 +559,7 @@ impl DeveloperRouter {
         };
 
         Self {
-            tools: vec![
-                bash_tool,
-                text_editor_tool,
-                list_windows_tool,
-                screen_capture_tool,
-                image_processor_tool,
-            ],
+            tools,
             prompts: Arc::new(load_prompt_files()),
             instructions,
             file_history: Arc::new(Mutex::new(HashMap::new())),
@@ -1568,6 +1634,186 @@ impl DeveloperRouter {
         ])
     }
 
+    #[allow(clippy::too_many_lines)]
+    async fn search_code(&self, params: Value) -> Result<Vec<Content>, ErrorData> {
+        let search_terms = params
+            .get("search_terms")
+            .and_then(|v| v.as_array())
+            .ok_or_else(|| {
+                ErrorData::new(
+                    ErrorCode::INVALID_PARAMS,
+                    "Missing 'search_terms' parameter".to_string(),
+                    None,
+                )
+            })?
+            .iter()
+            .filter_map(|v| v.as_str())
+            .map(|s| s.to_string())
+            .collect::<Vec<String>>();
+
+        if search_terms.is_empty() {
+            return Err(ErrorData::new(
+                ErrorCode::INVALID_PARAMS,
+                "search_terms array cannot be empty".to_string(),
+                None,
+            ));
+        }
+
+        let search_type = params
+            .get("search_type")
+            .and_then(|v| v.as_str())
+            .unwrap_or("content");
+
+        let context_lines = params
+            .get("context_lines")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(3) as usize;
+
+        let files_only = params
+            .get("files_only")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+
+        let search_path = if let Some(path_str) = params.get("path").and_then(|v| v.as_str()) {
+            self.resolve_path(path_str)?
+        } else {
+            std::env::current_dir().expect("should have a current working dir")
+        };
+
+        // Check if path is ignored
+        if self.is_ignored(&search_path) {
+            return Err(ErrorData::new(
+                ErrorCode::INTERNAL_ERROR,
+                format!(
+                    "Access to '{}' is restricted by .gooseignore",
+                    search_path.display()
+                ),
+                None,
+            ));
+        }
+
+        // Execute searches concurrently
+        let mut search_tasks = Vec::new();
+
+        for term in search_terms {
+            let search_path = search_path.clone();
+            let search_type = search_type.to_string();
+
+            let task = tokio::spawn(async move {
+                let mut cmd = tokio::process::Command::new("rg");
+
+                match search_type.as_str() {
+                    "files" => {
+                        // Search for files by name: rg --files | rg <pattern>
+                        let output = tokio::process::Command::new("rg")
+                            .arg("--files")
+                            .current_dir(&search_path)
+                            .output()
+                            .await;
+
+                        match output {
+                            Ok(output) if output.status.success() => {
+                                let files = String::from_utf8_lossy(&output.stdout);
+                                let matching_files: Vec<&str> =
+                                    files.lines().filter(|line| line.contains(&term)).collect();
+
+                                if matching_files.is_empty() {
+                                    Ok(format!("No files found matching: {}", term))
+                                } else {
+                                    Ok(format!(
+                                        "Files matching '{}':\n{}",
+                                        term,
+                                        matching_files.join("\n")
+                                    ))
+                                }
+                            }
+                            _ => Err(format!("Failed to search for files matching: {}", term)),
+                        }
+                    }
+                    "regex" => {
+                        // Regex search with PCRE2
+                        cmd.arg("-P");
+                        if files_only {
+                            cmd.arg("-l");
+                        } else {
+                            cmd.arg(format!("-C{}", context_lines));
+                        }
+                        cmd.arg(&term);
+                        cmd.current_dir(&search_path);
+
+                        let output = cmd.output().await;
+                        match output {
+                            Ok(output) if output.status.success() => {
+                                let result = String::from_utf8_lossy(&output.stdout);
+                                if result.trim().is_empty() {
+                                    Ok(format!("No matches found for regex: {}", term))
+                                } else {
+                                    Ok(format!("Regex matches for '{}':\n{}", term, result))
+                                }
+                            }
+                            Ok(output) if !output.status.success() && output.stdout.is_empty() => {
+                                Ok(format!("No matches found for regex: {}", term))
+                            }
+                            _ => Err(format!("Failed to search for regex: {}", term)),
+                        }
+                    }
+                    _ => {
+                        // Default content search
+                        if files_only {
+                            cmd.arg("-l");
+                        } else {
+                            cmd.arg(format!("-C{}", context_lines));
+                        }
+                        cmd.arg(&term);
+                        cmd.current_dir(&search_path);
+
+                        let output = cmd.output().await;
+                        match output {
+                            Ok(output) if output.status.success() => {
+                                let result = String::from_utf8_lossy(&output.stdout);
+                                if result.trim().is_empty() {
+                                    Ok(format!("No matches found for: {}", term))
+                                } else {
+                                    Ok(format!("Matches for '{}':\n{}", term, result))
+                                }
+                            }
+                            Ok(output) if !output.status.success() && output.stdout.is_empty() => {
+                                Ok(format!("No matches found for: {}", term))
+                            }
+                            _ => Err(format!("Failed to search for: {}", term)),
+                        }
+                    }
+                }
+            });
+
+            search_tasks.push(task);
+        }
+
+        // Wait for all searches to complete
+        let mut results = Vec::new();
+        for task in search_tasks {
+            match task.await {
+                Ok(Ok(result)) => results.push(result),
+                Ok(Err(err)) => results.push(err),
+                Err(e) => results.push(format!("Task failed: {}", e)),
+            }
+        }
+
+        let combined_results = results.join("\n\n---\n\n");
+
+        Ok(vec![
+            Content::text(format!(
+                "Search completed in {}:\n\n{}",
+                search_path.display(),
+                combined_results
+            ))
+            .with_audience(vec![Role::Assistant]),
+            Content::text(combined_results)
+                .with_audience(vec![Role::User])
+                .with_priority(0.0),
+        ])
+    }
+
     async fn screen_capture(&self, params: Value) -> Result<Vec<Content>, ErrorData> {
         let mut image =
             if let Some(window_title) = params.get("window_title").and_then(|v| v.as_str()) {
@@ -1708,6 +1954,7 @@ impl Router for DeveloperRouter {
                 "list_windows" => this.list_windows(arguments).await,
                 "screen_capture" => this.screen_capture(arguments).await,
                 "image_processor" => this.image_processor(arguments).await,
+                "search_code" => this.search_code(arguments).await,
                 _ => Err(ErrorData::new(
                     ErrorCode::METHOD_NOT_FOUND,
                     format!("Tool {} not found", tool_name),

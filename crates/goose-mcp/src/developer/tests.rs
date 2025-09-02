@@ -2112,3 +2112,145 @@ async fn test_shell_output_without_trailing_newline() {
 
     temp_dir.close().unwrap();
 }
+
+#[tokio::test]
+#[serial]
+async fn test_search_code_file_search() {
+    // Skip test if ripgrep is not available
+    if std::process::Command::new("rg")
+        .arg("--version")
+        .output()
+        .is_err()
+    {
+        eprintln!("Skipping test: ripgrep not installed");
+        return;
+    }
+
+    let temp_dir = TempDir::new().unwrap();
+    let test_file = temp_dir.path().join("test_file.rs");
+    std::fs::write(&test_file, "fn main() {\n    println!(\"Hello\");\n}").unwrap();
+
+    let another_file = temp_dir.path().join("another.txt");
+    std::fs::write(&another_file, "Some text content").unwrap();
+
+    std::env::set_current_dir(&temp_dir).unwrap();
+
+    let router = get_router().await;
+
+    // Test file search - use "." to match any file with test_file in the name
+    let result = router
+        .call_tool(
+            "search_code",
+            json!({
+                "search_type": "file",
+                "search_terms": ["."]
+            }),
+            dummy_sender(),
+        )
+        .await;
+
+    if result.is_err() {
+        eprintln!("Error calling search_code: {:?}", result.as_ref().err());
+    }
+    assert!(result.is_ok());
+    let response = result.unwrap();
+
+    // Find the text content in the response
+    let content = response
+        .iter()
+        .find(|c| {
+            c.audience()
+                .is_some_and(|roles| roles.contains(&Role::User))
+        })
+        .unwrap()
+        .as_text()
+        .unwrap();
+
+    assert!(
+        content.text.contains("test_file.rs"),
+        "Should find test_file.rs, but got: {}",
+        content.text
+    );
+
+    temp_dir.close().unwrap();
+}
+
+#[tokio::test]
+#[serial]
+async fn test_search_code_content_search() {
+    // Skip test if ripgrep is not available
+    if std::process::Command::new("rg")
+        .arg("--version")
+        .output()
+        .is_err()
+    {
+        eprintln!("Skipping test: ripgrep not installed");
+        return;
+    }
+
+    let temp_dir = TempDir::new().unwrap();
+    let test_file = temp_dir.path().join("example.rs");
+    std::fs::write(
+        &test_file,
+        "fn greet() {\n    println!(\"Hello, World!\");\n}\n\nfn main() {\n    greet();\n}",
+    )
+    .unwrap();
+
+    let another_file = temp_dir.path().join("lib.rs");
+    std::fs::write(&another_file, "pub fn calculate() -> i32 {\n    42\n}").unwrap();
+
+    std::env::set_current_dir(&temp_dir).unwrap();
+
+    let router = get_router().await;
+
+    // Test content search with context
+    let result = router
+        .call_tool(
+            "search_code",
+            json!({
+                "search_type": "content",
+                "search_terms": ["greet", "calculate"],
+                "context_lines": 1
+            }),
+            dummy_sender(),
+        )
+        .await;
+
+    if result.is_err() {
+        eprintln!("Error calling search_code: {:?}", result.as_ref().err());
+    }
+    assert!(result.is_ok());
+    let response = result.unwrap();
+
+    // Find the text content in the response
+    let content = response
+        .iter()
+        .find(|c| {
+            c.audience()
+                .is_some_and(|roles| roles.contains(&Role::User))
+        })
+        .unwrap()
+        .as_text()
+        .unwrap();
+
+    // Check that both search results are included
+    assert!(
+        content.text.contains("greet"),
+        "Should find 'greet' function, but got: {}",
+        content.text
+    );
+
+    assert!(
+        content.text.contains("calculate"),
+        "Should find 'calculate' function, but got: {}",
+        content.text
+    );
+
+    assert!(
+        content.text.contains("example.rs") || content.text.contains("lib.rs"),
+        "Should contain file names in results, but got: {}",
+        content.text
+    );
+
+    temp_dir.close().unwrap();
+}
