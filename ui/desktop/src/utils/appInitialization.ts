@@ -1,5 +1,4 @@
 import { ChatType } from '../types/chat';
-import { Recipe } from '../recipe';
 import { initializeSystem } from './providerUtils';
 import { initializeCostDatabase } from './costDatabase';
 import {
@@ -11,9 +10,9 @@ import {
   backupConfig,
   initConfig,
   readAllConfig,
+  Recipe,
   recoverConfig,
   validateConfig,
-  loadRecipe,
 } from '../api';
 import { COST_TRACKING_ENABLED } from '../updates';
 
@@ -39,23 +38,19 @@ export const initializeApp = async ({
   const urlParams = new URLSearchParams(window.location.search);
   const viewType = urlParams.get('view');
   const resumeSessionId = urlParams.get('resumeSessionId');
-  const recipeConfig = window.appConfig.get('recipe');
   const recipeId = window.appConfig.get('recipeId');
-  console.log("========recipeId", recipeId);
 
   if (resumeSessionId) {
     console.log('Session resume detected, letting useChat hook handle navigation');
     await initializeForSessionResume({ getExtensions, addExtension, provider, model });
     return;
   }
-
+  let recipe: Recipe | null = null;
   if (
-    (recipeConfig && typeof recipeConfig === 'object') ||
     (recipeId && typeof recipeId === 'string')
   ) {
     console.log('Recipe detected, initializing system for recipe');
-    await initializeForRecipe({
-      recipeConfig: recipeConfig as Recipe,
+    recipe = await initializeForRecipe({
       recipeId: recipeId as string,
       getExtensions,
       addExtension,
@@ -67,7 +62,7 @@ export const initializeApp = async ({
   }
 
   if (viewType) {
-    handleViewTypeDeepLink(viewType, recipeConfig);
+    handleViewTypeDeepLink(viewType, recipe);
     return;
   }
 
@@ -91,19 +86,12 @@ export const initializeApp = async ({
 
   if (provider && model) {
     try {
-      const initPromises = [
-        initializeSystem(provider, model, {
-          getExtensions,
-          addExtension,
-        }),
-      ];
+      await initializeSystem(provider, model, { getExtensions, addExtension});
 
       if (COST_TRACKING_ENABLED) {
-        initPromises.push(costDbPromise);
+        setMessage('starting extensions...');
+        await costDbPromise;
       }
-
-      setMessage('starting extensions...');
-      await Promise.all(initPromises);
     } catch (error) {
       console.error('Error in system initialization:', error);
       if (error instanceof MalformedConfigError) {
@@ -141,7 +129,6 @@ const initializeForSessionResume = async ({
 };
 
 const initializeForRecipe = async ({
-  recipeConfig,
   recipeId,
   getExtensions,
   addExtension,
@@ -152,47 +139,20 @@ const initializeForRecipe = async ({
   InitializationDependencies,
   'getExtensions' | 'addExtension' | 'setPairChat' | 'provider' | 'model'
 > & {
-  recipeConfig?: Recipe;
   recipeId?: string;
-}) => {
+}) : Promise<Recipe | null> => {
   await initConfig();
   await readAllConfig({ throwOnError: true });
 
-  await initializeSystem(provider, model, {
+  const recipe = await initializeSystem(provider, model, {
     getExtensions,
     addExtension,
   });
-  let finalRecipeConfig = recipeConfig;
-
-  if (recipeId) {
-    try {
-      const recipeResponse = await loadRecipe({ body: { id: recipeId } });
-      const recipe = recipeResponse.data?.recipe;
-
-      if (recipe) {
-        finalRecipeConfig = recipe;
-      } else {
-        console.error('Failed to load recipe: No recipe data received');
-        window.location.hash = '#/';
-        return;
-      }
-    } catch (error) {
-      console.error('Failed to load recipe:', error);
-      window.location.hash = '#/';
-      return;
-    }
-  }
-
-  if (!finalRecipeConfig) {
-    console.error('No recipe config available');
-    window.location.hash = '#/';
-    return;
-  }
 
   setPairChat((prevChat) => ({
     ...prevChat,
-    recipeConfig: finalRecipeConfig,
-    title: finalRecipeConfig?.title || 'Recipe Chat',
+    recipeConfig: recipe,
+    title: recipe?.title || 'Recipe Chat',
     messages: [],
     messageHistoryIndex: 0,
     recipeId: recipeId,
@@ -201,15 +161,16 @@ const initializeForRecipe = async ({
   window.location.hash = '#/pair';
   window.history.replaceState(
     {
-      recipeConfig: finalRecipeConfig,
+      recipeConfig: recipe,
       resetChat: true,
     },
     '',
     '#/pair'
   );
+  return recipe;
 };
 
-const handleViewTypeDeepLink = (viewType: string, recipeConfig: unknown) => {
+const handleViewTypeDeepLink = (viewType: string, recipeConfig: Recipe | null) => {
   if (viewType === 'recipeEditor' && recipeConfig) {
     window.location.hash = '#/recipe-editor';
     window.history.replaceState({ config: recipeConfig }, '', '#/recipe-editor');

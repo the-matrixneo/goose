@@ -119,14 +119,15 @@ export const initializeSystem = async (
     getExtensions?: (b: boolean) => Promise<FixedExtensionEntry[]>;
     addExtension?: (name: string, config: ExtensionConfig, enabled: boolean) => Promise<void>;
   }
-) => {
+) : Promise<Recipe | null> => {
   try {
     console.log('initializing agent with provider', provider, 'model', model);
     await initializeAgent({ provider, model });
-
-    // Get recipeConfig directly here
-    let recipeConfig = window.appConfig?.get?.('recipe');
-    
+    let recipeConfig = window.appConfig?.get?.('recipe') as Recipe | null;
+    if (window.appConfig?.get?.('recipeId')) {
+      const recipeResponse = await loadRecipe({ body: { id: window.appConfig?.get?.('recipeId') as string } });
+      recipeConfig = recipeResponse.data?.recipe as Recipe | null;
+    }
 
     const recipe_instructions = (recipeConfig as { instructions?: string })?.instructions;
     const responseConfig = (recipeConfig as { response?: { json_schema?: unknown } })?.response;
@@ -171,7 +172,7 @@ export const initializeSystem = async (
 
     if (!options?.getExtensions || !options?.addExtension) {
       console.warn('Extension helpers not provided in alpha mode');
-      return;
+      return recipeConfig;
     }
 
     // Initialize or sync built-in extensions into config.yaml
@@ -203,6 +204,7 @@ export const initializeSystem = async (
     });
 
     await Promise.allSettled(extensionLoadingPromises);
+    return recipeConfig;
   } catch (error) {
     console.error('Failed to initialize agent:', error);
     throw error;
