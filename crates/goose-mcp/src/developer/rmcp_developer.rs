@@ -1644,9 +1644,12 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[test]
     #[serial]
-    async fn test_bash_respects_ignore_patterns() {
+    fn test_bash_respects_ignore_patterns() {
+        // Create a separate runtime for this test to ensure clean shutdown
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let result = rt.block_on(async {
         let temp_dir = tempfile::tempdir().unwrap();
         std::env::set_current_dir(&temp_dir).unwrap();
 
@@ -1655,7 +1658,7 @@ mod tests {
         let peer = running_service.peer().clone();
 
         // Create an ignored file
-        let secret_file_path = temp_dir.path().join("secret.txt");
+        let secret_file_path = temp_dir.path().join("secrets.txt");
         fs::write(&secret_file_path, "secret content").unwrap();
 
         // try to cat the ignored file
@@ -1698,7 +1701,21 @@ mod tests {
 
         assert!(result.is_ok(), "Should be able to cat non-ignored file");
 
+        // Force cleanup before runtime shutdown
+        let cancellation_token = running_service.cancellation_token();
+        cancellation_token.cancel();
+        drop(peer);
+        drop(running_service);
+        
         temp_dir.close().unwrap();
+        });
+        
+        // Force shutdown the runtime to kill ALL spawned tasks
+        // This terminates the fire-and-forget tasks that rmcp doesn't track
+        rt.shutdown_timeout(std::time::Duration::from_millis(100));
+        
+        // Return the test result
+        result
     }
 
     #[tokio::test]
