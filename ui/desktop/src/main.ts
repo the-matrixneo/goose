@@ -755,11 +755,42 @@ const createChat = async (
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(`${MAIN_WINDOW_VITE_DEV_SERVER_URL}${queryParams}`);
   } else {
-    // In production, we need to use a proper file protocol URL with correct base path
+    // In production, load the HTML file first, then set the hash programmatically
     const indexPath = path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`);
-    mainWindow.loadFile(indexPath, {
-      search: queryParams ? queryParams.slice(1) : undefined,
+
+    // Load the file without hash parameters
+    const searchParams = queryParams ? queryParams.slice(1) : undefined;
+    await mainWindow.loadFile(indexPath, {
+      search: searchParams,
     });
+
+    // After the file loads, set the hash route programmatically if needed
+    if (recipe || recipeDeeplink) {
+      // For recipe-related navigation, go to pair view
+      mainWindow.webContents.executeJavaScript(`
+        window.history.replaceState({}, '', '#/pair');
+      `);
+    } else if (viewType) {
+      // For other view types, navigate accordingly
+      const routeMap: Record<string, string> = {
+        chat: '#/',
+        pair: '#/pair',
+        settings: '#/settings',
+        sessions: '#/sessions',
+        schedules: '#/schedules',
+        recipes: '#/recipes',
+        permission: '#/permission',
+        ConfigureProviders: '#/configure-providers',
+        sharedSession: '#/shared-session',
+        recipeEditor: '#/recipe-editor',
+        welcome: '#/welcome',
+      };
+
+      const route = routeMap[viewType] || '#/';
+      mainWindow.webContents.executeJavaScript(`
+        window.history.replaceState({}, '', '${route}');
+      `);
+    }
   }
 
   // Set up local keyboard shortcuts that only work when the window is focused

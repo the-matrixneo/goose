@@ -384,19 +384,17 @@ export default function App() {
     })();
 
     if (resumeSessionId || recipeFromAppConfig) {
-      window.location.hash = '#/pair';
+      // Use history.replaceState instead of window.location.hash for navigation
       window.history.replaceState(stateData, '', '#/pair');
       return;
     }
 
     if (!viewType) {
       if (window.location.hash === '' || window.location.hash === '#') {
-        window.location.hash = '#/';
         window.history.replaceState({}, '', '#/');
       }
     } else {
       if (viewType === 'recipeEditor' && recipeFromAppConfig) {
-        window.location.hash = '#/recipe-editor';
         window.history.replaceState({ config: recipeFromAppConfig }, '', '#/recipe-editor');
       } else {
         const routeMap: Record<string, string> = {
@@ -415,7 +413,6 @@ export default function App() {
 
         const route = routeMap[viewType];
         if (route) {
-          window.location.hash = route;
           window.history.replaceState({}, '', route);
         }
       }
@@ -438,16 +435,16 @@ export default function App() {
       setSharedSessionError(null);
       try {
         await openSharedSessionFromDeepLink(link, (_view: View, _options?: ViewOptions) => {
-          // Navigate to shared session view with the session data
-          window.location.hash = '#/shared-session';
+          // Navigate to shared session view with the session data using history.replaceState
           if (_options) {
             window.history.replaceState(_options, '', '#/shared-session');
+          } else {
+            window.history.replaceState({}, '', '#/shared-session');
           }
         });
       } catch (error) {
         console.error('Unexpected error opening shared session:', error);
-        // Navigate to shared session view with error
-        window.location.hash = '#/shared-session';
+        // Navigate to shared session view with error using history.replaceState
         const shareToken = link.replace('goose://sessions/', '');
         const options = {
           sessionDetails: null,
@@ -552,9 +549,9 @@ export default function App() {
       );
 
       if (section && newView === 'settings') {
-        window.location.hash = `#/settings?section=${section}`;
+        window.history.replaceState({}, '', `#/settings?section=${section}`);
       } else {
-        window.location.hash = `#/${newView}`;
+        window.history.replaceState({}, '', `#/${newView}`);
       }
     };
     const urlParams = new URLSearchParams(window.location.search);
