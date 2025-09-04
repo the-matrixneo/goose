@@ -1,16 +1,17 @@
 use agent_client_protocol::{self as acp, Client, SessionNotification};
 use anyhow::Result;
 use goose::agents::Agent;
+use goose::config::{Config, ExtensionConfigManager};
 use goose::conversation::Conversation;
 use goose::conversation::message::{Message, MessageContent};
 use goose::providers::create;
-use goose::config::Config;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot, Mutex};
+use tokio::task::JoinSet;
 use tokio_util::compat::{TokioAsyncReadCompatExt as _, TokioAsyncWriteCompatExt as _};
 use tokio_util::sync::CancellationToken;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 /// Represents a single Goose session for ACP
 struct GooseSession {
@@ -87,9 +88,61 @@ impl acp::Agent for GooseAcpAgent {
         let session_id = uuid::Uuid::new_v4().to_string();
         
         // Create a new Agent and session for this ACP session
-        let mut agent = Agent::new();
+        let agent = Agent::new();
         agent.update_provider(self.provider.clone()).await
             .map_err(|_| acp::Error::internal_error())?;
+        
+        // Load and add extensions just like the normal CLI
+        // Get all enabled extensions from configuration
+        let extensions_to_run: Vec<_> = ExtensionConfigManager::get_all()
+            .map_err(|e| {
+                error!("Failed to load extensions: {}", e);
+                acp::Error::internal_error()
+            })?
+            .into_iter()
+            .filter(|ext| ext.enabled)
+            .map(|ext| ext.config)
+            .collect();
+        
+        // Add extensions to the agent in parallel
+        let agent_ptr = Arc::new(agent);
+        let mut set = JoinSet::new();
+        let mut waiting_on = HashSet::new();
+        
+        for extension in extensions_to_run {
+            waiting_on.insert(extension.name());
+            let agent_ptr_clone = agent_ptr.clone();
+            set.spawn(async move {
+                (
+                    extension.name(),
+                    agent_ptr_clone.add_extension(extension.clone()).await,
+                )
+            });
+        }
+        
+        // Wait for all extensions to load
+        while let Some(result) = set.join_next().await {
+            match result {
+                Ok((name, Ok(_))) => {
+                    waiting_on.remove(&name);
+                    info!("Loaded extension: {}", name);
+                }
+                Ok((name, Err(e))) => {
+                    warn!("Failed to load extension '{}': {}", name, e);
+                    waiting_on.remove(&name);
+                }
+                Err(e) => {
+                    error!("Task error while loading extension: {}", e);
+                }
+            }
+        }
+        
+        // Unwrap the Arc to get the agent back
+        let agent = Arc::try_unwrap(agent_ptr)
+            .map_err(|_| {
+                error!("Failed to unwrap agent Arc");
+                acp::Error::internal_error()
+            })?;
         
         let session = GooseSession {
             agent,
@@ -99,6 +152,8 @@ impl acp::Agent for GooseAcpAgent {
         // Store the session
         let mut sessions = self.sessions.lock().await;
         sessions.insert(session_id.clone(), session);
+        
+        info!("Created new session with ID: {}", session_id);
         
         Ok(acp::NewSessionResponse {
             session_id: acp::SessionId(session_id.into()),
