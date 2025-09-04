@@ -16,24 +16,34 @@ import styles from '@site/src/components/Card/styles.module.css';
   <h2 className={styles.categoryTitle}>📚 Ollama Guides</h2>
   <div className={styles.cardGrid}>
     <Card 
-      title="Ollama Setup"
+      title="Recommended Models"
+      description="Community-drive list of local models known to work with Goose"
+      link="/docs/guides/local-models/recommended-models"
+    />
+    <Card 
+      title="Ollama Setup Notes"
       description="Using Ollama with Goose"
-      link="/docs/guides/local-models/ollama-setup"
+      link="/docs/guides/local-models/ollama-notes"
     />
     <Card 
-      title="Ollama on Mac"
-      description="Recommendations for Ollama and Mac"
-      link="/docs/guides/local-models/ollama-mac"
+      title="llama.cpp Setup Notes"
+      description="Using llama.cpp with Goose"
+      link="/docs/guides/local-models/llama-cpp-notes"
     />
     <Card 
-      title="Ollama on Windows"
-      description="Recommendations for Ollama and Windows"
-      link="/docs/guides/local-models/ollama-windows"
+      title="Mac Hardware Notes"
+      description="Recommendations for Mac hardware setup for local models with Goose"
+      link="/docs/guides/local-models/mac-hardware"
     />
     <Card 
-      title="Ollama on Linux"
-      description="Recommendations for Ollama and Linux"
-      link="/docs/guides/local-models/ollama-linux"
+      title="Windows Hardware Notes"
+      description="Recommendations for Windows hardware setup for local models with Goose"
+      link="/docs/guides/local-models/windows-hardware"
+    />
+    <Card 
+      title="Linux Hardware Notes"
+      description="Recommendations for Linux hardware setup for local models with Goose"
+      link="/docs/guides/local-models/linux-hardware"
     />
   </div>
 </div>
