@@ -1,24 +1,61 @@
 use agent_client_protocol::{self as acp, Client, SessionNotification};
 use anyhow::Result;
-use std::cell::Cell;
-use tokio::sync::{mpsc, oneshot};
+use goose::agents::Agent;
+use goose::conversation::Conversation;
+use goose::conversation::message::{Message, MessageContent};
+use goose::providers::create;
+use goose::config::Config;
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::{mpsc, oneshot, Mutex};
 use tokio_util::compat::{TokioAsyncReadCompatExt as _, TokioAsyncWriteCompatExt as _};
+use tokio_util::sync::CancellationToken;
 use tracing::{error, info};
 
-/// Simple Goose ACP Agent implementation
+/// Represents a single Goose session for ACP
+struct GooseSession {
+    agent: Agent,
+    messages: Conversation,
+}
+
+/// Goose ACP Agent implementation that connects to real Goose agents
 struct GooseAcpAgent {
     session_update_tx: mpsc::UnboundedSender<(acp::SessionNotification, oneshot::Sender<()>)>,
-    next_session_id: Cell<u64>,
+    sessions: Arc<Mutex<HashMap<String, GooseSession>>>,
+    provider: Arc<dyn goose::providers::base::Provider>,
 }
 
 impl GooseAcpAgent {
-    fn new(
+    async fn new(
         session_update_tx: mpsc::UnboundedSender<(acp::SessionNotification, oneshot::Sender<()>)>,
-    ) -> Self {
-        Self {
+    ) -> Result<Self> {
+        // Load config and create provider
+        let config = Config::global();
+        
+        let provider_name: String = config
+            .get_param("GOOSE_PROVIDER")
+            .map_err(|e| anyhow::anyhow!("No provider configured: {}", e))?;
+        
+        let model_name: String = config
+            .get_param("GOOSE_MODEL")
+            .map_err(|e| anyhow::anyhow!("No model configured: {}", e))?;
+
+        let model_config = goose::model::ModelConfig {
+            model_name: model_name.clone(),
+            context_limit: None,
+            temperature: None,
+            max_tokens: None,
+            toolshim: false,
+            toolshim_model: None,
+            fast_model: None,
+        };
+        let provider = create(&provider_name, model_config)?;
+
+        Ok(Self {
             session_update_tx,
-            next_session_id: Cell::new(0),
-        }
+            sessions: Arc::new(Mutex::new(HashMap::new())),
+            provider,
+        })
     }
 }
 
@@ -45,10 +82,26 @@ impl acp::Agent for GooseAcpAgent {
         arguments: acp::NewSessionRequest,
     ) -> Result<acp::NewSessionResponse, acp::Error> {
         info!("ACP: Received new session request {:?}", arguments);
-        let session_id = self.next_session_id.get();
-        self.next_session_id.set(session_id + 1);
+        
+        // Generate a unique session ID
+        let session_id = uuid::Uuid::new_v4().to_string();
+        
+        // Create a new Agent and session for this ACP session
+        let mut agent = Agent::new();
+        agent.update_provider(self.provider.clone()).await
+            .map_err(|_| acp::Error::internal_error())?;
+        
+        let session = GooseSession {
+            agent,
+            messages: Conversation::new_unvalidated(Vec::new()),
+        };
+        
+        // Store the session
+        let mut sessions = self.sessions.lock().await;
+        sessions.insert(session_id.clone(), session);
+        
         Ok(acp::NewSessionResponse {
-            session_id: acp::SessionId(session_id.to_string().into()),
+            session_id: acp::SessionId(session_id.into()),
         })
     }
 
@@ -64,22 +117,77 @@ impl acp::Agent for GooseAcpAgent {
     ) -> Result<acp::PromptResponse, acp::Error> {
         info!("ACP: Received prompt request {:?}", arguments);
 
-        // Echo back the prompt with a prefix (simple example behavior)
-        for content in ["Goose ACP Agent received: ".into()]
+        // Get the session
+        let session_id = arguments.session_id.0.to_string();
+        let mut sessions = self.sessions.lock().await;
+        let session = sessions.get_mut(&session_id)
+            .ok_or_else(|| acp::Error::invalid_params())?;
+        
+        // Convert ACP prompt to Goose message
+        // Extract text from ContentBlocks
+        let prompt_text = arguments.prompt
             .into_iter()
-            .chain(arguments.prompt)
-        {
-            let (tx, rx) = oneshot::channel();
-            self.session_update_tx
-                .send((
-                    SessionNotification {
-                        session_id: arguments.session_id.clone(),
-                        update: acp::SessionUpdate::AgentMessageChunk { content },
-                    },
-                    tx,
-                ))
-                .map_err(|_| acp::Error::internal_error())?;
-            rx.await.map_err(|_| acp::Error::internal_error())?;
+            .filter_map(|block| {
+                if let acp::ContentBlock::Text(text) = block {
+                    Some(text.text.clone())
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<String>>()
+            .join(" ");
+        
+        let user_message = Message::user().with_text(&prompt_text);
+        
+        // Add message to conversation
+        session.messages.push(user_message);
+        
+        // Get agent's reply through the Goose agent
+        let cancel_token = CancellationToken::new();
+        let mut stream = session.agent
+            .reply(session.messages.clone(), None, Some(cancel_token.clone()))
+            .await
+            .map_err(|e| {
+                error!("Error getting agent reply: {}", e);
+                acp::Error::internal_error()
+            })?;
+        
+        use futures::StreamExt;
+        
+        // Process the agent's response stream
+        while let Some(event) = stream.next().await {
+            match event {
+                Ok(goose::agents::AgentEvent::Message(message)) => {
+                    // Add to conversation
+                    session.messages.push(message.clone());
+                    
+                    // Stream the response text to the client
+                    for content_item in &message.content {
+                        if let MessageContent::Text(text) = content_item {
+                            let (tx, rx) = oneshot::channel();
+                            self.session_update_tx
+                                .send((
+                                    SessionNotification {
+                                        session_id: arguments.session_id.clone(),
+                                        update: acp::SessionUpdate::AgentMessageChunk { 
+                                            content: text.text.clone().into() 
+                                        },
+                                    },
+                                    tx,
+                                ))
+                                .map_err(|_| acp::Error::internal_error())?;
+                            rx.await.map_err(|_| acp::Error::internal_error())?;
+                        }
+                    }
+                }
+                Ok(_) => {
+                    // Ignore other events for now
+                }
+                Err(e) => {
+                    error!("Error in agent response stream: {}", e);
+                    return Err(acp::Error::internal_error());
+                }
+            }
         }
 
         Ok(acp::PromptResponse {
@@ -96,7 +204,7 @@ impl acp::Agent for GooseAcpAgent {
 /// Run the ACP agent server
 pub async fn run_acp_agent() -> Result<()> {
     info!("Starting Goose ACP agent server on stdio");
-    println!("Goose ACP agent started. Listening on stdio...");
+    eprintln!("Goose ACP agent started. Listening on stdio...");
 
     let outgoing = tokio::io::stdout().compat_write();
     let incoming = tokio::io::stdin().compat();
@@ -110,8 +218,10 @@ pub async fn run_acp_agent() -> Result<()> {
             let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
 
             // Start up the GooseAcpAgent connected to stdio.
+            let agent = GooseAcpAgent::new(tx).await
+                .map_err(|e| anyhow::anyhow!("Failed to create ACP agent: {}", e))?;
             let (conn, handle_io) =
-                acp::AgentSideConnection::new(GooseAcpAgent::new(tx), outgoing, incoming, |fut| {
+                acp::AgentSideConnection::new(agent, outgoing, incoming, |fut| {
                     tokio::task::spawn_local(fut);
                 });
 
