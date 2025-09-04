@@ -554,12 +554,12 @@ export function AppInner() {
           view: viewFromUrl,
         };
         window.history.replaceState(
-          {},
+          initialViewOptions,
           '',
-          `/recipe-editor?${new URLSearchParams(initialViewOptions).toString()}`
+          `#/recipe-editor?${new URLSearchParams(initialViewOptions).toString()}`
         );
       } else {
-        window.history.replaceState({}, '', `/${viewFromUrl}`);
+        window.history.replaceState({}, '', `#/${viewFromUrl}`);
       }
     }
     window.electron.on('set-view', handleSetView);

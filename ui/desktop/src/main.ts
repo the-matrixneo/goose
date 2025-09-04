@@ -760,11 +760,19 @@ const createChat = async (
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(`${MAIN_WINDOW_VITE_DEV_SERVER_URL}/#/${queryParams}`);
   } else {
-    // In production, we need to use a proper file protocol URL with correct base path
-    const indexPath = path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html/#/`);
-    mainWindow.loadFile(indexPath, {
-      search: queryParams ? queryParams.slice(1) : undefined,
-    });
+    // In production, load the HTML file first, then set the hash route
+    const indexPath = path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`);
+
+    // Load the file without hash
+    await mainWindow.loadFile(indexPath);
+
+    // After the file loads, set the hash route programmatically
+    if (queryParams) {
+      const hashRoute = queryParams.startsWith('?') ? `#/${queryParams}` : `#/?${queryParams}`;
+      await mainWindow.webContents.executeJavaScript(`
+        window.history.replaceState({}, '', '${hashRoute}');
+      `);
+    }
   }
 
   // Set up local keyboard shortcuts that only work when the window is focused
