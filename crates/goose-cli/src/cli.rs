@@ -4,6 +4,7 @@ use clap::{Args, Parser, Subcommand};
 use goose::config::{Config, ExtensionConfig};
 
 use crate::commands::acp::run_acp_agent;
+use crate::commands::acp_tui::run_acp_tui;
 use crate::commands::bench::agent_generator;
 use crate::commands::configure::handle_configure;
 use crate::commands::info::handle_info;
@@ -295,6 +296,10 @@ enum Command {
     /// Run Goose as an ACP (Agent Client Protocol) agent
     #[command(about = "Run Goose as an ACP agent server on stdio")]
     Acp {},
+
+    /// Run Goose ACP TUI client
+    #[command(about = "Run Goose with a Terminal User Interface (TUI) using ACP")]
+    AcpTui {},
 
     /// Start or resume interactive chat sessions
     #[command(
@@ -715,6 +720,7 @@ pub async fn cli() -> Result<()> {
         Some(Command::Info { .. }) => "info",
         Some(Command::Mcp { .. }) => "mcp",
         Some(Command::Acp {}) => "acp",
+        Some(Command::AcpTui {}) => "acp_tui",
         Some(Command::Session { .. }) => "session",
         Some(Command::Project {}) => "project",
         Some(Command::Projects) => "projects",
@@ -747,6 +753,10 @@ pub async fn cli() -> Result<()> {
         }
         Some(Command::Acp {}) => {
             let _ = run_acp_agent().await;
+            return Ok(());
+        }
+        Some(Command::AcpTui {}) => {
+            let _ = run_acp_tui().await;
             return Ok(());
         }
         Some(Command::Session {
