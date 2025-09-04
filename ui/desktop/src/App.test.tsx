@@ -6,7 +6,7 @@
 import React from 'react';
 import { render, waitFor } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import App from './App';
+import { AppInner } from './App';
 
 // Set up globals for jsdom
 Object.defineProperty(window, 'location', {
@@ -161,13 +161,19 @@ vi.mock('./components/AnnouncementModal', () => ({
   default: () => null,
 }));
 
+// Create mocks that we can track and configure per test
+const mockNavigate = vi.fn();
+const mockSearchParams = new URLSearchParams();
+const mockSetSearchParams = vi.fn();
+
 // Mock react-router-dom to avoid HashRouter issues in tests
 vi.mock('react-router-dom', () => ({
   HashRouter: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   Routes: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   Route: ({ element }: { element: React.ReactNode }) => element,
-  useNavigate: () => vi.fn(),
+  useNavigate: () => mockNavigate,
   useLocation: () => ({ state: null, pathname: '/' }),
+  useSearchParams: () => [mockSearchParams, mockSetSearchParams],
   Outlet: () => null,
 }));
 
@@ -216,6 +222,14 @@ Object.defineProperty(window, 'matchMedia', {
 describe('App Component - Brand New State', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockNavigate.mockClear();
+    mockSetSearchParams.mockClear();
+
+    // Reset search params
+    mockSearchParams.forEach((_, key) => {
+      mockSearchParams.delete(key);
+    });
+
     window.location.hash = '';
     window.location.search = '';
     window.location.pathname = '/';
@@ -235,21 +249,16 @@ describe('App Component - Brand New State', () => {
       GOOSE_ALLOWLIST_WARNING: false,
     });
 
-    render(<App />);
+    render(<AppInner />);
 
     // Wait for initialization
     await waitFor(() => {
       expect(mockElectron.reactReady).toHaveBeenCalled();
     });
 
-    // Check that we navigated to "/" not "/welcome"
-    await waitFor(() => {
-      // In some environments, the hash might be empty or just "#"
-      expect(window.location.hash).toMatch(/^(#\/?|)$/);
-    });
-
-    // History should have been updated to "/"
-    expect(window.history.replaceState).toHaveBeenCalledWith({}, '', '#/');
+    // The app should initialize without any navigation calls since we're already at "/"
+    // No navigate calls should be made when no provider is configured
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 
   it('should handle deep links correctly when app is brand new', async () => {
@@ -260,19 +269,19 @@ describe('App Component - Brand New State', () => {
       GOOSE_ALLOWLIST_WARNING: false,
     });
 
-    // Simulate a deep link
-    window.location.search = '?view=settings';
+    // Set up search params to simulate view=settings deep link
+    mockSearchParams.set('view', 'settings');
 
-    render(<App />);
+    render(<AppInner />);
 
     // Wait for initialization
     await waitFor(() => {
       expect(mockElectron.reactReady).toHaveBeenCalled();
     });
 
-    // Should redirect to settings route via hash
+    // Should navigate to settings route
     await waitFor(() => {
-      expect(window.location.hash).toBe('#/settings');
+      expect(mockNavigate).toHaveBeenCalledWith('/settings', { state: {} });
     });
   });
 
@@ -284,18 +293,15 @@ describe('App Component - Brand New State', () => {
       GOOSE_ALLOWLIST_WARNING: false,
     });
 
-    render(<App />);
+    render(<AppInner />);
 
     // Wait for initialization
     await waitFor(() => {
       expect(mockElectron.reactReady).toHaveBeenCalled();
     });
 
-    // Should stay at "/" since provider is configured
-    await waitFor(() => {
-      // In some environments, the hash might be empty or just "#"
-      expect(window.location.hash).toMatch(/^(#\/?|)$/);
-    });
+    // Should not navigate anywhere since provider is configured and we're already at "/"
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 
   it('should handle config recovery gracefully', async () => {
@@ -310,17 +316,14 @@ describe('App Component - Brand New State', () => {
       GOOSE_ALLOWLIST_WARNING: false,
     });
 
-    render(<App />);
+    render(<AppInner />);
 
     // Wait for initialization and recovery
     await waitFor(() => {
       expect(mockElectron.reactReady).toHaveBeenCalled();
     });
 
-    // App should still initialize and navigate to "/"
-    await waitFor(() => {
-      // In some environments, the hash might be empty or just "#"
-      expect(window.location.hash).toMatch(/^(#\/?|)$/);
-    });
+    // App should still initialize without any navigation calls
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 });

@@ -311,7 +311,7 @@ const ExtensionsRoute = () => {
   );
 };
 
-function AppInner() {
+export function AppInner() {
   const [fatalError, setFatalError] = useState<string | null>(null);
   const [isGoosehintsModalOpen, setIsGoosehintsModalOpen] = useState(false);
   const [agentWaitingMessage, setAgentWaitingMessage] = useState<string | null>(null);
