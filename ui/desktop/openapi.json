@@ -1702,7 +1702,8 @@
         "description": "Request payload for context management operations",
         "required": [
           "messages",
-          "manageAction"
+          "manageAction",
+          "sessionId"
         ],
         "properties": {
           "manageAction": {
@@ -1715,6 +1716,10 @@
               "$ref": "#/components/schemas/Message"
             },
             "description": "Collection of messages to be managed"
+          },
+          "sessionId": {
+            "type": "string",
+            "description": "Session ID for the context management"
           }
         }
       },
@@ -1782,7 +1787,8 @@
         "required": [
           "messages",
           "title",
-          "description"
+          "description",
+          "session_id"
         ],
         "properties": {
           "activities": {
@@ -1808,6 +1814,9 @@
             "items": {
               "$ref": "#/components/schemas/Message"
             }
+          },
+          "session_id": {
+            "type": "string"
           },
           "title": {
             "type": "string"
