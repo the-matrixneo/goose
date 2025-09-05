@@ -91,6 +91,36 @@ pub struct ImageProcessorParams {
     pub path: String,
 }
 
+/// Parameters for the search_code tool
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct SearchCodeParams {
+    /// List of search terms/patterns to find.
+    pub search_terms: Vec<String>,
+
+    /// Type of search: 'files' to find filenames, 'content' to search within files, 'regex' for regex patterns
+    #[serde(default = "default_search_type")]
+    pub search_type: String,
+
+    /// Number of context lines to show around matches (for content/regex search)
+    #[serde(default = "default_context_lines")]
+    pub context_lines: usize,
+
+    /// Only show file paths, not the matching content (for content/regex search)
+    #[serde(default)]
+    pub files_only: bool,
+
+    /// Optional path to search within (defaults to current directory)
+    pub path: Option<String>,
+}
+
+fn default_search_type() -> String {
+    "content".to_string()
+}
+
+fn default_context_lines() -> usize {
+    3
+}
+
 /// Template structure for prompt definitions
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PromptTemplate {
@@ -297,7 +327,8 @@ impl ServerHandler for DeveloperServer {
         let windows_specific = indoc! {r#"
             **Important**: For searching files and code:
 
-            Preferred: Use ripgrep (`rg`) when available - it respects .gitignore and is fast:
+            Preferred: Use `search_code` tool - when you need to locate a file or a code reference
+            Alternative: Use ripgrep (`rg`) when available - it respects .gitignore and is fast:
               - To locate a file by name: `rg --files | rg example.py`
               - To locate content inside files: `rg 'class Example'`
 
@@ -319,7 +350,7 @@ impl ServerHandler for DeveloperServer {
             If you need to run a long lived command, background it - e.g. `uvicorn main:app &` so that
             this tool does not run indefinitely.
 
-            **Important**: Use ripgrep - `rg` - exclusively when you need to locate a file or a code reference,
+            **Important**: Use `search_code` tool exclusively or the alternative ripgrep - `rg` - when you need to locate a file or a code reference,
             other solutions may produce too large output because of hidden files! For example *do not* use `find` or `ls -r`
               - List files by name: `rg --files | rg <filename>`
               - List files that contain a regex: `rg '<regex>' -l`
@@ -1086,6 +1117,154 @@ impl DeveloperServer {
             ))
             .with_audience(vec![Role::Assistant]),
             Content::image(data, "image/png").with_priority(0.0),
+        ]))
+    }
+
+    /// Search for code patterns in files.
+    /// This tool supports multiple search modes and can search concurrently.
+    /// Search terms are literal, you can provide similies and alternative spellings if needed to search wider (automatically concurrent).
+    /// Search types:
+    /// - File search: Find files by name pattern
+    /// - Content search: Search for terms/patterns within files
+    /// - Regex search: Use Perl-compatible regex patterns
+    /// Returns: either files, or file names + relevant content. Content always contains relevant line numbers.
+    #[tool(
+        name = "search_code",
+        description = "Search for code patterns. This tool supports multiple search modes and can search concurrently. Search terms are literal, you can provide similies and alternative spellings if needed to search wider (automatically concurrent). Search types: - File search: Find files by name pattern - Content search: Search for terms/patterns within files - Regex search: Use Perl-compatible regex patterns. Returns: either files, or file names + relevant content. Content always contains relevant line numbers."
+    )]
+    pub async fn search_code(
+        &self,
+        params: Parameters<SearchCodeParams>,
+        context: RequestContext<RoleServer>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let params = params.0;
+
+        // Check for ripgrep availability first
+        let check_rg_output = self
+            .execute_shell_command("which rg || where rg 2>nul", &context.peer)
+            .await
+            .unwrap_or_default();
+
+        if check_rg_output.trim().is_empty() {
+            return Err(ErrorData::new(
+                ErrorCode::INTERNAL_ERROR,
+                "The search_code tool requires ripgrep (rg) to be installed. Please install ripgrep first.".to_string(),
+                None,
+            ));
+        }
+
+        let search_terms = params.search_terms;
+        if search_terms.is_empty() {
+            return Err(ErrorData::new(
+                ErrorCode::INVALID_PARAMS,
+                "search_terms array cannot be empty".to_string(),
+                None,
+            ));
+        }
+
+        let search_type = params.search_type;
+        let context_lines = params.context_lines;
+        let files_only = params.files_only;
+
+        let search_path = if let Some(path_str) = params.path {
+            self.resolve_path(&path_str)?
+        } else {
+            std::env::current_dir().expect("should have a current working dir")
+        };
+
+        // Check if path is ignored
+        if self.is_ignored(&search_path) {
+            return Err(ErrorData::new(
+                ErrorCode::INTERNAL_ERROR,
+                format!(
+                    "Access to '{}' is restricted by .gooseignore",
+                    search_path.display()
+                ),
+                None,
+            ));
+        }
+
+        // Execute searches concurrently
+        let mut search_tasks = Vec::new();
+
+        for term in search_terms {
+            let search_path = search_path.clone();
+            let search_type = search_type.clone();
+            let peer = context.peer.clone();
+
+            let task = tokio::spawn(async move {
+                let cmd_str = match search_type.as_str() {
+                    "files" => {
+                        format!(
+                            "cd {} && rg --files | grep '{}'",
+                            search_path.display(),
+                            term
+                        )
+                    }
+                    "regex" => {
+                        let mut cmd = format!("cd {} && rg -P", search_path.display());
+                        if files_only {
+                            cmd.push_str(" -l");
+                        } else {
+                            cmd.push_str(&format!(" -C{}", context_lines));
+                        }
+                        cmd.push_str(&format!(" '{}'", term));
+                        cmd
+                    }
+                    _ => {
+                        // Default content search
+                        let mut cmd = format!("cd {} && rg", search_path.display());
+                        if files_only {
+                            cmd.push_str(" -l");
+                        } else {
+                            cmd.push_str(&format!(" -C{}", context_lines));
+                        }
+                        cmd.push_str(&format!(" '{}'", term));
+                        cmd
+                    }
+                };
+
+                // Use a temporary DeveloperServer instance to call execute_shell_command
+                // This is needed because we're in an async spawn context
+                let temp_server = DeveloperServer::new();
+                match temp_server.execute_shell_command(&cmd_str, &peer).await {
+                    Ok(output) => {
+                        let output = output.trim();
+                        if output.is_empty() {
+                            Ok(format!("No matches found for: {}", term))
+                        } else {
+                            Ok(format!("Matches for '{}':\n{}", term, output))
+                        }
+                    }
+                    Err(_) => Ok(format!("No matches found for: {}", term)),
+                }
+            });
+
+            search_tasks.push(task);
+        }
+
+        // Wait for all searches to complete
+        let mut results = Vec::new();
+        for task in search_tasks {
+            match task.await {
+                Ok(Ok(result)) => results.push(result),
+                Ok(Err(err)) => results.push(err),
+                Err(e) => results.push(format!("Task failed: {}", e)),
+            }
+        }
+
+        let combined_results = results.join("\n\n---\n\n");
+
+        Ok(CallToolResult::success(vec![
+            Content::text(format!(
+                "Search completed in {}:\n\n{}",
+                search_path.display(),
+                combined_results
+            ))
+            .with_audience(vec![Role::Assistant]),
+            Content::text(combined_results)
+                .with_audience(vec![Role::User])
+                .with_priority(0.0),
         ]))
     }
 

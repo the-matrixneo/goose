@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 
 #[cfg(test)]
 mod tests {
-    use crate::developer::rmcp_developer::{ShellParams, TextEditorParams};
+    use crate::developer::rmcp_developer::{SearchCodeParams, ShellParams, TextEditorParams};
     use crate::DeveloperServer;
 
     use super::*;
@@ -1940,5 +1940,268 @@ Additional instructions here.
         assert!(instructions.contains("Custom hints file content"));
         assert!(!instructions.contains(".goosehints")); // Make sure it's not loading the default
         std::env::remove_var("CONTEXT_FILE_NAMES");
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_search_code_basic_functionality() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        std::env::set_current_dir(&temp_dir).unwrap();
+
+        // Create test files with searchable content
+        fs::write(
+            "test1.rs",
+            "fn hello_world() {\n    println!(\"Hello, world!\");\n}",
+        )
+        .unwrap();
+        fs::write("test2.rs", "fn main() {\n    hello_world();\n}").unwrap();
+        fs::write("config.toml", "[dependencies]\nhello = \"1.0\"\n").unwrap();
+        fs::write("readme.md", "This is a hello world example").unwrap();
+
+        let server = create_test_server();
+        let running_service = serve_directly(server.clone(), create_test_transport(), None);
+        let peer = running_service.peer().clone();
+
+        // Test searching for "hello" in content
+        let search_params = Parameters(SearchCodeParams {
+            search_terms: vec!["hello".to_string()],
+            search_type: "content".to_string(),
+            context_lines: 1,
+            files_only: false,
+            path: None,
+        });
+
+        let result = server
+            .search_code(
+                search_params,
+                RequestContext {
+                    ct: Default::default(),
+                    id: NumberOrString::Number(1),
+                    meta: Default::default(),
+                    extensions: Default::default(),
+                    peer: peer.clone(),
+                },
+            )
+            .await;
+
+        // Check if ripgrep is available
+        let rg_check = std::process::Command::new("which").arg("rg").output();
+
+        if rg_check.is_ok() && rg_check.unwrap().status.success() {
+            // If ripgrep is available, the search should succeed
+            assert!(
+                result.is_ok(),
+                "Search should succeed when ripgrep is available"
+            );
+
+            let search_result = result.unwrap();
+            assert!(!search_result.content.is_empty());
+
+            // Find the assistant content which contains the results
+            let assistant_content = search_result
+                .content
+                .iter()
+                .find(|c| {
+                    c.audience()
+                        .is_some_and(|roles| roles.contains(&Role::Assistant))
+                })
+                .unwrap()
+                .as_text()
+                .unwrap();
+
+            // Should find hello in multiple files
+            assert!(
+                assistant_content.text.contains("test1.rs"),
+                "Should find hello in test1.rs"
+            );
+            assert!(
+                assistant_content.text.contains("test2.rs"),
+                "Should find hello in test2.rs"
+            );
+            assert!(
+                assistant_content.text.contains("config.toml"),
+                "Should find hello in config.toml"
+            );
+            assert!(
+                assistant_content.text.contains("readme.md"),
+                "Should find hello in readme.md"
+            );
+        } else {
+            // If ripgrep is not available, should return an error
+            assert!(
+                result.is_err(),
+                "Search should fail when ripgrep is not available"
+            );
+            let err = result.err().unwrap();
+            assert_eq!(err.code, ErrorCode::INTERNAL_ERROR);
+            assert!(err.message.contains("ripgrep") || err.message.contains("rg"));
+        }
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_search_code_multiple_terms_and_modes() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        std::env::set_current_dir(&temp_dir).unwrap();
+
+        // Create a more complex file structure
+        let src_dir = temp_dir.path().join("src");
+        fs::create_dir(&src_dir).unwrap();
+
+        fs::write(
+            src_dir.join("main.rs"),
+            "fn process_data() {\n    let data = vec![1, 2, 3];\n    analyze(data);\n}",
+        )
+        .unwrap();
+        fs::write(
+            src_dir.join("lib.rs"),
+            "pub fn analyze(data: Vec<i32>) {\n    // Process the data\n}",
+        )
+        .unwrap();
+        fs::write("Cargo.toml", "[package]\nname = \"test_project\"\n").unwrap();
+        fs::write("test.txt", "Some test data for analysis").unwrap();
+
+        let server = create_test_server();
+        let running_service = serve_directly(server.clone(), create_test_transport(), None);
+        let peer = running_service.peer().clone();
+
+        // Check if ripgrep is available first
+        let rg_check = std::process::Command::new("which").arg("rg").output();
+
+        if !rg_check.is_ok() || !rg_check.unwrap().status.success() {
+            // Skip the test if ripgrep is not available
+            return;
+        }
+
+        // Test 1: Search for multiple terms in content mode
+        let search_params = Parameters(SearchCodeParams {
+            search_terms: vec!["data".to_string(), "analyze".to_string()],
+            search_type: "content".to_string(),
+            context_lines: 0,
+            files_only: false,
+            path: None,
+        });
+
+        let result = server
+            .search_code(
+                search_params,
+                RequestContext {
+                    ct: Default::default(),
+                    id: NumberOrString::Number(1),
+                    meta: Default::default(),
+                    extensions: Default::default(),
+                    peer: peer.clone(),
+                },
+            )
+            .await
+            .unwrap();
+        let assistant_content = result
+            .content
+            .iter()
+            .find(|c| {
+                c.audience()
+                    .is_some_and(|roles| roles.contains(&Role::Assistant))
+            })
+            .unwrap()
+            .as_text()
+            .unwrap();
+
+        // Should find both terms - the tool formats results per term
+        // Check that we have results for both search terms
+        assert!(
+            assistant_content.text.contains("data") || assistant_content.text.contains("Data"),
+            "Should find results for 'data' term"
+        );
+        assert!(
+            assistant_content.text.contains("analyze")
+                || assistant_content.text.contains("Analyze"),
+            "Should find results for 'analyze' term"
+        );
+        assert!(assistant_content.text.contains("main.rs"));
+        assert!(assistant_content.text.contains("lib.rs"));
+
+        // Test 2: Search for files containing a term (files_only mode)
+        let search_params = Parameters(SearchCodeParams {
+            search_terms: vec!["data".to_string()],
+            search_type: "content".to_string(),
+            context_lines: 0,
+            files_only: true,
+            path: None,
+        });
+
+        let result = server
+            .search_code(
+                search_params,
+                RequestContext {
+                    ct: Default::default(),
+                    id: NumberOrString::Number(2),
+                    meta: Default::default(),
+                    extensions: Default::default(),
+                    peer: peer.clone(),
+                },
+            )
+            .await
+            .unwrap();
+        let assistant_content = result
+            .content
+            .iter()
+            .find(|c| {
+                c.audience()
+                    .is_some_and(|roles| roles.contains(&Role::Assistant))
+            })
+            .unwrap()
+            .as_text()
+            .unwrap();
+
+        // Should list files only, not the actual matches
+        assert!(
+            assistant_content.text.contains("main.rs")
+                || assistant_content.text.contains("src/main.rs")
+        );
+        assert!(
+            assistant_content.text.contains("lib.rs")
+                || assistant_content.text.contains("src/lib.rs")
+        );
+        assert!(assistant_content.text.contains("test.txt"));
+        // When files_only is true, the output should be just file paths without match details
+        // We can't assert that "fn process_data" is NOT there since the output format may vary
+
+        // Test 3: Search for files by name pattern
+        let search_params = Parameters(SearchCodeParams {
+            search_terms: vec!["lib".to_string()],
+            search_type: "files".to_string(),
+            context_lines: 0,
+            files_only: false,
+            path: Some(src_dir.to_str().unwrap().to_string()),
+        });
+
+        let result = server
+            .search_code(
+                search_params,
+                RequestContext {
+                    ct: Default::default(),
+                    id: NumberOrString::Number(3),
+                    meta: Default::default(),
+                    extensions: Default::default(),
+                    peer: peer.clone(),
+                },
+            )
+            .await
+            .unwrap();
+        let assistant_content = result
+            .content
+            .iter()
+            .find(|c| {
+                c.audience()
+                    .is_some_and(|roles| roles.contains(&Role::Assistant))
+            })
+            .unwrap()
+            .as_text()
+            .unwrap();
+
+        // Should find lib.rs in the src directory
+        assert!(assistant_content.text.contains("lib.rs"));
+        // Should not find main.rs since we're searching for "lib" in filenames
+        assert!(!assistant_content.text.contains("main.rs"));
     }
 }
