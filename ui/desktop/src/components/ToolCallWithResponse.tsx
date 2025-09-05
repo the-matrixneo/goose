@@ -13,7 +13,7 @@ import {
 import { cn, snakeToTitleCase } from '../utils';
 import { LoadingStatus } from './ui/Dot';
 import { NotificationEvent } from '../hooks/useMessageStream';
-import { ChevronRight, LoaderCircle, SquareArrowOutUpRight } from 'lucide-react';
+import { ChevronRight, SquareArrowOutUpRight } from 'lucide-react';
 import { TooltipWrapper } from './settings/providers/subcomponents/buttons/TooltipWrapper';
 // Inline MCP-UI renderer is unused now (sidecar only)
 import { isUIResource } from '@mcp-ui/client';
