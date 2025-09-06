@@ -140,7 +140,7 @@ const EditSessionModal = React.memo<EditSessionModalProps>(
 
 EditSessionModal.displayName = 'EditSessionModal';
 
-const LazyLoadComponent = ({ content }: { content: () => React.ReactNode }) => {
+const LazyLoad = ({ content }: { content: () => React.ReactNode }) => {
   const [isVisible, setIsVisible] = useState(false);
   const componentRef = useRef(null);
 
@@ -431,7 +431,7 @@ const SessionListView: React.FC<SessionListViewProps> = React.memo(
       setSessionToDelete(null);
     }, []);
 
-    const SessionItem = function SessionItem({
+    const SessionItem = React.memo(function SessionItem({
       session,
       onEditClick,
       onDeleteClick,
@@ -516,7 +516,7 @@ const SessionListView: React.FC<SessionListViewProps> = React.memo(
           </div>
         </Card>
       );
-    };
+    });
 
     // Render skeleton loader for session items with variations
     const SessionSkeleton = React.memo(({ variant = 0 }: { variant?: number }) => {
@@ -600,7 +600,7 @@ const SessionListView: React.FC<SessionListViewProps> = React.memo(
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
                 {group.sessions.map((session) => (
-                  <LazyLoadComponent
+                  <LazyLoad
                     key={session.id}
                     content={() => (
                       <SessionItem
