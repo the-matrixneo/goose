@@ -100,6 +100,7 @@ module.exports = [
         MediaStream: 'readonly',
         Blob: 'readonly',
         FormData: 'readonly',
+        IntersectionObserver: 'readonly',
       },
     },
     plugins: {

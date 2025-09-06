@@ -140,6 +140,40 @@ const EditSessionModal = React.memo<EditSessionModalProps>(
 
 EditSessionModal.displayName = 'EditSessionModal';
 
+const LazyLoadComponent = ({ content }: { content: () => React.ReactNode }) => {
+  const [isVisible, setIsVisible] = useState(false);
+  const componentRef = useRef(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setIsVisible(true);
+            observer.unobserve(entry.target); // Stop observing once visible
+          }
+        });
+      },
+      { threshold: 0.1 } // Trigger when 10% of the component is visible
+    );
+
+    const componentRefCurrent = componentRef.current;
+    if (componentRefCurrent) {
+      observer.observe(componentRefCurrent);
+    }
+
+    return () => {
+      if (componentRefCurrent) {
+        observer.unobserve(componentRefCurrent);
+      }
+    };
+  }, []);
+
+  return (
+    <div ref={componentRef}>{isVisible ? content() : <div style={{ minHeight: '100px' }} />}</div>
+  );
+};
+
 // Debounce hook for search
 function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState<T>(value);
@@ -397,7 +431,7 @@ const SessionListView: React.FC<SessionListViewProps> = React.memo(
       setSessionToDelete(null);
     }, []);
 
-    const SessionItem = React.memo(function SessionItem({
+    const SessionItem = function SessionItem({
       session,
       onEditClick,
       onDeleteClick,
@@ -482,7 +516,7 @@ const SessionListView: React.FC<SessionListViewProps> = React.memo(
           </div>
         </Card>
       );
-    });
+    };
 
     // Render skeleton loader for session items with variations
     const SessionSkeleton = React.memo(({ variant = 0 }: { variant?: number }) => {
@@ -566,11 +600,15 @@ const SessionListView: React.FC<SessionListViewProps> = React.memo(
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
                 {group.sessions.map((session) => (
-                  <SessionItem
+                  <LazyLoadComponent
                     key={session.id}
-                    session={session}
-                    onEditClick={handleEditSession}
-                    onDeleteClick={handleDeleteSession}
+                    content={() => (
+                      <SessionItem
+                        session={session}
+                        onEditClick={handleEditSession}
+                        onDeleteClick={handleDeleteSession}
+                      />
+                    )}
                   />
                 ))}
               </div>
