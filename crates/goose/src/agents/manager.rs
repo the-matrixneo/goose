@@ -196,7 +196,7 @@ pub struct AgentManager {
 
 impl AgentManager {
     /// Create a new AgentManager with the given configuration
-    pub async fn new(config: AgentManagerConfig) -> Self {
+    pub fn new(config: AgentManagerConfig) -> Self {
         Self {
             agents: Arc::new(RwLock::new(HashMap::new())),
             pool: None, // Start without pooling, add later
@@ -289,56 +289,14 @@ impl AgentManager {
         &self,
         _session_id: session::Identifier,
     ) -> Result<Arc<Agent>, AgentError> {
-        // For now, create a new agent directly
-        // In the future, this could use pooling or other optimizations
-
-        // Note: Agent::new() is synchronous, so we don't need await here
+        // Create a new agent without provider - it will be set later via API
+        // This matches the existing pattern where Agent::new() starts without a provider
         let agent = Agent::new();
-
-        // Initialize the agent with a provider from configuration
-        if let Err(e) = Self::initialize_agent_provider(&agent).await {
-            tracing::warn!("Failed to initialize provider for new agent: {}", e);
-            // Continue without provider - it can be set later via API
-        }
 
         // TODO: Once Agent is updated with session support, use:
         // let agent = Agent::new_with_session(session_id, ExecutionMode::Interactive);
 
         Ok(Arc::new(agent))
-    }
-
-    /// Initialize an agent with a provider from configuration
-    async fn initialize_agent_provider(agent: &Agent) -> Result<(), AgentError> {
-        use crate::config::Config;
-        use crate::model::ModelConfig;
-        use crate::providers::create;
-
-        let config = Config::global();
-
-        // Get provider and model from environment/config
-        let provider_name = config
-            .get_param::<String>("GOOSE_PROVIDER")
-            .map_err(|e| AgentError::ConfigError(format!("No provider configured: {}", e)))?;
-
-        let model_name = config
-            .get_param::<String>("GOOSE_MODEL")
-            .map_err(|e| AgentError::ConfigError(format!("No model configured: {}", e)))?;
-
-        // Create model configuration
-        let model_config = ModelConfig::new(&model_name)
-            .map_err(|e| AgentError::ConfigError(format!("Invalid model config: {}", e)))?;
-
-        // Create provider
-        let provider = create(&provider_name, model_config)
-            .map_err(|e| AgentError::CreationFailed(format!("Failed to create provider: {}", e)))?;
-
-        // Set the provider on the agent
-        agent
-            .update_provider(provider)
-            .await
-            .map_err(|e| AgentError::CreationFailed(format!("Failed to set provider: {}", e)))?;
-
-        Ok(())
     }
 
     /// Clean up idle agents to manage memory
@@ -399,5 +357,26 @@ impl AgentManager {
     /// Check if a session has an active agent
     pub async fn has_agent(&self, session_id: &session::Identifier) -> bool {
         self.agents.read().await.contains_key(session_id)
+    }
+
+    /// Spawn a background task to periodically clean up idle agents
+    pub fn spawn_cleanup_task(self: Arc<Self>) -> tokio::task::JoinHandle<()> {
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(self.config.cleanup_interval);
+            loop {
+                interval.tick().await;
+                match self.cleanup().await {
+                    Ok(count) if count > 0 => {
+                        tracing::info!("Cleaned up {} idle agents", count);
+                    }
+                    Ok(_) => {
+                        tracing::trace!("Cleanup check completed, no idle agents");
+                    }
+                    Err(e) => {
+                        tracing::error!("Agent cleanup failed: {}", e);
+                    }
+                }
+            }
+        })
     }
 }

@@ -6,7 +6,7 @@ use std::time::Duration;
 #[tokio::test]
 async fn test_agent_per_session() {
     // Verify each session gets unique agent
-    let manager = AgentManager::new(Default::default()).await;
+    let manager = AgentManager::new(Default::default());
     let session1 = session::Identifier::Name("session1".to_string());
     let session2 = session::Identifier::Name("session2".to_string());
 
@@ -24,7 +24,7 @@ async fn test_agent_per_session() {
 #[tokio::test]
 async fn test_cleanup_idle_agents() {
     // Verify idle agents are cleaned up
-    let manager = AgentManager::new(Default::default()).await;
+    let manager = AgentManager::new(Default::default());
     let session = session::Identifier::Name("cleanup_test".to_string());
 
     let _agent = manager.get_agent(session.clone()).await.unwrap();
@@ -46,7 +46,7 @@ async fn test_cleanup_idle_agents() {
 
 #[tokio::test]
 async fn test_metrics_tracking() {
-    let manager = AgentManager::new(Default::default()).await;
+    let manager = AgentManager::new(Default::default());
 
     // Create some agents
     let session1 = session::Identifier::Name("metrics1".to_string());
@@ -77,7 +77,7 @@ async fn test_metrics_tracking() {
 async fn test_concurrent_access() {
     use tokio::task;
 
-    let manager = Arc::new(AgentManager::new(Default::default()).await);
+    let manager = Arc::new(AgentManager::new(Default::default()));
     let session = session::Identifier::Name("concurrent".to_string());
 
     // Spawn multiple tasks accessing the same session
@@ -109,7 +109,7 @@ async fn test_concurrent_access() {
 
 #[tokio::test]
 async fn test_remove_specific_agent() {
-    let manager = AgentManager::new(Default::default()).await;
+    let manager = AgentManager::new(Default::default());
     let session = session::Identifier::Name("remove_test".to_string());
 
     // Create agent
@@ -129,7 +129,7 @@ async fn test_remove_specific_agent() {
 async fn test_execution_mode_update() {
     use goose::agents::manager::{ApprovalMode, ExecutionMode, InheritConfig};
 
-    let manager = AgentManager::new(Default::default()).await;
+    let manager = AgentManager::new(Default::default());
     let session = session::Identifier::Name("exec_mode".to_string());
     let parent_session = session::Identifier::Name("parent".to_string());
 
@@ -151,7 +151,7 @@ async fn test_execution_mode_update() {
 
 #[tokio::test]
 async fn test_touch_session() {
-    let manager = AgentManager::new(Default::default()).await;
+    let manager = AgentManager::new(Default::default());
     let session = session::Identifier::Name("touch_test".to_string());
 
     // Create agent
@@ -168,7 +168,7 @@ async fn test_touch_session() {
 
 #[tokio::test]
 async fn test_active_agent_count() {
-    let manager = AgentManager::new(Default::default()).await;
+    let manager = AgentManager::new(Default::default());
 
     assert_eq!(manager.active_agent_count().await, 0);
 
@@ -189,4 +189,34 @@ async fn test_active_agent_count() {
     // Remove one
     manager.remove_agent(&session1).await.unwrap();
     assert_eq!(manager.active_agent_count().await, 2);
+}
+
+#[tokio::test]
+async fn test_cleanup_task_runs() {
+    use goose::agents::manager::AgentManagerConfig;
+
+    let manager = Arc::new(AgentManager::new(AgentManagerConfig {
+        cleanup_interval: Duration::from_millis(100), // Fast for testing
+        max_idle_duration: Duration::from_millis(50), // Very short idle time for testing
+        ..Default::default()
+    }));
+
+    // Create an agent
+    let session = session::Identifier::Name("cleanup_task_test".to_string());
+    let _agent = manager.get_agent(session.clone()).await.unwrap();
+
+    // Verify agent exists
+    assert!(manager.has_agent(&session).await);
+
+    // Spawn cleanup task
+    let handle = manager.clone().spawn_cleanup_task();
+
+    // Wait for cleanup to run (should clean up after 50ms idle + 100ms interval)
+    tokio::time::sleep(Duration::from_millis(200)).await;
+
+    // Agent should be cleaned up
+    assert!(!manager.has_agent(&session).await);
+
+    // Clean up the task
+    handle.abort();
 }

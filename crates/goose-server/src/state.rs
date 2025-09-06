@@ -22,7 +22,11 @@ pub struct AppState {
 
 impl AppState {
     pub async fn new(secret_key: String) -> Arc<AppState> {
-        let agent_manager = Arc::new(AgentManager::new(AgentManagerConfig::default()).await);
+        let agent_manager = Arc::new(AgentManager::new(AgentManagerConfig::default()));
+
+        // Spawn the cleanup task
+        agent_manager.clone().spawn_cleanup_task();
+
         Arc::new(Self {
             agent_manager,
             secret_key,

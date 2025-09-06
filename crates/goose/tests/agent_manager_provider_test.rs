@@ -59,7 +59,7 @@ impl Provider for TrackingMockProvider {
 #[tokio::test]
 async fn test_provider_isolation_between_sessions() {
     // Each session should be able to have its own provider configuration
-    let manager = AgentManager::new(AgentManagerConfig::default()).await;
+    let manager = AgentManager::new(AgentManagerConfig::default());
 
     let session1 = session::Identifier::Name("provider_test_1".to_string());
     let session2 = session::Identifier::Name("provider_test_2".to_string());
@@ -110,7 +110,7 @@ async fn test_provider_initialization_failure_handling() {
     std::env::set_var("GOOSE_PROVIDER", "invalid_provider");
     std::env::set_var("GOOSE_MODEL", "invalid_model");
 
-    let manager = AgentManager::new(AgentManagerConfig::default()).await;
+    let manager = AgentManager::new(AgentManagerConfig::default());
     let session = session::Identifier::Name("provider_fail_test".to_string());
 
     // This should succeed even though provider initialization will fail
@@ -128,7 +128,7 @@ async fn test_provider_initialization_failure_handling() {
 #[tokio::test]
 async fn test_concurrent_provider_updates() {
     // Test that concurrent provider updates to different sessions don't interfere
-    let manager = Arc::new(AgentManager::new(AgentManagerConfig::default()).await);
+    let manager = Arc::new(AgentManager::new(AgentManagerConfig::default()));
     let update_counter = Arc::new(AtomicUsize::new(0));
 
     let mut handles = vec![];
@@ -180,7 +180,7 @@ async fn test_concurrent_provider_updates() {
 #[tokio::test]
 async fn test_provider_persistence_across_agent_retrievals() {
     // Test that a provider set on an agent persists when the agent is retrieved again
-    let manager = AgentManager::new(AgentManagerConfig::default()).await;
+    let manager = AgentManager::new(AgentManagerConfig::default());
     let session = session::Identifier::Name("provider_persistence".to_string());
 
     // Get agent and set provider
