@@ -20,13 +20,149 @@ use std::fs;
 use std::io::{self, BufRead, Write};
 use std::ops::DerefMut;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
+use std::time::{Duration, Instant};
+use tokio::sync::mpsc;
+use tokio::time::sleep;
 use utoipa::ToSchema;
 
 // Security limits
 const MAX_FILE_SIZE: u64 = 10 * 1024 * 1024; // 10MB
 const MAX_MESSAGE_COUNT: usize = 5000;
 const MAX_LINE_LENGTH: usize = 1024 * 1024; // 1MB per line
+
+// Async persistence constants
+const BATCH_SAVE_INTERVAL: Duration = Duration::from_millis(500);
+const MAX_BATCH_SIZE: usize = 10;
+
+/// Messages for the background persistence worker
+enum PersistenceTask {
+    Save {
+        session_file: PathBuf,
+        messages: Conversation,
+        metadata: Box<SessionMetadata>,
+    },
+    GenerateName {
+        session_file: PathBuf,
+        messages: Conversation,
+        metadata: Box<SessionMetadata>,
+        provider: Arc<dyn Provider>,
+    },
+}
+
+/// Global background persistence worker
+static SESSION_SAVER: OnceLock<mpsc::UnboundedSender<PersistenceTask>> = OnceLock::new();
+static _SESSION_SAVER_TASK: OnceLock<tokio::task::JoinHandle<()>> = OnceLock::new();
+
+/// Initialize the background session saver
+fn init_session_saver() -> mpsc::UnboundedSender<PersistenceTask> {
+    let (tx, mut rx) = mpsc::unbounded_channel::<PersistenceTask>();
+
+    let task_handle = tokio::spawn(async move {
+        let mut batch: Vec<PersistenceTask> = Vec::new();
+        let mut last_save = Instant::now();
+
+        loop {
+            // Try to receive tasks with a timeout
+            match tokio::time::timeout(BATCH_SAVE_INTERVAL, rx.recv()).await {
+                Ok(Some(task)) => {
+                    batch.push(task);
+
+                    // Save batch if it's full or enough time has passed
+                    if batch.len() >= MAX_BATCH_SIZE || last_save.elapsed() >= BATCH_SAVE_INTERVAL {
+                        save_batch(&mut batch).await;
+                        last_save = Instant::now();
+                    }
+                }
+                Ok(None) => break, // Channel closed
+                Err(_) => {
+                    // Timeout - save any pending tasks
+                    if !batch.is_empty() {
+                        save_batch(&mut batch).await;
+                        last_save = Instant::now();
+                    }
+                }
+            }
+        }
+
+        // Save any remaining tasks before exiting
+        if !batch.is_empty() {
+            save_batch(&mut batch).await;
+        }
+    });
+
+    // Store the task handle to prevent it from being dropped
+    let _ = _SESSION_SAVER_TASK.set(task_handle);
+    tx
+}
+
+/// Save a batch of persistence tasks
+async fn save_batch(batch: &mut Vec<PersistenceTask>) {
+    for task in batch.drain(..) {
+        match task {
+            PersistenceTask::Save {
+                session_file,
+                messages,
+                metadata,
+            } => {
+                if let Err(e) = save_messages_with_metadata(&session_file, &metadata, &messages) {
+                    tracing::error!(
+                        "Background save failed for {}: {}",
+                        session_file.display(),
+                        e
+                    );
+                }
+            }
+            PersistenceTask::GenerateName {
+                session_file,
+                messages,
+                metadata,
+                provider,
+            } => {
+                match provider.generate_session_name(&messages).await {
+                    Ok(description) => {
+                        // Update metadata with the generated name
+                        let mut updated_metadata = *metadata;
+                        updated_metadata.description = description;
+
+                        // Save with the updated metadata
+                        if let Err(e) =
+                            save_messages_with_metadata(&session_file, &updated_metadata, &messages)
+                        {
+                            tracing::error!(
+                                "Background save with naming failed for {}: {}",
+                                session_file.display(),
+                                e
+                            );
+                        }
+                    }
+                    Err(e) => {
+                        tracing::error!(
+                            "Background session naming failed for {}: {}",
+                            session_file.display(),
+                            e
+                        );
+                        // Still save the messages without the generated name
+                        if let Err(e) =
+                            save_messages_with_metadata(&session_file, &metadata, &messages)
+                        {
+                            tracing::error!(
+                                "Background save (after naming failure) failed for {}: {}",
+                                session_file.display(),
+                                e
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Get or initialize the session saver
+fn get_session_saver() -> &'static mpsc::UnboundedSender<PersistenceTask> {
+    SESSION_SAVER.get_or_init(init_session_saver)
+}
 
 fn get_home_dir() -> PathBuf {
     choose_app_strategy(crate::config::APP_STRATEGY.clone())
@@ -394,6 +530,56 @@ pub fn list_sessions() -> Result<Vec<(String, PathBuf)>> {
         .collect::<Vec<_>>();
 
     Ok(entries)
+}
+
+/// Initialize the background session saver
+pub fn init_background_session_saver() {
+    if SESSION_SAVER.get().is_some() {
+        return; // Already initialized
+    }
+
+    let (tx, mut rx) = mpsc::unbounded_channel::<PersistenceTask>();
+
+    let handle = tokio::spawn(async move {
+        let mut batch: Vec<PersistenceTask> = Vec::new();
+        let mut last_save = Instant::now();
+
+        loop {
+            tokio::select! {
+                // Receive new tasks
+                task = rx.recv() => {
+                    match task {
+                        Some(task) => {
+                            batch.push(task);
+
+                            // Save immediately if batch is full or if enough time has passed
+                            if batch.len() >= MAX_BATCH_SIZE || last_save.elapsed() >= BATCH_SAVE_INTERVAL {
+                                save_batch(&mut batch).await;
+                                last_save = Instant::now();
+                            }
+                        }
+                        None => break, // Channel closed
+                    }
+                }
+
+                // Periodic flush
+                _ = sleep(BATCH_SAVE_INTERVAL) => {
+                    if !batch.is_empty() && last_save.elapsed() >= BATCH_SAVE_INTERVAL {
+                        save_batch(&mut batch).await;
+                        last_save = Instant::now();
+                    }
+                }
+            }
+        }
+
+        // Final flush on shutdown
+        if !batch.is_empty() {
+            save_batch(&mut batch).await;
+        }
+    });
+
+    let _ = SESSION_SAVER.set(tx);
+    let _ = _SESSION_SAVER_TASK.set(handle);
 }
 
 /// Generate a session ID using timestamp format (yyyymmdd_hhmmss)
@@ -1354,6 +1540,100 @@ pub async fn update_metadata(session_file: &Path, metadata: &SessionMetadata) ->
 
     // Rewrite the file with the new metadata and existing messages
     save_messages_with_metadata(&secure_path, metadata, &messages)
+}
+
+/// Persist messages in the background without blocking
+pub fn persist_messages_background(
+    session_file: &Path,
+    messages: &Conversation,
+    provider: Option<Arc<dyn Provider>>,
+    working_dir: Option<PathBuf>,
+) -> Result<()> {
+    persist_messages_with_schedule_id_background(
+        session_file,
+        messages,
+        provider,
+        None,
+        working_dir,
+    )
+}
+
+/// Persist messages with schedule ID in the background without blocking
+pub fn persist_messages_with_schedule_id_background(
+    session_file: &Path,
+    messages: &Conversation,
+    provider: Option<Arc<dyn Provider>>,
+    schedule_id: Option<String>,
+    working_dir: Option<PathBuf>,
+) -> Result<()> {
+    // Validate the session file path for security
+    let secure_path = get_path(Identifier::Path(session_file.to_path_buf()))?;
+
+    // Security check: message count limit
+    if messages.len() > MAX_MESSAGE_COUNT {
+        tracing::warn!("Message count exceeds limit: {}", messages.len());
+        return Err(anyhow::anyhow!("Too many messages"));
+    }
+
+    // Count user messages
+    let user_message_count = messages
+        .iter()
+        .filter(|m| m.role == rmcp::model::Role::User && !m.as_concat_text().trim().is_empty())
+        .count();
+
+    // Create metadata immediately (synchronous)
+    let mut metadata = if secure_path.exists() {
+        read_metadata(&secure_path)?
+    } else {
+        // Create new metadata with the provided working_dir or fall back to home
+        let work_dir = working_dir.clone().unwrap_or_else(get_home_dir);
+        SessionMetadata::new(work_dir)
+    };
+
+    // Update the working_dir if provided (even for existing files)
+    if let Some(ref work_dir) = working_dir {
+        metadata.working_dir = work_dir.clone();
+    }
+
+    // Update the schedule_id if provided
+    if schedule_id.is_some() {
+        metadata.schedule_id = schedule_id.clone();
+    }
+
+    // Create the task for background saving/naming
+    let task = if let Some(provider) = provider.as_ref() {
+        if user_message_count < 4 {
+            // For early messages that need session naming, use the GenerateName task
+            PersistenceTask::GenerateName {
+                session_file: secure_path,
+                messages: messages.clone(),
+                metadata: Box::new(metadata),
+                provider: provider.clone(),
+            }
+        } else {
+            // For later messages, just save without naming
+            PersistenceTask::Save {
+                session_file: secure_path,
+                messages: messages.clone(),
+                metadata: Box::new(metadata),
+            }
+        }
+    } else {
+        // No provider, just save
+        PersistenceTask::Save {
+            session_file: secure_path,
+            messages: messages.clone(),
+            metadata: Box::new(metadata),
+        }
+    };
+
+    let sender = get_session_saver();
+    if let Err(e) = sender.send(task) {
+        tracing::error!("Failed to queue background task: {}", e);
+        return Err(anyhow::anyhow!("Failed to queue background task"));
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]

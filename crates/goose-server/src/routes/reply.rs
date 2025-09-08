@@ -359,21 +359,12 @@ async fn reply_handler(
         if all_messages.len() > saved_message_count {
             if let Ok(provider) = agent.provider().await {
                 let provider = Arc::clone(&provider);
-                let session_path_clone = session_path.to_path_buf();
-                let all_messages_clone = all_messages.clone();
-                let working_dir = session_config.working_dir.clone();
-                tokio::spawn(async move {
-                    if let Err(e) = session::persist_messages(
-                        &session_path_clone,
-                        &all_messages_clone,
-                        Some(provider),
-                        Some(working_dir),
-                    )
-                    .await
-                    {
-                        tracing::error!("Failed to store session history: {:?}", e);
-                    }
-                });
+                let _ = session::persist_messages_background(
+                    &session_path,
+                    &all_messages,
+                    Some(provider),
+                    Some(session_config.working_dir.clone()),
+                );
             }
         }
         let session_duration = session_start.elapsed();

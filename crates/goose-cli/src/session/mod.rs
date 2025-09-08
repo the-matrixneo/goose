@@ -386,14 +386,13 @@ impl Session {
                 std::env::current_dir().expect("failed to get current session working directory"),
             );
 
-            session::persist_messages_with_schedule_id(
+            session::persist_messages_with_schedule_id_background(
                 session_file,
                 &self.messages,
                 Some(provider),
                 self.scheduled_job_id.clone(),
                 working_dir,
-            )
-            .await?;
+            )?;
         }
 
         // Track the current directory and last instruction in projects.json
