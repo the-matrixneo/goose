@@ -14,6 +14,11 @@ let cfg = {
     rfc3161TimeStampServer: 'http://timestamp.digicert.com',
     signWithParams: '/fd sha256 /tr http://timestamp.digicert.com /td sha256',
   },
+  // macOS specific configuration
+  osxSign: {
+    entitlements: 'entitlements.plist',
+    'entitlements-inherit': 'entitlements.plist',
+  },
   // Protocol registration
   protocols: [
     {
