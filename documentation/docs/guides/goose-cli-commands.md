@@ -2,11 +2,8 @@
 sidebar_position: 7
 title: CLI Commands
 sidebar_label: CLI Commands
-hide_title: true
 toc_max_heading_level: 4
 ---
-
-## CLI Commands
 
 Goose provides a command-line interface (CLI) with several commands for managing sessions, configurations and extensions. This guide covers all available CLI commands and interactive session features.
 
