@@ -1,6 +1,8 @@
 const { FusesPlugin } = require('@electron-forge/plugin-fuses');
 const { FuseV1Options, FuseVersion } = require('@electron/fuses');
-const { resolve } = require('path');
+
+// Determine if this is a production build
+const isProduction = process.env.NODE_ENV === 'production' || process.env.FORGE_PRODUCTION === 'true';
 
 let cfg = {
   asar: true,
@@ -14,11 +16,13 @@ let cfg = {
     rfc3161TimeStampServer: 'http://timestamp.digicert.com',
     signWithParams: '/fd sha256 /tr http://timestamp.digicert.com /td sha256',
   },
-  // macOS specific configuration
-  osxSign: {
-    entitlements: 'entitlements.plist',
-    'entitlements-inherit': 'entitlements.plist',
-  },
+  // macOS specific configuration - only enabled for production builds
+  ...(isProduction && {
+    osxSign: {
+      entitlements: 'entitlements.plist',
+      'entitlements-inherit': 'entitlements.plist',
+    },
+  }),
   // Protocol registration
   protocols: [
     {
