@@ -1,7 +1,6 @@
 const { FusesPlugin } = require('@electron-forge/plugin-fuses');
 const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 
-// Determine if this is a production build
 const isProduction = process.env.NODE_ENV === 'production' || process.env.FORGE_PRODUCTION === 'true';
 
 let cfg = {
