@@ -3,6 +3,7 @@ sidebar_position: 7
 title: CLI Commands
 sidebar_label: CLI Commands
 hide_title: true
+toc_max_heading_level: 4
 ---
 
 ## CLI Commands
@@ -404,7 +405,7 @@ goose web --host 192.168.1.7 --port 8080
 Use `Ctrl+C` to stop the server.
 :::
 
-#### Limitations:
+**Limitations:**
 
 While the web interface provides most core features, be aware of these limitations:
 - Some file system operations may require additional confirmation
