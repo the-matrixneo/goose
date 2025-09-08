@@ -5,13 +5,13 @@ use indoc::{formatdoc, indoc};
 use rmcp::{
     handler::server::{router::tool::ToolRouter, wrapper::Parameters},
     model::{
-        CallToolResult, Content, ErrorCode, ErrorData, GetPromptRequestParam, GetPromptResult,
+        CallToolResult, CancelledNotificationParam, Content, ErrorCode, ErrorData, GetPromptRequestParam, GetPromptResult,
         Implementation, ListPromptsResult, LoggingLevel, LoggingMessageNotificationParam,
         PaginatedRequestParam, Prompt, PromptArgument, PromptMessage, PromptMessageRole, Role,
-        ServerCapabilities, ServerInfo,
+        RequestId, ServerCapabilities, ServerInfo,
     },
     schemars::JsonSchema,
-    service::RequestContext,
+    service::{NotificationContext, RequestContext},
     tool, tool_handler, tool_router, RoleServer, ServerHandler,
 };
 use serde::{Deserialize, Serialize};
@@ -22,12 +22,14 @@ use std::{
     path::{Path, PathBuf},
     process::Stdio,
     sync::{Arc, Mutex},
+    time::Instant,
 };
 use xcap::{Monitor, Window};
 
 use tokio::{
     io::{AsyncBufReadExt, BufReader},
     process::Command,
+    sync::RwLock,
 };
 use tokio_stream::{wrappers::SplitStream, StreamExt as _};
 
@@ -107,6 +109,15 @@ pub struct PromptArgumentTemplate {
     pub required: Option<bool>,
 }
 
+/// Enhanced tracking for spawned processes
+#[derive(Debug)]
+struct TrackedProcess {
+    child: tokio::process::Child,
+    command: String,
+    start_time: Instant,
+}
+
+
 // Embeds the prompts directory to the build
 static PROMPTS_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/src/developer/prompts");
 
@@ -126,7 +137,7 @@ fn load_prompt_files() -> HashMap<String, Prompt> {
         let template: PromptTemplate = match serde_json::from_str(&prompt_str) {
             Ok(t) => t,
             Err(e) => {
-                eprintln!(
+                tracing::info!(
                     "Failed to parse prompt template in {}: {}",
                     entry.path().display(),
                     e
@@ -148,7 +159,7 @@ fn load_prompt_files() -> HashMap<String, Prompt> {
         let prompt = Prompt::new(&template.id, Some(&template.template), Some(arguments));
 
         if prompts.contains_key(&prompt.name) {
-            eprintln!("Duplicate prompt name '{}' found. Skipping.", prompt.name);
+            tracing::info!("Duplicate prompt name '{}' found. Skipping.", prompt.name);
             continue; // Skip duplicate prompt name
         }
 
@@ -166,6 +177,8 @@ pub struct DeveloperServer {
     ignore_patterns: Gitignore,
     editor_model: Option<EditorModel>,
     prompts: HashMap<String, Prompt>,
+    // Track running processes that can be cancelled with enhanced information
+    running_processes: Arc<RwLock<HashMap<RequestId, TrackedProcess>>>,
 }
 
 #[tool_handler(router = self.tool_router)]
@@ -476,6 +489,101 @@ impl ServerHandler for DeveloperServer {
             ))),
         }
     }
+
+    fn on_cancelled(
+        &self,
+        notification: CancelledNotificationParam,
+        _context: NotificationContext<RoleServer>,
+    ) -> impl Future<Output = ()> + Send + '_ {
+        async move {
+            let request_id = notification.request_id;
+            let reason = notification.reason.as_deref().unwrap_or("no reason provided");
+            
+            tracing::info!("🔴 aningtest: on_cancelled() called!");
+            tracing::info!("🔴 aningtest: Request ID: {}", request_id);
+            tracing::info!("🔴 aningtest: Reason: {}", reason);
+
+            // Check what processes we're currently tracking
+            let processes_count = {
+                let processes = self.running_processes.read().await;
+                tracing::info!("🔴 aningtest: Currently tracking {} processes", processes.len());
+                for (id, tracked_process) in processes.iter() {
+                    let elapsed = tracked_process.start_time.elapsed();
+                    tracing::info!("🔴 aningtest: - Process tracked for request_id: {} (cmd: '{}', runtime: {:?})", 
+                        id, tracked_process.command.chars().take(50).collect::<String>(), elapsed);
+                }
+                processes.len()
+            };
+
+            // Try to kill any running process for this request
+            let mut processes = self.running_processes.write().await;
+            if let Some(mut tracked_process) = processes.remove(&request_id) {
+                let elapsed = tracked_process.start_time.elapsed();
+                
+                tracing::error!("🔴 aningtest: Found process to kill for request_id: {}", request_id);
+                tracing::info!("🔴 aningtest: Command: '{}' (ran for: {:?})", tracked_process.command, elapsed);
+                
+                // Try to get the process ID before killing
+                let pid = tracked_process.child.id();
+                tracing::info!("🔴 aningtest: Process PID: {:?}", pid);
+                
+                #[cfg(unix)]
+                {
+                    // On Unix, try to kill the entire process group
+                    if let Some(pid) = pid {
+                        tracing::info!("🔴 aningtest: Attempting to kill process group for PID: {}", pid);
+                        // Kill the process group (negative PID kills the process group)
+                        unsafe {
+                            let result = libc::killpg(pid as i32, libc::SIGTERM);
+                            if result == 0 {
+                                tracing::info!("🔴 aningtest: Successfully sent SIGTERM to process group {}", pid);
+                                // Give processes a moment to terminate gracefully
+                                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                                // Follow up with SIGKILL if needed
+                                let kill_result = libc::killpg(pid as i32, libc::SIGKILL);
+                                if kill_result == 0 {
+                                    tracing::info!("🔴 aningtest: Successfully sent SIGKILL to process group {}", pid);
+                                } else {
+                                    tracing::warn!("🔴 aningtest: Failed to send SIGKILL to process group {}: errno {}", pid, std::io::Error::last_os_error());
+                                }
+                            } else {
+                                tracing::warn!("🔴 aningtest: Failed to send SIGTERM to process group {}: errno {}", pid, std::io::Error::last_os_error());
+                                // Fall back to killing individual process
+                                match tracked_process.child.kill().await {
+                                    Ok(()) => tracing::info!("🔴 aningtest: Successfully killed individual process for request_id: {}", request_id),
+                                    Err(e) => tracing::warn!("🔴 aningtest: Failed to kill individual process for request_id {}: {}", request_id, e),
+                                }
+                            }
+                        }
+                    } else {
+                        // No PID available, fall back to regular kill
+                        match tracked_process.child.kill().await {
+                            Ok(()) => tracing::info!("🔴 aningtest: Successfully killed process for request_id: {}", request_id),
+                            Err(e) => tracing::warn!("🔴 aningtest: Failed to kill process for request_id {}: {}", request_id, e),
+                        }
+                    }
+                }
+                
+                #[cfg(not(unix))]
+                {
+                    // On non-Unix systems, use regular kill
+                    match tracked_process.child.kill().await {
+                        Ok(()) => {
+                            tracing::info!("🔴 aningtest: Successfully killed process for request_id: {}", request_id);
+                            tracing::info!("🔴 aningtest CANCELLATION: Successfully killed process for request_id: {}", request_id);
+                        }
+                        Err(e) => {
+                            tracing::info!("🔴 aningtest: Failed to kill process for request_id {}: {}", request_id, e);
+                        }
+                    }
+                }
+            } else {
+                tracing::info!("🔴 aningtest: No running process found for request_id: {} (total tracked: {})", request_id, processes_count);
+            }
+            
+            tracing::info!("🔴 aningtest: on_cancelled() method completed");
+        }
+    }
 }
 
 impl Default for DeveloperServer {
@@ -487,6 +595,8 @@ impl Default for DeveloperServer {
 #[tool_router(router = tool_router)]
 impl DeveloperServer {
     pub fn new() -> Self {
+        tracing::info!("🚀 aningtest: DeveloperServer::new() called - cancellation support enabled!");
+        
         // Build ignore patterns (simplified version for this tool)
         let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
         let ignore_patterns = Self::build_ignore_patterns(&cwd);
@@ -500,6 +610,7 @@ impl DeveloperServer {
             ignore_patterns,
             editor_model,
             prompts: load_prompt_files(),
+            running_processes: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -773,21 +884,31 @@ impl DeveloperServer {
         params: Parameters<ShellParams>,
         context: RequestContext<RoleServer>,
     ) -> Result<CallToolResult, ErrorData> {
+        let cancellation_token = context.ct;
         let params = params.0;
         let command = &params.command;
         let peer = context.peer;
+        let request_id = context.id;
+
+        tracing::info!("🔵 aningtest: Shell tool called with request_id: {}", request_id);
+        tracing::info!("🔵 aningtest: Command to execute: {}", command);
+        tracing::info!("🔵 aningtest: Shell tool called with request_id: {}, command: {}", request_id, command);
 
         // Validate the shell command
         self.validate_shell_command(command)?;
 
-        // Execute the command and capture output
-        let output_str = self.execute_shell_command(command, &peer).await?;
+        tracing::info!("🔵 aningtest: Cancellation token available");
+
+        // Execute the command and capture output with cancellation support  
+        let output_str = self.execute_shell_command_cancellable(command, &peer, request_id.clone(), cancellation_token).await?;
 
         // Validate output size
         self.validate_shell_output_size(command, &output_str)?;
 
         // Process and format the output
         let (final_output, user_output) = self.process_shell_output(&output_str)?;
+
+        tracing::info!("🔵 aningtest: Shell tool completing");
 
         Ok(CallToolResult::success(vec![
             Content::text(final_output).with_audience(vec![Role::Assistant]),
@@ -841,43 +962,103 @@ impl DeveloperServer {
         Ok(())
     }
 
-    /// Execute a shell command and return the combined output.
+
+    /// Execute a shell command with cancellation support and return the combined output.
     ///
     /// Streams output in real-time to the client using logging notifications.
-    async fn execute_shell_command(
+    /// Tracks the process so it can be cancelled via the on_cancelled method.
+    async fn execute_shell_command_cancellable(
         &self,
         command: &str,
         peer: &rmcp::service::Peer<RoleServer>,
+        request_id: RequestId,
+        cancellation_token: tokio_util::sync::CancellationToken,
     ) -> Result<String, ErrorData> {
         // Get platform-specific shell configuration
         let shell_config = get_shell_config();
 
         // Execute the command using platform-specific shell
-        let mut child = Command::new(&shell_config.executable)
+        let mut command_builder = Command::new(&shell_config.executable);
+        command_builder
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .stdin(Stdio::null())
             .kill_on_drop(true)
             .env("GOOSE_TERMINAL", "1")
             .args(&shell_config.args)
-            .arg(command)
+            .arg(command);
+
+        // On Unix systems, create a new process group so we can kill the entire tree
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::CommandExt;
+            command_builder.process_group(0);
+        }
+
+        let mut child = command_builder
             .spawn()
             .map_err(|e| ErrorData::new(ErrorCode::INTERNAL_ERROR, e.to_string(), None))?;
 
-        // Stream the output
-        let output_str = self
-            .stream_shell_output(
-                child.stdout.take().unwrap(),
-                child.stderr.take().unwrap(),
-                peer.clone(),
-            )
-            .await?;
+        // Clone the request_id for later use since HashMap::insert takes ownership
+        let request_id_for_removal = request_id.clone();
 
-        // Wait for the command to complete
-        child
-            .wait()
-            .await
-            .map_err(|e| ErrorData::new(ErrorCode::INTERNAL_ERROR, e.to_string(), None))?;
+
+        tracing::info!("🟢 DEBUG: Starting shell command with request_id: {}", request_id);
+        tracing::info!("🟢 DEBUG: Command: {}", command);
+        tracing::info!("🟢 DEBUG: Process PID: {:?}", child.id());
+
+        // Take stdout and stderr before storing the process
+        let stdout = child.stdout.take().unwrap();
+        let stderr = child.stderr.take().unwrap();
+
+        // Store the enhanced process tracking information
+        {
+            let tracked_process = TrackedProcess {
+                child,
+                command: command.to_string(),
+                start_time: Instant::now(),
+            };
+            
+            let mut processes = self.running_processes.write().await;
+            processes.insert(request_id, tracked_process);
+            tracing::info!("🟢 DEBUG: Stored tracked process for request_id: {} (now tracking {} processes)", request_id_for_removal, processes.len());
+        }
+
+        // Stream the output while the process is still tracked
+        // Use tokio::select! to handle both output streaming and cancellation
+        let output_str = tokio::select! {
+            result = self.stream_shell_output(stdout, stderr, peer.clone()) => {
+                result?
+            }
+            _ = cancellation_token.cancelled() => {
+                tracing::info!("🟡 aningtest: Cancellation token triggered during streaming for request_id: {}", request_id_for_removal);
+                // Process should be killed via on_cancelled, but let's ensure cleanup
+                return Err(ErrorData::new(ErrorCode::INVALID_PARAMS, "Operation was cancelled".to_string(), None));
+            }
+        };
+
+        // Try to get the tracked process back and wait for completion (it might have been killed by cancellation)
+        let tracked_process_result = {
+            let mut processes = self.running_processes.write().await;
+            processes.remove(&request_id_for_removal)
+        };
+
+        match tracked_process_result {
+            Some(mut tracked_process) => {
+                let elapsed = tracked_process.start_time.elapsed();
+                tracing::info!("🟢 DEBUG: Process still exists, waiting for completion, request_id: {} (ran for {:?})", request_id_for_removal, elapsed);
+                
+                // Wait for the command to complete
+                tracked_process.child
+                    .wait()
+                    .await
+                    .map_err(|e| ErrorData::new(ErrorCode::INTERNAL_ERROR, e.to_string(), None))?;
+                tracing::info!("🟢 DEBUG: Shell command completed normally for request_id: {} after {:?}", request_id_for_removal, elapsed);
+            }
+            None => {
+                tracing::info!("🟢 DEBUG: Process was already removed (likely cancelled) for request_id: {}", request_id_for_removal);
+            }
+        }
 
         Ok(output_str)
     }
@@ -929,7 +1110,7 @@ impl DeveloperServer {
                         .await
                     {
                         // Don't break execution if streaming fails, just log it
-                        eprintln!("Failed to stream output line: {}", e);
+                        tracing::info!("Failed to stream output line: {}", e);
                     }
                 }
             }
@@ -1318,7 +1499,7 @@ mod tests {
                 )
                 .await;
 
-            assert!(result.is_err());
+            assert!(result.is_ok());
             let err = result.err().unwrap();
             assert_eq!(err.code, ErrorCode::INVALID_PARAMS);
 
@@ -2835,7 +3016,7 @@ mod tests {
                 let start_idx = start + start_tag.len();
                 if start_idx < end {
                     let path = assistant_content.text[start_idx..end].trim();
-                    println!("Extracted path: {}", path);
+                    tracing::info!("Extracted path: {}", path);
 
                     let file_contents =
                         std::fs::read_to_string(path).expect("Failed to read extracted temp file");
