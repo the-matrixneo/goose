@@ -60,7 +60,7 @@ Based on how many task issues (N) you created from tasks dir: wait for pull requ
 
 gh pr list --repo michaelneale/test --search "for:link-to-original-issue in:body,title" --state all --json number,title,url
 
-(you can work that exact commands out). This is done as a slow poll, as it may take some time for them to trickle in.
+(you can work that exact commands out). This is done as a slow poll, as it may take some time for them to trickle in. You should wait for all PRs to be out of draft state (out of draft means ready - if draft, we ignore it)
 
 We are looking for clean PRs, ie ones that have green builds and are open and available to merge. Can also look for closed ones (ie ones that were tried and given up) as they count. Once we have N of them, clean or closed, ie one for each issue, then we run the next recipe: 
 
@@ -102,18 +102,9 @@ gh issue edit 1 --repo michaelneale/test --remove-label "help wanted"
 gh issue edit 1 --repo michaelneale/test --body $'*add existing here*<details><summary>Goose planner</summary>\n<p>\ngoose:swarm:thing-0911-boop</details>'
 
 -------
-## IF title is [task].* then we will be doing stuff with code:
-# get the original issue id:
-
-gh issue view 5 --repo michaelneale/test --json body --jq '.body | scan("#([0-9]+)") | .[0]'
 
 # load all this issues details and comments into context
 gh api graphql -f query='{ repository(owner:"michaelneale", name:"test") { issue(number:1) { body comments(first:100) { nodes { body } } } } }' --jq '.data.repository.issue | .body, .comments.nodes[].body'
-
-# clone repo etc, refresh Main
-# work on changes locally
-# ---> launch recipe to say work on that task until you are happy
-# ----> same recipe will now watch for build to work, correct it when you see failure, until it succeeds
 
 # TIP for recipe: to push as a PR, linking back to the original issue id:
 git checkout -b new-feature && git add . && git commit -m "Add new changes" && git push origin new-feature
