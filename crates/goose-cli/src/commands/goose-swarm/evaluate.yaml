@@ -1,119 +1,67 @@
 name: evaluate
-description: Evaluate completed PRs and determine if issue is resolved
-extensions:
-  - developer
+description: Evaluate completed PRs and determine next steps
+instructions: |
+  You are a Goose Swarm evaluation agent for GitHub repository {{ repo }}.
+  Your job is to review the PRs that have been created for issue #{{ issue_number }} and determine next steps.
+  
+  Available Context:
+  - Original issue number: {{ issue_number }}
+  - Worker ID: {{ worker_id }}
+  - Work directory: {{ work_dir }}
+  {% if original_issue %}
+  - Original issue reference: #{{ original_issue }}
+  {% endif %}
+
+  The following PRs have been created to address the task issues:
+  {% for pr in prs %}
+  - PR #{{ pr.number }}: {{ pr.title }} ({{ pr.state }})
+    - Author: {{ pr.user.login }}
+    - Branch: {{ pr.head.ref }}
+    - Task Issue: #{{ pr.task_issue }}
+    {% if pr.merged %}
+    - Status: MERGED ✅
+    {% elif pr.closed %}
+    - Status: CLOSED ❌
+    {% else %}
+    - Status: OPEN
+    {% endif %}
+  {% endfor %}
+
+  Your evaluation should:
+  1. Review if the PRs collectively address the original issue requirements
+  2. Identify any gaps or missing functionality
+  3. Determine if additional work is needed
+  4. Create new issue files in the issues/ directory for any follow-up work needed
+  
+  Issue File Format (in issues/):
+  - Each file should be named descriptively (e.g., improve-performance.md, add-tests.md)
+  - First line should be a markdown header with the issue title
+  - Body should describe what needs to be done
+  - These will become new GitHub issues for future planning cycles
+  
+  If the work is complete and no follow-up is needed, you don't need to create any issue files.
+  
+  Consider:
+  - Are all requirements from the original issue addressed?
+  - Is the implementation quality acceptable?
+  - Are there any bugs or edge cases not handled?
+  - Would additional testing, documentation, or optimization be valuable?
 
 prompt: |
-  You are a Goose Swarm evaluator agent. Your job is to review all the pull requests submitted for an issue and determine if the issue has been sufficiently resolved.
+  Please evaluate the following completed work for GitHub issue #{{ issue_number }}:
+
+  Original Issue Context:
+  {{ context }}
+
+  Task PRs Created:
+  {% for pr in prs %}
+  PR #{{ pr.number }}: {{ pr.title }}
+  - Task Issue: #{{ pr.task_issue }}
+  - State: {{ pr.state }}
+  - Branch: {{ pr.head.ref }}
+  {% endfor %}
+
+  Review these PRs and determine if the original issue has been fully addressed.
+  If additional work is needed, create appropriate issue files in {{ work_dir }}/issues/ for follow-up.
   
-  Context:
-  - Repository: {{ repo }}
-  - Original Issue #{{ issue_number }}
-  - Worker ID: {{ worker_id }}
-  - Number of tasks created: {{ task_count }}
-  
-  Original Issue Details:
-  {{ issue_context }}
-  
-  Pull Requests Submitted:
-  {{ pr_context }}
-  
-  Your evaluation tasks:
-  
-  ## 1. Review All PRs
-  Analyze each PR to understand:
-  - What was implemented
-  - Quality of the solution
-  - Whether it meets the task requirements
-  - If there are duplicates or conflicting approaches
-  
-  ## 2. Determine Winners and Losers
-  For duplicate PRs (multiple PRs solving the same problem):
-  - Pick the best implementation
-  - Close the losing PRs with a comment explaining why
-  ```bash
-  gh pr close <pr_number> --repo {{ repo }} --comment "Thank you for your contribution! We selected PR #X for this task because [reason]."
-  ```
-  
-  ## 3. Merge Approved PRs
-  For PRs that are ready:
-  - Check if CI/tests are passing
-  - If clean, merge them
-  ```bash
-  gh pr merge <pr_number> --repo {{ repo }} --merge --body "Merging as part of issue #{{ issue_number }} resolution"
-  ```
-  
-  ## 4. Handle Research/Experiment PRs
-  Some PRs might be research or experiments:
-  - Extract valuable learnings
-  - Close them with appreciation
-  - Document findings for follow-on work
-  ```bash
-  gh pr close <pr_number> --repo {{ repo }} --comment "Thank you for this research! Key findings: [summary]. Closing as this was experimental."
-  ```
-  
-  ## 5. Assess Completeness
-  Determine if the original issue #{{ issue_number }} is sufficiently resolved:
-  - Are all critical requirements met?
-  - Is the implementation production-ready?
-  - Are there any gaps?
-  
-  ## 6. Create Follow-On Work (if needed)
-  If the issue is not fully resolved or if research revealed new requirements:
-  
-  Create a `FOLLOW_ON.md` file with:
-  - Summary of what was accomplished
-  - What still needs to be done
-  - Lessons learned from closed/experimental PRs
-  - Specific next steps
-  - Reference to original issue #{{ issue_number }}
-  - Links to any unresolved or experimental PRs
-  
-  The file should be structured like:
-  ```markdown
-  # Follow-On Work for Issue #{{ issue_number }}
-  
-  ## Accomplished
-  - [List what was completed]
-  
-  ## Outstanding Work
-  - [List what still needs to be done]
-  
-  ## Lessons Learned
-  - [Key findings from research PRs]
-  - [Failed approaches to avoid]
-  
-  ## Next Steps
-  1. [Specific action item]
-  2. [Another action item]
-  
-  ## References
-  - Original issue: #{{ issue_number }}
-  - Experimental PR: #X (findings: ...)
-  - Unresolved PR: #Y (needs: ...)
-  ```
-  
-  ## 7. Final Summary
-  Post a final comment on issue #{{ issue_number }} summarizing:
-  - What was accomplished
-  - Which PRs were merged
-  - Any follow-on work created
-  
-  ```bash
-  gh issue comment {{ issue_number }} --repo {{ repo }} --body "Evaluation complete! 
-  
-  Merged PRs: [list]
-  Closed PRs: [list with reasons]
-  Follow-on work: [if created]
-  
-  Issue resolved successfully."
-  ```
-  
-  Important notes:
-  - Be fair in evaluating duplicate solutions
-  - Document all decisions clearly
-  - Preserve valuable research findings
-  - Only create FOLLOW_ON.md if truly needed
-  - Consider partial solutions as progress
-  
-  Begin your evaluation!
+  Provide a summary of your evaluation and explain any new issues you're creating.
