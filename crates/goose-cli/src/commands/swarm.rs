@@ -661,6 +661,55 @@ fn get_ready_prs_for_tasks(
     Ok(ready_prs)
 }
 
+/// Check which PRs are still open for the task issues
+fn check_open_prs(repo: &str, task_issue_numbers: &[u32]) -> Result<Vec<serde_json::Value>> {
+    let mut open_prs = Vec::new();
+
+    // For each task issue, find open PRs that reference it
+    for task_num in task_issue_numbers {
+        let output = Command::new("gh")
+            .args([
+                "pr",
+                "list",
+                "--repo",
+                repo,
+                "--search",
+                &format!("#{} in:body,title", task_num),
+                "--state",
+                "open",
+                "--json",
+                "number,title,url,state,body,isDraft",
+            ])
+            .output()
+            .context("Failed to get open PRs for task")?;
+
+        if output.status.success() {
+            let prs: Vec<serde_json::Value> = serde_json::from_slice(&output.stdout)?;
+
+            // Add task_issue field and filter out drafts
+            for mut pr in prs {
+                // Skip draft PRs
+                if pr.get("isDraft").and_then(|v| v.as_bool()).unwrap_or(false) {
+                    continue;
+                }
+                
+                pr["task_issue"] = serde_json::json!(task_num);
+
+                // Avoid duplicates if a PR mentions multiple task issues
+                let pr_number = pr["number"].as_u64();
+                if !open_prs
+                    .iter()
+                    .any(|p: &serde_json::Value| p["number"].as_u64() == pr_number)
+                {
+                    open_prs.push(pr);
+                }
+            }
+        }
+    }
+
+    Ok(open_prs)
+}
+
 /// Count task issues created from a planning issue
 fn count_task_issues(repo: &str, parent_issue: u32) -> Result<usize> {
     let output = Command::new("gh")
@@ -1020,13 +1069,52 @@ async fn execute_planning_work(repo: &str, issue: &GitHubIssue, worker_id: &str)
                 .join("src/commands/goose-swarm/evaluate.yaml");
 
             println!("🔮 Running evaluation recipe...");
-            run_recipe(eval_recipe_path, eval_params).await?;
-
-            // Close all task issues that were created
-            close_task_issues(repo, issue.number)?;
+            run_recipe(eval_recipe_path.clone(), eval_params.clone()).await?;
 
             // Process any new issues created by evaluate recipe
             process_evaluation_issues(repo, issue.number, &eval_issues_dir)?;
+
+            // Check if all PRs are closed/merged
+            let remaining_open_prs = check_open_prs(repo, &task_issue_numbers)?;
+            
+            if !remaining_open_prs.is_empty() {
+                println!("⚠️ {} PR(s) still open after evaluation. Running evaluation once more...", remaining_open_prs.len());
+                
+                // Run evaluation one more time to give it a chance to address open PRs
+                run_recipe(eval_recipe_path, eval_params).await?;
+                
+                // Process any new issues from second evaluation
+                process_evaluation_issues(repo, issue.number, &eval_issues_dir)?;
+                
+                // Check PRs again
+                let final_open_prs = check_open_prs(repo, &task_issue_numbers)?;
+                
+                if !final_open_prs.is_empty() {
+                    println!("📝 {} PR(s) still open. Closing them now...", final_open_prs.len());
+                    
+                    // Close all remaining open PRs
+                    for pr in final_open_prs {
+                        if let Some(pr_num) = pr.get("number").and_then(|n| n.as_u64()) {
+                            println!("   Closing PR #{}", pr_num);
+                            Command::new("gh")
+                                .args([
+                                    "pr",
+                                    "close",
+                                    &pr_num.to_string(),
+                                    "--repo",
+                                    repo,
+                                    "--comment",
+                                    "Automatically closed by Goose Swarm after evaluation phase.",
+                                ])
+                                .output()
+                                .context("Failed to close PR")?;
+                        }
+                    }
+                }
+            }
+
+            // Close all task issues that were created
+            close_task_issues(repo, issue.number)?;
 
             // Close the original planning issue
             println!("🔒 Closing planning issue #{}...", issue.number);
