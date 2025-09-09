@@ -568,35 +568,86 @@ fn prepare_workspace(repo: &str) -> Result<String> {
     Ok(workspace_dir)
 }
 
-/// Get PRs related to an issue
-fn get_related_prs(repo: &str, issue_number: u32) -> Result<Vec<serde_json::Value>> {
+/// Get task issue numbers created from a planning issue
+fn get_task_issue_numbers(repo: &str, parent_issue: u32) -> Result<Vec<u32>> {
     let output = Command::new("gh")
         .args([
-            "pr",
+            "issue",
             "list",
             "--repo",
             repo,
             "--search",
-            &format!("{} in:body,title", issue_number),
+            &format!("\"for:#{}\" in:body \"[task]\" in:title", parent_issue),
             "--state",
             "all",
             "--json",
-            "number,title,url,state,body,isDraft",
+            "number",
         ])
         .output()
-        .context("Failed to get related PRs")?;
+        .context("Failed to get task issue numbers")?;
 
     if output.status.success() {
-        let prs: Vec<serde_json::Value> = serde_json::from_slice(&output.stdout)?;
-        Ok(prs)
+        let issues: Vec<serde_json::Value> = serde_json::from_slice(&output.stdout)?;
+        let numbers: Vec<u32> = issues
+            .iter()
+            .filter_map(|issue| issue["number"].as_u64().map(|n| n as u32))
+            .collect();
+        Ok(numbers)
     } else {
         Ok(Vec::new())
     }
 }
 
-/// Get non-draft PRs that are ready (open or closed/merged)
-fn get_ready_prs(repo: &str, issue_number: u32) -> Result<Vec<serde_json::Value>> {
-    let all_prs = get_related_prs(repo, issue_number)?;
+/// Get PRs that reference task issues (either in title or body)
+fn get_prs_for_tasks(repo: &str, task_issue_numbers: &[u32]) -> Result<Vec<serde_json::Value>> {
+    let mut all_prs = Vec::new();
+
+    // For each task issue, find PRs that reference it
+    for task_num in task_issue_numbers {
+        let output = Command::new("gh")
+            .args([
+                "pr",
+                "list",
+                "--repo",
+                repo,
+                "--search",
+                &format!("#{} in:body,title", task_num),
+                "--state",
+                "all",
+                "--json",
+                "number,title,url,state,body,isDraft",
+            ])
+            .output()
+            .context("Failed to get PRs for task")?;
+
+        if output.status.success() {
+            let prs: Vec<serde_json::Value> = serde_json::from_slice(&output.stdout)?;
+
+            // Add task_issue field to each PR so we know which task it addresses
+            for mut pr in prs {
+                pr["task_issue"] = serde_json::json!(task_num);
+
+                // Avoid duplicates if a PR mentions multiple task issues
+                let pr_number = pr["number"].as_u64();
+                if !all_prs
+                    .iter()
+                    .any(|p: &serde_json::Value| p["number"].as_u64() == pr_number)
+                {
+                    all_prs.push(pr);
+                }
+            }
+        }
+    }
+
+    Ok(all_prs)
+}
+
+/// Get non-draft PRs that are ready (open or closed/merged) for task issues
+fn get_ready_prs_for_tasks(
+    repo: &str,
+    task_issue_numbers: &[u32],
+) -> Result<Vec<serde_json::Value>> {
+    let all_prs = get_prs_for_tasks(repo, task_issue_numbers)?;
 
     // Filter out draft PRs - we only want non-draft PRs (open, closed, or merged)
     let ready_prs: Vec<serde_json::Value> = all_prs
@@ -911,16 +962,16 @@ async fn execute_planning_work(repo: &str, issue: &GitHubIssue, worker_id: &str)
         task_count
     );
 
+    // Get task issue numbers for tracking PRs
+    let task_issue_numbers = get_task_issue_numbers(repo, issue.number)?;
+    println!("📝 Tracking PRs for task issues: {:?}", task_issue_numbers);
+
     // Poll for PRs to come in
     loop {
-        let all_prs = get_related_prs(repo, issue.number)?;
-        let ready_prs = get_ready_prs(repo, issue.number)?;
+        let all_prs = get_prs_for_tasks(repo, &task_issue_numbers)?;
+        let ready_prs = get_ready_prs_for_tasks(repo, &task_issue_numbers)?;
 
-        println!(
-            "🔍 Found {} PR(s) related to issue #{}",
-            all_prs.len(),
-            issue.number
-        );
+        println!("🔍 Found {} PR(s) addressing task issues", all_prs.len());
         println!(
             "   📋 {} non-draft PR(s) ready for evaluation",
             ready_prs.len()
