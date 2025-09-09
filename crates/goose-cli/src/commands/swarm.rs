@@ -521,7 +521,7 @@ fn get_original_issue_id(repo: &str, issue_number: u32) -> Result<Option<u32>> {
     Ok(None)
 }
 
-/// Clone repository to workspace
+/// Clone or refresh repository to workspace
 fn prepare_workspace(repo: &str) -> Result<String> {
     let repo_name = repo.split('/').next_back().unwrap_or(repo);
 
@@ -908,6 +908,10 @@ async fn execute_planning_work(repo: &str, issue: &GitHubIssue, worker_id: &str)
     // Count available drone nodes
     let available_nodes = count_available_nodes(repo)?;
 
+    // Prepare repository workspace (shared location for read-only access)
+    let repo_dir = prepare_workspace(repo)?;
+    println!("📁 Repository available at: {}", repo_dir);
+
     // Create working directory with tasks/ and issues/ subdirectories
     let home_dir = std::env::var("HOME")
         .or_else(|_| std::env::var("USERPROFILE"))
@@ -930,6 +934,7 @@ async fn execute_planning_work(repo: &str, issue: &GitHubIssue, worker_id: &str)
         ("context".to_string(), context.clone()),
         ("available_nodes".to_string(), available_nodes.to_string()),
         ("work_dir".to_string(), work_dir.clone()),
+        ("repo_dir".to_string(), repo_dir), // Pass the cloned repo directory
     ];
 
     // Check for original issue reference

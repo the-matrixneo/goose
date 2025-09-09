@@ -35,8 +35,23 @@ instructions: |
   Use git and gh CLI commands to manage your workflow.
   Test your changes if applicable before creating the PR.
 
+  For example, this is how you make a feature branch commit and push to a PR: 
+
+  `git checkout -b new-feature && git add . && git commit -m "Add new changes" && git push origin new-feature``
+  `gh pr create --title "short title here" --body "conten here"``
+
+  Always mention {{ original_issue }} and {{ issue_number }} in the PR body.
+
+  gh PR checks can ve checked like this example: 
+
+    `gh pr checks 4557 --repo block/goose`
+    `gh run view 17548570648 --repo block/goose --logs` to view logs for failing checks if needed
+
+
+
+
 prompt: |
-  I need to implement a solution for the following GitHub task issue:
+  I need to implement a solution for the following task:
 
   {{ context }}
 
@@ -51,3 +66,8 @@ prompt: |
   {% if original_issue %}
   5. Also reference original issue #{{ original_issue }} in the PR
   {% endif %}
+
+  Once pushed, use the gh cli to track progress of any checks, epecially watching for failures. 
+  if you detect a failure in the checks, fetch its log, address, commit and push the fix for that, and watch the PR for success.
+
+  Your job is to iterate to a working solution for the task, and passing build
