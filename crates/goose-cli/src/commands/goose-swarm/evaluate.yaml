@@ -27,6 +27,8 @@ instructions: |
     {% endif %}
   {% endfor %}
 
+  Some PRs may have been exploratory or experiments, or even alternative implementations to choose from.  
+
   Your evaluation should:
   1. Review if the PRs collectively address the original issue requirements
   2. Identify any gaps or missing functionality
@@ -47,6 +49,8 @@ instructions: |
   - Are there any bugs or edge cases not handled?
   - Would additional testing, documentation, or optimization be valuable?
 
+  You have access to the gh cli to take actions.
+
 prompt: |
   Please evaluate the following completed work for GitHub issue #{{ issue_number }}:
 
@@ -62,6 +66,13 @@ prompt: |
   {% endfor %}
 
   Review these PRs and determine if the original issue has been fully addressed.
-  If additional work is needed, create appropriate issue files in {{ work_dir }}/issues/ for follow-up.
   
-  Provide a summary of your evaluation and explain any new issues you're creating.
+  Actions, using the gh cli: 
+  * If a PR is successful and suitable based on the critieria described, you may merge it. 
+  * If it is not, you must close it.
+  NOTE: Some PRs may be exploratory and informative, you must close them. 
+  NOTE: In some cases there may be several PRs which appear to be duplicate implementations, in this case, choose the best one, merge it, and always close the others. 
+
+  CRITICAL: you should end up closing all these PRs one way or another (merging or not). 
+
+  IMPORTANT: If after all this, it is clear additional work is needed, create appropriate issue files in {{ work_dir }}/issues/ for follow-up.
