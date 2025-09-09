@@ -12,7 +12,7 @@
         <id>https://block.github.io/goose/pr-preview/pr-4578/blog/2025/09/08/turn-any-mcp-server-mcp-ui-compatible</id>
         <link href="https://block.github.io/goose/pr-preview/pr-4578/blog/2025/09/08/turn-any-mcp-server-mcp-ui-compatible"/>
         <updated>2025-09-08T00:00:00.000Z</updated>
-        <summary type="html"><![CDATA[How an engineering team is trialling autonomous AI-powered technical debt cleanup]]></summary>
+        <summary type="html"><![CDATA[How I made Cloudinary and Filesystem MCP servers MCP-UI compatible with just a few lines of code.]]></summary>
         <content type="html"><![CDATA[<p><a href="https://mcpui.dev/guide/introduction" target="_blank" rel="noopener noreferrer">MCP-UI</a> isn’t fully rolled out yet, but to me that’s what makes it so fun to play with. We’re at this point where the spec is still taking shape, clients are only partially supporting it, and yet… you can already do a lot.</p>
 <p>I wanted to see how far I could push it. So I grabbed two open source MCP servers, <a href="https://github.com/felores/cloudinary-mcp-server" target="_blank" rel="noopener noreferrer">Cloudinary</a> and <a href="https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem" target="_blank" rel="noopener noreferrer">Filesystem</a>, and gave them a UI. Instead of boring text, I now get rich, interactive interfaces right inside goose.</p>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="why-i-wanted-this">Why I Wanted This<a href="https://block.github.io/goose/pr-preview/pr-4578/blog/2025/09/08/turn-any-mcp-server-mcp-ui-compatible#why-i-wanted-this" class="hash-link" aria-label="Direct link to Why I Wanted This" title="Direct link to Why I Wanted This">​</a></h2>
