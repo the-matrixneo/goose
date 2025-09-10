@@ -1,8 +1,7 @@
-use super::utils::verify_secret_key;
 use crate::state::AppState;
 use axum::{
     extract::{DefaultBodyLimit, State},
-    http::{self, HeaderMap, StatusCode},
+    http::{self, StatusCode},
     response::IntoResponse,
     routing::post,
     Json, Router,
@@ -168,11 +167,8 @@ async fn stream_event(
 
 async fn reply_handler(
     State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
     Json(request): Json<ChatRequest>,
 ) -> Result<SseResponse, StatusCode> {
-    verify_secret_key(&headers, &state)?;
-
     let session_start = std::time::Instant::now();
 
     tracing::info!(
@@ -313,7 +309,11 @@ async fn reply_handler(
                             }
 
                             all_messages.push(message.clone());
-                            stream_event(MessageEvent::Message { message }, &tx, &cancel_token).await;
+
+                            // Only send message to client if it's user_visible
+                            if message.is_user_visible() {
+                                stream_event(MessageEvent::Message { message }, &tx, &cancel_token).await;
+                            }
                         }
                         Ok(Some(Ok(AgentEvent::HistoryReplaced(new_messages)))) => {
                             // Replace the message history with the compacted messages
@@ -457,11 +457,8 @@ fn default_principal_type() -> PrincipalType {
 )]
 pub async fn confirm_permission(
     State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
     Json(request): Json<PermissionConfirmationRequest>,
 ) -> Result<Json<Value>, StatusCode> {
-    verify_secret_key(&headers, &state)?;
-
     let agent = state.get_agent().await;
     let permission = match request.action.as_str() {
         "always_allow" => Permission::AlwaysAllow,
@@ -492,11 +489,8 @@ struct ToolResultRequest {
 
 async fn submit_tool_result(
     State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
     raw: Json<Value>,
 ) -> Result<Json<Value>, StatusCode> {
-    verify_secret_key(&headers, &state)?;
-
     tracing::info!(
         "Received tool result request: {}",
         serde_json::to_string_pretty(&raw.0).unwrap()
@@ -590,7 +584,7 @@ mod tests {
             });
             let agent = Agent::new();
             let _ = agent.update_provider(mock_provider).await;
-            let state = AppState::new(Arc::new(agent), "test-secret".to_string());
+            let state = AppState::new(Arc::new(agent));
 
             let app = routes(state);
 

@@ -34,7 +34,13 @@ function parseLastModified(val: string | Date): Date {
  * Get the storage directory path for recipes
  */
 export function getStorageDirectory(isGlobal: boolean): string {
-  return isGlobal ? '~/.config/goose/recipes' : '.goose/recipes';
+  if (isGlobal) {
+    return '~/.config/goose/recipes';
+  } else {
+    // For directory recipes, build absolute path using working directory
+    const workingDir = window.appConfig.get('GOOSE_WORKING_DIR') as string;
+    return `${workingDir}/.goose/recipes`;
+  }
 }
 
 /**
@@ -43,37 +49,6 @@ export function getStorageDirectory(isGlobal: boolean): string {
 function getRecipeFilePath(recipeName: string, isGlobal: boolean): string {
   const dir = getStorageDirectory(isGlobal);
   return `${dir}/${recipeName}.yaml`;
-}
-
-/**
- * Load recipe from file
- */
-async function loadRecipeFromFile(
-  recipeName: string,
-  isGlobal: boolean
-): Promise<SavedRecipe | null> {
-  const filePath = getRecipeFilePath(recipeName, isGlobal);
-
-  try {
-    const result = await window.electron.readFile(filePath);
-    if (!result.found || result.error) {
-      return null;
-    }
-
-    const recipeData = yaml.parse(result.file) as SavedRecipe;
-
-    // Convert lastModified string to Date if needed
-    recipeData.lastModified = parseLastModified(recipeData.lastModified);
-
-    return {
-      ...recipeData,
-      isGlobal: isGlobal,
-      filename: recipeName,
-    };
-  } catch (error) {
-    console.warn(`Failed to load recipe from ${filePath}:`, error);
-    return null;
-  }
 }
 
 /**
@@ -134,34 +109,6 @@ export async function saveRecipe(recipe: Recipe, options: SaveRecipeOptions): Pr
   } catch (error) {
     throw new Error(
       `Failed to save recipe: ${error instanceof Error ? error.message : 'Unknown error'}`
-    );
-  }
-}
-
-/**
- * Load a recipe by name from file.
- */
-export async function loadRecipe(recipeName: string, isGlobal: boolean): Promise<Recipe> {
-  try {
-    const savedRecipe = await loadRecipeFromFile(recipeName, isGlobal);
-
-    if (!savedRecipe) {
-      throw new Error('Recipe not found');
-    }
-
-    // Validate the loaded recipe has required fields
-    if (!savedRecipe.recipe.title || !savedRecipe.recipe.description) {
-      throw new Error('Loaded recipe is missing required fields');
-    }
-
-    if (!savedRecipe.recipe.instructions && !savedRecipe.recipe.prompt) {
-      throw new Error('Loaded recipe must have either instructions or prompt');
-    }
-
-    return savedRecipe.recipe;
-  } catch (error) {
-    throw new Error(
-      `Failed to load recipe: ${error instanceof Error ? error.message : 'Unknown error'}`
     );
   }
 }
