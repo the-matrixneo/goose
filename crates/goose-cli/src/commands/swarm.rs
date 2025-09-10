@@ -6,13 +6,19 @@ use crate::commands::goose_swarm::repo::{
     get_task_issue_numbers, is_issue_claimed, register_node, remove_help_wanted_label,
     unclaim_issue, GitHubIssue,
 };
-use crate::recipes::extract_from_cli::extract_recipe_info_from_cli;
 use crate::session::{build_session, SessionBuilderConfig};
 use anyhow::{Context, Result};
 use clap::Args;
+use std::fs;
+use std::path::Path;
 use std::process::Command;
 use std::thread;
 use std::time::Duration;
+
+// Embed recipe YAML files at compile time
+const PLAN_WORK_RECIPE: &str = include_str!("goose_swarm/plan_work.yaml");
+const SWARM_DRONE_RECIPE: &str = include_str!("goose_swarm/swarm_drone.yaml");
+const EVALUATE_RECIPE: &str = include_str!("goose_swarm/evaluate.yaml");
 
 /// Orchestrate parallel work on GitHub issues using swarm intelligence
 #[derive(Args, Debug)]
@@ -40,17 +46,69 @@ enum WorkType {
     None,                  // No work available
 }
 
-/// Generate a unique worker ID
+/// Generate a unique worker ID with fun names
 fn generate_worker_id() -> String {
-    let timestamp = chrono::Utc::now().format("%m%d");
-    let random_suffix: String = (0..4)
-        .map(|_| {
-            let idx = rand::random::<usize>() % 26;
-            (b'a' + idx as u8) as char
-        })
-        .collect();
+    // Fun adjectives for the first word
+    let adjectives = [
+        "happy", "brave", "clever", "swift", "mighty", "gentle", "bright", "eager", "noble",
+        "bold", "wise", "keen", "quick", "sharp", "calm", "cool", "smart", "lucky", "proud",
+        "strong", "wild", "free", "grand", "true", "fair", "kind", "warm", "neat", "glad", "busy",
+        "spry", "jolly",
+    ];
 
-    format!("thing-{}-{}", timestamp, random_suffix)
+    // Fun nouns for the last word
+    let nouns = [
+        "fox", "owl", "bee", "cat", "dog", "bat", "ant", "elk", "emu", "jay", "hawk", "wolf",
+        "bear", "lion", "deer", "duck", "crow", "dove", "fish", "frog", "goat", "hare", "moth",
+        "newt", "orca", "puma", "quail", "raven", "seal", "swan", "toad", "vole", "wasp", "yak",
+        "lynx", "mole", "otter",
+    ];
+
+    let adj_idx = rand::random::<usize>() % adjectives.len();
+    let noun_idx = rand::random::<usize>() % nouns.len();
+    let timestamp = chrono::Utc::now().format("%m%d");
+
+    format!("{}-{}-{}", adjectives[adj_idx], timestamp, nouns[noun_idx])
+}
+
+/// Load or generate worker ID, persisting it to .node-id file
+fn get_or_create_worker_id(provided_id: Option<String>) -> Result<String> {
+    // If explicitly provided, use that
+    if let Some(id) = provided_id {
+        return Ok(id);
+    }
+
+    // Check for .node-id file in current directory
+    let node_id_path = Path::new(".node-id");
+
+    if node_id_path.exists() {
+        // Try to read existing ID
+        match fs::read_to_string(node_id_path) {
+            Ok(contents) => {
+                let id = contents.trim().to_string();
+                if !id.is_empty() {
+                    println!("📎 Loaded worker ID from .node-id: {}", id);
+                    return Ok(id);
+                }
+            }
+            Err(e) => {
+                println!("⚠️ Failed to read .node-id: {}", e);
+            }
+        }
+    }
+
+    // Generate new ID
+    let new_id = generate_worker_id();
+
+    // Try to save it
+    if let Err(e) = fs::write(node_id_path, &new_id) {
+        println!("⚠️ Failed to save .node-id: {}", e);
+        println!("   Worker ID will be regenerated on next run");
+    } else {
+        println!("💾 Saved worker ID to .node-id for future runs");
+    }
+
+    Ok(new_id)
 }
 
 /// Detect available work
@@ -222,6 +280,7 @@ fn process_evaluation_issues(repo: &str, parent_issue: u32, issues_dir: &str) ->
 }
 
 /// Execute planning work
+#[allow(clippy::too_many_lines)]
 async fn execute_planning_work(repo: &str, issue: &GitHubIssue, worker_id: &str) -> Result<()> {
     println!(
         "📋 Working on planning issue #{}: {}",
@@ -272,11 +331,8 @@ async fn execute_planning_work(repo: &str, issue: &GitHubIssue, worker_id: &str)
     }
 
     // Run the planning recipe to create tasks
-    let recipe_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("src/commands/goose-swarm/plan_work.yaml");
-
     println!("🎯 Running planning recipe to break down the issue...");
-    run_recipe(recipe_path, params).await?;
+    run_recipe(PLAN_WORK_RECIPE, params).await?;
 
     // Process task files in tasks/ directory
     process_task_files(repo, issue.number, &tasks_dir)?;
@@ -345,37 +401,44 @@ async fn execute_planning_work(repo: &str, issue: &GitHubIssue, worker_id: &str)
             ];
 
             // Run the evaluate recipe
-            let eval_recipe_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .join("src/commands/goose-swarm/evaluate.yaml");
-
             println!("🔮 Running evaluation recipe...");
-            run_recipe(eval_recipe_path.clone(), eval_params.clone()).await?;
+            run_recipe(EVALUATE_RECIPE, eval_params.clone()).await?;
 
             // Process any new issues created by evaluate recipe
             process_evaluation_issues(repo, issue.number, &eval_issues_dir)?;
 
             // Check if all PRs are closed/merged
             let remaining_open_prs = check_open_prs(repo, &task_issue_numbers)?;
-            
+
             if !remaining_open_prs.is_empty() {
-                println!("⚠️ {} PR(s) still open after evaluation. Running evaluation once more...", remaining_open_prs.len());
-                
+                println!(
+                    "⚠️ {} PR(s) still open after evaluation. Running evaluation once more...",
+                    remaining_open_prs.len()
+                );
+
                 // Run evaluation one more time to give it a chance to address open PRs
-                run_recipe(eval_recipe_path, eval_params).await?;
-                
+                run_recipe(EVALUATE_RECIPE, eval_params).await?;
+
                 // Process any new issues from second evaluation
                 process_evaluation_issues(repo, issue.number, &eval_issues_dir)?;
-                
+
                 // Check PRs again
                 let final_open_prs = check_open_prs(repo, &task_issue_numbers)?;
-                
+
                 if !final_open_prs.is_empty() {
-                    println!("📝 {} PR(s) still open. Closing them now...", final_open_prs.len());
-                    
+                    println!(
+                        "📝 {} PR(s) still open. Closing them now...",
+                        final_open_prs.len()
+                    );
+
                     // Close all remaining open PRs
                     for pr in final_open_prs {
                         if let Some(pr_num) = pr.get("number").and_then(|n| n.as_u64()) {
-                            close_pr(repo, pr_num, "Automatically closed by Goose Swarm after evaluation phase.")?;
+                            close_pr(
+                                repo,
+                                pr_num,
+                                "Automatically closed by Goose Swarm after evaluation phase.",
+                            )?;
                         }
                     }
                 }
@@ -434,10 +497,7 @@ async fn execute_task_work(repo: &str, issue: &GitHubIssue, worker_id: &str) -> 
     }
 
     // Run the worker recipe
-    let recipe_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("src/commands/goose-swarm/swarm_drone.yaml");
-
-    run_recipe(recipe_path, params).await?;
+    run_recipe(SWARM_DRONE_RECIPE, params).await?;
 
     // Check if still on main branch (indicates failure)
     let output = Command::new("git")
@@ -467,13 +527,46 @@ async fn execute_task_work(repo: &str, issue: &GitHubIssue, worker_id: &str) -> 
 }
 
 /// Run a recipe with given parameters
-async fn run_recipe(recipe_path: std::path::PathBuf, params: Vec<(String, String)>) -> Result<()> {
-    // Extract recipe info and build input config
-    let (input_config, recipe_info) = extract_recipe_info_from_cli(
-        recipe_path.to_string_lossy().to_string(),
-        params,
-        Vec::new(),
-    )?;
+async fn run_recipe(recipe_content: &str, params: Vec<(String, String)>) -> Result<()> {
+    // Parse the YAML content directly
+    let recipe: goose::recipe::Recipe =
+        serde_yaml::from_str(recipe_content).context("Failed to parse recipe YAML")?;
+
+    // Build the prompt from recipe template and parameters
+    let prompt = if let Some(mut template) = recipe.prompt.clone() {
+        for (key, value) in &params {
+            let placeholder = format!("{{{{ {} }}}}", key);
+            template = template.replace(&placeholder, value);
+        }
+        template
+    } else {
+        return Err(anyhow::anyhow!("Recipe does not have a prompt template"));
+    };
+
+    // Convert recipe Settings to SessionSettings
+    let session_settings = recipe
+        .settings
+        .clone()
+        .map(|s| crate::session::SessionSettings {
+            goose_provider: s.goose_provider,
+            goose_model: s.goose_model,
+            temperature: s.temperature,
+        });
+
+    // Create input config from the recipe
+    let input_config = crate::cli::InputConfig {
+        contents: Some(prompt),
+        extensions_override: recipe.extensions.clone(),
+        additional_system_prompt: None,
+    };
+
+    // Create recipe info from the recipe
+    let recipe_info = crate::cli::RecipeInfo {
+        session_settings,
+        sub_recipes: recipe.sub_recipes.clone(),
+        final_output_response: recipe.response.clone(),
+        retry_config: recipe.retry.clone(),
+    };
 
     // Build and run the session
     let mut session = build_session(SessionBuilderConfig {
@@ -512,7 +605,7 @@ async fn run_recipe(recipe_path: std::path::PathBuf, params: Vec<(String, String
 }
 
 pub async fn run(args: SwarmArgs) -> Result<()> {
-    let worker_id = args.worker_id.unwrap_or_else(generate_worker_id);
+    let worker_id = get_or_create_worker_id(args.worker_id)?;
 
     println!("🐝 Starting Goose Swarm");
     println!("📍 Repository: {}", args.repo);

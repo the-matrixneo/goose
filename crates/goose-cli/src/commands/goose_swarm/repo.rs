@@ -62,14 +62,13 @@ pub fn register_node(repo: &str, worker_id: &str) -> Result<()> {
             // Get the issue number we just created
             let url = String::from_utf8_lossy(&output.stdout);
             url.split('/')
-                .last()
+                .next_back()
                 .and_then(|s| s.trim().parse::<u32>().ok())
                 .context("Failed to parse issue number from URL")?
         } else {
             issues[0]["number"]
                 .as_u64()
-                .context("Failed to get issue number")?
-                as u32
+                .context("Failed to get issue number")? as u32
         }
     } else {
         return Err(anyhow::anyhow!("Failed to list issues"));
@@ -577,7 +576,7 @@ pub fn check_open_prs(repo: &str, task_issue_numbers: &[u32]) -> Result<Vec<serd
                 if pr.get("isDraft").and_then(|v| v.as_bool()).unwrap_or(false) {
                     continue;
                 }
-                
+
                 pr["task_issue"] = serde_json::json!(task_num);
 
                 // Avoid duplicates if a PR mentions multiple task issues
@@ -679,7 +678,12 @@ pub fn create_task_issue(repo: &str, parent_issue: u32, title: &str, content: &s
 }
 
 /// Create a planning issue from a file
-pub fn create_planning_issue(repo: &str, parent_issue: u32, title: &str, content: &str) -> Result<()> {
+pub fn create_planning_issue(
+    repo: &str,
+    parent_issue: u32,
+    title: &str,
+    content: &str,
+) -> Result<()> {
     // Make sure it doesn't have [task] prefix
     let final_title = if title.starts_with("[task]") {
         title.replace("[task]", "").trim().to_string()
@@ -780,7 +784,12 @@ pub fn close_planning_issue(repo: &str, issue_number: u32) -> Result<()> {
 }
 
 /// Create an evaluation issue
-pub fn create_evaluation_issue(repo: &str, parent_issue: u32, title: &str, content: &str) -> Result<()> {
+pub fn create_evaluation_issue(
+    repo: &str,
+    parent_issue: u32,
+    title: &str,
+    content: &str,
+) -> Result<()> {
     let body = format!("{}\n\nOriginal issue: #{}", content, parent_issue);
 
     // Create the new issue
@@ -819,6 +828,6 @@ pub fn add_help_wanted_label(repo: &str, issue_number: u32) -> Result<()> {
     if output.status.success() {
         println!("🔄 Re-added 'help wanted' label for another worker to try");
     }
-    
+
     Ok(())
 }
