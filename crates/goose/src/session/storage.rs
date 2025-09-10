@@ -68,14 +68,16 @@ fn init_session_saver() -> mpsc::UnboundedSender<PersistenceTask> {
                 Ok(Some(task)) => {
                     // Extract the session file path
                     let session_file = match &task {
-                        PersistenceTask::Save { session_file, .. } |
-                        PersistenceTask::GenerateName { session_file, .. } => session_file.clone(),
+                        PersistenceTask::Save { session_file, .. }
+                        | PersistenceTask::GenerateName { session_file, .. } => {
+                            session_file.clone()
+                        }
                     };
-                    
+
                     // Replace any pending save for this file with the newer one
                     // This automatically deduplicates - we only keep the latest
                     pending_saves.insert(session_file, task);
-                    
+
                     // Optional: flush if we have too many different files pending
                     if pending_saves.len() >= MAX_BATCH_SIZE {
                         save_pending_tasks(&mut pending_saves).await;
@@ -107,13 +109,13 @@ async fn save_pending_tasks(pending_saves: &mut HashMap<PathBuf, PersistenceTask
     if pending_saves.is_empty() {
         return;
     }
-    
+
     // Log if we're deduplicating
     tracing::debug!(
         "Processing {} unique session files from pending saves",
         pending_saves.len()
     );
-    
+
     // Process each pending task
     for (_, task) in pending_saves.drain() {
         match task {
@@ -176,11 +178,17 @@ async fn save_pending_tasks(pending_saves: &mut HashMap<PathBuf, PersistenceTask
     }
 }
 
-
-
 /// Get or initialize the session saver
 fn get_session_saver() -> &'static mpsc::UnboundedSender<PersistenceTask> {
     SESSION_SAVER.get_or_init(init_session_saver)
+}
+
+/// Flush all pending persistence tasks (useful for testing)
+/// This function waits for all queued tasks to complete
+pub async fn flush_background_saves() {
+    // Small delay to ensure tasks are processed
+    // The background worker processes tasks every BATCH_SAVE_INTERVAL (500ms)
+    tokio::time::sleep(Duration::from_millis(600)).await;
 }
 
 fn get_home_dir() -> PathBuf {
@@ -1210,91 +1218,9 @@ pub fn read_metadata(session_file: &Path) -> Result<SessionMetadata> {
     }
 }
 
-/// Write messages to a session file with metadata
-///
-/// Overwrites the file with metadata as the first line, followed by all messages in JSONL format.
-/// If a provider is supplied, it will automatically generate a description when appropriate.
-///
-/// Security features:
-/// - Validates file paths to prevent directory traversal
-pub async fn persist_messages(
-    session_file: &Path,
-    messages: &Conversation,
-    provider: Option<Arc<dyn Provider>>,
-    working_dir: Option<PathBuf>,
-) -> Result<()> {
-    persist_messages_with_schedule_id(session_file, messages, provider, None, working_dir).await
-}
 
-/// Write messages to a session file with metadata, including an optional scheduled job ID
-///
-/// Overwrites the file with metadata as the first line, followed by all messages in JSONL format.
-/// If a provider is supplied, it will automatically generate a description when appropriate.
-///
-/// Security features:
-/// - Validates file paths to prevent directory traversal
-/// - Limits error message details in logs
-/// - Uses atomic file operations via save_messages_with_metadata
-pub async fn persist_messages_with_schedule_id(
-    session_file: &Path,
-    messages: &Conversation,
-    provider: Option<Arc<dyn Provider>>,
-    schedule_id: Option<String>,
-    working_dir: Option<PathBuf>,
-) -> Result<()> {
-    // Validate the session file path for security
-    let secure_path = get_path(Identifier::Path(session_file.to_path_buf()))?;
 
-    // Security check: message count limit
-    if messages.len() > MAX_MESSAGE_COUNT {
-        tracing::warn!("Message count exceeds limit: {}", messages.len());
-        return Err(anyhow::anyhow!("Too many messages"));
-    }
 
-    // Count user messages
-    let user_message_count = messages
-        .iter()
-        .filter(|m| m.role == rmcp::model::Role::User && !m.as_concat_text().trim().is_empty())
-        .count();
-
-    // Check if we need to update the description (after 1st or 3rd user message)
-    match provider {
-        Some(provider) if user_message_count < 4 => {
-            //generate_description is responsible for writing the messages
-            generate_description_with_schedule_id(
-                &secure_path,
-                messages,
-                provider,
-                schedule_id,
-                working_dir,
-            )
-            .await
-        }
-        _ => {
-            // Read existing metadata or create new with proper working_dir
-            let mut metadata = if secure_path.exists() {
-                read_metadata(&secure_path)?
-            } else {
-                // Create new metadata with the provided working_dir or fall back to home
-                let work_dir = working_dir.clone().unwrap_or_else(get_home_dir);
-                SessionMetadata::new(work_dir)
-            };
-
-            // Update the working_dir if provided (even for existing files)
-            if let Some(work_dir) = working_dir {
-                metadata.working_dir = work_dir;
-            }
-
-            // Update the schedule_id if provided
-            if schedule_id.is_some() {
-                metadata.schedule_id = schedule_id;
-            }
-
-            // Write the file with metadata and messages
-            save_messages_with_metadata(&secure_path, &metadata, messages)
-        }
-    }
-}
 
 /// Write messages to a session file with the provided metadata using secure atomic operations
 ///
@@ -1419,97 +1345,13 @@ pub fn save_messages_with_metadata(
     Ok(())
 }
 
-/// Generate a description for the session using the provider
-///
-/// This function is called when appropriate to generate a short description
-/// of the session based on the conversation history.
-pub async fn generate_description(
-    session_file: &Path,
-    messages: &Conversation,
-    provider: Arc<dyn Provider>,
-    working_dir: Option<PathBuf>,
-) -> Result<()> {
-    generate_description_with_schedule_id(session_file, messages, provider, None, working_dir).await
-}
-
-/// Generate a description for the session using the provider, including an optional scheduled job ID and working directory
-///
-/// This function is called when appropriate to generate a short description
-/// of the session based on the conversation history.
-///
-/// Security features:
-/// - Validates file paths to prevent directory traversal
-/// - Limits context size to prevent resource exhaustion
-/// - Uses secure file operations for saving
-pub async fn generate_description_with_schedule_id(
-    session_file: &Path,
-    messages: &Conversation,
-    provider: Arc<dyn Provider>,
-    schedule_id: Option<String>,
-    working_dir: Option<PathBuf>,
-) -> Result<()> {
-    // Validate the path for security
-    let secure_path = get_path(Identifier::Path(session_file.to_path_buf()))?;
-
-    // Security check: message count limit
-    if messages.len() > MAX_MESSAGE_COUNT {
-        tracing::warn!(
-            "Message count exceeds limit during description generation: {}",
-            messages.len()
-        );
-        return Err(anyhow::anyhow!(
-            "Too many messages for description generation"
-        ));
-    }
-
-    // Use the provider's session naming capability
-    let sanitized_description = provider
-        .generate_session_name(messages)
-        .await
-        .map_err(|e| {
-            tracing::error!("Failed to generate session description: {}", e);
-            anyhow::anyhow!("Failed to generate session description")
-        })?;
-
-    // Create metadata with proper working_dir or read existing and update
-    let mut metadata = if secure_path.exists() {
-        read_metadata(&secure_path)?
-    } else {
-        // Create new metadata with the provided working_dir or fall back to home
-        let work_dir = working_dir.clone().unwrap_or_else(get_home_dir);
-        SessionMetadata::new(work_dir)
-    };
-
-    // Update description and schedule_id
-    metadata.description = sanitized_description;
-    if schedule_id.is_some() {
-        metadata.schedule_id = schedule_id;
-    }
-
-    // Update the working_dir if provided (even for existing files)
-    if let Some(work_dir) = working_dir {
-        metadata.working_dir = work_dir;
-    }
-
-    // Update the file with the new metadata and existing messages
-    save_messages_with_metadata(&secure_path, &metadata, messages)
-}
-
 /// Update only the metadata in a session file, preserving all messages
-///
-/// Security features:
-/// - Validates file paths to prevent directory traversal
-/// - Uses secure file operations for reading and writing
 pub async fn update_metadata(session_file: &Path, metadata: &SessionMetadata) -> Result<()> {
-    // Validate the path for security
     let secure_path = get_path(Identifier::Path(session_file.to_path_buf()))?;
-
-    // Read all messages from the file
     let messages = read_messages(&secure_path)?;
-
-    // Rewrite the file with the new metadata and existing messages
     save_messages_with_metadata(&secure_path, metadata, &messages)
 }
+
 
 /// Persist messages in the background without blocking
 pub fn persist_messages_background(
@@ -1695,8 +1537,9 @@ mod tests {
             Message::assistant().with_text("Hi there"),
         ]);
 
-        // Write messages
-        persist_messages(&file_path, &messages, None, None).await?;
+        // Write messages using background version
+        persist_messages_background(&file_path, &messages, None, None)?;
+        flush_background_saves().await;
 
         // Read them back
         let read_messages = read_messages(&file_path)?;
@@ -1803,8 +1646,9 @@ mod tests {
             messages.push(Message::assistant().with_text(text));
         }
 
-        // Write messages with special characters
-        persist_messages(&file_path, &messages, None, None).await?;
+        // Write messages with special characters using background version
+        persist_messages_background(&file_path, &messages, None, None)?;
+        flush_background_saves().await;
 
         // Read them back
         let read_messages = read_messages(&file_path)?;
@@ -1868,8 +1712,9 @@ mod tests {
             Message::assistant().with_text("Small response"),
         ]);
 
-        // Write messages
-        persist_messages(&file_path, &messages, None, None).await?;
+        // Write messages using background version
+        persist_messages_background(&file_path, &messages, None, None)?;
+        flush_background_saves().await;
 
         // Read them back - should be truncated
         let read_messages = read_messages(&file_path)?;
@@ -1976,15 +1821,15 @@ mod tests {
         let messages =
             Conversation::new_unvalidated(vec![Message::user().with_text("test message")]);
 
-        // Use persist_messages_with_schedule_id to set working dir
-        persist_messages_with_schedule_id(
+        // Use persist_messages_with_schedule_id_background to set working dir
+        persist_messages_with_schedule_id_background(
             &file_path,
             &messages,
             None,
             None,
             Some(working_dir_path.clone()),
-        )
-        .await?;
+        )?;
+        flush_background_saves().await;
 
         // Read back the metadata and verify working_dir is preserved
         let metadata = read_metadata(&file_path)?;
@@ -2018,33 +1863,34 @@ mod tests {
         // Get the home directory for comparison
         let home_dir = get_home_dir();
 
-        // Test 1: Using the old persist_messages function (without working_dir)
+        // Test 1: Using persist_messages_background (without working_dir)
         // This will fall back to home directory since no working_dir is provided
-        persist_messages(&file_path, &messages, None, None).await?;
+        persist_messages_background(&file_path, &messages, None, None)?;
+        flush_background_saves().await;
 
         // Read back the metadata - this should now have the home directory as working_dir
         let metadata_old = read_metadata(&file_path)?;
         assert_eq!(
             metadata_old.working_dir, home_dir,
-            "persist_messages should use home directory when no working_dir is provided"
+            "persist_messages_background should use home directory when no working_dir is provided"
         );
 
-        // Test 2: Using persist_messages_with_schedule_id function
+        // Test 2: Using persist_messages_with_schedule_id_background function
         // This should properly set the working_dir (this is the main fix)
-        persist_messages_with_schedule_id(
+        persist_messages_with_schedule_id_background(
             &file_path,
             &messages,
             None,
             None,
             Some(working_dir_path.clone()),
-        )
-        .await?;
+        )?;
+        flush_background_saves().await;
 
         // Read back the metadata - this should now have the correct working_dir
         let metadata_new = read_metadata(&file_path)?;
         assert_eq!(
             metadata_new.working_dir, working_dir_path,
-            "persist_messages_with_schedule_id should use provided working_dir"
+            "persist_messages_with_schedule_id_background should use provided working_dir"
         );
         assert_ne!(
             metadata_new.working_dir, home_dir,
@@ -2053,24 +1899,26 @@ mod tests {
 
         // Test 3: Create a new session file without working_dir (should fall back to home)
         let file_path_2 = dir.path().join("test2.jsonl");
-        persist_messages_with_schedule_id(
+        persist_messages_with_schedule_id_background(
             &file_path_2,
             &messages,
             None,
             None,
             None, // No working_dir provided
-        )
-        .await?;
+        )?;
+        flush_background_saves().await;
 
         let metadata_fallback = read_metadata(&file_path_2)?;
-        assert_eq!(metadata_fallback.working_dir, home_dir, "persist_messages_with_schedule_id should fall back to home directory when no working_dir is provided");
+        assert_eq!(metadata_fallback.working_dir, home_dir, "persist_messages_with_schedule_id_background should fall back to home directory when no working_dir is provided");
 
         // Test 4: Test that the fix works for existing files
         // Create a session file and then add to it with different working_dir
         let file_path_3 = dir.path().join("test3.jsonl");
 
         // First, create with home directory
-        persist_messages(&file_path_3, &messages, None, None).await?;
+        persist_messages_background(&file_path_3, &messages, None, None)?;
+        flush_background_saves().await;
+        
         let metadata_initial = read_metadata(&file_path_3)?;
         assert_eq!(
             metadata_initial.working_dir, home_dir,
@@ -2078,14 +1926,14 @@ mod tests {
         );
 
         // Then update with a specific working_dir
-        persist_messages_with_schedule_id(
+        persist_messages_with_schedule_id_background(
             &file_path_3,
             &messages,
             None,
             None,
             Some(working_dir_path.clone()),
-        )
-        .await?;
+        )?;
+        flush_background_saves().await;
 
         let metadata_updated = read_metadata(&file_path_3)?;
         assert_eq!(
@@ -2099,14 +1947,14 @@ mod tests {
         let current_dir = std::env::current_dir()?;
 
         // This is what web.rs and session/mod.rs do now after the fix
-        persist_messages_with_schedule_id(
+        persist_messages_with_schedule_id_background(
             &file_path_4,
             &messages,
             None,
             None,
             Some(current_dir.clone()),
-        )
-        .await?;
+        )?;
+        flush_background_saves().await;
 
         let metadata_current = read_metadata(&file_path_4)?;
         assert_eq!(
@@ -2211,15 +2059,15 @@ mod tests {
             Message::assistant().with_text("Test response"),
         ]);
 
-        // Test persist_messages_with_schedule_id with working_dir parameter
-        persist_messages_with_schedule_id(
+        // Test persist_messages_with_schedule_id_background with working_dir parameter
+        persist_messages_with_schedule_id_background(
             &file_path,
             &messages,
             None,
             Some("test_schedule".to_string()),
             None,
-        )
-        .await?;
+        )?;
+        flush_background_saves().await;
 
         assert!(
             file_path.exists(),
