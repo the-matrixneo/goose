@@ -9,6 +9,9 @@ async fn main() -> Result<()> {
 
     let result = cli().await;
 
+    // Ensure all background saves complete before exiting
+    goose::session::shutdown_background_saves().await;
+
     // Only wait for telemetry flush if OTLP is configured
     let should_wait = goose::config::Config::global()
         .get_param::<String>("otel_exporter_otlp_endpoint")

@@ -48,6 +48,7 @@ enum PersistenceTask {
         metadata: Box<SessionMetadata>,
         provider: Arc<dyn Provider>,
     },
+    Shutdown,
 }
 
 /// Global background persistence worker
@@ -66,12 +67,23 @@ fn init_session_saver() -> mpsc::UnboundedSender<PersistenceTask> {
             // Wait for tasks with a timeout to periodically flush pending saves
             match tokio::time::timeout(BATCH_SAVE_INTERVAL, rx.recv()).await {
                 Ok(Some(task)) => {
+                    // Handle shutdown request
+                    if matches!(task, PersistenceTask::Shutdown) {
+                        tracing::debug!("Background saver received shutdown signal");
+                        // Process all pending saves before shutting down
+                        if !pending_saves.is_empty() {
+                            save_pending_tasks(&mut pending_saves).await;
+                        }
+                        break;
+                    }
+
                     // Extract the session file path
                     let session_file = match &task {
                         PersistenceTask::Save { session_file, .. }
                         | PersistenceTask::GenerateName { session_file, .. } => {
                             session_file.clone()
                         }
+                        PersistenceTask::Shutdown => unreachable!(),
                     };
 
                     // Replace any pending save for this file with the newer one
@@ -174,6 +186,10 @@ async fn save_pending_tasks(pending_saves: &mut HashMap<PathBuf, PersistenceTask
                     }
                 }
             }
+            PersistenceTask::Shutdown => {
+                // This shouldn't happen in the drain loop but handle it anyway
+                tracing::debug!("Unexpected Shutdown task in pending saves");
+            }
         }
     }
 }
@@ -189,6 +205,18 @@ pub async fn flush_background_saves() {
     // Small delay to ensure tasks are processed
     // The background worker processes tasks every BATCH_SAVE_INTERVAL (500ms)
     tokio::time::sleep(Duration::from_millis(600)).await;
+}
+
+/// Shutdown the background persistence worker and wait for all pending saves to complete
+pub async fn shutdown_background_saves() {
+    if let Some(sender) = SESSION_SAVER.get() {
+        // Send shutdown signal
+        let _ = sender.send(PersistenceTask::Shutdown);
+
+        // Wait for the background task to complete
+        // The worker will process all pending saves before shutting down
+        tokio::time::sleep(Duration::from_millis(700)).await;
+    }
 }
 
 fn get_home_dir() -> PathBuf {
@@ -1218,10 +1246,6 @@ pub fn read_metadata(session_file: &Path) -> Result<SessionMetadata> {
     }
 }
 
-
-
-
-
 /// Write messages to a session file with the provided metadata using secure atomic operations
 ///
 /// This function uses atomic file operations to prevent corruption:
@@ -1351,7 +1375,6 @@ pub async fn update_metadata(session_file: &Path, metadata: &SessionMetadata) ->
     let messages = read_messages(&secure_path)?;
     save_messages_with_metadata(&secure_path, metadata, &messages)
 }
-
 
 /// Persist messages in the background without blocking
 pub fn persist_messages_background(
@@ -1918,7 +1941,7 @@ mod tests {
         // First, create with home directory
         persist_messages_background(&file_path_3, &messages, None, None)?;
         flush_background_saves().await;
-        
+
         let metadata_initial = read_metadata(&file_path_3)?;
         assert_eq!(
             metadata_initial.working_dir, home_dir,

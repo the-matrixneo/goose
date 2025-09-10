@@ -535,7 +535,11 @@ impl Session {
                         }
                     }
                 }
-                input::InputResult::Exit => break,
+                input::InputResult::Exit => {
+                    // Flush any pending saves before exiting
+                    self.flush_saves().await;
+                    break;
+                }
                 input::InputResult::AddExtension(cmd) => {
                     save_history(&mut editor);
 
@@ -1680,6 +1684,23 @@ impl Session {
 
     fn push_message(&mut self, message: Message) {
         self.messages.push(message);
+    }
+
+    /// Flush pending saves to ensure all messages are persisted
+    async fn flush_saves(&self) {
+        // Call the shutdown function to ensure all pending saves complete
+        session::shutdown_background_saves().await;
+    }
+}
+
+impl Drop for Session {
+    fn drop(&mut self) {
+        // Note: Background saves are handled by calling shutdown_background_saves()
+        // in main.rs after cli() completes. We can't block on async operations
+        // here because Drop might be called from within an async context.
+        //
+        // The explicit /exit and /quit commands call flush_saves() directly,
+        // and the main function ensures cleanup for other exit paths.
     }
 }
 
