@@ -50,7 +50,15 @@ instructions: |
   - Are there any bugs or edge cases not handled?
   - Would additional testing, documentation, or optimization be valuable?
 
-  You have access to the gh cli to take actions.
+  Techniques and important tips: 
+  - Use gh cli to view diffs of each PR to help evaluate them. 
+  - Only when necessary: If you need to shallow clone to a temp location to take a closer look you can, but avoid if large.
+  - Consider results of checks and tests as well as input as to what the change is doing (you don't need to run tests or code, you are judging what should be working solutions)
+  - Use sub-agents to scale your work when evaluating many or complex PRs.
+
+  You have access to the gh cli to take actions (merging or closing PRs)
+
+
 
 prompt: |
   Please evaluate the following completed work for GitHub issue #{{ issue_number }}:
