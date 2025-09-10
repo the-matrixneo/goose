@@ -265,6 +265,7 @@ export default function GooseMessage({
                 toolResponsesMap={toolResponsesMap}
                 messageHistoryIndex={messageHistoryIndex}
                 isStreaming={isStreaming}
+                append={append}
               />
             ) : !messageChain ? (
               <div className="relative flex flex-col w-full">

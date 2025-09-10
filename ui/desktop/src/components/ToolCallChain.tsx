@@ -1,4 +1,6 @@
 import { formatMessageTimestamp } from '../utils/timeUtils';
+import React from 'react';
+
 import { Message, getToolRequests } from '../types/message';
 import { NotificationEvent } from '../hooks/useMessageStream';
 import ToolCallWithResponse from './ToolCallWithResponse';
@@ -19,7 +21,7 @@ export default function ToolCallChain({
   toolResponsesMap,
   messageHistoryIndex,
   isStreaming = false,
-}: ToolCallChainProps) {
+}: ToolCallChainProps & { append?: (value: string) => void }) {
   const lastMessageIndex = chainIndices[chainIndices.length - 1];
   const lastMessage = messages[lastMessageIndex];
   const timestamp = lastMessage ? formatMessageTimestamp(lastMessage.created) : '';
@@ -42,6 +44,7 @@ export default function ToolCallChain({
                 toolResponse={toolResponsesMap.get(toolRequest.id)}
                 notifications={toolCallNotifications.get(toolRequest.id)}
                 isStreamingMessage={isStreaming}
+                append={append}
               />
             </div>
           ));
