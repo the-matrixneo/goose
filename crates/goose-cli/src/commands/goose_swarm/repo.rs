@@ -762,3 +762,174 @@ pub fn add_help_wanted_label(repo: &str, issue_number: u32) -> Result<()> {
 
     Ok(())
 }
+
+/// Add "in progress" label to issue (creates if doesn't exist)
+pub fn add_in_progress_label(repo: &str, issue_number: u32) -> Result<()> {
+    // First check if label exists
+    let output = Command::new("gh")
+        .args(["label", "list", "--repo", repo, "--search", "in progress"])
+        .output()
+        .context("Failed to check labels")?;
+
+    if output.status.success() {
+        let labels = String::from_utf8_lossy(&output.stdout);
+        if !labels.contains("in progress") {
+            // Create the label
+            Command::new("gh")
+                .args([
+                    "label",
+                    "create",
+                    "in progress",
+                    "--repo",
+                    repo,
+                    "--color",
+                    "0E8A16",  // Green color
+                    "--description",
+                    "Work is actively being done on this issue",
+                ])
+                .output()
+                .context("Failed to create 'in progress' label")?;
+            println!("✅ Created 'in progress' label");
+        }
+    }
+
+    // Add label to issue
+    let output = Command::new("gh")
+        .args([
+            "issue",
+            "edit",
+            &issue_number.to_string(),
+            "--repo",
+            repo,
+            "--add-label",
+            "in progress",
+        ])
+        .output()
+        .context("Failed to add 'in progress' label")?;
+
+    if output.status.success() {
+        println!("✅ Added 'in progress' label to issue #{}", issue_number);
+    }
+
+    Ok(())
+}
+
+/// Remove "in progress" label from issue
+pub fn remove_in_progress_label(repo: &str, issue_number: u32) -> Result<()> {
+    let output = Command::new("gh")
+        .args([
+            "issue",
+            "edit",
+            &issue_number.to_string(),
+            "--repo",
+            repo,
+            "--remove-label",
+            "in progress",
+        ])
+        .output()
+        .context("Failed to remove 'in progress' label")?;
+
+    if output.status.success() {
+        println!("✅ Removed 'in progress' label from issue #{}", issue_number);
+    }
+
+    Ok(())
+}
+
+/// Get issues with "in progress" label
+pub fn get_in_progress_issues(repo: &str) -> Result<Vec<u32>> {
+    let output = Command::new("gh")
+        .args([
+            "issue",
+            "list",
+            "--repo",
+            repo,
+            "--label",
+            "in progress",
+            "--state",
+            "open",
+            "--json",
+            "number",
+        ])
+        .output()
+        .context("Failed to list issues with 'in progress' label")?;
+
+    if !output.status.success() {
+        return Ok(Vec::new());
+    }
+
+    let issues: Vec<serde_json::Value> = serde_json::from_slice(&output.stdout)?;
+    let issue_numbers: Vec<u32> = issues
+        .iter()
+        .filter_map(|issue| issue["number"].as_u64().map(|n| n as u32))
+        .collect();
+
+    Ok(issue_numbers)
+}
+
+/// Remove all Goose claims from issue (planner, drone, evaluator)
+pub fn remove_all_goose_claims(repo: &str, issue_number: u32) -> Result<()> {
+    // Get current issue body
+    let output = Command::new("gh")
+        .args([
+            "issue",
+            "view",
+            &issue_number.to_string(),
+            "--repo",
+            repo,
+            "--json",
+            "body",
+            "--jq",
+            ".body",
+        ])
+        .output()
+        .context("Failed to get issue body")?;
+
+    if !output.status.success() {
+        let error = String::from_utf8_lossy(&output.stderr);
+        return Err(anyhow::anyhow!("Failed to get issue body: {}", error));
+    }
+
+    let current_body = String::from_utf8_lossy(&output.stdout);
+    
+    // Remove all Goose claim sections (including the details blocks)
+    let mut in_goose_section = false;
+    let mut new_lines = Vec::new();
+    
+    for line in current_body.lines() {
+        if line.contains("<details><summary>Goose ") {
+            in_goose_section = true;
+            continue;
+        }
+        if in_goose_section && line.contains("</details>") {
+            in_goose_section = false;
+            continue;
+        }
+        if !in_goose_section {
+            new_lines.push(line);
+        }
+    }
+    
+    let new_body = new_lines.join("\n").trim().to_string();
+
+    // Update issue body
+    let output = Command::new("gh")
+        .args([
+            "issue",
+            "edit",
+            &issue_number.to_string(),
+            "--repo",
+            repo,
+            "--body",
+            &new_body,
+        ])
+        .output()
+        .context("Failed to update issue body")?;
+
+    if !output.status.success() {
+        let error = String::from_utf8_lossy(&output.stderr);
+        return Err(anyhow::anyhow!("Failed to remove claims from issue: {}", error));
+    }
+
+    Ok(())
+}

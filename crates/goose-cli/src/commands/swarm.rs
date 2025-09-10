@@ -1,9 +1,11 @@
 use crate::commands::goose_swarm::repo::{
-    add_help_wanted_label, check_open_prs_for_issue, claim_issue, close_planning_issue, close_pr,
-    close_task_issues, count_available_nodes, create_evaluation_issue, create_planning_issue,
-    create_task_issue, get_all_issues, get_help_wanted_issues, get_issue_context,
-    get_prs_for_issue, get_ready_prs_for_issue, is_issue_claimed, register_node,
-    remove_help_wanted_label, unclaim_issue, GitHubIssue,
+    add_help_wanted_label, add_in_progress_label, check_open_prs_for_issue, claim_issue,
+    close_planning_issue, close_pr, close_task_issues, count_available_nodes,
+    create_evaluation_issue, create_planning_issue, create_task_issue, get_all_issues,
+    get_help_wanted_issues, get_in_progress_issues, get_issue_context,
+    get_ready_prs_for_issue, get_task_issue_numbers, is_issue_claimed, register_node,
+    remove_all_goose_claims, remove_help_wanted_label, remove_in_progress_label, unclaim_issue,
+    GitHubIssue,
 };
 use crate::session::{build_session, SessionBuilderConfig};
 use anyhow::{Context, Result};
@@ -41,9 +43,10 @@ pub struct SwarmArgs {
 
 #[derive(Debug)]
 enum WorkType {
-    Planning(GitHubIssue), // Planning issue that needs breakdown
-    Task(GitHubIssue),     // Task ready to execute
-    None,                  // No work available
+    Planning(GitHubIssue),   // Planning issue that needs breakdown
+    Task(GitHubIssue),       // Task ready to execute
+    Evaluation(GitHubIssue), // Issue ready for evaluation (has all PRs)
+    None,                    // No work available
 }
 
 /// Generate a unique worker ID with fun names
@@ -111,9 +114,39 @@ fn get_or_create_worker_id(provided_id: Option<String>) -> Result<String> {
     Ok(new_id)
 }
 
-/// Detect available work
+/// Detect available work - prioritizes tasks, then evaluation, then planning work
 fn detect_work_type(repo: &str) -> Result<WorkType> {
-    // Get all help wanted issues
+    // First check for issues ready for evaluation (in progress with all PRs ready)
+    let in_progress = get_in_progress_issues(repo)?;
+    
+    if !in_progress.is_empty() {
+        // Get full details for all issues to check them
+        let all_issues = get_all_issues(repo)?;
+        
+        for issue_num in in_progress {
+            // Skip if already claimed
+            if is_issue_claimed(repo, issue_num)? {
+                continue;
+            }
+            
+            // Get the task issues for this parent issue
+            let task_issues = get_task_issue_numbers(repo, issue_num)?;
+            
+            if !task_issues.is_empty() {
+                // Check if all tasks have ready PRs
+                let ready_prs = get_ready_prs_for_issue(repo, issue_num)?;
+                
+                if ready_prs.len() >= task_issues.len() {
+                    // All tasks have PRs - ready for evaluation
+                    if let Some(issue) = all_issues.iter().find(|i| i.number == issue_num) {
+                        return Ok(WorkType::Evaluation(issue.clone()));
+                    }
+                }
+            }
+        }
+    }
+    
+    // Now check for help wanted issues (tasks and planning)
     let help_wanted = get_help_wanted_issues(repo)?;
 
     if help_wanted.is_empty() {
@@ -122,6 +155,10 @@ fn detect_work_type(repo: &str) -> Result<WorkType> {
 
     // Get full details for all issues to classify them
     let all_issues = get_all_issues(repo)?;
+
+    // Collect available work, separating tasks and planning issues
+    let mut available_tasks = Vec::new();
+    let mut available_planning = Vec::new();
 
     for issue_num in help_wanted {
         // Skip if already claimed
@@ -138,13 +175,24 @@ fn detect_work_type(repo: &str) -> Result<WorkType> {
                 // Determine role based on title prefix
                 if issue.title.starts_with("[task]") {
                     // Task issue = drone/worker role
-                    return Ok(WorkType::Task(issue.clone()));
+                    available_tasks.push(issue.clone());
                 } else {
                     // Non-task issue with help wanted = planner role
-                    return Ok(WorkType::Planning(issue.clone()));
+                    available_planning.push(issue.clone());
                 }
             }
         }
+    }
+
+    // Prioritize tasks over planning work
+    if !available_tasks.is_empty() {
+        // Return the first available task
+        return Ok(WorkType::Task(available_tasks.into_iter().next().unwrap()));
+    }
+
+    if !available_planning.is_empty() {
+        // Return the first available planning issue
+        return Ok(WorkType::Planning(available_planning.into_iter().next().unwrap()));
     }
 
     Ok(WorkType::None)
@@ -368,120 +416,143 @@ async fn execute_planning_work(repo: &str, issue: &GitHubIssue, worker_id: &str)
         return Ok(());
     }
 
+    println!("📊 Created {} task issues.", task_count);
+    
+    // Add "in progress" label to mark that tasks are being worked on
+    add_in_progress_label(repo, issue.number)?;
+    
+    // Remove the planner claim so evaluator can pick it up later
+    remove_all_goose_claims(repo, issue.number)?;
+    
+    println!("✅ Planning complete. Issue marked as 'in progress' for evaluation when PRs are ready.");
+    
+    Ok(())
+}
+
+/// Execute evaluation work for issues with all PRs ready
+async fn execute_evaluation_work(repo: &str, issue: &GitHubIssue, worker_id: &str) -> Result<()> {
     println!(
-        "📊 Created {} task issues. Now polling for PRs...",
+        "🔮 Ready to evaluate issue #{}: {}",
+        issue.number, issue.title
+    );
+    
+    // Remove "in progress" label first
+    remove_in_progress_label(repo, issue.number)?;
+    
+    // Random pause to avoid race conditions (1-30 seconds)
+    let wait_seconds = rand::thread_rng().gen_range(1..=30);
+    println!(
+        "⏸️  Waiting {} seconds before claiming as evaluator...",
+        wait_seconds
+    );
+    thread::sleep(Duration::from_secs(wait_seconds));
+    
+    // Check if someone else claimed it while we were waiting
+    if is_issue_claimed(repo, issue.number)? {
+        println!(
+            "⚠️ Issue #{} was claimed by another evaluator while waiting. Skipping.",
+            issue.number
+        );
+        return Ok(()); // Exit gracefully, will look for more work
+    }
+    
+    // Claim the issue as evaluator
+    claim_issue(repo, issue.number, worker_id, "evaluator")?;
+    
+    // Get full issue context
+    let context = get_issue_context(repo, issue.number)?;
+    
+    // Get the task issues and count
+    let task_issues = get_task_issue_numbers(repo, issue.number)?;
+    let task_count = task_issues.len();
+    
+    // Get ready PRs
+    let ready_prs = get_ready_prs_for_issue(repo, issue.number)?;
+    
+    println!(
+        "📊 Evaluating {} PRs for {} tasks",
+        ready_prs.len(),
         task_count
     );
-
-    // Poll for PRs to come in (they reference the original issue)
-    println!("📝 Tracking PRs for original issue #{}", issue.number);
-
-    // Poll for PRs to come in
-    loop {
-        let all_prs = get_prs_for_issue(repo, issue.number)?;
-        let ready_prs = get_ready_prs_for_issue(repo, issue.number)?;
-
-        println!("🔍 Found {} PR(s) addressing the issue", all_prs.len());
+    
+    // Prepare context for evaluation
+    let pr_context = serde_json::to_string_pretty(&ready_prs)?;
+    
+    // Create evaluation working directory with issues/ subdirectory
+    let home_dir = std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
+        .context("Failed to get home directory")?;
+    let eval_work_dir = format!(
+        "{}/.local/share/goose-swarm/eval-work-{}",
+        home_dir, issue.number
+    );
+    let eval_issues_dir = format!("{}/issues", eval_work_dir);
+    std::fs::create_dir_all(&eval_issues_dir)
+        .context("Failed to create evaluation issues directory")?;
+    
+    // Build parameters for evaluate recipe
+    let eval_params = vec![
+        ("repo".to_string(), repo.to_string()),
+        ("issue_number".to_string(), issue.number.to_string()),
+        ("worker_id".to_string(), worker_id.to_string()),
+        ("issue_context".to_string(), context),
+        ("pr_context".to_string(), pr_context),
+        ("task_count".to_string(), task_count.to_string()),
+        ("work_dir".to_string(), eval_work_dir.clone()),
+    ];
+    
+    // Run the evaluate recipe
+    println!("🔮 Running evaluation recipe...");
+    run_recipe(EVALUATE_RECIPE, eval_params.clone()).await?;
+    
+    // Process any new issues created by evaluate recipe
+    process_evaluation_issues(repo, issue.number, &eval_issues_dir)?;
+    
+    // Check if all PRs are closed/merged
+    let remaining_open_prs = check_open_prs_for_issue(repo, issue.number)?;
+    
+    if !remaining_open_prs.is_empty() {
         println!(
-            "   📋 {} non-draft PR(s) ready for evaluation",
-            ready_prs.len()
+            "⚠️ {} PR(s) still open after evaluation. Running evaluation once more...",
+            remaining_open_prs.len()
         );
-
-        // Show draft PRs for visibility
-        let draft_count = all_prs.len() - ready_prs.len();
-        if draft_count > 0 {
-            println!("   📝 {} PR(s) still in draft", draft_count);
-        }
-
-        // Check if we have enough ready PRs (at least one per task, non-draft)
-        if ready_prs.len() >= task_count {
-            println!("✅ All tasks have ready PRs (non-draft). Running evaluation...");
-
-            // Prepare context for evaluation (include all PRs for context, but evaluation focuses on ready ones)
-            let pr_context = serde_json::to_string_pretty(&ready_prs)?;
-
-            // Create evaluation working directory with issues/ subdirectory
-            let eval_work_dir = format!(
-                "{}/.local/share/goose-swarm/eval-work-{}",
-                home_dir, issue.number
+        
+        // Run evaluation one more time to give it a chance to address open PRs
+        run_recipe(EVALUATE_RECIPE, eval_params).await?;
+        
+        // Process any new issues from second evaluation
+        process_evaluation_issues(repo, issue.number, &eval_issues_dir)?;
+        
+        // Check PRs again
+        let final_open_prs = check_open_prs_for_issue(repo, issue.number)?;
+        
+        if !final_open_prs.is_empty() {
+            println!(
+                "📝 {} PR(s) still open. Closing them now...",
+                final_open_prs.len()
             );
-            let eval_issues_dir = format!("{}/issues", eval_work_dir);
-            std::fs::create_dir_all(&eval_issues_dir)
-                .context("Failed to create evaluation issues directory")?;
-
-            // Build parameters for evaluate recipe
-            let eval_params = vec![
-                ("repo".to_string(), repo.to_string()),
-                ("issue_number".to_string(), issue.number.to_string()),
-                ("worker_id".to_string(), worker_id.to_string()),
-                ("issue_context".to_string(), context),
-                ("pr_context".to_string(), pr_context),
-                ("task_count".to_string(), task_count.to_string()),
-                ("work_dir".to_string(), eval_work_dir.clone()),
-            ];
-
-            // Run the evaluate recipe
-            println!("🔮 Running evaluation recipe...");
-            run_recipe(EVALUATE_RECIPE, eval_params.clone()).await?;
-
-            // Process any new issues created by evaluate recipe
-            process_evaluation_issues(repo, issue.number, &eval_issues_dir)?;
-
-            // Check if all PRs are closed/merged
-            let remaining_open_prs = check_open_prs_for_issue(repo, issue.number)?;
-
-            if !remaining_open_prs.is_empty() {
-                println!(
-                    "⚠️ {} PR(s) still open after evaluation. Running evaluation once more...",
-                    remaining_open_prs.len()
-                );
-
-                // Run evaluation one more time to give it a chance to address open PRs
-                run_recipe(EVALUATE_RECIPE, eval_params).await?;
-
-                // Process any new issues from second evaluation
-                process_evaluation_issues(repo, issue.number, &eval_issues_dir)?;
-
-                // Check PRs again
-                let final_open_prs = check_open_prs_for_issue(repo, issue.number)?;
-
-                if !final_open_prs.is_empty() {
-                    println!(
-                        "📝 {} PR(s) still open. Closing them now...",
-                        final_open_prs.len()
-                    );
-
-                    // Close all remaining open PRs
-                    for pr in final_open_prs {
-                        if let Some(pr_num) = pr.get("number").and_then(|n| n.as_u64()) {
-                            close_pr(
-                                repo,
-                                pr_num,
-                                "Automatically closed by Goose Swarm after evaluation phase.",
-                            )?;
-                        }
-                    }
+            
+            // Close all remaining open PRs
+            for pr in final_open_prs {
+                if let Some(pr_num) = pr.get("number").and_then(|n| n.as_u64()) {
+                    close_pr(
+                        repo,
+                        pr_num,
+                        "Automatically closed by Goose Swarm after evaluation phase.",
+                    )?;
                 }
             }
-
-            // Close all task issues that were created
-            close_task_issues(repo, issue.number)?;
-
-            // Close the original planning issue
-            close_planning_issue(repo, issue.number)?;
-
-            break;
         }
-
-        // Wait before polling again
-        println!(
-            "⏳ Waiting for more ready PRs... ({}/{} ready)",
-            ready_prs.len(),
-            task_count
-        );
-        thread::sleep(Duration::from_secs(60)); // Poll every minute
     }
-
+    
+    // Close all task issues that were created
+    close_task_issues(repo, issue.number)?;
+    
+    // Close the original planning issue
+    close_planning_issue(repo, issue.number)?;
+    
+    println!("✅ Evaluation complete. Issue #{} closed.", issue.number);
+    
     Ok(())
 }
 
@@ -686,6 +757,11 @@ pub async fn run(args: SwarmArgs) -> Result<()> {
             WorkType::Task(issue) => {
                 execute_task_work(&args.repo, &issue, &worker_id).await?;
                 println!("✅ Completed task work");
+                // Continue polling for more work
+            }
+            WorkType::Evaluation(issue) => {
+                execute_evaluation_work(&args.repo, &issue, &worker_id).await?;
+                println!("✅ Completed evaluation work");
                 // Continue polling for more work
             }
             WorkType::None => {
