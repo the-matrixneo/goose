@@ -612,32 +612,6 @@ pub fn close_pr(repo: &str, pr_number: u64, comment: &str) -> Result<()> {
     Ok(())
 }
 
-/// Count task issues created from a planning issue
-pub fn count_task_issues(repo: &str, parent_issue: u32) -> Result<usize> {
-    let output = Command::new("gh")
-        .args([
-            "issue",
-            "list",
-            "--repo",
-            repo,
-            "--search",
-            &format!("\"for:#{}\" in:body \"[task]\" in:title", parent_issue),
-            "--state",
-            "all",
-            "--json",
-            "number",
-        ])
-        .output()
-        .context("Failed to count task issues")?;
-
-    if output.status.success() {
-        let issues: Vec<serde_json::Value> = serde_json::from_slice(&output.stdout)?;
-        Ok(issues.len())
-    } else {
-        Ok(0)
-    }
-}
-
 /// Create a task issue from a file
 pub fn create_task_issue(repo: &str, parent_issue: u32, title: &str, content: &str) -> Result<()> {
     // Add [task] prefix if not present

@@ -1,10 +1,9 @@
 use crate::commands::goose_swarm::repo::{
     add_help_wanted_label, check_open_prs, claim_issue, close_planning_issue, close_pr,
-    close_task_issues, count_available_nodes, count_task_issues, create_evaluation_issue,
-    create_planning_issue, create_task_issue, get_all_issues, get_help_wanted_issues,
-    get_issue_context, get_original_issue_id, get_prs_for_tasks, get_ready_prs_for_tasks,
-    get_task_issue_numbers, is_issue_claimed, register_node, remove_help_wanted_label,
-    unclaim_issue, GitHubIssue,
+    close_task_issues, count_available_nodes, create_evaluation_issue, create_planning_issue,
+    create_task_issue, get_all_issues, get_help_wanted_issues, get_issue_context,
+    get_original_issue_id, get_prs_for_tasks, get_ready_prs_for_tasks, get_task_issue_numbers,
+    is_issue_claimed, register_node, remove_help_wanted_label, unclaim_issue, GitHubIssue,
 };
 use crate::session::{build_session, SessionBuilderConfig};
 use anyhow::{Context, Result};
@@ -198,8 +197,10 @@ fn prepare_workspace(repo: &str) -> Result<String> {
 }
 
 /// Process task files in tasks/ directory to create [task] issues
-fn process_task_files(repo: &str, parent_issue: u32, tasks_dir: &str) -> Result<()> {
+/// Returns the number of task issues created
+fn process_task_files(repo: &str, parent_issue: u32, tasks_dir: &str) -> Result<usize> {
     let entries = std::fs::read_dir(tasks_dir).context("Failed to read tasks directory")?;
+    let mut task_count = 0;
 
     for entry in entries {
         let entry = entry?;
@@ -217,10 +218,11 @@ fn process_task_files(repo: &str, parent_issue: u32, tasks_dir: &str) -> Result<
                 .trim();
 
             create_task_issue(repo, parent_issue, title, &content)?;
+            task_count += 1;
         }
     }
 
-    Ok(())
+    Ok(task_count)
 }
 
 /// Process issue files in issues/ directory to create non-task issues
@@ -334,14 +336,13 @@ async fn execute_planning_work(repo: &str, issue: &GitHubIssue, worker_id: &str)
     println!("🎯 Running planning recipe to break down the issue...");
     run_recipe(PLAN_WORK_RECIPE, params).await?;
 
-    // Process task files in tasks/ directory
-    process_task_files(repo, issue.number, &tasks_dir)?;
+    // Process task files in tasks/ directory and get the count
+    let task_count = process_task_files(repo, issue.number, &tasks_dir)?;
 
     // Process issue files in issues/ directory
     process_issue_files(repo, issue.number, &issues_dir)?;
 
-    // Count how many task issues were created
-    let task_count = count_task_issues(repo, issue.number)?;
+    // Check if any task issues were created
     if task_count == 0 {
         println!("⚠️ No task issues were created. Planning may have failed.");
         return Ok(());
