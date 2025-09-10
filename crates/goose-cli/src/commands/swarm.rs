@@ -1,8 +1,15 @@
+use crate::commands::goose_swarm::repo::{
+    add_help_wanted_label, check_open_prs, claim_issue, close_planning_issue, close_pr,
+    close_task_issues, count_available_nodes, count_task_issues, create_evaluation_issue,
+    create_planning_issue, create_task_issue, get_all_issues, get_help_wanted_issues,
+    get_issue_context, get_original_issue_id, get_prs_for_tasks, get_ready_prs_for_tasks,
+    get_task_issue_numbers, is_issue_claimed, register_node, remove_help_wanted_label,
+    unclaim_issue, GitHubIssue,
+};
 use crate::recipes::extract_from_cli::extract_recipe_info_from_cli;
 use crate::session::{build_session, SessionBuilderConfig};
 use anyhow::{Context, Result};
 use clap::Args;
-use serde::{Deserialize, Serialize};
 use std::process::Command;
 use std::thread;
 use std::time::Duration;
@@ -26,45 +33,11 @@ pub struct SwarmArgs {
     pub poll_interval: u64,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct GitHubIssue {
-    number: u32,
-    title: String,
-    body: Option<String>,
-    labels: Vec<GitHubLabel>,
-    state: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct GitHubLabel {
-    name: String,
-}
-
 #[derive(Debug)]
 enum WorkType {
     Planning(GitHubIssue), // Planning issue that needs breakdown
     Task(GitHubIssue),     // Task ready to execute
     None,                  // No work available
-}
-
-impl Clone for GitHubIssue {
-    fn clone(&self) -> Self {
-        GitHubIssue {
-            number: self.number,
-            title: self.title.clone(),
-            body: self.body.clone(),
-            labels: self.labels.clone(),
-            state: self.state.clone(),
-        }
-    }
-}
-
-impl Clone for GitHubLabel {
-    fn clone(&self) -> Self {
-        GitHubLabel {
-            name: self.name.clone(),
-        }
-    }
 }
 
 /// Generate a unique worker ID
@@ -78,206 +51,6 @@ fn generate_worker_id() -> String {
         .collect();
 
     format!("thing-{}-{}", timestamp, random_suffix)
-}
-
-/// Register node in the goose swarm issue
-fn register_node(repo: &str, worker_id: &str) -> Result<()> {
-    // First, check if a goose swarm issue exists
-    let output = Command::new("gh")
-        .args([
-            "issue",
-            "list",
-            "--repo",
-            repo,
-            "--search",
-            "#gooseswarm",
-            "--json",
-            "number,title,body",
-        ])
-        .output()
-        .context("Failed to search for goose swarm issue")?;
-
-    let issues: Vec<serde_json::Value> = if output.status.success() {
-        serde_json::from_slice(&output.stdout)?
-    } else {
-        Vec::new()
-    };
-
-    let node_entry = format!("goose:node:{}", worker_id);
-
-    if let Some(issue) = issues.first() {
-        // Issue exists, update it with our node ID
-        let issue_number = issue["number"]
-            .as_u64()
-            .ok_or_else(|| anyhow::anyhow!("Invalid issue number"))?;
-
-        let current_body = issue["body"].as_str().unwrap_or("").to_string();
-
-        // Check if we're already registered
-        if current_body.contains(&node_entry) {
-            println!("✅ Node already registered in swarm issue");
-            return Ok(());
-        }
-
-        // Add our node entry
-        let new_body = if current_body.is_empty() {
-            node_entry
-        } else {
-            format!("{}\n{}", current_body, node_entry)
-        };
-
-        Command::new("gh")
-            .args([
-                "issue",
-                "edit",
-                &issue_number.to_string(),
-                "--repo",
-                repo,
-                "--body",
-                &new_body,
-            ])
-            .output()
-            .context("Failed to update goose swarm issue")?;
-
-        println!("📝 Registered node {} in existing swarm issue", worker_id);
-    } else {
-        // Create new goose swarm issue
-        Command::new("gh")
-            .args([
-                "issue",
-                "create",
-                "--repo",
-                repo,
-                "--title",
-                "#gooseswarm",
-                "--body",
-                &node_entry,
-            ])
-            .output()
-            .context("Failed to create goose swarm issue")?;
-
-        println!(
-            "📝 Created goose swarm issue and registered node {}",
-            worker_id
-        );
-    }
-
-    Ok(())
-}
-
-/// Count available drone nodes from the goose swarm issue
-fn count_available_nodes(repo: &str) -> Result<usize> {
-    let output = Command::new("gh")
-        .args([
-            "issue",
-            "list",
-            "--repo",
-            repo,
-            "--search",
-            "#gooseswarm",
-            "--json",
-            "body",
-            "--jq",
-            ".[0].body",
-        ])
-        .output()
-        .context("Failed to get goose swarm issue")?;
-
-    if output.status.success() {
-        let body = String::from_utf8_lossy(&output.stdout);
-        let node_count = body
-            .lines()
-            .filter(|line| line.trim().starts_with("goose:node:"))
-            .count();
-
-        // Subtract 1 for the current node (planner)
-        Ok(node_count.saturating_sub(1))
-    } else {
-        Ok(0)
-    }
-}
-
-/// Get help wanted issues
-fn get_help_wanted_issues(repo: &str) -> Result<Vec<u32>> {
-    let output = Command::new("gh")
-        .args([
-            "issue",
-            "list",
-            "--repo",
-            repo,
-            "--label",
-            "help wanted",
-            "--state",
-            "open",
-            "--json",
-            "number",
-            "--jq",
-            ".[].number",
-        ])
-        .output()
-        .context("Failed to list help wanted issues")?;
-
-    if !output.status.success() {
-        return Ok(Vec::new());
-    }
-
-    let numbers_str = String::from_utf8_lossy(&output.stdout);
-    let numbers: Vec<u32> = numbers_str
-        .lines()
-        .filter_map(|line| line.trim().parse().ok())
-        .collect();
-
-    Ok(numbers)
-}
-
-/// Get all open issues
-fn get_all_issues(repo: &str) -> Result<Vec<GitHubIssue>> {
-    let output = Command::new("gh")
-        .args([
-            "issue",
-            "list",
-            "--repo",
-            repo,
-            "--state",
-            "open",
-            "--json",
-            "number,title,body,labels",
-            "--limit",
-            "100",
-        ])
-        .output()
-        .context("Failed to list issues")?;
-
-    if !output.status.success() {
-        let error = String::from_utf8_lossy(&output.stderr);
-        return Err(anyhow::anyhow!("Failed to list issues: {}", error));
-    }
-
-    let issues: Vec<GitHubIssue> = serde_json::from_slice(&output.stdout)?;
-    Ok(issues)
-}
-
-/// Check if issue is already claimed by checking for goose:swarm: in body
-fn is_issue_claimed(repo: &str, issue_number: u32) -> Result<bool> {
-    let output = Command::new("gh")
-        .args([
-            "issue",
-            "view",
-            &issue_number.to_string(),
-            "--repo",
-            repo,
-            "--json",
-            "body",
-        ])
-        .output()
-        .context("Failed to get issue body")?;
-
-    if output.status.success() {
-        let content = String::from_utf8_lossy(&output.stdout);
-        return Ok(content.contains("goose:swarm:"));
-    }
-
-    Ok(false)
 }
 
 /// Detect available work
@@ -317,208 +90,6 @@ fn detect_work_type(repo: &str) -> Result<WorkType> {
     }
 
     Ok(WorkType::None)
-}
-
-/// Remove help wanted label from an issue
-fn remove_help_wanted_label(repo: &str, issue_number: u32) -> Result<()> {
-    let output = Command::new("gh")
-        .args([
-            "issue",
-            "edit",
-            &issue_number.to_string(),
-            "--repo",
-            repo,
-            "--remove-label",
-            "help wanted",
-        ])
-        .output()
-        .context("Failed to remove help wanted label")?;
-
-    if !output.status.success() {
-        // It's okay if the label wasn't there
-        let error = String::from_utf8_lossy(&output.stderr);
-        if !error.contains("does not have label") {
-            return Err(anyhow::anyhow!("Failed to remove label: {}", error));
-        }
-    }
-
-    Ok(())
-}
-
-/// Remove claim from issue body
-fn unclaim_issue(repo: &str, issue_number: u32, worker_id: &str) -> Result<()> {
-    // Get current issue body
-    let output = Command::new("gh")
-        .args([
-            "issue",
-            "view",
-            &issue_number.to_string(),
-            "--repo",
-            repo,
-            "--json",
-            "body",
-            "--jq",
-            ".body",
-        ])
-        .output()
-        .context("Failed to get issue body")?;
-
-    if !output.status.success() {
-        let error = String::from_utf8_lossy(&output.stderr);
-        return Err(anyhow::anyhow!("Failed to get issue body: {}", error));
-    }
-
-    let current_body = String::from_utf8_lossy(&output.stdout);
-
-    // Remove the claim line for this worker
-    let claim_line_drone = format!("Claimed by: {} (Goose drone)", worker_id);
-    let claim_line_planner = format!("Claimed by: {} (Goose planner)", worker_id);
-
-    let new_body = current_body
-        .lines()
-        .filter(|line| !line.contains(&claim_line_drone) && !line.contains(&claim_line_planner))
-        .collect::<Vec<_>>()
-        .join("\n");
-
-    // Update issue body without the claim
-    let output = Command::new("gh")
-        .args([
-            "issue",
-            "edit",
-            &issue_number.to_string(),
-            "--repo",
-            repo,
-            "--body",
-            &new_body,
-        ])
-        .output()
-        .context("Failed to update issue body")?;
-
-    if !output.status.success() {
-        let error = String::from_utf8_lossy(&output.stderr);
-        return Err(anyhow::anyhow!("Failed to unclaim issue: {}", error));
-    }
-
-    Ok(())
-}
-
-/// Mark issue as claimed by adding worker ID to body with role-specific summary
-fn claim_issue(repo: &str, issue_number: u32, worker_id: &str, role: &str) -> Result<()> {
-    // Get current issue body
-    let output = Command::new("gh")
-        .args([
-            "issue",
-            "view",
-            &issue_number.to_string(),
-            "--repo",
-            repo,
-            "--json",
-            "body",
-            "--jq",
-            ".body",
-        ])
-        .output()
-        .context("Failed to get issue body")?;
-
-    let current_body = if output.status.success() {
-        String::from_utf8_lossy(&output.stdout).to_string()
-    } else {
-        String::new()
-    };
-
-    // Add worker ID marker with role-specific summary
-    let new_body = format!(
-        "{}\n<details><summary>Goose {}</summary>\n<p>\ngoose:swarm:{}</p>\n</details>",
-        current_body.trim(),
-        role,
-        worker_id
-    );
-
-    // Update issue body
-    let output = Command::new("gh")
-        .args([
-            "issue",
-            "edit",
-            &issue_number.to_string(),
-            "--repo",
-            repo,
-            "--body",
-            &new_body,
-        ])
-        .output()
-        .context("Failed to update issue body")?;
-
-    if !output.status.success() {
-        let error = String::from_utf8_lossy(&output.stderr);
-        return Err(anyhow::anyhow!("Failed to claim issue: {}", error));
-    }
-
-    println!(
-        "🏷️ Claimed issue #{} as {} with worker ID: {}",
-        issue_number, role, worker_id
-    );
-    Ok(())
-}
-
-/// Get issue context including body and comments using GraphQL
-fn get_issue_context(repo: &str, issue_number: u32) -> Result<String> {
-    let parts: Vec<&str> = repo.split('/').collect();
-    if parts.len() != 2 {
-        return Err(anyhow::anyhow!(
-            "Invalid repository format. Expected owner/repo"
-        ));
-    }
-
-    let query = format!(
-        r#"{{ repository(owner:"{}", name:"{}") {{ issue(number:{}) {{ title body comments(first:100) {{ nodes {{ body }} }} }} }} }}"#,
-        parts[0], parts[1], issue_number
-    );
-
-    let output = Command::new("gh")
-        .args([
-            "api",
-            "graphql",
-            "-f",
-            &format!("query={}", query),
-            "--jq",
-            r#".data.repository.issue | "Title: \(.title)\n\nBody:\n\(.body)\n\nComments:\n" + (.comments.nodes | map(.body) | join("\n---\n"))"#,
-        ])
-        .output()
-        .context("Failed to get issue context")?;
-
-    if !output.status.success() {
-        let error = String::from_utf8_lossy(&output.stderr);
-        return Err(anyhow::anyhow!("Failed to fetch issue details: {}", error));
-    }
-
-    Ok(String::from_utf8_lossy(&output.stdout).to_string())
-}
-
-/// Get original issue ID if this task references another issue
-fn get_original_issue_id(repo: &str, issue_number: u32) -> Result<Option<u32>> {
-    let output = Command::new("gh")
-        .args([
-            "issue",
-            "view",
-            &issue_number.to_string(),
-            "--repo",
-            repo,
-            "--json",
-            "body",
-            "--jq",
-            r##".body | scan("#([0-9]+)") | .[0]"##,
-        ])
-        .output()
-        .context("Failed to check for original issue")?;
-
-    if output.status.success() {
-        let id_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        if !id_str.is_empty() {
-            return Ok(id_str.parse().ok());
-        }
-    }
-
-    Ok(None)
 }
 
 /// Clone or refresh repository to workspace
@@ -568,174 +139,6 @@ fn prepare_workspace(repo: &str) -> Result<String> {
     Ok(workspace_dir)
 }
 
-/// Get task issue numbers created from a planning issue
-fn get_task_issue_numbers(repo: &str, parent_issue: u32) -> Result<Vec<u32>> {
-    let output = Command::new("gh")
-        .args([
-            "issue",
-            "list",
-            "--repo",
-            repo,
-            "--search",
-            &format!("\"for:#{}\" in:body \"[task]\" in:title", parent_issue),
-            "--state",
-            "all",
-            "--json",
-            "number",
-        ])
-        .output()
-        .context("Failed to get task issue numbers")?;
-
-    if output.status.success() {
-        let issues: Vec<serde_json::Value> = serde_json::from_slice(&output.stdout)?;
-        let numbers: Vec<u32> = issues
-            .iter()
-            .filter_map(|issue| issue["number"].as_u64().map(|n| n as u32))
-            .collect();
-        Ok(numbers)
-    } else {
-        Ok(Vec::new())
-    }
-}
-
-/// Get PRs that reference task issues (either in title or body)
-fn get_prs_for_tasks(repo: &str, task_issue_numbers: &[u32]) -> Result<Vec<serde_json::Value>> {
-    let mut all_prs = Vec::new();
-
-    // For each task issue, find PRs that reference it
-    for task_num in task_issue_numbers {
-        let output = Command::new("gh")
-            .args([
-                "pr",
-                "list",
-                "--repo",
-                repo,
-                "--search",
-                &format!("#{} in:body,title", task_num),
-                "--state",
-                "all",
-                "--json",
-                "number,title,url,state,body,isDraft",
-            ])
-            .output()
-            .context("Failed to get PRs for task")?;
-
-        if output.status.success() {
-            let prs: Vec<serde_json::Value> = serde_json::from_slice(&output.stdout)?;
-
-            // Add task_issue field to each PR so we know which task it addresses
-            for mut pr in prs {
-                pr["task_issue"] = serde_json::json!(task_num);
-
-                // Avoid duplicates if a PR mentions multiple task issues
-                let pr_number = pr["number"].as_u64();
-                if !all_prs
-                    .iter()
-                    .any(|p: &serde_json::Value| p["number"].as_u64() == pr_number)
-                {
-                    all_prs.push(pr);
-                }
-            }
-        }
-    }
-
-    Ok(all_prs)
-}
-
-/// Get non-draft PRs that are ready (open or closed/merged) for task issues
-fn get_ready_prs_for_tasks(
-    repo: &str,
-    task_issue_numbers: &[u32],
-) -> Result<Vec<serde_json::Value>> {
-    let all_prs = get_prs_for_tasks(repo, task_issue_numbers)?;
-
-    // Filter out draft PRs - we only want non-draft PRs (open, closed, or merged)
-    let ready_prs: Vec<serde_json::Value> = all_prs
-        .into_iter()
-        .filter(|pr| {
-            // Check if PR is not a draft
-            !pr.get("isDraft").and_then(|v| v.as_bool()).unwrap_or(false)
-        })
-        .collect();
-
-    Ok(ready_prs)
-}
-
-/// Check which PRs are still open for the task issues
-fn check_open_prs(repo: &str, task_issue_numbers: &[u32]) -> Result<Vec<serde_json::Value>> {
-    let mut open_prs = Vec::new();
-
-    // For each task issue, find open PRs that reference it
-    for task_num in task_issue_numbers {
-        let output = Command::new("gh")
-            .args([
-                "pr",
-                "list",
-                "--repo",
-                repo,
-                "--search",
-                &format!("#{} in:body,title", task_num),
-                "--state",
-                "open",
-                "--json",
-                "number,title,url,state,body,isDraft",
-            ])
-            .output()
-            .context("Failed to get open PRs for task")?;
-
-        if output.status.success() {
-            let prs: Vec<serde_json::Value> = serde_json::from_slice(&output.stdout)?;
-
-            // Add task_issue field and filter out drafts
-            for mut pr in prs {
-                // Skip draft PRs
-                if pr.get("isDraft").and_then(|v| v.as_bool()).unwrap_or(false) {
-                    continue;
-                }
-                
-                pr["task_issue"] = serde_json::json!(task_num);
-
-                // Avoid duplicates if a PR mentions multiple task issues
-                let pr_number = pr["number"].as_u64();
-                if !open_prs
-                    .iter()
-                    .any(|p: &serde_json::Value| p["number"].as_u64() == pr_number)
-                {
-                    open_prs.push(pr);
-                }
-            }
-        }
-    }
-
-    Ok(open_prs)
-}
-
-/// Count task issues created from a planning issue
-fn count_task_issues(repo: &str, parent_issue: u32) -> Result<usize> {
-    let output = Command::new("gh")
-        .args([
-            "issue",
-            "list",
-            "--repo",
-            repo,
-            "--search",
-            &format!("\"for:#{}\" in:body \"[task]\" in:title", parent_issue),
-            "--state",
-            "all",
-            "--json",
-            "number",
-        ])
-        .output()
-        .context("Failed to count task issues")?;
-
-    if output.status.success() {
-        let issues: Vec<serde_json::Value> = serde_json::from_slice(&output.stdout)?;
-        Ok(issues.len())
-    } else {
-        Ok(0)
-    }
-}
-
 /// Process task files in tasks/ directory to create [task] issues
 fn process_task_files(repo: &str, parent_issue: u32, tasks_dir: &str) -> Result<()> {
     let entries = std::fs::read_dir(tasks_dir).context("Failed to read tasks directory")?;
@@ -755,39 +158,7 @@ fn process_task_files(repo: &str, parent_issue: u32, tasks_dir: &str) -> Result<
                 .trim_start_matches('#')
                 .trim();
 
-            // Add [task] prefix if not present
-            let final_title = if title.starts_with("[task]") {
-                title.to_string()
-            } else {
-                format!("[task] {}", title)
-            };
-
-            // Add "for:#<parent>" to the body
-            let body_with_reference = format!("{}\n\nfor:#{}", content, parent_issue);
-
-            // Create the task issue
-            let output = Command::new("gh")
-                .args([
-                    "issue",
-                    "create",
-                    "--repo",
-                    repo,
-                    "--title",
-                    &final_title,
-                    "--body",
-                    &body_with_reference,
-                    "--label",
-                    "help wanted",
-                ])
-                .output()
-                .context("Failed to create task issue")?;
-
-            if output.status.success() {
-                println!("✅ Created task issue: {}", final_title);
-            } else {
-                let error = String::from_utf8_lossy(&output.stderr);
-                eprintln!("Failed to create task issue: {}", error);
-            }
+            create_task_issue(repo, parent_issue, title, &content)?;
         }
     }
 
@@ -813,83 +184,7 @@ fn process_issue_files(repo: &str, parent_issue: u32, issues_dir: &str) -> Resul
                 .trim_start_matches('#')
                 .trim();
 
-            // Make sure it doesn't have [task] prefix
-            let final_title = if title.starts_with("[task]") {
-                title.replace("[task]", "").trim().to_string()
-            } else {
-                title.to_string()
-            };
-
-            // Add "for:#<parent>" to the body
-            let body_with_reference = format!("{}\n\nfor:#{}", content, parent_issue);
-
-            // Create the issue (with help wanted for planning work)
-            let output = Command::new("gh")
-                .args([
-                    "issue",
-                    "create",
-                    "--repo",
-                    repo,
-                    "--title",
-                    &final_title,
-                    "--body",
-                    &body_with_reference,
-                    "--label",
-                    "help wanted",
-                ])
-                .output()
-                .context("Failed to create issue")?;
-
-            if output.status.success() {
-                println!("✅ Created planning issue: {}", final_title);
-            } else {
-                let error = String::from_utf8_lossy(&output.stderr);
-                eprintln!("Failed to create issue: {}", error);
-            }
-        }
-    }
-
-    Ok(())
-}
-
-/// Close all task issues created from a planning issue
-fn close_task_issues(repo: &str, parent_issue: u32) -> Result<()> {
-    // Find all task issues for this parent
-    let output = Command::new("gh")
-        .args([
-            "issue",
-            "list",
-            "--repo",
-            repo,
-            "--search",
-            &format!("\"for:#{}\" in:body \"[task]\" in:title", parent_issue),
-            "--state",
-            "open",
-            "--json",
-            "number",
-        ])
-        .output()
-        .context("Failed to list task issues")?;
-
-    if output.status.success() {
-        let issues: Vec<serde_json::Value> = serde_json::from_slice(&output.stdout)?;
-
-        for issue in issues {
-            if let Some(issue_number) = issue["number"].as_u64() {
-                println!("🔒 Closing task issue #{}...", issue_number);
-                Command::new("gh")
-                    .args([
-                        "issue",
-                        "close",
-                        &issue_number.to_string(),
-                        "--repo",
-                        repo,
-                        "--comment",
-                        "Task completed. Closed by Goose Swarm after evaluation.",
-                    ])
-                    .output()
-                    .context("Failed to close task issue")?;
-            }
+            create_planning_issue(repo, parent_issue, title, &content)?;
         }
     }
 
@@ -919,22 +214,7 @@ fn process_evaluation_issues(repo: &str, parent_issue: u32, issues_dir: &str) ->
                 .trim_start_matches('#')
                 .trim();
 
-            let body = format!("{}\n\nOriginal issue: #{}", content, parent_issue);
-
-            // Create the new issue
-            let output = Command::new("gh")
-                .args([
-                    "issue", "create", "--repo", repo, "--title", title, "--body", &body,
-                ])
-                .output()
-                .context("Failed to create evaluation issue")?;
-
-            if output.status.success() {
-                println!("✅ Created new issue from evaluation: {}", title);
-            } else {
-                let error = String::from_utf8_lossy(&output.stderr);
-                eprintln!("Failed to create evaluation issue: {}", error);
-            }
+            create_evaluation_issue(repo, parent_issue, title, &content)?;
         }
     }
 
@@ -1095,19 +375,7 @@ async fn execute_planning_work(repo: &str, issue: &GitHubIssue, worker_id: &str)
                     // Close all remaining open PRs
                     for pr in final_open_prs {
                         if let Some(pr_num) = pr.get("number").and_then(|n| n.as_u64()) {
-                            println!("   Closing PR #{}", pr_num);
-                            Command::new("gh")
-                                .args([
-                                    "pr",
-                                    "close",
-                                    &pr_num.to_string(),
-                                    "--repo",
-                                    repo,
-                                    "--comment",
-                                    "Automatically closed by Goose Swarm after evaluation phase.",
-                                ])
-                                .output()
-                                .context("Failed to close PR")?;
+                            close_pr(repo, pr_num, "Automatically closed by Goose Swarm after evaluation phase.")?;
                         }
                     }
                 }
@@ -1117,19 +385,7 @@ async fn execute_planning_work(repo: &str, issue: &GitHubIssue, worker_id: &str)
             close_task_issues(repo, issue.number)?;
 
             // Close the original planning issue
-            println!("🔒 Closing planning issue #{}...", issue.number);
-            Command::new("gh")
-                .args([
-                    "issue",
-                    "close",
-                    &issue.number.to_string(),
-                    "--repo",
-                    repo,
-                    "--comment",
-                    "All tasks completed and evaluated. Issue closed by Goose Swarm.",
-                ])
-                .output()
-                .context("Failed to close issue")?;
+            close_planning_issue(repo, issue.number)?;
 
             break;
         }
@@ -1199,22 +455,7 @@ async fn execute_task_work(repo: &str, issue: &GitHubIssue, worker_id: &str) -> 
             unclaim_issue(repo, issue.number, worker_id)?;
 
             // Re-add help wanted label
-            let output = Command::new("gh")
-                .args([
-                    "issue",
-                    "edit",
-                    &issue.number.to_string(),
-                    "--repo",
-                    repo,
-                    "--add-label",
-                    "help wanted",
-                ])
-                .output()
-                .context("Failed to re-add help wanted label")?;
-
-            if output.status.success() {
-                println!("🔄 Re-added 'help wanted' label for another worker to try");
-            }
+            add_help_wanted_label(repo, issue.number)?;
 
             return Err(anyhow::anyhow!("Failed to complete task - no PR created"));
         } else {
