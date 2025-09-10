@@ -16,14 +16,14 @@ use chrono::Local;
 use etcetera::{choose_app_strategy, AppStrategy, AppStrategyArgs};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
 use std::io::{self, BufRead, Write};
 use std::ops::DerefMut;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, OnceLock};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use tokio::sync::mpsc;
-use tokio::time::sleep;
 use utoipa::ToSchema;
 
 // Security limits
@@ -59,35 +59,41 @@ fn init_session_saver() -> mpsc::UnboundedSender<PersistenceTask> {
     let (tx, mut rx) = mpsc::unbounded_channel::<PersistenceTask>();
 
     let task_handle = tokio::spawn(async move {
-        let mut batch: Vec<PersistenceTask> = Vec::new();
-        let mut last_save = Instant::now();
+        // Keep track of the latest save task for each session file
+        let mut pending_saves: HashMap<PathBuf, PersistenceTask> = HashMap::new();
 
         loop {
-            // Try to receive tasks with a timeout
+            // Wait for tasks with a timeout to periodically flush pending saves
             match tokio::time::timeout(BATCH_SAVE_INTERVAL, rx.recv()).await {
                 Ok(Some(task)) => {
-                    batch.push(task);
-
-                    // Save batch if it's full or enough time has passed
-                    if batch.len() >= MAX_BATCH_SIZE || last_save.elapsed() >= BATCH_SAVE_INTERVAL {
-                        save_batch(&mut batch).await;
-                        last_save = Instant::now();
+                    // Extract the session file path
+                    let session_file = match &task {
+                        PersistenceTask::Save { session_file, .. } |
+                        PersistenceTask::GenerateName { session_file, .. } => session_file.clone(),
+                    };
+                    
+                    // Replace any pending save for this file with the newer one
+                    // This automatically deduplicates - we only keep the latest
+                    pending_saves.insert(session_file, task);
+                    
+                    // Optional: flush if we have too many different files pending
+                    if pending_saves.len() >= MAX_BATCH_SIZE {
+                        save_pending_tasks(&mut pending_saves).await;
                     }
                 }
                 Ok(None) => break, // Channel closed
                 Err(_) => {
-                    // Timeout - save any pending tasks
-                    if !batch.is_empty() {
-                        save_batch(&mut batch).await;
-                        last_save = Instant::now();
+                    // Timeout - save all pending tasks
+                    if !pending_saves.is_empty() {
+                        save_pending_tasks(&mut pending_saves).await;
                     }
                 }
             }
         }
 
         // Save any remaining tasks before exiting
-        if !batch.is_empty() {
-            save_batch(&mut batch).await;
+        if !pending_saves.is_empty() {
+            save_pending_tasks(&mut pending_saves).await;
         }
     });
 
@@ -96,9 +102,20 @@ fn init_session_saver() -> mpsc::UnboundedSender<PersistenceTask> {
     tx
 }
 
-/// Save a batch of persistence tasks
-async fn save_batch(batch: &mut Vec<PersistenceTask>) {
-    for task in batch.drain(..) {
+/// Save pending tasks from a HashMap
+async fn save_pending_tasks(pending_saves: &mut HashMap<PathBuf, PersistenceTask>) {
+    if pending_saves.is_empty() {
+        return;
+    }
+    
+    // Log if we're deduplicating
+    tracing::debug!(
+        "Processing {} unique session files from pending saves",
+        pending_saves.len()
+    );
+    
+    // Process each pending task
+    for (_, task) in pending_saves.drain() {
         match task {
             PersistenceTask::Save {
                 session_file,
@@ -158,6 +175,8 @@ async fn save_batch(batch: &mut Vec<PersistenceTask>) {
         }
     }
 }
+
+
 
 /// Get or initialize the session saver
 fn get_session_saver() -> &'static mpsc::UnboundedSender<PersistenceTask> {
