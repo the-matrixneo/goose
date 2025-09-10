@@ -373,41 +373,6 @@ pub fn claim_issue(repo: &str, issue_number: u32, worker_id: &str, role: &str) -
     Ok(())
 }
 
-/// Get the original issue ID from a task issue
-pub fn get_original_issue_id(repo: &str, task_issue: u32) -> Result<Option<u32>> {
-    let output = Command::new("gh")
-        .args([
-            "issue",
-            "view",
-            &task_issue.to_string(),
-            "--repo",
-            repo,
-            "--json",
-            "body",
-        ])
-        .output()
-        .context("Failed to get issue body")?;
-
-    if output.status.success() {
-        let body_json: serde_json::Value = serde_json::from_slice(&output.stdout)?;
-        if let Some(body) = body_json["body"].as_str() {
-            // Look for "for:#<number>" pattern
-            for line in body.lines() {
-                if let Some(pos) = line.find("for:#") {
-                    let number_str = &line[pos + 5..];
-                    if let Some(end) = number_str.find(|c: char| !c.is_ascii_digit()) {
-                        return Ok(number_str[..end].parse().ok());
-                    } else {
-                        return Ok(number_str.parse().ok());
-                    }
-                }
-            }
-        }
-    }
-
-    Ok(None)
-}
-
 /// Get full issue context (title, body, comments)
 pub fn get_issue_context(repo: &str, issue_number: u32) -> Result<String> {
     let output = Command::new("gh")
@@ -482,56 +447,61 @@ pub fn get_task_issue_numbers(repo: &str, parent_issue: u32) -> Result<Vec<u32>>
     }
 }
 
-/// Get PRs that reference task issues (either in title or body)
-pub fn get_prs_for_tasks(repo: &str, task_issue_numbers: &[u32]) -> Result<Vec<serde_json::Value>> {
-    let mut all_prs = Vec::new();
+/// Get PRs that reference the original issue (either in title or body)
+pub fn get_prs_for_issue(repo: &str, issue_number: u32) -> Result<Vec<serde_json::Value>> {
+    let gh_command = format!(
+        "gh pr list --repo {} --search \"#{} in:body,title\" --state all --json number,title,url,state,body,isDraft",
+        repo, issue_number
+    );
+    eprintln!("Command: {}", gh_command);
 
-    // For each task issue, find PRs that reference it
-    for task_num in task_issue_numbers {
-        let output = Command::new("gh")
-            .args([
-                "pr",
-                "list",
-                "--repo",
-                repo,
-                "--search",
-                &format!("#{} in:body,title", task_num),
-                "--state",
-                "all",
-                "--json",
-                "number,title,url,state,body,isDraft",
-            ])
-            .output()
-            .context("Failed to get PRs for task")?;
+    let output = Command::new("gh")
+        .args([
+            "pr",
+            "list",
+            "--repo",
+            repo,
+            "--search",
+            &format!("#{} in:body,title", issue_number),
+            "--state",
+            "all",
+            "--json",
+            "number,title,url,state,body,isDraft",
+        ])
+        .output()
+        .context("Failed to get PRs for issue")?;
 
-        if output.status.success() {
-            let prs: Vec<serde_json::Value> = serde_json::from_slice(&output.stdout)?;
+    if output.status.success() {
+        let prs: Vec<serde_json::Value> = serde_json::from_slice(&output.stdout)?;
 
-            // Add task_issue field to each PR so we know which task it addresses
-            for mut pr in prs {
-                pr["task_issue"] = serde_json::json!(task_num);
-
-                // Avoid duplicates if a PR mentions multiple task issues
-                let pr_number = pr["number"].as_u64();
-                if !all_prs
-                    .iter()
-                    .any(|p: &serde_json::Value| p["number"].as_u64() == pr_number)
-                {
-                    all_prs.push(pr);
-                }
-            }
+        // Debug: log what we found
+        eprintln!(
+            "DEBUG: For issue #{}, found {} PRs",
+            issue_number,
+            prs.len()
+        );
+        for pr in &prs {
+            eprintln!(
+                "  - PR #{}: isDraft={}",
+                pr["number"].as_u64().unwrap_or(0),
+                pr["isDraft"].as_bool().unwrap_or(false)
+            );
         }
-    }
 
-    Ok(all_prs)
+        Ok(prs)
+    } else {
+        eprintln!(
+            "DEBUG: Failed to get PRs for issue #{}: {}",
+            issue_number,
+            String::from_utf8_lossy(&output.stderr)
+        );
+        Ok(Vec::new())
+    }
 }
 
-/// Get non-draft PRs that are ready (open or closed/merged) for task issues
-pub fn get_ready_prs_for_tasks(
-    repo: &str,
-    task_issue_numbers: &[u32],
-) -> Result<Vec<serde_json::Value>> {
-    let all_prs = get_prs_for_tasks(repo, task_issue_numbers)?;
+/// Get non-draft PRs that are ready (open or closed/merged) for the issue
+pub fn get_ready_prs_for_issue(repo: &str, issue_number: u32) -> Result<Vec<serde_json::Value>> {
+    let all_prs = get_prs_for_issue(repo, issue_number)?;
 
     // Filter out draft PRs - we only want non-draft PRs (open, closed, or merged)
     let ready_prs: Vec<serde_json::Value> = all_prs
@@ -545,53 +515,40 @@ pub fn get_ready_prs_for_tasks(
     Ok(ready_prs)
 }
 
-/// Check which PRs are still open for the task issues
-pub fn check_open_prs(repo: &str, task_issue_numbers: &[u32]) -> Result<Vec<serde_json::Value>> {
-    let mut open_prs = Vec::new();
+/// Check which PRs are still open for the issue
+pub fn check_open_prs_for_issue(repo: &str, issue_number: u32) -> Result<Vec<serde_json::Value>> {
+    let output = Command::new("gh")
+        .args([
+            "pr",
+            "list",
+            "--repo",
+            repo,
+            "--search",
+            &format!("#{} in:body,title", issue_number),
+            "--state",
+            "open",
+            "--json",
+            "number,title,url,state,body,isDraft",
+        ])
+        .output()
+        .context("Failed to get open PRs for issue")?;
 
-    // For each task issue, find open PRs that reference it
-    for task_num in task_issue_numbers {
-        let output = Command::new("gh")
-            .args([
-                "pr",
-                "list",
-                "--repo",
-                repo,
-                "--search",
-                &format!("#{} in:body,title", task_num),
-                "--state",
-                "open",
-                "--json",
-                "number,title,url,state,body,isDraft",
-            ])
-            .output()
-            .context("Failed to get open PRs for task")?;
+    if output.status.success() {
+        let prs: Vec<serde_json::Value> = serde_json::from_slice(&output.stdout)?;
 
-        if output.status.success() {
-            let prs: Vec<serde_json::Value> = serde_json::from_slice(&output.stdout)?;
-
-            // Add task_issue field and filter out drafts
-            for mut pr in prs {
+        // Filter out draft PRs
+        let open_prs: Vec<serde_json::Value> = prs
+            .into_iter()
+            .filter(|pr| {
                 // Skip draft PRs
-                if pr.get("isDraft").and_then(|v| v.as_bool()).unwrap_or(false) {
-                    continue;
-                }
+                !pr.get("isDraft").and_then(|v| v.as_bool()).unwrap_or(false)
+            })
+            .collect();
 
-                pr["task_issue"] = serde_json::json!(task_num);
-
-                // Avoid duplicates if a PR mentions multiple task issues
-                let pr_number = pr["number"].as_u64();
-                if !open_prs
-                    .iter()
-                    .any(|p: &serde_json::Value| p["number"].as_u64() == pr_number)
-                {
-                    open_prs.push(pr);
-                }
-            }
-        }
+        Ok(open_prs)
+    } else {
+        Ok(Vec::new())
     }
-
-    Ok(open_prs)
 }
 
 /// Close a PR with a comment
@@ -618,7 +575,7 @@ pub fn create_task_issue(repo: &str, parent_issue: u32, title: &str, content: &s
     let final_title = if title.starts_with("[task]") {
         title.to_string()
     } else {
-        format!("[task] {}", title)
+        format!("[task] {} [issue:{}]", title, parent_issue)
     };
 
     // Add "for:#<parent>" to the body

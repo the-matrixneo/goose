@@ -11,9 +11,6 @@ instructions: |
   - Available drone nodes: {{ available_nodes }}
   - Work directory: {{ work_dir }}
   - Repository directory (READ-ONLY): {{ repo_dir }}
-  {% if original_issue %}
-  - Original issue reference: #{{ original_issue }}
-  {% endif %}
 
   The repository has been cloned to {{ repo_dir }} for your reference. You can explore the codebase
   to better understand the structure and make more informed planning decisions. Use this directory

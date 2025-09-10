@@ -1,13 +1,14 @@
 use crate::commands::goose_swarm::repo::{
-    add_help_wanted_label, check_open_prs, claim_issue, close_planning_issue, close_pr,
+    add_help_wanted_label, check_open_prs_for_issue, claim_issue, close_planning_issue, close_pr,
     close_task_issues, count_available_nodes, create_evaluation_issue, create_planning_issue,
     create_task_issue, get_all_issues, get_help_wanted_issues, get_issue_context,
-    get_original_issue_id, get_prs_for_tasks, get_ready_prs_for_tasks, get_task_issue_numbers,
-    is_issue_claimed, register_node, remove_help_wanted_label, unclaim_issue, GitHubIssue,
+    get_prs_for_issue, get_ready_prs_for_issue, is_issue_claimed, register_node,
+    remove_help_wanted_label, unclaim_issue, GitHubIssue,
 };
 use crate::session::{build_session, SessionBuilderConfig};
 use anyhow::{Context, Result};
 use clap::Args;
+use rand::Rng;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
@@ -150,14 +151,18 @@ fn detect_work_type(repo: &str) -> Result<WorkType> {
 }
 
 /// Clone or refresh repository to workspace
-fn prepare_workspace(repo: &str) -> Result<String> {
+fn prepare_workspace(repo: &str, worker_id: &str) -> Result<String> {
     let repo_name = repo.split('/').next_back().unwrap_or(repo);
 
     // Use ~/.local/share/goose-swarm as per design spec
+    // Include worker_id to make directory unique per node
     let home_dir = std::env::var("HOME")
         .or_else(|_| std::env::var("USERPROFILE"))
         .context("Failed to get home directory")?;
-    let workspace_dir = format!("{}/.local/share/goose-swarm/{}", home_dir, repo_name);
+    let workspace_dir = format!(
+        "{}/.local/share/goose-swarm/{}-{}",
+        home_dir, repo_name, worker_id
+    );
 
     // Create workspace directory
     std::fs::create_dir_all(&workspace_dir).context("Failed to create workspace")?;
@@ -289,6 +294,26 @@ async fn execute_planning_work(repo: &str, issue: &GitHubIssue, worker_id: &str)
         issue.number, issue.title
     );
 
+    // Remove help wanted label first
+    remove_help_wanted_label(repo, issue.number)?;
+
+    // Random pause to avoid race conditions (1-30 seconds)
+    let wait_seconds = rand::thread_rng().gen_range(1..=30);
+    println!(
+        "⏸️  Waiting {} seconds before claiming to avoid collisions...",
+        wait_seconds
+    );
+    thread::sleep(Duration::from_secs(wait_seconds));
+
+    // Check if someone else claimed it while we were waiting
+    if is_issue_claimed(repo, issue.number)? {
+        println!(
+            "⚠️ Issue #{} was claimed by another worker while waiting. Skipping.",
+            issue.number
+        );
+        return Ok(()); // Exit gracefully, will look for more work
+    }
+
     // Claim the issue as planner
     claim_issue(repo, issue.number, worker_id, "planner")?;
 
@@ -299,7 +324,7 @@ async fn execute_planning_work(repo: &str, issue: &GitHubIssue, worker_id: &str)
     let available_nodes = count_available_nodes(repo)?;
 
     // Prepare repository workspace (shared location for read-only access)
-    let repo_dir = prepare_workspace(repo)?;
+    let repo_dir = prepare_workspace(repo, worker_id)?;
     println!("📁 Repository available at: {}", repo_dir);
 
     // Create working directory with tasks/ and issues/ subdirectories
@@ -317,7 +342,7 @@ async fn execute_planning_work(repo: &str, issue: &GitHubIssue, worker_id: &str)
     std::fs::create_dir_all(&issues_dir).context("Failed to create issues directory")?;
 
     // Build recipe parameters for planning
-    let mut params = vec![
+    let params = vec![
         ("repo".to_string(), repo.to_string()),
         ("issue_number".to_string(), issue.number.to_string()),
         ("worker_id".to_string(), worker_id.to_string()),
@@ -326,11 +351,6 @@ async fn execute_planning_work(repo: &str, issue: &GitHubIssue, worker_id: &str)
         ("work_dir".to_string(), work_dir.clone()),
         ("repo_dir".to_string(), repo_dir), // Pass the cloned repo directory
     ];
-
-    // Check for original issue reference
-    if let Ok(Some(original_id)) = get_original_issue_id(repo, issue.number) {
-        params.push(("original_issue".to_string(), original_id.to_string()));
-    }
 
     // Run the planning recipe to create tasks
     println!("🎯 Running planning recipe to break down the issue...");
@@ -353,16 +373,15 @@ async fn execute_planning_work(repo: &str, issue: &GitHubIssue, worker_id: &str)
         task_count
     );
 
-    // Get task issue numbers for tracking PRs
-    let task_issue_numbers = get_task_issue_numbers(repo, issue.number)?;
-    println!("📝 Tracking PRs for task issues: {:?}", task_issue_numbers);
+    // Poll for PRs to come in (they reference the original issue)
+    println!("📝 Tracking PRs for original issue #{}", issue.number);
 
     // Poll for PRs to come in
     loop {
-        let all_prs = get_prs_for_tasks(repo, &task_issue_numbers)?;
-        let ready_prs = get_ready_prs_for_tasks(repo, &task_issue_numbers)?;
+        let all_prs = get_prs_for_issue(repo, issue.number)?;
+        let ready_prs = get_ready_prs_for_issue(repo, issue.number)?;
 
-        println!("🔍 Found {} PR(s) addressing task issues", all_prs.len());
+        println!("🔍 Found {} PR(s) addressing the issue", all_prs.len());
         println!(
             "   📋 {} non-draft PR(s) ready for evaluation",
             ready_prs.len()
@@ -409,7 +428,7 @@ async fn execute_planning_work(repo: &str, issue: &GitHubIssue, worker_id: &str)
             process_evaluation_issues(repo, issue.number, &eval_issues_dir)?;
 
             // Check if all PRs are closed/merged
-            let remaining_open_prs = check_open_prs(repo, &task_issue_numbers)?;
+            let remaining_open_prs = check_open_prs_for_issue(repo, issue.number)?;
 
             if !remaining_open_prs.is_empty() {
                 println!(
@@ -424,7 +443,7 @@ async fn execute_planning_work(repo: &str, issue: &GitHubIssue, worker_id: &str)
                 process_evaluation_issues(repo, issue.number, &eval_issues_dir)?;
 
                 // Check PRs again
-                let final_open_prs = check_open_prs(repo, &task_issue_numbers)?;
+                let final_open_prs = check_open_prs_for_issue(repo, issue.number)?;
 
                 if !final_open_prs.is_empty() {
                     println!(
@@ -466,12 +485,43 @@ async fn execute_planning_work(repo: &str, issue: &GitHubIssue, worker_id: &str)
     Ok(())
 }
 
+/// Extract issue number from title containing [issue:N] pattern
+fn extract_issue_number_from_title(title: &str) -> Option<u32> {
+    // Look for pattern [issue:N] in the title
+    if let Some(start) = title.find("[issue:") {
+        let rest = &title[start + 7..];
+        if let Some(end) = rest.find(']') {
+            return rest[..end].parse().ok();
+        }
+    }
+    None
+}
+
 /// Execute task work
 async fn execute_task_work(repo: &str, issue: &GitHubIssue, worker_id: &str) -> Result<()> {
     println!("🔧 Working on task #{}: {}", issue.number, issue.title);
 
     // Remove help wanted label
     remove_help_wanted_label(repo, issue.number)?;
+
+    // Random pause to avoid race conditions (1-30 seconds)
+    let wait_seconds = rand::thread_rng().gen_range(1..=30);
+    println!(
+        "⏸️  Waiting {} seconds before claiming to avoid collisions...",
+        wait_seconds
+    );
+    thread::sleep(Duration::from_secs(wait_seconds));
+
+    // Check if someone else claimed it while we were waiting
+    if is_issue_claimed(repo, issue.number)? {
+        println!(
+            "⚠️ Issue #{} was claimed by another worker while waiting. Skipping.",
+            issue.number
+        );
+        // Re-add help wanted label if no one actually claimed it
+        add_help_wanted_label(repo, issue.number)?;
+        return Ok(()); // Exit gracefully, will look for more work
+    }
 
     // Claim the issue as drone
     claim_issue(repo, issue.number, worker_id, "drone")?;
@@ -480,22 +530,29 @@ async fn execute_task_work(repo: &str, issue: &GitHubIssue, worker_id: &str) -> 
     let context = get_issue_context(repo, issue.number)?;
 
     // Prepare workspace
-    let workspace = prepare_workspace(repo)?;
+    let workspace = prepare_workspace(repo, worker_id)?;
     println!("📁 Workspace: {}", workspace);
 
     // Build recipe parameters
     let mut params = vec![
         ("repo".to_string(), repo.to_string()),
-        ("issue_number".to_string(), issue.number.to_string()),
+        ("task_number".to_string(), issue.number.to_string()),
         ("worker_id".to_string(), worker_id.to_string()),
         ("context".to_string(), context),
         ("workspace".to_string(), workspace.clone()),
     ];
 
-    // Check for original issue reference
-    if let Ok(Some(original_id)) = get_original_issue_id(repo, issue.number) {
-        params.push(("original_issue".to_string(), original_id.to_string()));
-    }
+    // Extract original issue number from title (format: [issue:N])
+    // This is REQUIRED for task issues - fail if not present
+    let original_id = extract_issue_number_from_title(&issue.title).ok_or_else(|| {
+        anyhow::anyhow!(
+            "Task issue #{} is missing [issue:N] pattern in title: '{}'",
+            issue.number,
+            issue.title
+        )
+    })?;
+
+    params.push(("original_issue".to_string(), original_id.to_string()));
 
     // Run the worker recipe
     run_recipe(SWARM_DRONE_RECIPE, params).await?;
