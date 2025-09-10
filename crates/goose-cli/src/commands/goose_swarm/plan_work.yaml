@@ -1,4 +1,5 @@
-name: plan_work
+version: 1.0.0
+title: Plan Work
 description: Break down GitHub issues into parallel executable tasks
 instructions: |
   You are a Goose Swarm planner agent working on GitHub repository {{ repo }}.

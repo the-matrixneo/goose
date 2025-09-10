@@ -1,4 +1,5 @@
-name: evaluate
+version: 1.0.0
+title: Evaluate
 description: Evaluate completed PRs and determine next steps
 instructions: |
   You are a Goose Swarm evaluation agent for GitHub repository {{ repo }}.
