@@ -532,56 +532,6 @@ pub fn list_sessions() -> Result<Vec<(String, PathBuf)>> {
     Ok(entries)
 }
 
-/// Initialize the background session saver
-pub fn init_background_session_saver() {
-    if SESSION_SAVER.get().is_some() {
-        return; // Already initialized
-    }
-
-    let (tx, mut rx) = mpsc::unbounded_channel::<PersistenceTask>();
-
-    let handle = tokio::spawn(async move {
-        let mut batch: Vec<PersistenceTask> = Vec::new();
-        let mut last_save = Instant::now();
-
-        loop {
-            tokio::select! {
-                // Receive new tasks
-                task = rx.recv() => {
-                    match task {
-                        Some(task) => {
-                            batch.push(task);
-
-                            // Save immediately if batch is full or if enough time has passed
-                            if batch.len() >= MAX_BATCH_SIZE || last_save.elapsed() >= BATCH_SAVE_INTERVAL {
-                                save_batch(&mut batch).await;
-                                last_save = Instant::now();
-                            }
-                        }
-                        None => break, // Channel closed
-                    }
-                }
-
-                // Periodic flush
-                _ = sleep(BATCH_SAVE_INTERVAL) => {
-                    if !batch.is_empty() && last_save.elapsed() >= BATCH_SAVE_INTERVAL {
-                        save_batch(&mut batch).await;
-                        last_save = Instant::now();
-                    }
-                }
-            }
-        }
-
-        // Final flush on shutdown
-        if !batch.is_empty() {
-            save_batch(&mut batch).await;
-        }
-    });
-
-    let _ = SESSION_SAVER.set(tx);
-    let _ = _SESSION_SAVER_TASK.set(handle);
-}
-
 /// Generate a session ID using timestamp format (yyyymmdd_hhmmss)
 /// TODO(Douwe): make this actually be unique
 pub fn generate_session_id() -> String {
