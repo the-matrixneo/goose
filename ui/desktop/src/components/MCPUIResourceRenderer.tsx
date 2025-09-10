@@ -142,14 +142,65 @@ export default function MCPUIResourceRenderer({
       actionEvent: UIActionResultToolCall
     ): Promise<UIActionHandlerResult> => {
       const { toolName, params } = actionEvent.payload;
-      toast.info(<ToastComponent messageType="tool" message={toolName} isImplemented={false} />, {
-        theme: currentThemeValue,
-      });
+
+      // If we have an append function, instruct the LLM to call this tool with the provided params
+      if (appendPromptToChat) {
+        try {
+          const prettyParams = (() => {
+            try {
+              return JSON.stringify(params ?? {}, null, 2);
+            } catch {
+              return String(params);
+            }
+          })();
+
+          const prompt = [
+            "CALL A TOOL",
+            "- Name: " + toolName,
+            "- Arguments (JSON):",
+            prettyParams,
+            "",
+            "Instructions:",
+            "1) If the tool exists, call it immediately using exactly the arguments shown.",
+            "2) Do not ask for confirmation unless required by policy.",
+            "3) If arguments are incomplete, politely request the missing values.",
+          ].join("\n");
+
+          appendPromptToChat(prompt);
+          window.dispatchEvent(new CustomEvent('scroll-chat-to-bottom'));
+
+          toast.info(
+            <ToastComponent messageType="tool" message={`Requested ${toolName}`} isImplemented={true} />,
+            { theme: currentThemeValue }
+          );
+
+          return {
+            status: 'success' as const,
+            message: `Requested tool call: ${toolName}`,
+            data: { toolName, params },
+          };
+        } catch (error) {
+          return {
+            status: 'error' as const,
+            error: {
+              code: UIActionErrorCode.TOOL_EXECUTION_FAILED,
+              message: 'Failed to submit tool call request to chat',
+              details: error instanceof Error ? error.message : error,
+            },
+          };
+        }
+      }
+
+      // Fallback when append function is unavailable
+      toast.info(
+        <ToastComponent messageType="tool" message={`${toolName} (append unavailable)`} isImplemented={false} />,
+        { theme: currentThemeValue }
+      );
       return {
         status: 'error' as const,
         error: {
           code: UIActionErrorCode.UNSUPPORTED_ACTION,
-          message: 'Tool calls are not yet implemented',
+          message: 'Tool calls require chat context (append function missing)',
           details: { toolName, params },
         },
       };
