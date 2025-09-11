@@ -1474,6 +1474,7 @@ pub fn persist_messages_with_schedule_id_background(
 mod tests {
     use super::*;
     use crate::conversation::message::{Message, MessageContent};
+    use serial_test::serial;
     use tempfile::tempdir;
 
     #[test]
@@ -1550,6 +1551,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_read_write_messages() -> Result<()> {
         let dir = tempdir()?;
         let file_path = dir.path().join("test.jsonl");
@@ -1617,9 +1619,10 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_special_characters_and_long_text() -> Result<()> {
         let dir = tempdir()?;
-        let file_path = dir.path().join("special.jsonl");
+        let file_path = dir.path().join("test.jsonl");
 
         // Insert some problematic JSON-like content between moderately long text
         // (keeping under truncation limit to test serialization/deserialization)
@@ -1832,6 +1835,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_working_dir_preservation() -> Result<()> {
         let dir = tempdir()?;
         let file_path = dir.path().join("test.jsonl");
@@ -1870,10 +1874,12 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_working_dir_issue_fixed() -> Result<()> {
         // This test demonstrates that the working_dir issue in jsonl files is fixed
         let dir = tempdir()?;
-        let file_path = dir.path().join("test.jsonl");
+        // Use unique file paths to avoid race conditions with background deduplication
+        let file_path_1 = dir.path().join("test1.jsonl");
 
         // Create a temporary working directory (this simulates the actual working directory)
         let working_dir = tempdir()?;
@@ -1888,11 +1894,11 @@ mod tests {
 
         // Test 1: Using persist_messages_background (without working_dir)
         // This will fall back to home directory since no working_dir is provided
-        persist_messages_background(&file_path, &messages, None, None)?;
+        persist_messages_background(&file_path_1, &messages, None, None)?;
         flush_background_saves().await;
 
         // Read back the metadata - this should now have the home directory as working_dir
-        let metadata_old = read_metadata(&file_path)?;
+        let metadata_old = read_metadata(&file_path_1)?;
         assert_eq!(
             metadata_old.working_dir, home_dir,
             "persist_messages_background should use home directory when no working_dir is provided"
@@ -1900,8 +1906,9 @@ mod tests {
 
         // Test 2: Using persist_messages_with_schedule_id_background function
         // This should properly set the working_dir (this is the main fix)
+        let file_path_2 = dir.path().join("test2_unique.jsonl");
         persist_messages_with_schedule_id_background(
-            &file_path,
+            &file_path_2,
             &messages,
             None,
             None,
@@ -1910,7 +1917,7 @@ mod tests {
         flush_background_saves().await;
 
         // Read back the metadata - this should now have the correct working_dir
-        let metadata_new = read_metadata(&file_path)?;
+        let metadata_new = read_metadata(&file_path_2)?;
         assert_eq!(
             metadata_new.working_dir, working_dir_path,
             "persist_messages_with_schedule_id_background should use provided working_dir"
@@ -1921,9 +1928,9 @@ mod tests {
         );
 
         // Test 3: Create a new session file without working_dir (should fall back to home)
-        let file_path_2 = dir.path().join("test2.jsonl");
+        let file_path_3 = dir.path().join("test3.jsonl");
         persist_messages_with_schedule_id_background(
-            &file_path_2,
+            &file_path_3,
             &messages,
             None,
             None,
@@ -1931,18 +1938,18 @@ mod tests {
         )?;
         flush_background_saves().await;
 
-        let metadata_fallback = read_metadata(&file_path_2)?;
+        let metadata_fallback = read_metadata(&file_path_3)?;
         assert_eq!(metadata_fallback.working_dir, home_dir, "persist_messages_with_schedule_id_background should fall back to home directory when no working_dir is provided");
 
         // Test 4: Test that the fix works for existing files
         // Create a session file and then add to it with different working_dir
-        let file_path_3 = dir.path().join("test3.jsonl");
+        let file_path_4 = dir.path().join("test4.jsonl");
 
         // First, create with home directory
-        persist_messages_background(&file_path_3, &messages, None, None)?;
+        persist_messages_background(&file_path_4, &messages, None, None)?;
         flush_background_saves().await;
 
-        let metadata_initial = read_metadata(&file_path_3)?;
+        let metadata_initial = read_metadata(&file_path_4)?;
         assert_eq!(
             metadata_initial.working_dir, home_dir,
             "Initial session should use home directory"
@@ -1950,7 +1957,7 @@ mod tests {
 
         // Then update with a specific working_dir
         persist_messages_with_schedule_id_background(
-            &file_path_3,
+            &file_path_4,
             &messages,
             None,
             None,
@@ -1958,7 +1965,7 @@ mod tests {
         )?;
         flush_background_saves().await;
 
-        let metadata_updated = read_metadata(&file_path_3)?;
+        let metadata_updated = read_metadata(&file_path_4)?;
         assert_eq!(
             metadata_updated.working_dir, working_dir_path,
             "Updated session should use new working_dir"
@@ -1966,12 +1973,12 @@ mod tests {
 
         // Test 5: Most important test - simulate the real-world scenario where
         // CLI and web interfaces pass the current directory instead of None
-        let file_path_4 = dir.path().join("test4.jsonl");
+        let file_path_5 = dir.path().join("test5.jsonl");
         let current_dir = std::env::current_dir()?;
 
         // This is what web.rs and session/mod.rs do now after the fix
         persist_messages_with_schedule_id_background(
-            &file_path_4,
+            &file_path_5,
             &messages,
             None,
             None,
@@ -1979,9 +1986,10 @@ mod tests {
         )?;
         flush_background_saves().await;
 
-        let metadata_current = read_metadata(&file_path_4)?;
+        let metadata_current = read_metadata(&file_path_5)?;
         assert_eq!(
-            metadata_current.working_dir, current_dir,
+            metadata_current.working_dir,
+            current_dir.clone(),
             "Session should use current directory when explicitly provided"
         );
         // This should NOT be the home directory anymore (unless current_dir == home_dir)
@@ -2073,9 +2081,10 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_persist_messages_with_save_session_false() -> Result<()> {
         let dir = tempdir()?;
-        let file_path = dir.path().join("test_persist_no_save.jsonl");
+        let file_path = dir.path().join("test.jsonl");
 
         let messages = Conversation::new_unvalidated(vec![
             Message::user().with_text("Test message"),
