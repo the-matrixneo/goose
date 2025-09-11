@@ -783,7 +783,7 @@ pub fn add_in_progress_label(repo: &str, issue_number: u32) -> Result<()> {
                     "--repo",
                     repo,
                     "--color",
-                    "0E8A16",  // Green color
+                    "0E8A16", // Green color
                     "--description",
                     "Work is actively being done on this issue",
                 ])
@@ -830,7 +830,10 @@ pub fn remove_in_progress_label(repo: &str, issue_number: u32) -> Result<()> {
         .context("Failed to remove 'in progress' label")?;
 
     if output.status.success() {
-        println!("✅ Removed 'in progress' label from issue #{}", issue_number);
+        println!(
+            "✅ Removed 'in progress' label from issue #{}",
+            issue_number
+        );
     }
 
     Ok(())
@@ -891,11 +894,11 @@ pub fn remove_all_goose_claims(repo: &str, issue_number: u32) -> Result<()> {
     }
 
     let current_body = String::from_utf8_lossy(&output.stdout);
-    
+
     // Remove all Goose claim sections (including the details blocks)
     let mut in_goose_section = false;
     let mut new_lines = Vec::new();
-    
+
     for line in current_body.lines() {
         if line.contains("<details><summary>Goose ") {
             in_goose_section = true;
@@ -909,7 +912,7 @@ pub fn remove_all_goose_claims(repo: &str, issue_number: u32) -> Result<()> {
             new_lines.push(line);
         }
     }
-    
+
     let new_body = new_lines.join("\n").trim().to_string();
 
     // Update issue body
@@ -928,7 +931,10 @@ pub fn remove_all_goose_claims(repo: &str, issue_number: u32) -> Result<()> {
 
     if !output.status.success() {
         let error = String::from_utf8_lossy(&output.stderr);
-        return Err(anyhow::anyhow!("Failed to remove claims from issue: {}", error));
+        return Err(anyhow::anyhow!(
+            "Failed to remove claims from issue: {}",
+            error
+        ));
     }
 
     Ok(())

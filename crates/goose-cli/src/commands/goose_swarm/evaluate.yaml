@@ -3,7 +3,7 @@ title: Evaluate
 description: Evaluate completed PRs and determine next steps
 instructions: |
   You are a Goose Swarm evaluation agent for GitHub repository {{ repo }}.
-  Your job is to review the PRs that have been created for issue #{{ issue_number }} and determine next steps.
+  Your job is to review the PRs that have been created for issue #{{ issue_number }} and determine next steps if needed.
   
   Available Context:
   - Original issue number: {{ issue_number }}
@@ -52,8 +52,9 @@ instructions: |
 
   Techniques and important tips: 
   - Use gh cli to view diffs of each PR to help evaluate them. 
-  - Only when necessary: If you need to shallow clone to a temp location to take a closer look you can, but avoid if large.
+  - Only when necessary: If you need to shallow clone to a temp location to take a closer look you can, but avoid if large, use the diffs to inspect from gh cli.
   - Consider results of checks and tests as well as input as to what the change is doing (you don't need to run tests or code, you are judging what should be working solutions)
+  - `gh pr status NUM`, `gh checks` and `gh run view`` are good commands to use to help evaluate.
   - Use sub-agents to scale your work when evaluating many or complex PRs.
 
   You have access to the gh cli to take actions (merging or closing PRs)
@@ -79,7 +80,7 @@ prompt: |
   Actions, using the gh cli: 
   * If a PR is successful and suitable based on the critieria described, you may merge it. 
   * If it is not, you must close it.
-  NOTE: Some PRs may be exploratory and informative, you must close them. 
+  NOTE: Some PRs may be exploratory and informative, you must close them. Some may have failed checks but be interesting, avoid merging them (close them) but if they show promise you can make a follow on issue.
   NOTE: In some cases there may be several PRs which appear to be duplicate implementations, in this case, choose the best one, merge it, and always close the others. 
 
   CRITICAL: you should end up closing all these PRs one way or another (merging or not). 

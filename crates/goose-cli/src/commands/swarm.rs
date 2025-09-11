@@ -2,10 +2,9 @@ use crate::commands::goose_swarm::repo::{
     add_help_wanted_label, add_in_progress_label, check_open_prs_for_issue, claim_issue,
     close_planning_issue, close_pr, close_task_issues, count_available_nodes,
     create_evaluation_issue, create_planning_issue, create_task_issue, get_all_issues,
-    get_help_wanted_issues, get_in_progress_issues, get_issue_context,
-    get_ready_prs_for_issue, get_task_issue_numbers, is_issue_claimed, register_node,
-    remove_all_goose_claims, remove_help_wanted_label, remove_in_progress_label, unclaim_issue,
-    GitHubIssue,
+    get_help_wanted_issues, get_in_progress_issues, get_issue_context, get_ready_prs_for_issue,
+    get_task_issue_numbers, is_issue_claimed, register_node, remove_all_goose_claims,
+    remove_help_wanted_label, remove_in_progress_label, unclaim_issue, GitHubIssue,
 };
 use crate::session::{build_session, SessionBuilderConfig};
 use anyhow::{Context, Result};
@@ -14,8 +13,7 @@ use rand::Rng;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
-use std::thread;
-use std::time::Duration;
+use tokio::time::{sleep, Duration};
 
 // Embed recipe YAML files at compile time
 const PLAN_WORK_RECIPE: &str = include_str!("goose_swarm/plan_work.yaml");
@@ -118,24 +116,24 @@ fn get_or_create_worker_id(provided_id: Option<String>) -> Result<String> {
 fn detect_work_type(repo: &str) -> Result<WorkType> {
     // First check for issues ready for evaluation (in progress with all PRs ready)
     let in_progress = get_in_progress_issues(repo)?;
-    
+
     if !in_progress.is_empty() {
         // Get full details for all issues to check them
         let all_issues = get_all_issues(repo)?;
-        
+
         for issue_num in in_progress {
             // Skip if already claimed
             if is_issue_claimed(repo, issue_num)? {
                 continue;
             }
-            
+
             // Get the task issues for this parent issue
             let task_issues = get_task_issue_numbers(repo, issue_num)?;
-            
+
             if !task_issues.is_empty() {
                 // Check if all tasks have ready PRs
                 let ready_prs = get_ready_prs_for_issue(repo, issue_num)?;
-                
+
                 if ready_prs.len() >= task_issues.len() {
                     // All tasks have PRs - ready for evaluation
                     if let Some(issue) = all_issues.iter().find(|i| i.number == issue_num) {
@@ -145,7 +143,7 @@ fn detect_work_type(repo: &str) -> Result<WorkType> {
             }
         }
     }
-    
+
     // Now check for help wanted issues (tasks and planning)
     let help_wanted = get_help_wanted_issues(repo)?;
 
@@ -192,7 +190,9 @@ fn detect_work_type(repo: &str) -> Result<WorkType> {
 
     if !available_planning.is_empty() {
         // Return the first available planning issue
-        return Ok(WorkType::Planning(available_planning.into_iter().next().unwrap()));
+        return Ok(WorkType::Planning(
+            available_planning.into_iter().next().unwrap(),
+        ));
     }
 
     Ok(WorkType::None)
@@ -230,19 +230,65 @@ fn prepare_workspace(repo: &str, worker_id: &str) -> Result<String> {
     } else {
         // Pull latest changes
         println!("🔄 Updating repository...");
+
+        // First, fetch the latest refs to know what branches are available
         let output = Command::new("git")
-            .args(["pull", "origin", "main"])
+            .args(["fetch", "origin"])
             .current_dir(&workspace_dir)
             .output()
-            .context("Failed to pull latest changes")?;
+            .context("Failed to fetch from origin")?;
 
         if !output.status.success() {
-            // Try pulling from master if main doesn't exist
-            Command::new("git")
-                .args(["pull", "origin", "master"])
+            let error = String::from_utf8_lossy(&output.stderr);
+            return Err(anyhow::anyhow!("Failed to fetch: {}", error));
+        }
+
+        // Determine the default branch (try main first, then master)
+        let default_branch = {
+            let output = Command::new("git")
+                .args(["rev-parse", "--verify", "origin/main"])
                 .current_dir(&workspace_dir)
-                .output()
-                .context("Failed to pull from master")?;
+                .output();
+
+            if output.is_ok() && output.unwrap().status.success() {
+                "main"
+            } else {
+                "master"
+            }
+        };
+
+        // Switch to the default branch
+        println!("🔀 Switching to {} branch...", default_branch);
+        let output = Command::new("git")
+            .args(["checkout", default_branch])
+            .current_dir(&workspace_dir)
+            .output()
+            .context("Failed to checkout branch")?;
+
+        if !output.status.success() {
+            let error = String::from_utf8_lossy(&output.stderr);
+            return Err(anyhow::anyhow!(
+                "Failed to checkout {}: {}",
+                default_branch,
+                error
+            ));
+        }
+
+        // Pull latest changes from the default branch
+        println!("⬇️ Pulling latest changes from {}...", default_branch);
+        let output = Command::new("git")
+            .args(["pull", "origin", default_branch])
+            .current_dir(&workspace_dir)
+            .output()
+            .context("Failed to pull from origin")?;
+
+        if !output.status.success() {
+            let error = String::from_utf8_lossy(&output.stderr);
+            return Err(anyhow::anyhow!(
+                "Failed to pull from {}: {}",
+                default_branch,
+                error
+            ));
         }
     }
 
@@ -351,7 +397,7 @@ async fn execute_planning_work(repo: &str, issue: &GitHubIssue, worker_id: &str)
         "⏸️  Waiting {} seconds before claiming to avoid collisions...",
         wait_seconds
     );
-    thread::sleep(Duration::from_secs(wait_seconds));
+    sleep(Duration::from_secs(wait_seconds)).await;
 
     // Check if someone else claimed it while we were waiting
     if is_issue_claimed(repo, issue.number)? {
@@ -417,15 +463,17 @@ async fn execute_planning_work(repo: &str, issue: &GitHubIssue, worker_id: &str)
     }
 
     println!("📊 Created {} task issues.", task_count);
-    
+
     // Add "in progress" label to mark that tasks are being worked on
     add_in_progress_label(repo, issue.number)?;
-    
+
     // Remove the planner claim so evaluator can pick it up later
     remove_all_goose_claims(repo, issue.number)?;
-    
-    println!("✅ Planning complete. Issue marked as 'in progress' for evaluation when PRs are ready.");
-    
+
+    println!(
+        "✅ Planning complete. Issue marked as 'in progress' for evaluation when PRs are ready."
+    );
+
     Ok(())
 }
 
@@ -435,18 +483,18 @@ async fn execute_evaluation_work(repo: &str, issue: &GitHubIssue, worker_id: &st
         "🔮 Ready to evaluate issue #{}: {}",
         issue.number, issue.title
     );
-    
+
     // Remove "in progress" label first
     remove_in_progress_label(repo, issue.number)?;
-    
+
     // Random pause to avoid race conditions (1-30 seconds)
     let wait_seconds = rand::thread_rng().gen_range(1..=30);
     println!(
         "⏸️  Waiting {} seconds before claiming as evaluator...",
         wait_seconds
     );
-    thread::sleep(Duration::from_secs(wait_seconds));
-    
+    sleep(Duration::from_secs(wait_seconds)).await;
+
     // Check if someone else claimed it while we were waiting
     if is_issue_claimed(repo, issue.number)? {
         println!(
@@ -455,29 +503,29 @@ async fn execute_evaluation_work(repo: &str, issue: &GitHubIssue, worker_id: &st
         );
         return Ok(()); // Exit gracefully, will look for more work
     }
-    
+
     // Claim the issue as evaluator
     claim_issue(repo, issue.number, worker_id, "evaluator")?;
-    
+
     // Get full issue context
     let context = get_issue_context(repo, issue.number)?;
-    
+
     // Get the task issues and count
     let task_issues = get_task_issue_numbers(repo, issue.number)?;
     let task_count = task_issues.len();
-    
+
     // Get ready PRs
     let ready_prs = get_ready_prs_for_issue(repo, issue.number)?;
-    
+
     println!(
         "📊 Evaluating {} PRs for {} tasks",
         ready_prs.len(),
         task_count
     );
-    
+
     // Prepare context for evaluation
     let pr_context = serde_json::to_string_pretty(&ready_prs)?;
-    
+
     // Create evaluation working directory with issues/ subdirectory
     let home_dir = std::env::var("HOME")
         .or_else(|_| std::env::var("USERPROFILE"))
@@ -489,7 +537,7 @@ async fn execute_evaluation_work(repo: &str, issue: &GitHubIssue, worker_id: &st
     let eval_issues_dir = format!("{}/issues", eval_work_dir);
     std::fs::create_dir_all(&eval_issues_dir)
         .context("Failed to create evaluation issues directory")?;
-    
+
     // Build parameters for evaluate recipe
     let eval_params = vec![
         ("repo".to_string(), repo.to_string()),
@@ -500,38 +548,38 @@ async fn execute_evaluation_work(repo: &str, issue: &GitHubIssue, worker_id: &st
         ("task_count".to_string(), task_count.to_string()),
         ("work_dir".to_string(), eval_work_dir.clone()),
     ];
-    
+
     // Run the evaluate recipe
     println!("🔮 Running evaluation recipe...");
     run_recipe(EVALUATE_RECIPE, eval_params.clone()).await?;
-    
+
     // Process any new issues created by evaluate recipe
     process_evaluation_issues(repo, issue.number, &eval_issues_dir)?;
-    
+
     // Check if all PRs are closed/merged
     let remaining_open_prs = check_open_prs_for_issue(repo, issue.number)?;
-    
+
     if !remaining_open_prs.is_empty() {
         println!(
             "⚠️ {} PR(s) still open after evaluation. Running evaluation once more...",
             remaining_open_prs.len()
         );
-        
+
         // Run evaluation one more time to give it a chance to address open PRs
         run_recipe(EVALUATE_RECIPE, eval_params).await?;
-        
+
         // Process any new issues from second evaluation
         process_evaluation_issues(repo, issue.number, &eval_issues_dir)?;
-        
+
         // Check PRs again
         let final_open_prs = check_open_prs_for_issue(repo, issue.number)?;
-        
+
         if !final_open_prs.is_empty() {
             println!(
                 "📝 {} PR(s) still open. Closing them now...",
                 final_open_prs.len()
             );
-            
+
             // Close all remaining open PRs
             for pr in final_open_prs {
                 if let Some(pr_num) = pr.get("number").and_then(|n| n.as_u64()) {
@@ -544,15 +592,15 @@ async fn execute_evaluation_work(repo: &str, issue: &GitHubIssue, worker_id: &st
             }
         }
     }
-    
+
     // Close all task issues that were created
     close_task_issues(repo, issue.number)?;
-    
+
     // Close the original planning issue
     close_planning_issue(repo, issue.number)?;
-    
+
     println!("✅ Evaluation complete. Issue #{} closed.", issue.number);
-    
+
     Ok(())
 }
 
@@ -581,7 +629,7 @@ async fn execute_task_work(repo: &str, issue: &GitHubIssue, worker_id: &str) -> 
         "⏸️  Waiting {} seconds before claiming to avoid collisions...",
         wait_seconds
     );
-    thread::sleep(Duration::from_secs(wait_seconds));
+    sleep(Duration::from_secs(wait_seconds)).await;
 
     // Check if someone else claimed it while we were waiting
     if is_issue_claimed(repo, issue.number)? {
@@ -744,33 +792,63 @@ pub async fn run(args: SwarmArgs) -> Result<()> {
     // Register this node in the swarm issue
     register_node(&args.repo, &worker_id)?;
 
-    // Main polling loop
-    loop {
-        println!("🔍 Polling for available work...");
+    // Set up Ctrl+C handler
+    let shutdown = tokio::signal::ctrl_c();
+    tokio::pin!(shutdown);
 
-        match detect_work_type(&args.repo)? {
-            WorkType::Planning(issue) => {
-                execute_planning_work(&args.repo, &issue, &worker_id).await?;
-                println!("✅ Completed planning work");
-                // Continue polling for more work
+    // Main polling loop with graceful shutdown
+    loop {
+        tokio::select! {
+            _ = &mut shutdown => {
+                println!("\n\n🛑 Received shutdown signal, exiting gracefully...");
+                println!("👋 Goose Swarm worker {} shutting down", worker_id);
+                break;
             }
-            WorkType::Task(issue) => {
-                execute_task_work(&args.repo, &issue, &worker_id).await?;
-                println!("✅ Completed task work");
-                // Continue polling for more work
-            }
-            WorkType::Evaluation(issue) => {
-                execute_evaluation_work(&args.repo, &issue, &worker_id).await?;
-                println!("✅ Completed evaluation work");
-                // Continue polling for more work
-            }
-            WorkType::None => {
-                println!(
-                    "💤 No work available, waiting {} seconds...",
-                    args.poll_interval
-                );
-                thread::sleep(Duration::from_secs(args.poll_interval));
+            result = async {
+                println!("🔍 Polling for available work...");
+
+                match detect_work_type(&args.repo) {
+                    Ok(WorkType::Planning(issue)) => {
+                        if let Err(e) = execute_planning_work(&args.repo, &issue, &worker_id).await {
+                            eprintln!("❌ Error during planning work: {}", e);
+                        } else {
+                            println!("✅ Completed planning work");
+                        }
+                    }
+                    Ok(WorkType::Task(issue)) => {
+                        if let Err(e) = execute_task_work(&args.repo, &issue, &worker_id).await {
+                            eprintln!("❌ Error during task work: {}", e);
+                        } else {
+                            println!("✅ Completed task work");
+                        }
+                    }
+                    Ok(WorkType::Evaluation(issue)) => {
+                        if let Err(e) = execute_evaluation_work(&args.repo, &issue, &worker_id).await {
+                            eprintln!("❌ Error during evaluation work: {}", e);
+                        } else {
+                            println!("✅ Completed evaluation work");
+                        }
+                    }
+                    Ok(WorkType::None) => {
+                        println!(
+                            "💤 No work available, waiting {} seconds...",
+                            args.poll_interval
+                        );
+                        sleep(Duration::from_secs(args.poll_interval)).await;
+                    }
+                    Err(e) => {
+                        eprintln!("❌ Error detecting work type: {}", e);
+                        // Wait before retrying to avoid hammering the API
+                        sleep(Duration::from_secs(5)).await;
+                    }
+                }
+                Ok::<(), anyhow::Error>(())
+            } => {
+                // Continue looping
+                let _ = result;
             }
         }
     }
+
+    Ok(())
 }
