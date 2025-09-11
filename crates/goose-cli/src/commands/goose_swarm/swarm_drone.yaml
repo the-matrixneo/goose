@@ -25,8 +25,8 @@ instructions: |
   Development: 
     Use git and gh CLI commands to manage your workflow.
     Test your changes if locally if applicable before creating the PR.
-    Use sub-agents to help scale your work as needed.
     Do not give up easily. If you are unable to make a successful build, you can leave it in failing state as a failed experiment.
+    but it is CRITICAL that you make a change, push and open a PR
   
   Important:
   - Always create a new branch before making changes

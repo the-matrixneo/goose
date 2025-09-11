@@ -704,6 +704,7 @@ async fn execute_task_work(repo: &str, issue: &GitHubIssue, worker_id: &str) -> 
 }
 
 /// Run a recipe with given parameters
+/// For swarm_drone, use a session identifier to allow for persistence
 async fn run_recipe(recipe_content: &str, params: Vec<(String, String)>) -> Result<()> {
     // Parse the YAML content directly
     let recipe: goose::recipe::Recipe =
@@ -745,11 +746,37 @@ async fn run_recipe(recipe_content: &str, params: Vec<(String, String)>) -> Resu
         retry_config: recipe.retry.clone(),
     };
 
+    // Determine if this is a swarm_drone task that needs a session
+    // We check if task_number is in the params to identify drone work
+    let needs_session = params.iter().any(|(k, _)| k == "task_number");
+
+    // Create a session identifier for drone tasks
+    let session_identifier = if needs_session {
+        // Extract worker_id and task_number for unique session name
+        let worker_id = params
+            .iter()
+            .find(|(k, _)| k == "worker_id")
+            .map(|(_, v)| v.as_str())
+            .unwrap_or("unknown");
+        let task_number = params
+            .iter()
+            .find(|(k, _)| k == "task_number")
+            .map(|(_, v)| v.as_str())
+            .unwrap_or("0");
+
+        Some(goose::session::Identifier::Name(format!(
+            "swarm-drone-{}-task-{}",
+            worker_id, task_number
+        )))
+    } else {
+        None
+    };
+
     // Build and run the session
     let mut session = build_session(SessionBuilderConfig {
-        identifier: None,
+        identifier: session_identifier.clone(),
         resume: false,
-        no_session: true,
+        no_session: !needs_session, // Use session for drone tasks
         extensions: Vec::new(),
         remote_extensions: Vec::new(),
         streamable_http_extensions: Vec::new(),
