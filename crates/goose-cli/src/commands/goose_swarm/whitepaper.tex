@@ -130,10 +130,11 @@ The agent lifecycle consists of several distinct phases:
     \STATE Poll for available work
     \IF{work detected}
         \STATE Determine required role
-        \STATE Attempt to claim work
+        \STATE Attempt to claim work atomically
         \IF{claim successful}
             \STATE Execute role-specific behavior
             \STATE Update environmental state
+            \STATE Release claim if transitioning phases
         \ENDIF
     \ELSE
         \STATE Wait for polling interval
@@ -173,10 +174,12 @@ Planner agents serve as the system's strategic layer, decomposing complex issues
     
     \item \textbf{Issue Generation}: Creates new planning issues for complex sub-components requiring additional analysis.
     
-    \item \textbf{Progress Monitoring}: Polls for pull request submissions, tracking task completion and readiness for evaluation.
+    \item \textbf{State Transition}: Marks issue as "in progress" and releases claim, allowing any peer to evaluate when ready.
 \end{enumerate}
 
 The planner's decomposition strategy adapts to the number of available workers, balancing granularity with coordination overhead. This dynamic adjustment ensures efficient resource utilization regardless of swarm size.
+
+After creating tasks, the planner releases its claim on the issue, enabling any available peer to assume the evaluator role once all tasks are complete.
 
 \subsection{Drone Agents}
 
@@ -196,9 +199,17 @@ Drone agents represent the system's execution layer, implementing specific tasks
 
 Drones operate with complete autonomy within their claimed tasks, making implementation decisions based on local context and specified requirements.
 
-\subsection{Evaluator Behavior}
+\subsection{Evaluator Agents}
 
-While primarily embedded within the planner role during the evaluation phase, the evaluator function represents a critical quality assurance mechanism:
+Evaluator agents represent the system's quality assurance and integration layer. Unlike the initial design where evaluation was tied to the planner role, the current implementation allows any peer in the swarm to assume the evaluator role when an issue is ready for evaluation. This occurs when:
+
+\begin{itemize}
+    \item An issue is marked as "in progress" (indicating planning is complete)
+    \item All associated task issues have submitted pull requests
+    \item No other agent has claimed the evaluation role
+\end{itemize}
+
+When an evaluator claims an issue, it performs:
 
 \begin{itemize}
     \item \textbf{PR Assessment}: Analyzing submitted pull requests for correctness, completeness, and adherence to requirements.
@@ -209,6 +220,8 @@ While primarily embedded within the planner role during the evaluation phase, th
     
     \item \textbf{Cleanup Operations}: Closing completed task issues and updating parent issue status.
 \end{itemize}
+
+This decoupled evaluation approach improves system efficiency by allowing any available agent to perform evaluation, rather than waiting for the original planner to become available again.
 
 \section{Coordination Mechanisms}
 

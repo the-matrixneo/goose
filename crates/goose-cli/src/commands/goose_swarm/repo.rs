@@ -450,17 +450,17 @@ pub fn get_task_issue_numbers(repo: &str, parent_issue: u32) -> Result<Vec<u32>>
 /// Get PRs that reference the original issue (either in title or body)
 pub fn get_prs_for_issue(repo: &str, issue_number: u32) -> Result<Vec<serde_json::Value>> {
     let args = [
-            "pr",
-            "list",
-            "--repo",
-            repo,
-            "--search",
-            &format!("[issue:{}] in:title", issue_number),
-            "--state",
-            "all",
-            "--json",
-            "number,title,url,state,body,isDraft",
-        ];
+        "pr",
+        "list",
+        "--repo",
+        repo,
+        "--search",
+        &format!("[issue:{}] in:title", issue_number),
+        "--state",
+        "all",
+        "--json",
+        "number,title,url,state,body,isDraft",
+    ];
     let output = Command::new("gh")
         .args(args)
         .output()
@@ -473,7 +473,7 @@ pub fn get_prs_for_issue(repo: &str, issue_number: u32) -> Result<Vec<serde_json
         eprintln!(
             "DEBUG: For issue #{}, found {} PRs, command: gh {}",
             issue_number,
-            prs.len(), 
+            prs.len(),
             args.join(" ")
         );
         for pr in &prs {
