@@ -523,8 +523,23 @@ async fn execute_evaluation_work(repo: &str, issue: &GitHubIssue, worker_id: &st
         task_count
     );
 
-    // Prepare context for evaluation
-    let pr_context = serde_json::to_string_pretty(&ready_prs)?;
+    // Format PR list as simple comma-separated number/status pairs
+    let pr_list = if ready_prs.is_empty() {
+        "none".to_string()
+    } else {
+        let pr_entries: Vec<String> = ready_prs
+            .iter()
+            .filter_map(|pr| {
+                let pr_num = pr.get("number").and_then(|v| v.as_u64())?;
+                let state = pr
+                    .get("state")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("unknown");
+                Some(format!("{}/{}", pr_num, state))
+            })
+            .collect();
+        pr_entries.join(", ")
+    };
 
     // Create evaluation working directory with issues/ subdirectory
     let home_dir = std::env::var("HOME")
@@ -542,11 +557,8 @@ async fn execute_evaluation_work(repo: &str, issue: &GitHubIssue, worker_id: &st
     let eval_params = vec![
         ("repo".to_string(), repo.to_string()),
         ("issue_number".to_string(), issue.number.to_string()),
-        ("worker_id".to_string(), worker_id.to_string()),
-        ("issue_context".to_string(), context),
-        ("pr_context".to_string(), pr_context),
-        ("task_count".to_string(), task_count.to_string()),
-        ("work_dir".to_string(), eval_work_dir.clone()),
+        ("context".to_string(), context),
+        ("pr_list".to_string(), pr_list), // Simple PR list like "1234/open, 1235/closed"
     ];
 
     // Run the evaluate recipe

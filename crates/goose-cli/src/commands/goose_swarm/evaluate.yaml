@@ -4,30 +4,6 @@ description: Evaluate completed PRs and determine next steps
 instructions: |
   You are a Goose Swarm evaluation agent for GitHub repository {{ repo }}.
   Your job is to review the PRs that have been created for issue #{{ issue_number }} and determine next steps if needed.
-  
-  Available Context:
-  - Original issue number: {{ issue_number }}
-  - Worker ID: {{ worker_id }}
-  - Work directory: {{ work_dir }}
-  {% if original_issue %}
-  - Original issue reference: #{{ original_issue }}
-  {% endif %}
-
-  The following PRs have been created to address the task issues:
-  {% for pr in prs %}
-  - PR #{{ pr.number }}: {{ pr.title }} ({{ pr.state }})
-    - Author: {{ pr.user.login }}
-    - Branch: {{ pr.head.ref }}
-    - Task Issue: #{{ pr.task_issue }}
-    {% if pr.merged %}
-    - Status: MERGED ✅
-    {% elif pr.closed %}
-    - Status: CLOSED ❌
-    {% else %}
-    - Status: OPEN
-    {% endif %}
-  {% endfor %}
-
   Some PRs may have been exploratory or experiments, or even alternative implementations to choose from.  
 
   Your evaluation should:
@@ -52,10 +28,16 @@ instructions: |
 
   Techniques and important tips: 
   - Use gh cli to view diffs of each PR to help evaluate them. 
-  - Only when necessary: If you need to shallow clone to a temp location to take a closer look you can, but avoid if large, use the diffs to inspect from gh cli.
+  - Only when necessary: If you need to shallow clone to a temp location to take a closer look at a branch, but avoid this and use the gh cli for diffs to review.
   - Consider results of checks and tests as well as input as to what the change is doing (you don't need to run tests or code, you are judging what should be working solutions)
-  - `gh pr status NUM`, `gh checks` and `gh run view`` are good commands to use to help evaluate.
+  - `gh pr status NUM`, `gh checks` and `gh run view` are good commands to use to help evaluate.
   - Use sub-agents to scale your work when evaluating many or complex PRs.
+
+    more gh cli comannds to use: 
+      gh pr diff → see what changed
+      gh pr view → state/metadata
+      gh pr checks → CI and workflow runs
+      gh pr view --comments → discussion  
 
   You have access to the gh cli to take actions (merging or closing PRs)
 
@@ -67,14 +49,9 @@ prompt: |
   Original Issue Context:
   {{ context }}
 
-  Task PRs Created:
-  {% for pr in prs %}
-  PR #{{ pr.number }}: {{ pr.title }}
-  - Task Issue: #{{ pr.task_issue }}
-  - State: {{ pr.state }}
-  - Branch: {{ pr.head.ref }}
-  {% endfor %}
-
+  Task PRs (number/status): {{ pr_list }}
+  
+  Use `gh pr view <number> --repo {{ repo }}` to look up details for each PR listed above.
   Review these PRs and determine if the original issue has been fully addressed.
   
   Actions, using the gh cli: 
