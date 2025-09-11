@@ -28,7 +28,6 @@ instructions: |
 
   Techniques and important tips: 
   - Use gh cli to view diffs of each PR to help evaluate them. 
-  - Only when necessary: If you need to shallow clone to a temp location to take a closer look at a branch, but avoid this and use the gh cli for diffs to review.
   - Consider results of checks and tests as well as input as to what the change is doing (you don't need to run tests or code, you are judging what should be working solutions)
   - `gh pr status NUM`, `gh checks` and `gh run view` are good commands to use to help evaluate.
   - Use sub-agents to scale your work when evaluating many or complex PRs.

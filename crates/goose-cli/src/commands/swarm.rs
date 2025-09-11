@@ -439,7 +439,6 @@ async fn execute_planning_work(repo: &str, issue: &GitHubIssue, worker_id: &str)
     let params = vec![
         ("repo".to_string(), repo.to_string()),
         ("issue_number".to_string(), issue.number.to_string()),
-        ("worker_id".to_string(), worker_id.to_string()),
         ("context".to_string(), context.clone()),
         ("available_nodes".to_string(), available_nodes.to_string()),
         ("work_dir".to_string(), work_dir.clone()),

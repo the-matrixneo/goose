@@ -98,14 +98,4 @@ mod tests {
         assert!(!prompt.contains("{{ context }}"));
         assert!(!prompt.contains("{{ repo_dir }}"));
     }
-
-    #[test]
-    fn test_worker_id_format() {
-        // Test that generated worker IDs follow expected format
-        // This is a minimal test since we can't access the private functions from swarm.rs
-        // But we can test that our test recipe YAML files are valid
-        assert!(TEST_PLAN_WORK_RECIPE.contains("Worker ID: {{ worker_id }}"));
-        assert!(TEST_SWARM_DRONE_RECIPE.contains("Worker ID: {{ worker_id }}"));
-        assert!(TEST_EVALUATE_RECIPE.contains("Worker ID: {{ worker_id }}"));
-    }
 }
