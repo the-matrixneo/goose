@@ -60,8 +60,10 @@ prompt: |
   5. In the tasks do not be overly prescriptive for how the drones should operate (drones will know how to do PRs and builds when asked), focus on what is needed, how to validate, what is essential, and you can offer suggestions. 
       - make clear suggestions vs requirements.
   
-  Tips: 
+  Tips when starting: 
    * ONLY if no code exists, you should plan a task to scaffold the necessary structure, including a github workflow pipeline to validate changes, the task could include a minimal implementation if clear
+      - the pipeline should be crisp and simple and fast to validate. 
+      - it is important you have a scaffold and pipeline in place
    * a follow on issue may be required to implement things after scaffolding is in place 
    * be clear and thorough in your task instructions
    * if suggesting new issues, they will be seperately planned and implemented

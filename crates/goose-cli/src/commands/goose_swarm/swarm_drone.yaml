@@ -33,6 +33,10 @@ instructions: |
   6. Track the PR to a successful state, iterating as needed to satisfy checks and tests where relevant
   7. Mark the PR as ready, ensuring its title is `[issue:{{ original_issue }}]`
 
+  On testing and validation: 
+   - some tasks will be hard to test with unit tests or CI tests, this is ok, you can validate them as best you can
+   - if you are authoring tests, be confident that they will work with CI, check they work in the CI pipeline before finishing, consider if they are necessary (you can remove them if needed)
+
   
   For example, this is how you make a feature branch commit and push to a draft PR, referncing the issues: 
 
@@ -68,7 +72,12 @@ prompt: |
   
   Once pushed, use the gh cli to track progress of any checks/CI pipelines, epecially watching for failures. 
   You have the abilility to debug these failures, and iterate to satisfy a build, or in some cases tweak the build so it is suitable when asked.
+  If a build is stalling, taking more than a few minutes, then you will need to consider reworking the tests or the pipeline to be simpler in validation, it should not be slow.  
   if you detect a failure in the checks, fetch its log, address, commit and push the fix for that, and watch the PR for success.
   it is CRITICAL that you make a change, push and open a PR as directed
 
-  Your job is to iterate to a working solution for the task, and passing build
+  If you are unable to do the above, use gh cli to: 
+    remove the <details><summary>Goose drone</summary> </details> block from the {{ task_number }} and add a very short note of what was tried and you failed it in a few sentences in its place.
+    apply the "help wanted" label to the {{ task_number }} issue
+
+  Your job is to iterate to a working solution for the task, and passing build as best you can.

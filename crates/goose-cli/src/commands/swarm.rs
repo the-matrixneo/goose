@@ -325,8 +325,10 @@ fn process_task_files(repo: &str, parent_issue: u32, tasks_dir: &str) -> Result<
 }
 
 /// Process issue files in issues/ directory to create non-task issues
-fn process_issue_files(repo: &str, parent_issue: u32, issues_dir: &str) -> Result<()> {
+/// Returns the number of issues created
+fn process_issue_files(repo: &str, parent_issue: u32, issues_dir: &str) -> Result<usize> {
     let entries = std::fs::read_dir(issues_dir).context("Failed to read issues directory")?;
+    let mut issue_count = 0;
 
     for entry in entries {
         let entry = entry?;
@@ -344,10 +346,11 @@ fn process_issue_files(repo: &str, parent_issue: u32, issues_dir: &str) -> Resul
                 .trim();
 
             create_planning_issue(repo, parent_issue, title, &content)?;
+            issue_count += 1;
         }
     }
 
-    Ok(())
+    Ok(issue_count)
 }
 
 /// Process new issues created by the evaluation recipe
@@ -432,8 +435,9 @@ async fn execute_planning_work(repo: &str, issue: &GitHubIssue, worker_id: &str)
     let tasks_dir = format!("{}/tasks", work_dir);
     let issues_dir = format!("{}/issues", work_dir);
 
-    std::fs::create_dir_all(&tasks_dir).context("Failed to create tasks directory")?;
-    std::fs::create_dir_all(&issues_dir).context("Failed to create issues directory")?;
+    
+    prepare_task_directories(&tasks_dir, &issues_dir)?;
+       
 
     // Build recipe parameters for planning
     let params = vec![
@@ -453,15 +457,30 @@ async fn execute_planning_work(repo: &str, issue: &GitHubIssue, worker_id: &str)
     let task_count = process_task_files(repo, issue.number, &tasks_dir)?;
 
     // Process issue files in issues/ directory
-    process_issue_files(repo, issue.number, &issues_dir)?;
+    let issue_count = process_issue_files(repo, issue.number, &issues_dir)?;
 
-    // Check if any task issues were created
-    if task_count == 0 {
-        println!("⚠️ No task issues were created. Planning may have failed.");
+    // Check if any task issues or follow-on issues were created
+    if task_count == 0 && issue_count == 0 {
+        println!("⚠️ No task issues or follow-on issues were created. Planning may have failed.");
+        println!("🔓 Removing claim and restoring help wanted label...");
+
+        // Remove the claim from the issue
+        unclaim_issue(repo, issue.number, worker_id)?;
+
+        // Re-add help wanted label so others can try
+        add_help_wanted_label(repo, issue.number)?;
+
+        println!(
+            "↩️ Issue #{} is available for other workers to attempt.",
+            issue.number
+        );
         return Ok(());
     }
 
-    println!("📊 Created {} task issues.", task_count);
+    println!(
+        "📊 Created {} task issues and {} follow-on issues.",
+        task_count, issue_count
+    );
 
     // Add "in progress" label to mark that tasks are being worked on
     add_in_progress_label(repo, issue.number)?;
@@ -474,6 +493,19 @@ async fn execute_planning_work(repo: &str, issue: &GitHubIssue, worker_id: &str)
     );
 
     Ok(())
+}
+
+fn prepare_task_directories(tasks_dir: &String, issues_dir: &String) -> Result<(), anyhow::Error> {
+    std::fs::create_dir_all(tasks_dir).context("Failed to create tasks directory")?;
+    std::fs::create_dir_all(issues_dir).context("Failed to create issues directory")?;
+    for entry in fs::read_dir(tasks_dir)? {
+        let entry = entry?;
+        fs::remove_file(entry.path())?;
+    }
+    Ok(for entry in fs::read_dir(issues_dir)? {
+        let entry = entry?;
+        fs::remove_file(entry.path())?;
+    })
 }
 
 /// Execute evaluation work for issues with all PRs ready

@@ -722,7 +722,16 @@ pub fn create_evaluation_issue(
     // Create the new issue
     let output = Command::new("gh")
         .args([
-            "issue", "create", "--repo", repo, "--title", title, "--body", &body,
+            "issue",
+            "create",
+            "--repo",
+            repo,
+            "--title",
+            title,
+            "--body",
+            &body,
+            "--label",
+            "help wanted",
         ])
         .output()
         .context("Failed to create evaluation issue")?;
