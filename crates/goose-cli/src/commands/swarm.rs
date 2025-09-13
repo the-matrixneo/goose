@@ -112,42 +112,13 @@ fn get_or_create_worker_id(provided_id: Option<String>) -> Result<String> {
     Ok(new_id)
 }
 
-/// Detect available work - prioritizes tasks, then evaluation, then planning work
+/// Detect available work - prioritizes tasks, then planning work, then evaluation work
 fn detect_work_type(repo: &str) -> Result<WorkType> {
-    // First check for issues ready for evaluation (in progress with all PRs ready)
+
     let in_progress = get_in_progress_issues(repo)?;
-
-    if !in_progress.is_empty() {
-        // Get full details for all issues to check them
-        let all_issues = get_all_issues(repo)?;
-
-        for issue_num in in_progress {
-            // Skip if already claimed
-            if is_issue_claimed(repo, issue_num)? {
-                continue;
-            }
-
-            // Get the task issues for this parent issue
-            let task_issues = get_task_issue_numbers(repo, issue_num)?;
-
-            if !task_issues.is_empty() {
-                // Check if all tasks have ready PRs
-                let ready_prs = get_ready_prs_for_issue(repo, issue_num)?;
-
-                if ready_prs.len() >= task_issues.len() {
-                    // All tasks have PRs - ready for evaluation
-                    if let Some(issue) = all_issues.iter().find(|i| i.number == issue_num) {
-                        return Ok(WorkType::Evaluation(issue.clone()));
-                    }
-                }
-            }
-        }
-    }
-
-    // Now check for help wanted issues (tasks and planning)
     let help_wanted = get_help_wanted_issues(repo)?;
 
-    if help_wanted.is_empty() {
+    if help_wanted.is_empty() && in_progress.is_empty() {
         return Ok(WorkType::None);
     }
 
@@ -194,6 +165,33 @@ fn detect_work_type(repo: &str) -> Result<WorkType> {
             available_planning.into_iter().next().unwrap(),
         ));
     }
+
+    // Next, check for evaluation work in progress issues
+    if !in_progress.is_empty() {
+
+        for issue_num in in_progress {
+            // Skip if already claimed
+            if is_issue_claimed(repo, issue_num)? {
+                continue;
+            }
+
+            // Get the task issues for this parent issue
+            let task_issues = get_task_issue_numbers(repo, issue_num)?;
+
+            if !task_issues.is_empty() {
+                // Check if all tasks have ready PRs
+                let ready_prs = get_ready_prs_for_issue(repo, issue_num)?;
+
+                if ready_prs.len() >= task_issues.len() {
+                    // All tasks have PRs - ready for evaluation
+                    if let Some(issue) = all_issues.iter().find(|i| i.number == issue_num) {
+                        return Ok(WorkType::Evaluation(issue.clone()));
+                    }
+                }
+            }
+        }
+    }
+
 
     Ok(WorkType::None)
 }
@@ -677,11 +675,9 @@ async fn execute_task_work(repo: &str, issue: &GitHubIssue, worker_id: &str) -> 
     // Check if someone else claimed it while we were waiting
     if is_issue_claimed(repo, issue.number)? {
         println!(
-            "⚠️ Issue #{} was claimed by another worker while waiting. Skipping.",
+            "⚠️ Task #{} was claimed by another worker while waiting. Skipping.",
             issue.number
         );
-        // Re-add help wanted label if no one actually claimed it
-        add_help_wanted_label(repo, issue.number)?;
         return Ok(()); // Exit gracefully, will look for more work
     }
 

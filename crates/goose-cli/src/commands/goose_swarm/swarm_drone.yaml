@@ -76,8 +76,6 @@ prompt: |
   if you detect a failure in the checks, fetch its log, address, commit and push the fix for that, and watch the PR for success.
   it is CRITICAL that you make a change, push and open a PR as directed
 
-  If you are unable to do the above, use gh cli to: 
-    remove the <details><summary>Goose drone</summary> </details> block from the {{ task_number }} and add a very short note of what was tried and you failed it in a few sentences in its place.
-    apply the "help wanted" label to the {{ task_number }} issue
-
   Your job is to iterate to a working solution for the task, and passing build as best you can.
+
+  If you are unable to do the above, close the the PR you opened, and switch back to the main branch and exit.
