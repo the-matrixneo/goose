@@ -36,7 +36,8 @@ prompt: |
   Copy the contents into from templates dir {{ repo_dir }} and commit the changes with a message "chore: initial scaffolding"
   Then push to the main branch of the repo with git cli that you have.  
 
-  use this pattern: 
-     `cp -r ~/.local/share/goose-swarm/templates/<chosen-template>/* {{ repo_dir }}`
+  use this pattern to sync it: 
+  
+     `rsync -a --exclude='.git/' ~/.local/share/goose-swarm/templates/<chosen-template>/ {{ repo_dir }}/`
      `git add . && git commit -m "chore: initial scaffolding" && git push origin main`
   
