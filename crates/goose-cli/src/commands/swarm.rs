@@ -19,6 +19,7 @@ use tokio::time::{sleep, Duration};
 const PLAN_WORK_RECIPE: &str = include_str!("goose_swarm/plan_work.yaml");
 const SWARM_DRONE_RECIPE: &str = include_str!("goose_swarm/swarm_drone.yaml");
 const EVALUATE_RECIPE: &str = include_str!("goose_swarm/evaluate.yaml");
+const INIT_WORK_RECIPE: &str = include_str!("goose_swarm/init_work.yaml");
 
 /// Orchestrate parallel work on GitHub issues using swarm intelligence
 #[derive(Args, Debug)]
@@ -114,7 +115,6 @@ fn get_or_create_worker_id(provided_id: Option<String>) -> Result<String> {
 
 /// Detect available work - prioritizes tasks, then planning work, then evaluation work
 fn detect_work_type(repo: &str) -> Result<WorkType> {
-
     let in_progress = get_in_progress_issues(repo)?;
     let help_wanted = get_help_wanted_issues(repo)?;
 
@@ -168,7 +168,6 @@ fn detect_work_type(repo: &str) -> Result<WorkType> {
 
     // Next, check for evaluation work in progress issues
     if !in_progress.is_empty() {
-
         for issue_num in in_progress {
             // Skip if already claimed
             if is_issue_claimed(repo, issue_num)? {
@@ -191,7 +190,6 @@ fn detect_work_type(repo: &str) -> Result<WorkType> {
             }
         }
     }
-
 
     Ok(WorkType::None)
 }
@@ -291,6 +289,12 @@ fn prepare_workspace(repo: &str, worker_id: &str) -> Result<String> {
     }
 
     Ok(workspace_dir)
+}
+
+/// Check if the repository has a .workflow directory
+fn has_workflow_directory(repo_dir: &str) -> bool {
+    let workflow_path = format!("{}/.workflow", repo_dir);
+    std::path::Path::new(&workflow_path).exists()
 }
 
 /// Process task files in tasks/ directory to create [task] issues
@@ -433,9 +437,14 @@ async fn execute_planning_work(repo: &str, issue: &GitHubIssue, worker_id: &str)
     let tasks_dir = format!("{}/tasks", work_dir);
     let issues_dir = format!("{}/issues", work_dir);
 
-    
     prepare_task_directories(&tasks_dir, &issues_dir)?;
-       
+
+    // Check if .workflow directory exists and run initialization recipe if needed
+    if !has_workflow_directory(&repo_dir) {
+        println!("🚀 No .workflow directory found, running initialization recipe first...");
+    } else {
+        println!("📂 Found .workflow directory, skipping initialization.");
+    }
 
     // Build recipe parameters for planning
     let params = vec![
@@ -444,11 +453,17 @@ async fn execute_planning_work(repo: &str, issue: &GitHubIssue, worker_id: &str)
         ("context".to_string(), context.clone()),
         ("available_nodes".to_string(), available_nodes.to_string()),
         ("work_dir".to_string(), work_dir.clone()),
-        ("repo_dir".to_string(), repo_dir), // Pass the cloned repo directory
+        ("repo_dir".to_string(), repo_dir.clone()), // Pass the cloned repo directory
     ];
 
-    // Run the planning recipe to create tasks
-    println!("🎯 Running planning recipe to break down the issue...");
+    // Run initialization recipe if needed
+    if !has_workflow_directory(&repo_dir) {
+        run_recipe(INIT_WORK_RECIPE, params.clone()).await?;
+        println!("✅ Initialization recipe complete.");
+    }
+
+    // Run the standard planning recipe to create tasks
+    println!("🎯 Running standard planning recipe to break down the issue...");
     run_recipe(PLAN_WORK_RECIPE, params).await?;
 
     // Process task files in tasks/ directory and get the count
@@ -500,10 +515,11 @@ fn prepare_task_directories(tasks_dir: &String, issues_dir: &String) -> Result<(
         let entry = entry?;
         fs::remove_file(entry.path())?;
     }
-    Ok(for entry in fs::read_dir(issues_dir)? {
+    for entry in fs::read_dir(issues_dir)? {
         let entry = entry?;
         fs::remove_file(entry.path())?;
-    })
+    }
+    Ok(())
 }
 
 /// Execute evaluation work for issues with all PRs ready
