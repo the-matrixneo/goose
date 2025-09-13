@@ -4,7 +4,7 @@ description: Initialize a repository with workflow structure and basic scaffoldi
 instructions: |
   You are Goose Swarm agent working on a github repo {{ repo }}.
   Your job is to analyze issue #{{ issue_number }} and create initial scaffolding and workflow structure
-  since the repository doesn't have a .workflow directory yet.
+  since the repository is new.
   
   Context:
   - Issue: {{ issue_number }}
@@ -14,31 +14,29 @@ instructions: |
   IMPORTANT: This repository is a brand new project, you will be choosing and implementing an initial scaffolding (non functional) and a simple github pipeline to validate this.
 
   
-  Remember:
-  - Focus on initialization and scaffolding tasks
-  - Create a GitHub Actions workflow pipeline that is crisp, simple, and fast
-  - you have access to git and gh cli tools 
-
 prompt: |
   I need to initialize and scaffold the following project description:
 
   {{ context }}
 
-  The repository is available for exploration at: {{ repo_dir }}
-  
-  Please:
-  1. Analyize at a high level what will be built, it may be a vague description so some imagination needed.
-  2. Choose an appropriate starting tech stack approach (minimal)
-  3. Layout minimal project structure for this, and a github workflow to validate it
-  4. Create a branch, and push your changes to the branch (and then create a pull request from this branch using `gh pr create ...`)
-  5. using gh CLI, it is critical you follow the PR to a successful state, checks passing, you can pull every 30 seconds to check for its success. 
-  If failure or taking too long, iterate on your changes, simplify as needed, adjust pipeline and simplify. 
-  6. Merge your pull request into the main branch when successful 
 
-  gh PR checks can be checked like this example: 
+  Based on what you can tell, you are to select from one of the following template repos to help get started:
 
-    `gh pr checks 4557 --repo block/goose`
-    `gh run view 17548570648 --repo block/goose --logs` to view logs for failing checks if needed
-    `gh pr status ...` can be consulted
+  https://github.com/t3-oss/create-t3-app - typescript template
+  https://github.com/pwa-builder/pwa-starter - for apps which are mobile targeted, but can work as a progressive web apps
+  https://github.com/golang-templates/seed - a golang seed application for golang apps 
+  https://github.com/android/nowinandroid - for rich full featured android app 
+  https://github.com/Q42/template-ios - for ios 
+
+  For x-platform mobile apps, consider making a flutter app if not a PWA 
+
+
+
+  Clone a template repo into ~/.local/share/goose-swarm/templates if not already there when you have picked one (you can also inspect contents when in there to ensure it seems apporpruate)
+  Copy the contents into from templates dir {{ repo_dir }} and commit the changes with a message "chore: initial scaffolding"
+  Then push to the main branch of the repo with git cli that you have.  
+
+  use this pattern: 
+     `cp -r ~/.local/share/goose-swarm/templates/<chosen-template>/* {{ repo_dir }}`
+     `git add . && git commit -m "chore: initial scaffolding" && git push origin main`
   
-  Remember: you are only done when successfully merged in to main branch with passing workflow checks.

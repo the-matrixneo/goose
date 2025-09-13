@@ -53,22 +53,14 @@ prompt: |
   The repository is available for exploration at: {{ repo_dir }}
   
   Please:
-  1. First explore the repository structure at {{ repo_dir }} to understand the codebase
-  2. Analyze the issue requirements in context of the actual code
+  1. First explore the repository structure at {{ repo_dir }} to understand the codebase (it may be in a new or templated state, that is ok, you are to evolve and change it)
+  2. Analyze the issue requirements in context of the actual code and layout
   3. Create appropriate task files in {{ work_dir }}/tasks/ for drone workers to execute
   4. If there are complex sub-components that need additional planning, create issue files in {{ work_dir }}/issues/
   5. In the tasks do not be overly prescriptive for how the drones should operate (drones will know how to do PRs and builds when asked), focus on what is needed, how to validate, what is essential, and you can offer suggestions. 
       - make clear suggestions vs requirements.
   
-  Tips when starting: 
-   * ONLY if no code exists, you should plan a task to scaffold the necessary structure, including a github workflow pipeline to validate changes, the task could include a minimal implementation if clear
-      - the pipeline should be crisp and simple and fast to validate. 
-      - it is important you have a scaffold and pipeline in place
-   * a follow on issue may be required to implement things after scaffolding is in place 
-   * be clear and thorough in your task instructions
-   * if suggesting new issues, they will be seperately planned and implemented
 
-  
   Each task should be independently executable and result in a PR that addresses part of this issue.
   Target creating around {{ available_nodes }} tasks if the work can be parallelized effectively.
   
