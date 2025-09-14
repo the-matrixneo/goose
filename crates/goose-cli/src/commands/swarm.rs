@@ -19,7 +19,6 @@ use tokio::time::{sleep, Duration};
 const PLAN_WORK_RECIPE: &str = include_str!("goose_swarm/plan_work.yaml");
 const SWARM_DRONE_RECIPE: &str = include_str!("goose_swarm/swarm_drone.yaml");
 const EVALUATE_RECIPE: &str = include_str!("goose_swarm/evaluate.yaml");
-const INIT_WORK_RECIPE: &str = include_str!("goose_swarm/init_work.yaml");
 
 /// Orchestrate parallel work on GitHub issues using swarm intelligence
 #[derive(Args, Debug)]
@@ -291,11 +290,6 @@ fn prepare_workspace(repo: &str, worker_id: &str) -> Result<String> {
     Ok(workspace_dir)
 }
 
-/// Check if the repository has a .workflow directory
-fn has_workflow_directory(repo_dir: &str) -> bool {
-    let workflow_path = format!("{}/.workflow", repo_dir);
-    std::path::Path::new(&workflow_path).exists()
-}
 
 /// Process task files in tasks/ directory to create [task] issues
 /// Returns the number of task issues created
@@ -439,13 +433,6 @@ async fn execute_planning_work(repo: &str, issue: &GitHubIssue, worker_id: &str)
 
     prepare_task_directories(&tasks_dir, &issues_dir)?;
 
-    // Check if .workflow directory exists and run initialization recipe if needed
-    if !has_workflow_directory(&repo_dir) {
-        println!("🚀 No .workflow directory found, running initialization recipe first...");
-    } else {
-        println!("📂 Found .workflow directory, skipping initialization.");
-    }
-
     // Build recipe parameters for planning
     let params = vec![
         ("repo".to_string(), repo.to_string()),
@@ -455,12 +442,6 @@ async fn execute_planning_work(repo: &str, issue: &GitHubIssue, worker_id: &str)
         ("work_dir".to_string(), work_dir.clone()),
         ("repo_dir".to_string(), repo_dir.clone()), // Pass the cloned repo directory
     ];
-
-    // Run initialization recipe if needed
-    if !has_workflow_directory(&repo_dir) {
-        run_recipe(INIT_WORK_RECIPE, params.clone()).await?;
-        println!("✅ Initialization recipe complete.");
-    }
 
     // Run the standard planning recipe to create tasks
     println!("🎯 Running standard planning recipe to break down the issue...");
