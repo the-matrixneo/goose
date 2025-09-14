@@ -514,6 +514,7 @@ impl Agent {
 
             let todo_content = if let Some(path) = session_file_path {
                 session::storage::read_metadata(&path)
+                    .await
                     .ok()
                     .and_then(|m| {
                         session::TodoState::from_extension_data(&m.extension_data)
@@ -553,7 +554,7 @@ impl Agent {
             } else if let Some(session_config) = session {
                 // Update session metadata with new TODO content
                 match session::storage::get_path(session_config.id.clone()) {
-                    Ok(path) => match session::storage::read_metadata(&path) {
+                    Ok(path) => match session::storage::read_metadata(&path).await {
                         Ok(mut metadata) => {
                             let todo_state = session::TodoState::new(content);
                             todo_state
@@ -912,7 +913,9 @@ impl Agent {
         // Try to get session metadata for more accurate token counts
         let session_metadata = if let Some(session_config) = session {
             match session::storage::get_path(session_config.id.clone()) {
-                Ok(session_file_path) => session::storage::read_metadata(&session_file_path).ok(),
+                Ok(session_file_path) => session::storage::read_metadata(&session_file_path)
+                    .await
+                    .ok(),
                 Err(_) => None,
             }
         } else {

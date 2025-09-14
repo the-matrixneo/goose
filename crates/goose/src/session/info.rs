@@ -18,7 +18,7 @@ pub enum SortOrder {
     Descending,
 }
 
-pub fn get_valid_sorted_sessions(sort_order: SortOrder) -> Result<Vec<SessionInfo>> {
+pub async fn get_valid_sorted_sessions(sort_order: SortOrder) -> Result<Vec<SessionInfo>> {
     let sessions = match session::list_sessions() {
         Ok(sessions) => sessions,
         Err(e) => {
@@ -46,7 +46,7 @@ pub fn get_valid_sorted_sessions(sort_order: SortOrder) -> Result<Vec<SessionInf
             });
 
         // Try to read metadata with error handling
-        match session::read_metadata(&path) {
+        match session::read_metadata(&path).await {
             Ok(metadata) => {
                 session_infos.push(SessionInfo {
                     id,
