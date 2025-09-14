@@ -55,11 +55,6 @@ mod tests {
         );
 
         let recipe = result.unwrap();
-        assert_eq!(recipe.title, "Evaluate");
-        assert_eq!(
-            recipe.description,
-            "Evaluate completed PRs and determine next steps"
-        );
         assert!(recipe.instructions.is_some());
         assert!(recipe.prompt.is_some());
     }

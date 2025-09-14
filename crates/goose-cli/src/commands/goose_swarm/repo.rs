@@ -373,7 +373,100 @@ pub fn claim_issue(repo: &str, issue_number: u32, worker_id: &str, role: &str) -
     Ok(())
 }
 
-/// Get full issue context (title, body, comments)
+/// Get all open pull requests
+pub fn get_open_prs(repo: &str) -> Result<Vec<serde_json::Value>> {
+    let output = Command::new("gh")
+        .args([
+            "pr",
+            "list",
+            "--repo",
+            repo,
+            "--state",
+            "open",
+            "--json",
+            "number,title,body,isDraft,headRefName",
+        ])
+        .output()
+        .context("Failed to list open PRs")?;
+
+    if !output.status.success() {
+        return Ok(Vec::new());
+    }
+
+    let prs: Vec<serde_json::Value> = serde_json::from_slice(&output.stdout)?;
+    Ok(prs)
+}
+
+/// Get PR context including diff, comments, and review status
+pub fn get_pr_context(repo: &str, pr_number: u64) -> Result<String> {
+    let mut context = String::new();
+
+    // Get PR details
+    let output = Command::new("gh")
+        .args(["pr", "view", &pr_number.to_string(), "--repo", repo])
+        .output()
+        .context("Failed to get PR details")?;
+
+    if output.status.success() {
+        context.push_str("=== PR Details ===\n");
+        context.push_str(&String::from_utf8_lossy(&output.stdout));
+        context.push_str("\n\n");
+    }
+
+    // Get PR diff (limited to avoid huge context)
+    let output = Command::new("gh")
+        .args(["pr", "diff", &pr_number.to_string(), "--repo", repo])
+        .output()
+        .context("Failed to get PR diff")?;
+
+    if output.status.success() {
+        let diff = String::from_utf8_lossy(&output.stdout);
+        // Limit diff size to avoid overwhelming context
+        let diff_lines: Vec<&str> = diff.lines().take(500).collect();
+        context.push_str("=== PR Diff (first 500 lines) ===\n");
+        context.push_str(&diff_lines.join("\n"));
+        if diff.lines().count() > 500 {
+            context.push_str("\n... (diff truncated) ...\n");
+        }
+        context.push_str("\n\n");
+    }
+
+    Ok(context)
+}
+
+/// Get the status of a PR (OPEN, CLOSED, MERGED)
+pub fn get_pr_status(repo: &str, pr_number: u64) -> Result<String> {
+    let output = Command::new("gh")
+        .args([
+            "pr",
+            "view",
+            &pr_number.to_string(),
+            "--repo",
+            repo,
+            "--json",
+            "state,merged",
+        ])
+        .output()
+        .context("Failed to get PR status")?;
+
+    if !output.status.success() {
+        return Err(anyhow::anyhow!("Failed to get PR status"));
+    }
+
+    let pr: serde_json::Value = serde_json::from_slice(&output.stdout)?;
+
+    if pr.get("merged").and_then(|v| v.as_bool()).unwrap_or(false) {
+        Ok("MERGED".to_string())
+    } else {
+        let state = pr
+            .get("state")
+            .and_then(|v| v.as_str())
+            .unwrap_or("UNKNOWN");
+        Ok(state.to_string())
+    }
+}
+
+/// Get the full context of an issue including title, body, and comments
 pub fn get_issue_context(repo: &str, issue_number: u32) -> Result<String> {
     let output = Command::new("gh")
         .args([
@@ -566,7 +659,13 @@ pub fn close_pr(repo: &str, pr_number: u64, comment: &str) -> Result<()> {
 }
 
 /// Create a task issue from a file
-pub fn create_task_issue(repo: &str, parent_issue: u32, title: &str, content: &str) -> Result<()> {
+pub fn create_task_issue(
+    repo: &str,
+    parent_issue: u32,
+    title: &str,
+    content: &str,
+    original_issue_body: &str,
+) -> Result<()> {
     // Add [task] prefix if not present
     let final_title = if title.starts_with("[task]") {
         title.to_string()
@@ -574,8 +673,17 @@ pub fn create_task_issue(repo: &str, parent_issue: u32, title: &str, content: &s
         format!("[task] {} [issue:{}]", title, parent_issue)
     };
 
-    // Add "for:#<parent>" to the body
-    let body_with_reference = format!("{}\n\nfor:#{}", content, parent_issue);
+    // Build the body with the original issue content clearly marked
+    let body_with_reference = format!(
+        "{}\n\n---\n\n## Original issue that this task contributes to:\n\n{}\n\n---\n\nfor:#{}",
+        content,
+        original_issue_body
+            .lines()
+            .map(|line| format!("> {}", line))
+            .collect::<Vec<_>>()
+            .join("\n"),
+        parent_issue
+    );
 
     // Create the task issue
     let output = Command::new("gh")
@@ -648,7 +756,34 @@ pub fn create_planning_issue(
     Ok(())
 }
 
-/// Close all task issues created from a planning issue
+/// Merge a PR
+pub fn merge_pr(repo: &str, pr_number: u64, merge_method: Option<&str>) -> Result<()> {
+    println!("🔀 Merging PR #{}...", pr_number);
+
+    let method = merge_method.unwrap_or("squash");
+
+    let output = Command::new("gh")
+        .args([
+            "pr",
+            "merge",
+            &pr_number.to_string(),
+            "--repo",
+            repo,
+            &format!("--{}", method),
+            "--delete-branch",
+        ])
+        .output()
+        .context("Failed to merge PR")?;
+
+    if !output.status.success() {
+        let error = String::from_utf8_lossy(&output.stderr);
+        return Err(anyhow::anyhow!("Failed to merge PR: {}", error));
+    }
+
+    Ok(())
+}
+
+/// Close all task issues related to a parent issue
 pub fn close_task_issues(repo: &str, parent_issue: u32) -> Result<()> {
     // Find all task issues for this parent
     let output = Command::new("gh")
@@ -703,10 +838,54 @@ pub fn close_planning_issue(repo: &str, issue_number: u32) -> Result<()> {
             "--repo",
             repo,
             "--comment",
-            "All tasks completed and evaluated. Issue closed by Goose Swarm.",
+            "Planning phase complete. Task issues have been created and are ready for work. Issue closed by Goose Swarm.",
         ])
         .output()
         .context("Failed to close issue")?;
+    Ok(())
+}
+
+/// Close a generic issue with a comment
+pub fn close_issue(repo: &str, issue_number: u32, comment: &str) -> Result<()> {
+    let output = Command::new("gh")
+        .args([
+            "issue",
+            "close",
+            &issue_number.to_string(),
+            "--repo",
+            repo,
+            "--comment",
+            comment,
+        ])
+        .output()
+        .context("Failed to close issue")?;
+
+    if !output.status.success() {
+        let error = String::from_utf8_lossy(&output.stderr);
+        return Err(anyhow::anyhow!("Failed to close issue: {}", error));
+    }
+
+    Ok(())
+}
+
+/// Create a follow-up issue for failed tasks
+pub fn create_follow_up_issue(repo: &str, title: &str, body: &str) -> Result<()> {
+    let output = Command::new("gh")
+        .args([
+            "issue", "create", "--repo", repo, "--title", title, "--body", body,
+        ])
+        .output()
+        .context("Failed to create follow-up issue")?;
+
+    if !output.status.success() {
+        let error = String::from_utf8_lossy(&output.stderr);
+        return Err(anyhow::anyhow!(
+            "Failed to create follow-up issue: {}",
+            error
+        ));
+    }
+
+    println!("✅ Created follow-up issue: {}", title);
     Ok(())
 }
 

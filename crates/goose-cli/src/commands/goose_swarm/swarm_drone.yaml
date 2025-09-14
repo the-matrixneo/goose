@@ -34,7 +34,7 @@ instructions: |
   7. Mark the PR as ready, ensuring its title is `[issue:{{ original_issue }}]`
 
   On testing and validation: 
-   - some tasks will be hard to test with unit tests or CI tests, this is ok, you can validate them as best you can
+   - some tasks will be hard to test with unit tests or CI tests, this is ok, you can validate them as best you can (CI isn't alwasy needed)
    - if you are authoring tests, be confident that they will work with CI, check they work in the CI pipeline before finishing, consider if they are necessary (you can remove them if needed)
 
   
