@@ -380,20 +380,19 @@ impl Session {
         // Get the provider from the agent for description generation
         let provider = self.agent.provider().await?;
 
-        // Persist messages with provider for automatic description generation
+        // Persist messages with provider for automatic description generation (non-blocking)
         if let Some(session_file) = &self.session_file {
             let working_dir = Some(
                 std::env::current_dir().expect("failed to get current session working directory"),
             );
 
-            session::persist_messages_with_schedule_id(
-                session_file,
-                &self.messages,
+            goose::session::storage::persist_messages_with_schedule_id_non_blocking(
+                session_file.clone(),
+                self.messages.clone(),
                 Some(provider),
                 self.scheduled_job_id.clone(),
                 working_dir,
-            )
-            .await?;
+            );
         }
 
         // Track the current directory and last instruction in projects.json

@@ -1071,6 +1071,58 @@ pub async fn persist_messages(
     persist_messages_with_schedule_id(session_file, messages, provider, None, working_dir).await
 }
 
+/// Non-blocking version of persist_messages that runs in the background
+///
+/// This spawns a tokio task to handle the persistence, allowing the caller to continue
+/// immediately. Particularly useful when the provider needs to make LLM calls for
+/// generating session descriptions, which can be slow.
+///
+/// Note: Errors are logged but not returned to the caller since this is fire-and-forget.
+pub fn persist_messages_non_blocking(
+    session_file: PathBuf,
+    messages: Conversation,
+    provider: Option<Arc<dyn Provider>>,
+    working_dir: Option<PathBuf>,
+) {
+    tokio::spawn(async move {
+        if let Err(e) = persist_messages(&session_file, &messages, provider, working_dir).await {
+            tracing::error!("Failed to persist messages in background: {}", e);
+        }
+    });
+}
+
+/// Non-blocking version of persist_messages_with_schedule_id that runs in the background
+///
+/// This spawns a tokio task to handle the persistence, allowing the caller to continue
+/// immediately. Particularly useful when the provider needs to make LLM calls for
+/// generating session descriptions, which can be slow.
+///
+/// Note: Errors are logged but not returned to the caller since this is fire-and-forget.
+pub fn persist_messages_with_schedule_id_non_blocking(
+    session_file: PathBuf,
+    messages: Conversation,
+    provider: Option<Arc<dyn Provider>>,
+    schedule_id: Option<String>,
+    working_dir: Option<PathBuf>,
+) {
+    tokio::spawn(async move {
+        if let Err(e) = persist_messages_with_schedule_id(
+            &session_file,
+            &messages,
+            provider,
+            schedule_id,
+            working_dir,
+        )
+        .await
+        {
+            tracing::error!(
+                "Failed to persist messages with schedule_id in background: {}",
+                e
+            );
+        }
+    });
+}
+
 /// Write messages to a session file with metadata, including an optional scheduled job ID
 ///
 /// Overwrites the file with metadata as the first line, followed by all messages in JSONL format.
