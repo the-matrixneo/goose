@@ -38,7 +38,7 @@ instructions: |
   - include a link to parent issue (with a note as to what it was about and that this is a spin off issue)
   
   Remember:
-  - Break down work into {{ available_nodes }} or fewer parallel tasks when possible
+  - Break down work into {{ available_nodes }} or fewer parallel tasks when possible. These may be run in parallel so don't expect things to be sequential.
   - Each task should be completable by a single drone worker
   - Tasks should result in a PR that addresses part of the original issue
   - Keep tasks focused and well-scoped

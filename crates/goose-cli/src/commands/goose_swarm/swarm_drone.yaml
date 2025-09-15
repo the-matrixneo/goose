@@ -17,6 +17,7 @@ instructions: |
     use tools to make your changes locally
     Test your changes if locally if applicable before pushing code
     Do not give up easily. If you are unable to make a successful build, you can leave it in failing state as a failed experiment.
+    Consider if CI tests are helpful (isn't always required for some problem domains)
   
   Important:
   - Always create a new branch before making changes
