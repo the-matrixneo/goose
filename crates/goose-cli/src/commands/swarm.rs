@@ -1,8 +1,8 @@
 use crate::commands::goose_swarm::repo::{
-    claim_issue, close_issue, close_planning_issue, close_pr, count_available_nodes,
+    claim_issue, claim_pr, close_issue, close_planning_issue, close_pr, count_available_nodes,
     create_follow_up_issue, create_planning_issue, create_task_issue, get_all_issues,
     get_help_wanted_issues, get_issue_context, get_open_prs, get_pr_context, get_pr_status,
-    is_issue_claimed, register_node, remove_help_wanted_label, GitHubIssue,
+    is_issue_claimed, is_pr_claimed, register_node, remove_help_wanted_label, GitHubIssue,
 };
 use crate::session::{build_session, SessionBuilderConfig};
 use anyhow::{Context, Result};
@@ -134,6 +134,11 @@ fn detect_work_type(repo: &str) -> Result<WorkType> {
             pr.get("number").and_then(|v| v.as_u64()),
             pr.get("title").and_then(|v| v.as_str()),
         ) {
+            // Skip if already claimed by another evaluator
+            if is_pr_claimed(repo, number)? {
+                continue;
+            }
+
             let body = pr.get("body").and_then(|v| v.as_str()).map(String::from);
             return Ok(WorkType::Evaluation(PullRequest {
                 number,
@@ -484,6 +489,26 @@ fn prepare_task_directories(tasks_dir: &String, issues_dir: &String) -> Result<(
 /// Execute evaluation work for a PR
 async fn execute_pr_evaluation(repo: &str, pr: &PullRequest, worker_id: &str) -> Result<()> {
     println!("🔍 Evaluating PR #{}: {}", pr.number, pr.title);
+
+    // Random pause to avoid race conditions (1-30 seconds)
+    let wait_seconds = rand::thread_rng().gen_range(1..=30);
+    println!(
+        "⏸️  Waiting {} seconds before claiming to avoid collisions...",
+        wait_seconds
+    );
+    sleep(Duration::from_secs(wait_seconds)).await;
+
+    // Check if someone else claimed it while we were waiting
+    if is_pr_claimed(repo, pr.number)? {
+        println!(
+            "⚠️ PR #{} was claimed by another evaluator while waiting. Skipping.",
+            pr.number
+        );
+        return Ok(()); // Exit gracefully, will look for more work
+    }
+
+    // Claim the PR as evaluator
+    claim_pr(repo, pr.number, worker_id)?;
 
     // Get PR context (diff, comments, etc.)
     let pr_context = get_pr_context(repo, pr.number)?;

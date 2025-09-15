@@ -640,6 +640,78 @@ pub fn check_open_prs_for_issue(repo: &str, issue_number: u32) -> Result<Vec<ser
     }
 }
 
+/// Claim a PR by adding a marker to its body
+pub fn claim_pr(repo: &str, pr_number: u64, worker_id: &str) -> Result<()> {
+    // Get current PR body
+    let output = Command::new("gh")
+        .args([
+            "pr",
+            "view",
+            &pr_number.to_string(),
+            "--repo",
+            repo,
+            "--json",
+            "body",
+            "--jq",
+            ".body",
+        ])
+        .output()
+        .context("Failed to get PR body")?;
+
+    let current_body = if output.status.success() {
+        String::from_utf8_lossy(&output.stdout).to_string()
+    } else {
+        String::new()
+    };
+
+    // Add evaluator marker
+    let new_body = format!(
+        "{}\n<details><summary>Goose evaluator</summary>\n<p>\ngoose:swarm:evaluator:{}</p>\n</details>",
+        current_body.trim(),
+        worker_id
+    );
+
+    // Update PR body
+    Command::new("gh")
+        .args([
+            "pr",
+            "edit",
+            &pr_number.to_string(),
+            "--repo",
+            repo,
+            "--body",
+            &new_body,
+        ])
+        .output()
+        .context("Failed to update PR body")?;
+
+    println!("✅ Claimed PR #{} as evaluator", pr_number);
+    Ok(())
+}
+
+/// Check if a PR has been claimed by an evaluator
+pub fn is_pr_claimed(repo: &str, pr_number: u64) -> Result<bool> {
+    let output = Command::new("gh")
+        .args([
+            "pr",
+            "view",
+            &pr_number.to_string(),
+            "--repo",
+            repo,
+            "--json",
+            "body",
+        ])
+        .output()
+        .context("Failed to get PR body")?;
+
+    if output.status.success() {
+        let content = String::from_utf8_lossy(&output.stdout);
+        return Ok(content.contains("goose:swarm:evaluator:"));
+    }
+
+    Ok(false)
+}
+
 /// Close a PR with a comment
 pub fn close_pr(repo: &str, pr_number: u64, comment: &str) -> Result<()> {
     println!("   Closing PR #{}", pr_number);
