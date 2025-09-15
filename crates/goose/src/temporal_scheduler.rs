@@ -716,7 +716,7 @@ impl TemporalScheduler {
         let mut schedule_sessions: Vec<(String, SessionMetadata)> = Vec::new();
 
         for (session_name, session_path) in all_session_files {
-            match storage::read_metadata(&session_path) {
+            match storage::read_metadata(&session_path).await {
                 Ok(metadata) => {
                     // Check if this session belongs to the requested schedule
                     if metadata.schedule_id.as_deref() == Some(sched_id) {

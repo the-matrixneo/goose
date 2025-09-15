@@ -81,6 +81,7 @@ pub struct ActivityHeatmapCell {
 // List all available sessions
 async fn list_sessions() -> Result<Json<SessionListResponse>, StatusCode> {
     let sessions = get_valid_sorted_sessions(SortOrder::Descending)
+        .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     Ok(Json(SessionListResponse { sessions }))
@@ -112,7 +113,9 @@ async fn get_session_history(
         Err(_) => return Err(StatusCode::BAD_REQUEST),
     };
 
-    let metadata = session::read_metadata(&session_path).map_err(|_| StatusCode::NOT_FOUND)?;
+    let metadata = session::read_metadata(&session_path)
+        .await
+        .map_err(|_| StatusCode::NOT_FOUND)?;
 
     let messages = match session::read_messages(&session_path) {
         Ok(messages) => messages,
@@ -153,10 +156,12 @@ async fn get_session_history(
 async fn get_session_insights() -> Result<Json<SessionInsights>, StatusCode> {
     let handler_start = Instant::now();
 
-    let sessions = get_valid_sorted_sessions(SortOrder::Descending).map_err(|e| {
-        error!("Failed to get session info: {:?}", e);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
+    let sessions = get_valid_sorted_sessions(SortOrder::Descending)
+        .await
+        .map_err(|e| {
+            error!("Failed to get session info: {:?}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
     // Filter out sessions without descriptions
     let sessions: Vec<SessionInfo> = sessions
@@ -268,7 +273,9 @@ async fn update_session_metadata(
         .map_err(|_| StatusCode::BAD_REQUEST)?;
 
     // Read current metadata
-    let mut metadata = session::read_metadata(&session_path).map_err(|_| StatusCode::NOT_FOUND)?;
+    let mut metadata = session::read_metadata(&session_path)
+        .await
+        .map_err(|_| StatusCode::NOT_FOUND)?;
 
     // Update description
     metadata.description = request.description;

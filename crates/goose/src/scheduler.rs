@@ -657,7 +657,7 @@ impl Scheduler {
         let mut schedule_sessions: Vec<(String, SessionMetadata)> = Vec::new();
 
         for (session_name, session_path) in all_session_files {
-            match session::storage::read_metadata(&session_path) {
+            match session::storage::read_metadata(&session_path).await {
                 Ok(metadata) => {
                     // metadata is not mutable here, and SessionMetadata is original
                     if metadata.schedule_id.as_deref() == Some(sched_id) {
@@ -1266,7 +1266,7 @@ async fn run_scheduled_job_internal(
                     }
                 }
 
-                match crate::session::storage::read_metadata(&session_file_path) {
+                match crate::session::storage::read_metadata(&session_file_path).await {
                     Ok(mut updated_metadata) => {
                         updated_metadata.message_count = all_session_messages.len();
                         if let Err(e) = crate::session::storage::save_messages_with_metadata(
@@ -1494,7 +1494,7 @@ mod tests {
             expected_session_path.display()
         );
 
-        let metadata = read_metadata(&expected_session_path)?;
+        let metadata = read_metadata(&expected_session_path).await?;
 
         assert_eq!(
             metadata.schedule_id,

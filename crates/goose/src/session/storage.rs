@@ -21,7 +21,7 @@ use std::io::{self, BufRead, Write};
 use std::ops::DerefMut;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use tokio::io::AsyncBufReadExt;
+use tokio::io::AsyncReadExt;
 use utoipa::ToSchema;
 
 // Security limits
@@ -1014,24 +1014,27 @@ fn truncate_json_string(json_str: &str, max_content_size: usize) -> String {
 pub async fn read_metadata(session_file: &Path) -> Result<SessionMetadata> {
     let secure_path = get_path(Identifier::Path(session_file.to_path_buf()))?;
 
-    if !tokio::fs::try_exists(&secure_path).await? {
+    let mut file = match tokio::fs::File::open(&secure_path).await {
+        Ok(file) => file,
+        Err(_) => return Ok(SessionMetadata::default()),
+    };
+
+    let mut buffer = vec![0u8; MAX_LINE_LENGTH.min(1024)];
+    let bytes_read = file.read(&mut buffer).await?;
+
+    if bytes_read == 0 {
         return Ok(SessionMetadata::default());
     }
 
-    let file = tokio::fs::File::open(&secure_path).await?;
-    let mut first_line = String::new();
-    let mut reader = tokio::io::BufReader::new(file);
-
-    if reader.read_line(&mut first_line).await? == 0 {
-        return Ok(SessionMetadata::default());
-    }
+    let content = String::from_utf8_lossy(&buffer[..bytes_read]);
+    let first_line = content.lines().next().unwrap_or("");
 
     if first_line.len() > MAX_LINE_LENGTH {
         tracing::warn!("Metadata line exceeds length limit");
         return Err(anyhow::anyhow!("Metadata line too long"));
     }
 
-    Ok(serde_json::from_str(&first_line).unwrap_or_else(|e| {
+    Ok(serde_json::from_str(first_line).unwrap_or_else(|e| {
         tracing::debug!("Metadata parse error: {}", e);
         SessionMetadata::default()
     }))
@@ -1661,8 +1664,8 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn test_invalid_working_dir() -> Result<()> {
+    #[tokio::test]
+    async fn test_invalid_working_dir() -> Result<()> {
         let dir = tempdir()?;
         let file_path = dir.path().join("test.jsonl");
 
@@ -1774,7 +1777,7 @@ mod tests {
         .await?;
 
         // Read back the metadata - this should now have the correct working_dir
-        let metadata_new = read_metadata(&file_path)?;
+        let metadata_new = read_metadata(&file_path).await?;
         assert_eq!(
             metadata_new.working_dir, working_dir_path,
             "persist_messages_with_schedule_id should use provided working_dir"
@@ -1795,7 +1798,7 @@ mod tests {
         )
         .await?;
 
-        let metadata_fallback = read_metadata(&file_path_2)?;
+        let metadata_fallback = read_metadata(&file_path_2).await?;
         assert_eq!(metadata_fallback.working_dir, home_dir, "persist_messages_with_schedule_id should fall back to home directory when no working_dir is provided");
 
         // Test 4: Test that the fix works for existing files
@@ -1804,7 +1807,7 @@ mod tests {
 
         // First, create with home directory
         persist_messages(&file_path_3, &messages, None, None).await?;
-        let metadata_initial = read_metadata(&file_path_3)?;
+        let metadata_initial = read_metadata(&file_path_3).await?;
         assert_eq!(
             metadata_initial.working_dir, home_dir,
             "Initial session should use home directory"

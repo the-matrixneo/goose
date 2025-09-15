@@ -284,7 +284,7 @@ impl Agent {
                 return Err(anyhow::anyhow!("Failed to get session file path: {}", e));
             }
         };
-        let mut metadata = session::storage::read_metadata(&session_file_path)?;
+        let mut metadata = session::storage::read_metadata(&session_file_path).await?;
 
         metadata.schedule_id = session_config.schedule_id.clone();
 
