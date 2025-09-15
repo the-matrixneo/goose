@@ -1,9 +1,11 @@
 import { listRecipes, RecipeManifestResponse } from '../api';
 import { Recipe } from './index';
 import * as yaml from 'yaml';
+import { validateRecipe, getValidationErrorMessages } from './validation';
 
 export interface SaveRecipeOptions {
   name: string;
+  title?: string;
   global?: boolean; // true for global (~/.config/goose/recipes/), false for project-specific (.goose/recipes/)
 }
 
@@ -69,21 +71,29 @@ async function saveRecipeToFile(recipe: SavedRecipe): Promise<boolean> {
  * Save a recipe to a file using IPC.
  */
 export async function saveRecipe(recipe: Recipe, options: SaveRecipeOptions): Promise<string> {
-  const { name, global = true } = options;
+  const { name, title, global = true } = options;
 
-  // Sanitize name
-  const sanitizedName = sanitizeRecipeName(name);
-  if (!sanitizedName) {
-    throw new Error('Invalid recipe name');
+  let sanitizedName: string;
+
+  if (title) {
+    recipe.title = title.trim();
+    sanitizedName = generateRecipeFilename(recipe);
+    if (!sanitizedName) {
+      throw new Error('Invalid recipe title - cannot generate filename');
+    }
+  } else {
+    // This branch should now be considered deprecated and will be removed once the same functionality
+    // is incorporated in CreateRecipeForm
+    sanitizedName = sanitizeRecipeName(name);
+    if (!sanitizedName) {
+      throw new Error('Invalid recipe name');
+    }
   }
 
-  // Validate recipe has required fields
-  if (!recipe.title || !recipe.description) {
-    throw new Error('Recipe is missing required fields (title, description)');
-  }
-
-  if (!recipe.instructions && !recipe.prompt) {
-    throw new Error('Recipe must have either instructions or prompt');
+  const validationResult = validateRecipe(recipe);
+  if (!validationResult.success) {
+    const errorMessages = getValidationErrorMessages(validationResult.errors);
+    throw new Error(`Recipe validation failed: ${errorMessages.join(', ')}`);
   }
 
   try {
