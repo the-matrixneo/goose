@@ -944,7 +944,16 @@ pub fn close_issue(repo: &str, issue_number: u32, comment: &str) -> Result<()> {
 pub fn create_follow_up_issue(repo: &str, title: &str, body: &str) -> Result<()> {
     let output = Command::new("gh")
         .args([
-            "issue", "create", "--repo", repo, "--title", title, "--body", body,
+            "issue",
+            "create",
+            "--repo",
+            repo,
+            "--title",
+            title,
+            "--body",
+            body,
+            "--label",
+            "help wanted",
         ])
         .output()
         .context("Failed to create follow-up issue")?;
