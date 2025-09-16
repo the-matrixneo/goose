@@ -608,7 +608,6 @@ impl Agent {
                 Err(e) => return (request_id, Err(e)),
             }
         } else {
-            // Clone the result to ensure no references to extension_manager are returned
             let result = self
                 .extension_manager
                 .dispatch_tool_call(tool_call.clone(), cancellation_token.unwrap_or_default())
@@ -1066,13 +1065,48 @@ impl Agent {
                 }
 
 
-                let mut stream = Self::stream_response_from_provider(
+                // Try to create the stream, handling context length errors
+                let mut stream = match Self::stream_response_from_provider(
                     self.provider().await?,
                     &system_prompt,
                     messages.messages(),
                     &tools,
                     &toolshim_tools,
-                ).await?;
+                ).await {
+                    Ok(s) => s,
+                    Err(ProviderError::ContextLengthExceeded(error_msg)) => {
+                        info!("Context length exceeded during stream creation, attempting compaction");
+
+                        match auto_compact::perform_compaction(self, messages.messages()).await {
+                            Ok(compact_result) => {
+                                messages = compact_result.messages;
+
+                                yield AgentEvent::Message(
+                                    Message::assistant().with_summarization_requested(
+                                        "Context limit reached. Conversation has been automatically compacted to continue."
+                                    )
+                                );
+                                yield AgentEvent::HistoryReplaced(messages.messages().to_vec());
+
+                                // Retry with compacted messages
+                                continue;
+                            }
+                            Err(_) => {
+                                yield AgentEvent::Message(Message::assistant().with_context_length_exceeded(
+                                    format!("Context length exceeded and cannot summarize: {}. Unable to continue.", error_msg)
+                                ));
+                                break;
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        error!("Failed to create stream: {}", e);
+                        yield AgentEvent::Message(Message::assistant().with_text(
+                            format!("Failed to process request: {}.\n\nPlease retry if you think this is a transient or recoverable error.", e)
+                        ));
+                        break;
+                    }
+                };
 
                 let mut added_message = false;
                 let mut messages_to_add = Vec::new();
