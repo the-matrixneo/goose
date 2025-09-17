@@ -91,8 +91,14 @@ jobs:
             echo "No patch file found at /tmp/test_addition.patch"
           fi
 
-          # Check if a valid git patch was created (simplified check)
-          if [ -f /tmp/test_addition.patch ] && [ -s /tmp/test_addition.patch ]; then
+          # Check for new commits that Goose might have made
+          COMMITS_AHEAD=$(git rev-list HEAD --not --remotes=origin --count 2>/dev/null || echo "0")
+          echo "Commits ahead of origin: $COMMITS_AHEAD"
+
+          # Check if we have changes to create a PR from
+          # Either: 1) A patch file exists, OR 2) There are new commits
+          if [ -f /tmp/test_addition.patch ] && [ -s /tmp/test_addition.patch ] || [ "$COMMITS_AHEAD" -gt 0 ]; then
+            echo "Changes detected (patch file or new commits)"
             echo "Attempting to apply patch..."
             # Try to apply the patch, show errors if it fails
             git apply --check /tmp/test_addition.patch 2>&1 || echo "Warning: Patch validation failed, but continuing anyway"
