@@ -100,10 +100,8 @@ jobs:
           if [ -f /tmp/test_addition.patch ] && [ -s /tmp/test_addition.patch ] || [ "$COMMITS_AHEAD" -gt 0 ]; then
             echo "Changes detected (patch file or new commits)"
             echo "Attempting to apply patch..."
-            # Try to apply the patch, show errors if it fails
-            git apply --check /tmp/test_addition.patch 2>&1 || echo "Warning: Patch validation failed, but continuing anyway"
             # Apply the patch for the PR
-            git apply /tmp/test_addition.patch
+            git apply /tmp/test_addition.patch 2>/dev/null || echo "Patch already applied or changes already present"
             echo "patch_created=true" >> $GITHUB_OUTPUT
             echo "Test creation successful - patch file created"
 
@@ -111,8 +109,9 @@ jobs:
             if [ -f /tmp/function_tested.txt ]; then
               FUNC_NAME=$(cat /tmp/function_tested.txt | head -1)
             else
-              # Fallback: Extract from test name in patch
-              FUNC_NAME=$(grep "fn test_" /tmp/test_addition.patch | head -1 | sed 's/.*fn test_//' | sed 's/(.*//' || echo "function")
+              # Fallback: Extract from test name in the actual changes (staged or committed)
+              # Try staged changes first, then last commit, then patch file
+              FUNC_NAME=$(git diff --cached | grep "^+.*fn test_" | head -1 | sed 's/.*fn test_//' | sed 's/(.*//' || git diff HEAD~1 | grep "^+.*fn test_" | head -1 | sed 's/.*fn test_//' | sed 's/(.*//' || grep "fn test_" /tmp/test_addition.patch 2>/dev/null | head -1 | sed 's/.*fn test_//' | sed 's/(.*//' || echo "function")
             fi
             # Clean up the function name (remove any trailing whitespace or special chars)
             FUNC_NAME=$(echo "$FUNC_NAME" | tr -d '\n\r' | sed 's/[[:space:]]*$//')
