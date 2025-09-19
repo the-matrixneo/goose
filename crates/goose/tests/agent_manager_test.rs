@@ -209,7 +209,7 @@ async fn test_cleanup_task_runs() {
     assert!(manager.has_agent(&session).await);
 
     // Spawn cleanup task
-    let handle = manager.clone().spawn_cleanup_task();
+    let handle = manager.clone().spawn_cleanup_task().await;
 
     // Wait for cleanup to run (should clean up after 50ms idle + 100ms interval)
     tokio::time::sleep(Duration::from_millis(200)).await;
@@ -219,4 +219,29 @@ async fn test_cleanup_task_runs() {
 
     // Clean up the task
     handle.abort();
+}
+
+#[tokio::test]
+async fn test_cleanup_task_graceful_shutdown() {
+    use goose::agents::manager::AgentManagerConfig;
+
+    let manager = Arc::new(AgentManager::new(AgentManagerConfig {
+        cleanup_interval: Duration::from_secs(60), // Long interval so it won't run during test
+        ..Default::default()
+    }));
+
+    // Spawn cleanup task
+    let handle = manager.clone().spawn_cleanup_task().await;
+
+    // Verify task is running
+    assert!(!handle.is_finished());
+
+    // Shutdown the manager
+    manager.shutdown().await;
+
+    // Give it a moment to abort
+    tokio::time::sleep(Duration::from_millis(10)).await;
+
+    // Task should be aborted
+    assert!(handle.is_finished());
 }

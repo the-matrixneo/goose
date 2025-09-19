@@ -157,9 +157,20 @@ impl Default for SessionMetadata {
 // The single app name used for all Goose applications
 const APP_NAME: &str = "goose";
 
+/// Session identifier that can be either a name or a direct path
+///
+/// In practice:
+/// - `Name(String)` is used for normal session operations (99% of cases)
+///   The string is the session ID and will be resolved to a path in the sessions directory
+/// - `Path(PathBuf)` is used for direct file access (testing, migration, recovery)
+///   The path must point to a valid .jsonl file within the sessions directory
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum Identifier {
+    /// Session name/ID - will be resolved to a file in the sessions directory
+    /// This is the standard way to identify sessions
     Name(String),
+    /// Direct path to a session file - used for testing and special operations
+    /// Must be within the sessions directory for security
     Path(PathBuf),
 }
 

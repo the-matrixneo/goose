@@ -192,6 +192,9 @@ pub struct AgentManager {
 
     /// Metrics for monitoring and debugging
     metrics: Arc<RwLock<AgentMetrics>>,
+
+    /// Handle to abort the cleanup task on shutdown
+    cleanup_handle: Arc<RwLock<Option<tokio::task::AbortHandle>>>,
 }
 
 impl AgentManager {
@@ -202,6 +205,7 @@ impl AgentManager {
             pool: None, // Start without pooling, add later
             config,
             metrics: Arc::new(RwLock::new(AgentMetrics::default())),
+            cleanup_handle: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -360,8 +364,12 @@ impl AgentManager {
     }
 
     /// Spawn a background task to periodically clean up idle agents
-    pub fn spawn_cleanup_task(self: Arc<Self>) -> tokio::task::JoinHandle<()> {
-        tokio::spawn(async move {
+    /// Returns the JoinHandle which can be used to await task completion
+    pub async fn spawn_cleanup_task(self: Arc<Self>) -> tokio::task::JoinHandle<()> {
+        // Store the abort handle before moving self
+        let cleanup_handle = self.cleanup_handle.clone();
+
+        let handle = tokio::spawn(async move {
             let mut interval = tokio::time::interval(self.config.cleanup_interval);
             loop {
                 interval.tick().await;
@@ -377,6 +385,19 @@ impl AgentManager {
                     }
                 }
             }
-        })
+        });
+
+        // Store the abort handle for graceful shutdown
+        *cleanup_handle.write().await = Some(handle.abort_handle());
+
+        handle
+    }
+
+    /// Shutdown the agent manager, aborting the cleanup task
+    pub async fn shutdown(&self) {
+        if let Some(handle) = self.cleanup_handle.write().await.take() {
+            handle.abort();
+            tracing::info!("Agent manager cleanup task aborted");
+        }
     }
 }

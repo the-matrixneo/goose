@@ -25,7 +25,7 @@ impl AppState {
         let agent_manager = Arc::new(AgentManager::new(AgentManagerConfig::default()));
 
         // Spawn the cleanup task
-        agent_manager.clone().spawn_cleanup_task();
+        agent_manager.clone().spawn_cleanup_task().await;
 
         Arc::new(Self {
             agent_manager,
@@ -73,5 +73,10 @@ impl AppState {
 
     pub async fn get_agent_metrics(&self) -> goose::agents::manager::AgentMetrics {
         self.agent_manager.get_metrics().await
+    }
+
+    #[allow(dead_code)] // Will be used when server graceful shutdown is implemented
+    pub async fn shutdown(&self) {
+        self.agent_manager.shutdown().await;
     }
 }
