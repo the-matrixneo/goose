@@ -39,6 +39,7 @@ impl goose::providers::base::Provider for SimpleMockProvider {
                 vec![MessageContent::Text(TextContent {
                     raw: RawTextContent {
                         text: "Mock response".to_string(),
+                        meta: None,
                     },
                     annotations: None,
                 })],

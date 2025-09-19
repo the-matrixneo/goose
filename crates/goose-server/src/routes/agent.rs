@@ -1,9 +1,9 @@
-use super::utils::verify_secret_key;
 use crate::state::AppState;
-use axum::response::IntoResponse;
+
 use axum::{
     extract::{Query, State},
-    http::{HeaderMap, StatusCode},
+    http::StatusCode,
+    response::IntoResponse,
     routing::{get, post},
     Json, Router,
 };
@@ -118,17 +118,13 @@ pub struct AgentStatsResponse {
     responses(
         (status = 200, description = "Agent started successfully", body = StartAgentResponse),
         (status = 400, description = "Bad request - invalid working directory"),
-        (status = 401, description = "Unauthorized - invalid secret key"),
-        (status = 500, description = "Internal server error")
+        (status = 401, description = "Unauthorized - invalid secret key")
     )
 )]
 async fn start_agent(
     State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
     Json(payload): Json<StartAgentRequest>,
 ) -> Result<Json<StartAgentResponse>, StatusCode> {
-    verify_secret_key(&headers, &state)?;
-
     // No longer reset the global agent - each session gets its own
 
     let session_id = session::generate_session_id();
@@ -177,12 +173,8 @@ async fn start_agent(
     )
 )]
 async fn resume_agent(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
     Json(payload): Json<ResumeAgentRequest>,
 ) -> Result<Json<StartAgentResponse>, StatusCode> {
-    verify_secret_key(&headers, &state)?;
-
     let session_path =
         match session::get_path(session::Identifier::Name(payload.session_id.clone())) {
             Ok(path) => path,
@@ -213,16 +205,13 @@ async fn resume_agent(
     responses(
         (status = 200, description = "Added sub recipes to agent successfully", body = AddSubRecipesResponse),
         (status = 401, description = "Unauthorized - invalid secret key"),
-        (status = 424, description = "Agent not initialized"),
-    ),
+        (status = 424, description = "Agent not initialized")
+    )
 )]
 async fn add_sub_recipes(
     State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
     Json(payload): Json<AddSubRecipesRequest>,
 ) -> Result<Json<AddSubRecipesResponse>, StatusCode> {
-    verify_secret_key(&headers, &state)?;
-
     let session_id = session::Identifier::Name(payload.session_id.clone());
     let agent = state.get_agent(session_id).await.map_err(|e| {
         tracing::error!("Failed to get agent for session: {}", e);
@@ -239,16 +228,13 @@ async fn add_sub_recipes(
     responses(
         (status = 200, description = "Extended system prompt successfully", body = ExtendPromptResponse),
         (status = 401, description = "Unauthorized - invalid secret key"),
-        (status = 424, description = "Agent not initialized"),
-    ),
+        (status = 424, description = "Agent not initialized")
+    )
 )]
 async fn extend_prompt(
     State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
     Json(payload): Json<ExtendPromptRequest>,
 ) -> Result<Json<ExtendPromptResponse>, StatusCode> {
-    verify_secret_key(&headers, &state)?;
-
     let session_id = session::Identifier::Name(payload.session_id.clone());
     let agent = state.get_agent(session_id).await.map_err(|e| {
         tracing::error!("Failed to get agent for session: {}", e);
@@ -267,18 +253,13 @@ async fn extend_prompt(
     ),
     responses(
         (status = 200, description = "Tools retrieved successfully", body = Vec<ToolInfo>),
-        (status = 401, description = "Unauthorized - invalid secret key"),
-        (status = 424, description = "Agent not initialized"),
-        (status = 500, description = "Internal server error")
+        (status = 401, description = "Unauthorized - invalid secret key")
     )
 )]
 async fn get_tools(
     State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
     Query(query): Query<GetToolsQuery>,
 ) -> Result<Json<Vec<ToolInfo>>, StatusCode> {
-    verify_secret_key(&headers, &state)?;
-
     let config = Config::global();
     let goose_mode = config.get_param("GOOSE_MODE").unwrap_or("auto".to_string());
     let session_id = session::Identifier::Name(query.session_id.clone());
@@ -328,18 +309,13 @@ async fn get_tools(
     responses(
         (status = 200, description = "Provider updated successfully"),
         (status = 400, description = "Bad request - missing or invalid parameters"),
-        (status = 401, description = "Unauthorized - invalid secret key"),
-        (status = 424, description = "Agent not initialized"),
-        (status = 500, description = "Internal server error")
+        (status = 401, description = "Unauthorized - invalid secret key")
     )
 )]
 async fn update_agent_provider(
     State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
     Json(payload): Json<UpdateProviderRequest>,
 ) -> Result<StatusCode, impl IntoResponse> {
-    verify_secret_key(&headers, &state).map_err(|e| (e, String::new()))?;
-
     let session_id = session::Identifier::Name(payload.session_id.clone());
     let agent = state.get_agent(session_id).await.map_err(|e| {
         tracing::error!("Failed to get agent for session: {}", e);
@@ -389,15 +365,8 @@ async fn update_agent_provider(
 )]
 async fn update_router_tool_selector(
     State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
     Json(payload): Json<UpdateRouterToolSelectorRequest>,
 ) -> Result<Json<String>, Json<ErrorResponse>> {
-    verify_secret_key(&headers, &state).map_err(|_| {
-        Json(ErrorResponse {
-            error: "Unauthorized - Invalid or missing API key".to_string(),
-        })
-    })?;
-
     let session_id = session::Identifier::Name(payload.session_id.clone());
     let agent = state.get_agent(session_id).await.map_err(|e| {
         tracing::error!("Failed to get agent for session: {}", e);
@@ -433,15 +402,8 @@ async fn update_router_tool_selector(
 )]
 async fn update_session_config(
     State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
     Json(payload): Json<SessionConfigRequest>,
 ) -> Result<Json<String>, Json<ErrorResponse>> {
-    verify_secret_key(&headers, &state).map_err(|_| {
-        Json(ErrorResponse {
-            error: "Unauthorized - Invalid or missing API key".to_string(),
-        })
-    })?;
-
     let session_id = session::Identifier::Name(payload.session_id.clone());
     let agent = state.get_agent(session_id).await.map_err(|e| {
         tracing::error!("Failed to get agent for session: {}", e);
@@ -472,10 +434,7 @@ async fn update_session_config(
 )]
 async fn get_agent_stats(
     State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
 ) -> Result<Json<AgentStatsResponse>, StatusCode> {
-    verify_secret_key(&headers, &state)?;
-
     let metrics = state.get_agent_metrics().await;
 
     Ok(Json(AgentStatsResponse {
@@ -496,17 +455,11 @@ async fn get_agent_stats(
         (status = 500, description = "Internal server error")
     )
 )]
-async fn cleanup_agents(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-) -> Result<Json<String>, StatusCode> {
-    verify_secret_key(&headers, &state)?;
-
+async fn cleanup_agents(State(state): State<Arc<AppState>>) -> Result<Json<String>, StatusCode> {
     let cleaned = state.cleanup_idle_agents().await.map_err(|e| {
         tracing::error!("Failed to cleanup agents: {}", e);
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
-
     Ok(Json(format!("Cleaned up {} idle agents", cleaned)))
 }
 

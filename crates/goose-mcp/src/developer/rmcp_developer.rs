@@ -3,7 +3,7 @@ use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use include_dir::{include_dir, Dir};
 use indoc::{formatdoc, indoc};
 use rmcp::{
-    handler::server::{router::tool::ToolRouter, tool::Parameters},
+    handler::server::{router::tool::ToolRouter, wrapper::Parameters},
     model::{
         CallToolResult, Content, ErrorCode, ErrorData, GetPromptRequestParam, GetPromptResult,
         Implementation, ListPromptsResult, LoggingLevel, LoggingMessageNotificationParam,
@@ -31,6 +31,7 @@ use tokio::{
 };
 use tokio_stream::{wrappers::SplitStream, StreamExt as _};
 
+use super::analyze::{types::AnalyzeParams, CodeAnalyzer};
 use super::editor_models::{create_editor_model, EditorModel};
 use super::goose_hints::load_hints::{load_hint_files, GOOSE_HINTS_FILENAME};
 use super::shell::{expand_path, get_shell_config, is_absolute_path};
@@ -59,6 +60,11 @@ pub struct TextEditorParams {
     /// The operation to perform. Allowed options are: `view`, `write`, `str_replace`, `insert`, `undo_edit`.
     pub command: String,
 
+    /// Unified diff to apply. Supports editing multiple files simultaneously. Cannot create or delete files
+    /// Example: "--- a/file\n+++ b/file\n@@ -1,3 +1,3 @@\n context\n-old\n+new\n context"
+    /// Preferred edit method.
+    pub diff: Option<String>,
+
     /// Optional array of two integers specifying the start and end line numbers to view.
     /// Line numbers are 1-indexed, and -1 for the end line means read to the end of the file.
     /// This parameter only applies when viewing files, not directories.
@@ -67,10 +73,10 @@ pub struct TextEditorParams {
     /// The content to write to the file. Required for `write` command.
     pub file_text: Option<String>,
 
-    /// The old string to replace. Required for `str_replace` command.
+    /// The old string to replace.
     pub old_str: Option<String>,
 
-    /// The new string to replace with. Required for `str_replace` and `insert` commands.
+    /// The new string to replace with. Required for `insert` command.
     pub new_str: Option<String>,
 
     /// The line number after which to insert text (0 for beginning). Required for `insert` command.
@@ -159,13 +165,14 @@ fn load_prompt_files() -> HashMap<String, Prompt> {
 }
 
 /// Developer MCP Server using official RMCP SDK
-#[derive(Debug)]
+#[derive(Clone)]
 pub struct DeveloperServer {
     tool_router: ToolRouter<Self>,
     file_history: Arc<Mutex<HashMap<PathBuf, Vec<String>>>>,
     ignore_patterns: Gitignore,
     editor_model: Option<EditorModel>,
     prompts: HashMap<String, Prompt>,
+    code_analyzer: CodeAnalyzer,
 }
 
 #[tool_handler(router = self.tool_router)]
@@ -175,6 +182,7 @@ impl ServerHandler for DeveloperServer {
         // Get base instructions and working directory
         let cwd = std::env::current_dir().expect("should have a current working dir");
         let os = std::env::consts::OS;
+        let in_container = Self::is_definitely_container();
 
         let base_instructions = match os {
             "windows" => formatdoc! {r#"
@@ -186,15 +194,19 @@ impl ServerHandler for DeveloperServer {
 
                 Use the shell tool as needed to locate files or interact with the project.
 
+                Leverage `analyze` through `return_last_only=true` subagents for deep codebase understanding with lean context
+                - delegate analysis, retain summaries
+
                 Your windows/screen tools can be used for visual debugging. You should not use these tools unless
                 prompted to, but you can mention they are available if they are relevant.
 
                 operating system: {os}
                 current directory: {cwd}
-
+                {container_info}
                 "#,
                 os=os,
                 cwd=cwd.to_string_lossy(),
+                container_info=if in_container { "container: true" } else { "" },
             },
             _ => formatdoc! {r#"
                 The developer extension gives you the capabilities to edit code files and run shell commands,
@@ -203,15 +215,21 @@ impl ServerHandler for DeveloperServer {
             You can use the shell tool to run any command that would work on the relevant operating system.
             Use the shell tool as needed to locate files or interact with the project.
 
+            Leverage `analyze` through `return_last_only=true` subagents for deep codebase understanding with lean context
+            - delegate analysis, retain summaries
+
             Your windows/screen tools can be used for visual debugging. You should not use these tools unless
             prompted to, but you can mention they are available if they are relevant.
 
+            Always prefer ripgrep (rg -C 3) to grep.
+
             operating system: {os}
             current directory: {cwd}
-
+            {container_info}
                 "#,
                 os=os,
                 cwd=cwd.to_string_lossy(),
+                container_info=if in_container { "container: true" } else { "" },
             },
         };
 
@@ -231,49 +249,59 @@ impl ServerHandler for DeveloperServer {
             formatdoc! {r#"
 
                 Additional Text Editor Tool Instructions:
-                
+
                 Perform text editing operations on files.
                 The `command` parameter specifies the operation to perform. Allowed options are:
                 - `view`: View the content of a file.
                 - `write`: Create or overwrite a file with the given content
-                - `str_replace`: Edit the file with the new content.
+                - `str_replace`: Replace text in one or more files.
                 - `insert`: Insert text at a specific line location in the file.
                 - `undo_edit`: Undo the last edit made to a file.
 
                 To use the write command, you must specify `file_text` which will become the new content of the file. Be careful with
                 existing files! This is a full overwrite, so you must include everything - not just sections you are modifying.
-                
-                To use the insert command, you must specify both `insert_line` (the line number after which to insert, 0 for beginning, -1 for end) 
+
+                To use the insert command, you must specify both `insert_line` (the line number after which to insert, 0 for beginning, -1 for end)
                 and `new_str` (the text to insert).
 
-                To use the edit_file command, you must specify both `old_str` and `new_str` 
+                To use the str_replace command to edit multiple files, use the `diff` parameter with a unified diff.
+                To use the str_replace command to edit one file, you must specify both `old_str` and `new_str` - the `old_str` needs to exactly match one
+                unique section of the original file, including any whitespace. Make sure to include enough context that the match is not
+                ambiguous. The entire original string will be replaced with `new_str`
+
+                When possible, batch file edits together by using a multi-file unified `diff` within a single str_replace tool call.
+
                 {}
-                
+
             "#, editor.get_str_replace_description()}
         } else {
             formatdoc! {r#"
 
                 Additional Text Editor Tool Instructions:
-                
+
                 Perform text editing operations on files.
 
                 The `command` parameter specifies the operation to perform. Allowed options are:
                 - `view`: View the content of a file.
                 - `write`: Create or overwrite a file with the given content
-                - `str_replace`: Replace a string in a file with a new string.
+                - `str_replace`: Replace text in one or more files.
                 - `insert`: Insert text at a specific line location in the file.
                 - `undo_edit`: Undo the last edit made to a file.
 
                 To use the write command, you must specify `file_text` which will become the new content of the file. Be careful with
                 existing files! This is a full overwrite, so you must include everything - not just sections you are modifying.
 
-                To use the str_replace command, you must specify both `old_str` and `new_str` - the `old_str` needs to exactly match one
+                To use the str_replace command to edit multiple files, use the `diff` parameter with a unified diff.
+                To use the str_replace command to edit one file, you must specify both `old_str` and `new_str` - the `old_str` needs to exactly match one
                 unique section of the original file, including any whitespace. Make sure to include enough context that the match is not
-                ambiguous. The entire original string will be replaced with `new_str`.
+                ambiguous. The entire original string will be replaced with `new_str`
 
-                To use the insert command, you must specify both `insert_line` (the line number after which to insert, 0 for beginning, -1 for end) 
+                When possible, batch file edits together by using a multi-file unified `diff` within a single str_replace tool call.
+
+                To use the insert command, you must specify both `insert_line` (the line number after which to insert, 0 for beginning, -1 for end)
                 and `new_str` (the text to insert).
-                
+
+
             "#}
         };
 
@@ -291,7 +319,6 @@ impl ServerHandler for DeveloperServer {
             **Important**: Each shell command runs in its own process. Things like directory changes or
             sourcing files do not persist between tool calls. So you may need to repeat them each time by
             stringing together commands.
-              - Pathnames: Use absolute paths and avoid cd unless explicitly requested
         "#};
 
         let windows_specific = indoc! {r#"
@@ -500,6 +527,7 @@ impl DeveloperServer {
             ignore_patterns,
             editor_model,
             prompts: load_prompt_files(),
+            code_analyzer: CodeAnalyzer::new(),
         }
     }
 
@@ -654,7 +682,7 @@ impl DeveloperServer {
     /// - `undo_edit`: Undo the last edit made to a file.
     #[tool(
         name = "text_editor",
-        description = "Perform text editing operations on files. Commands: view (show file content), write (create/overwrite file), str_replace (AI-enhanced replace text when configured, fallback to literal replacement), insert (insert at line), undo_edit (undo last change)."
+        description = "Perform text editing operations on files. Commands: view (show file content), write (create/overwrite file), str_replace (edit file), insert (insert at line), undo_edit (undo last change)."
     )]
     pub async fn text_editor(
         &self,
@@ -699,29 +727,46 @@ impl DeveloperServer {
                 Ok(CallToolResult::success(content))
             }
             "str_replace" => {
-                let old_str = params.old_str.ok_or_else(|| {
-                    ErrorData::new(
-                        ErrorCode::INVALID_PARAMS,
-                        "Missing 'old_str' parameter for str_replace command".to_string(),
-                        None,
+                // Check if diff parameter is provided
+                if let Some(ref diff) = params.diff {
+                    // When diff is provided, old_str and new_str are not required
+                    let content = text_editor_replace(
+                        &path,
+                        "", // old_str not used with diff
+                        "", // new_str not used with diff
+                        Some(diff),
+                        &self.editor_model,
+                        &self.file_history,
                     )
-                })?;
-                let new_str = params.new_str.ok_or_else(|| {
-                    ErrorData::new(
-                        ErrorCode::INVALID_PARAMS,
-                        "Missing 'new_str' parameter for str_replace command".to_string(),
+                    .await?;
+                    Ok(CallToolResult::success(content))
+                } else {
+                    // Traditional str_replace with old_str and new_str
+                    let old_str = params.old_str.ok_or_else(|| {
+                        ErrorData::new(
+                            ErrorCode::INVALID_PARAMS,
+                            "Missing 'old_str' parameter for str_replace command".to_string(),
+                            None,
+                        )
+                    })?;
+                    let new_str = params.new_str.ok_or_else(|| {
+                        ErrorData::new(
+                            ErrorCode::INVALID_PARAMS,
+                            "Missing 'new_str' parameter for str_replace command".to_string(),
+                            None,
+                        )
+                    })?;
+                    let content = text_editor_replace(
+                        &path,
+                        &old_str,
+                        &new_str,
                         None,
+                        &self.editor_model,
+                        &self.file_history,
                     )
-                })?;
-                let content = text_editor_replace(
-                    &path,
-                    &old_str,
-                    &new_str,
-                    &self.editor_model,
-                    &self.file_history,
-                )
-                .await?;
-                Ok(CallToolResult::success(content))
+                    .await?;
+                    Ok(CallToolResult::success(content))
+                }
             }
             "insert" => {
                 let insert_line = params.insert_line.ok_or_else(|| {
@@ -802,12 +847,16 @@ impl DeveloperServer {
     /// Checks for empty commands and ensures the command doesn't attempt to access
     /// files that are restricted by ignore patterns.
     fn validate_shell_command(&self, command: &str) -> Result<(), ErrorData> {
-        let cmd_parts: Vec<&str> = command.split_whitespace().collect();
-
-        // Allow empty commands - they'll be handled gracefully
-        if cmd_parts.is_empty() {
-            return Ok(());
+        // Check for empty commands
+        if command.trim().is_empty() {
+            return Err(ErrorData::new(
+                ErrorCode::INVALID_PARAMS,
+                "Shell command cannot be empty".to_string(),
+                None,
+            ));
         }
+
+        let cmd_parts: Vec<&str> = command.split_whitespace().collect();
 
         // Check if command arguments reference ignored files
         for arg in &cmd_parts[1..] {
@@ -845,11 +894,6 @@ impl DeveloperServer {
         command: &str,
         peer: &rmcp::service::Peer<RoleServer>,
     ) -> Result<String, ErrorData> {
-        // Handle empty commands
-        if command.trim().is_empty() {
-            return Ok(String::new());
-        }
-
         // Get platform-specific shell configuration
         let shell_config = get_shell_config();
 
@@ -968,6 +1012,31 @@ impl DeveloperServer {
         }
 
         Ok(())
+    }
+
+    /// Analyze code structure and relationships.
+    ///
+    /// Automatically selects the appropriate analysis:
+    /// - Files: Semantic analysis with call graphs
+    /// - Directories: Structure overview with metrics
+    /// - With focus parameter: Track symbol across files
+    ///
+    /// Examples:
+    /// analyze(path="file.py") -> semantic analysis
+    /// analyze(path="src/") -> structure overview down to max_depth subdirs
+    /// analyze(path="src/", focus="main") -> track main() across files in src/ down to max_depth subdirs
+    #[tool(
+        name = "analyze",
+        description = "Analyze code structure in 3 modes: 1) Directory overview - file tree with LOC/function/class counts to max_depth. 2) File details - functions, classes, imports. 3) Symbol focus - call graphs across directory to max_depth (requires directory path, case-sensitive). Typical flow: directory → files → symbols. Functions called >3x show •N."
+    )]
+    pub async fn analyze(
+        &self,
+        params: Parameters<AnalyzeParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let params = params.0;
+        let path = self.resolve_path(&params.path)?;
+        self.code_analyzer
+            .analyze(params, path, &self.ignore_patterns)
     }
 
     /// Process an image file from disk.
@@ -1096,19 +1165,12 @@ impl DeveloperServer {
         let expanded = expand_path(path_str);
         let path = Path::new(&expanded);
 
-        let suggestion = cwd.join(path);
-
-        match is_absolute_path(&expanded) {
-            true => Ok(path.to_path_buf()),
-            false => Err(ErrorData::new(
-                ErrorCode::INVALID_PARAMS,
-                format!(
-                    "The path {} is not an absolute path, did you possibly mean {}?",
-                    path_str,
-                    suggestion.to_string_lossy(),
-                ),
-                None,
-            )),
+        // If the path is absolute, return it as-is
+        if is_absolute_path(&expanded) {
+            Ok(path.to_path_buf())
+        } else {
+            // For relative paths, resolve them relative to the current working directory
+            Ok(cwd.join(path))
         }
     }
 
@@ -1145,6 +1207,36 @@ impl DeveloperServer {
     // Helper method to check if a path should be ignored
     fn is_ignored(&self, path: &Path) -> bool {
         self.ignore_patterns.matched(path, false).is_ignore()
+    }
+
+    // Only returns true when 100% certain (checks /proc/1/cgroup for container markers)
+    fn is_definitely_container() -> bool {
+        let Ok(content) = std::fs::read_to_string("/proc/1/cgroup") else {
+            // If the file doesn't exist, we're definitely not in a Linux container
+            return false;
+        };
+
+        // Check for definitive container markers in cgroup paths
+        for line in content.lines() {
+            if line.contains("/docker/")
+                || line.contains("/docker-")
+                || line.contains("/kubepods/")
+                || line.contains("/libpod-")
+                || line.contains("/lxc/")
+                || line.contains("/containerd/")
+            {
+                return true;
+            }
+        }
+
+        // Check for cgroups v2 unified hierarchy in containers
+        // In Docker with cgroups v2, we typically see just "0::/"
+        // This is a strong signal when it's the only line
+        if content.trim() == "0::/" {
+            return true;
+        }
+
+        false
     }
 
     // Helper function to handle Mac screenshot filenames that contain U+202F (narrow no-break space)
@@ -1243,7 +1335,9 @@ impl DeveloperServer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rmcp::handler::server::tool::Parameters;
+    use rmcp::handler::server::wrapper::Parameters;
+    use rmcp::model::NumberOrString;
+    use rmcp::service::serve_directly;
     use serial_test::serial;
     use std::fs;
     use tempfile::TempDir;
@@ -1252,137 +1346,185 @@ mod tests {
         DeveloperServer::new()
     }
 
-    #[test]
-    #[serial]
-    fn test_global_goosehints() {
-        // Note: This test checks if ~/.config/goose/.goosehints exists and includes it in instructions
-        // Since RMCP version uses get_info() instead of instructions(), we test that method
-        let global_hints_path =
-            PathBuf::from(shellexpand::tilde("~/.config/goose/.goosehints").to_string());
-        let global_hints_bak_path =
-            PathBuf::from(shellexpand::tilde("~/.config/goose/.goosehints.bak").to_string());
-        let mut globalhints_existed = false;
+    /// Creates a test transport using in-memory streams instead of stdio
+    /// This avoids the hanging issues caused by multiple tests competing for stdio
+    fn create_test_transport() -> impl rmcp::transport::IntoTransport<
+        RoleServer,
+        std::io::Error,
+        rmcp::transport::async_rw::TransportAdapterAsyncCombinedRW,
+    > {
+        let (_client, server) = tokio::io::duplex(1024);
+        server
+    }
 
-        if global_hints_path.is_file() {
-            globalhints_existed = true;
-            fs::copy(&global_hints_path, &global_hints_bak_path).unwrap();
-        }
+    /// Helper function to run shell tests with proper runtime management
+    /// This ensures clean shutdown and prevents hanging tests
+    fn run_shell_test<F, Fut, T>(test_fn: F) -> T
+    where
+        F: FnOnce() -> Fut,
+        Fut: std::future::Future<Output = T>,
+    {
+        // Create a separate runtime for this test to ensure clean shutdown
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let result = rt.block_on(test_fn());
 
-        fs::write(&global_hints_path, "These are my global goose hints.").unwrap();
+        // Force shutdown the runtime to kill ALL spawned tasks
+        // This terminates the fire-and-forget tasks that rmcp doesn't track
+        rt.shutdown_timeout(std::time::Duration::from_millis(100));
 
-        let dir = TempDir::new().unwrap();
-        std::env::set_current_dir(dir.path()).unwrap();
+        // Return the test result
+        result
+    }
 
-        let server = create_test_server();
-        let server_info = server.get_info();
-
-        assert!(server_info.instructions.is_some());
-        let instructions = server_info.instructions.unwrap();
-        assert!(instructions.contains("my global goose hints."));
-
-        // restore backup if globalhints previously existed
-        if globalhints_existed {
-            fs::copy(&global_hints_bak_path, &global_hints_path).unwrap();
-            fs::remove_file(&global_hints_bak_path).unwrap();
-        } else {
-            fs::remove_file(&global_hints_path).unwrap();
-        }
+    /// Helper function to clean up test services and prevent hanging tests
+    /// This should be called at the end of tests that create running services
+    fn cleanup_test_service(
+        running_service: rmcp::service::RunningService<RoleServer, DeveloperServer>,
+        peer: rmcp::service::Peer<RoleServer>,
+    ) {
+        let cancellation_token = running_service.cancellation_token();
+        cancellation_token.cancel();
+        drop(peer);
+        drop(running_service);
     }
 
     #[test]
     #[serial]
-    fn test_goosehints_when_present() {
-        let dir = TempDir::new().unwrap();
-        std::env::set_current_dir(dir.path()).unwrap();
+    fn test_shell_missing_parameters() {
+        run_shell_test(|| async {
+            let server = create_test_server();
+            let running_service = serve_directly(server.clone(), create_test_transport(), None);
+            let peer = running_service.peer().clone();
 
-        fs::write(".goosehints", "Test hint content").unwrap();
-        let server = create_test_server();
-        let server_info = server.get_info();
+            // Test directly on the server instead of using peer.call_tool
+            let result = server
+                .shell(
+                    Parameters(ShellParams {
+                        command: "".to_string(),
+                    }),
+                    RequestContext {
+                        ct: Default::default(),
+                        id: NumberOrString::Number(1),
+                        meta: Default::default(),
+                        extensions: Default::default(),
+                        peer: peer.clone(),
+                    },
+                )
+                .await;
 
-        assert!(server_info.instructions.is_some());
-        let instructions = server_info.instructions.unwrap();
-        assert!(instructions.contains("Test hint content"));
+            assert!(result.is_err());
+            let err = result.err().unwrap();
+            assert_eq!(err.code, ErrorCode::INVALID_PARAMS);
+
+            // Force cleanup before runtime shutdown
+            cleanup_test_service(running_service, peer);
+        });
     }
 
     #[test]
     #[serial]
-    fn test_goosehints_when_missing() {
-        let dir = TempDir::new().unwrap();
-        std::env::set_current_dir(dir.path()).unwrap();
+    #[cfg(windows)]
+    fn test_windows_specific_commands() {
+        run_shell_test(|| async {
+            let temp_dir = tempfile::tempdir().unwrap();
+            std::env::set_current_dir(&temp_dir).unwrap();
 
-        let server = create_test_server();
-        let server_info = server.get_info();
+            let server = create_test_server();
+            let running_service = serve_directly(server.clone(), create_test_transport(), None);
+            let peer = running_service.peer().clone();
 
-        assert!(server_info.instructions.is_some());
-        let instructions = server_info.instructions.unwrap();
-        // When no hints are present, instructions should not contain hint content
-        assert!(!instructions.contains("AGENTS.md:") && !instructions.contains(".goosehints:"));
+            // Test PowerShell command
+            let shell_params = Parameters(ShellParams {
+                command: "Get-ChildItem".to_string(),
+            });
+
+            let result = server
+                .shell(
+                    shell_params,
+                    RequestContext {
+                        ct: Default::default(),
+                        id: NumberOrString::Number(1),
+                        meta: Default::default(),
+                        extensions: Default::default(),
+                        peer: peer.clone(),
+                    },
+                )
+                .await;
+
+            assert!(result.is_err());
+
+            // Test that resolve_path works with Windows paths
+            let windows_path = r"C:\Windows\System32";
+            if Path::new(windows_path).exists() {
+                let resolved = server.resolve_path(windows_path);
+                assert!(resolved.is_ok());
+            }
+
+            // Force cleanup before runtime shutdown
+            cleanup_test_service(running_service, peer);
+        });
     }
 
     #[tokio::test]
     #[serial]
-    async fn test_shell_parameter_validation() {
+    async fn test_text_editor_size_limits() {
         let temp_dir = tempfile::tempdir().unwrap();
         std::env::set_current_dir(&temp_dir).unwrap();
-
         let server = create_test_server();
 
-        // Test that the shell functionality works by testing parameter validation
-        // and the ignore pattern checking logic without actually running commands
+        // Test file size limit
+        {
+            let large_file_path = temp_dir.path().join("large.txt");
 
-        // Test that empty command parts are handled correctly
-        let cmd_parts: Vec<&str> = "".split_whitespace().collect();
-        assert!(
-            cmd_parts.is_empty(),
-            "Empty command should result in empty parts"
-        );
+            // Create a file larger than 2MB
+            let content = "x".repeat(3 * 1024 * 1024); // 3MB
+            fs::write(&large_file_path, content).unwrap();
 
-        // Test ignore pattern checking with different paths
-        assert!(
-            !server.is_ignored(std::path::Path::new("allowed.txt")),
-            "Non-ignored file should not be blocked"
-        );
+            let view_params = Parameters(TextEditorParams {
+                path: large_file_path.to_str().unwrap().to_string(),
+                command: "view".to_string(),
+                view_range: None,
+                file_text: None,
+                old_str: None,
+                new_str: None,
+                insert_line: None,
+                diff: None,
+            });
 
-        // Note: Full shell execution with RequestContext requires integration testing
-        // with proper RMCP framework setup. This test validates the core parameter
-        // handling logic that would be used by the shell method.
-    }
+            let result = server.text_editor(view_params).await;
 
-    #[test]
-    #[serial]
-    fn test_goosehints_multiple_filenames() {
-        let dir = TempDir::new().unwrap();
-        std::env::set_current_dir(dir.path()).unwrap();
-        std::env::set_var("CONTEXT_FILE_NAMES", r#"["CLAUDE.md", ".goosehints"]"#);
+            assert!(result.is_err());
+            let err = result.err().unwrap();
+            assert_eq!(err.code, ErrorCode::INTERNAL_ERROR);
+            assert!(err.to_string().contains("too large"));
+        }
 
-        fs::write("CLAUDE.md", "Custom hints file content from CLAUDE.md").unwrap();
-        fs::write(".goosehints", "Custom hints file content from .goosehints").unwrap();
-        let server = create_test_server();
-        let server_info = server.get_info();
+        // Test character count limit
+        {
+            let many_chars_path = temp_dir.path().join("many_chars.txt");
 
-        assert!(server_info.instructions.is_some());
-        let instructions = server_info.instructions.unwrap();
-        assert!(instructions.contains("Custom hints file content from CLAUDE.md"));
-        assert!(instructions.contains("Custom hints file content from .goosehints"));
-        std::env::remove_var("CONTEXT_FILE_NAMES");
-    }
+            // This is above MAX_FILE_SIZE
+            let content = "x".repeat(500_000);
+            fs::write(&many_chars_path, content).unwrap();
 
-    #[test]
-    #[serial]
-    fn test_goosehints_configurable_filename() {
-        let dir = TempDir::new().unwrap();
-        std::env::set_current_dir(dir.path()).unwrap();
-        std::env::set_var("CONTEXT_FILE_NAMES", r#"["CLAUDE.md"]"#);
+            let view_params = Parameters(TextEditorParams {
+                path: many_chars_path.to_str().unwrap().to_string(),
+                command: "view".to_string(),
+                view_range: None,
+                file_text: None,
+                old_str: None,
+                new_str: None,
+                insert_line: None,
+                diff: None,
+            });
 
-        fs::write("CLAUDE.md", "Custom hints file content").unwrap();
-        let server = create_test_server();
-        let server_info = server.get_info();
+            let result = server.text_editor(view_params).await;
 
-        assert!(server_info.instructions.is_some());
-        let instructions = server_info.instructions.unwrap();
-        assert!(instructions.contains("Custom hints file content"));
-        assert!(!instructions.contains(".goosehints")); // Make sure it's not loading the default
-        std::env::remove_var("CONTEXT_FILE_NAMES");
+            assert!(result.is_err());
+            let err = result.err().unwrap();
+            assert_eq!(err.code, ErrorCode::INTERNAL_ERROR);
+            assert!(err.to_string().contains("is too large"));
+        }
     }
 
     #[tokio::test]
@@ -1404,6 +1546,7 @@ mod tests {
             old_str: None,
             new_str: None,
             insert_line: None,
+            diff: None,
         });
 
         server.text_editor(write_params).await.unwrap();
@@ -1417,6 +1560,7 @@ mod tests {
             old_str: None,
             new_str: None,
             insert_line: None,
+            diff: None,
         });
 
         let view_result = server.text_editor(view_params).await.unwrap();
@@ -1454,6 +1598,7 @@ mod tests {
             old_str: None,
             new_str: None,
             insert_line: None,
+            diff: None,
         });
 
         server.text_editor(write_params).await.unwrap();
@@ -1467,6 +1612,7 @@ mod tests {
             old_str: Some("world".to_string()),
             new_str: Some("Rust".to_string()),
             insert_line: None,
+            diff: None,
         });
 
         let replace_result = server.text_editor(replace_params).await.unwrap();
@@ -1494,37 +1640,6 @@ mod tests {
 
     #[tokio::test]
     #[serial]
-    async fn test_text_editor_size_limits() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        std::env::set_current_dir(&temp_dir).unwrap();
-
-        let server = create_test_server();
-
-        // Create a large file that exceeds the 400KB limit
-        let large_content = "a".repeat(500 * 1024); // 500KB
-        let file_path = temp_dir.path().join("large_file.txt");
-        fs::write(&file_path, &large_content).unwrap();
-
-        let view_params = Parameters(TextEditorParams {
-            path: file_path.to_str().unwrap().to_string(),
-            command: "view".to_string(),
-            view_range: None,
-            file_text: None,
-            old_str: None,
-            new_str: None,
-            insert_line: None,
-        });
-
-        let result = server.text_editor(view_params).await;
-        assert!(result.is_err());
-
-        let error = result.err().unwrap();
-        assert_eq!(error.code, ErrorCode::INTERNAL_ERROR);
-        assert!(error.message.contains("too large"));
-    }
-
-    #[tokio::test]
-    #[serial]
     async fn test_text_editor_undo_edit() {
         let temp_dir = tempfile::tempdir().unwrap();
         let file_path = temp_dir.path().join("test.txt");
@@ -1542,6 +1657,7 @@ mod tests {
             old_str: None,
             new_str: None,
             insert_line: None,
+            diff: None,
         });
 
         server.text_editor(write_params).await.unwrap();
@@ -1555,6 +1671,7 @@ mod tests {
             old_str: Some("Original".to_string()),
             new_str: Some("Modified".to_string()),
             insert_line: None,
+            diff: None,
         });
 
         server.text_editor(replace_params).await.unwrap();
@@ -1572,6 +1689,7 @@ mod tests {
             old_str: None,
             new_str: None,
             insert_line: None,
+            diff: None,
         });
 
         let undo_result = server.text_editor(undo_params).await.unwrap();
@@ -1651,6 +1769,7 @@ mod tests {
             old_str: None,
             new_str: None,
             insert_line: None,
+            diff: None,
         });
 
         let result = server.text_editor(write_params).await;
@@ -1670,6 +1789,7 @@ mod tests {
             old_str: None,
             new_str: None,
             insert_line: None,
+            diff: None,
         });
 
         let result = server.text_editor(write_params).await;
@@ -1679,48 +1799,67 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[test]
     #[serial]
-    async fn test_shell_ignore_pattern_validation() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        std::env::set_current_dir(&temp_dir).unwrap();
+    fn test_shell_respects_ignore_patterns() {
+        run_shell_test(|| async {
+            let temp_dir = tempfile::tempdir().unwrap();
+            std::env::set_current_dir(&temp_dir).unwrap();
 
-        // Create .gooseignore file
-        fs::write(".gooseignore", "secret.txt").unwrap();
-        fs::write("secret.txt", "secret content").unwrap();
+            let server = create_test_server();
+            let running_service = serve_directly(server.clone(), create_test_transport(), None);
+            let peer = running_service.peer().clone();
 
-        let server = create_test_server();
+            // Create an ignored file
+            let secret_file_path = temp_dir.path().join("secrets.txt");
+            fs::write(&secret_file_path, "secret content").unwrap();
 
-        // Test that the ignore pattern checking logic works correctly
-        // This tests the core functionality that would be used by the shell method
+            // try to cat the ignored file
+            let result = server
+                .shell(
+                    Parameters(ShellParams {
+                        command: format!("cat {}", secret_file_path.to_str().unwrap()),
+                    }),
+                    RequestContext {
+                        ct: Default::default(),
+                        id: NumberOrString::Number(1),
+                        meta: Default::default(),
+                        extensions: Default::default(),
+                        peer: peer.clone(),
+                    },
+                )
+                .await;
 
-        // Verify ignore patterns are loaded correctly
-        assert!(
-            server.is_ignored(std::path::Path::new("secret.txt")),
-            "secret.txt should be ignored based on .gooseignore"
-        );
+            assert!(result.is_err(), "Should not be able to cat ignored file");
+            assert_eq!(result.unwrap_err().code, ErrorCode::INTERNAL_ERROR);
 
-        assert!(
-            !server.is_ignored(std::path::Path::new("allowed.txt")),
-            "allowed.txt should not be ignored"
-        );
+            // Try to cat a non-ignored file
+            let allowed_file_path = temp_dir.path().join("allowed.txt");
+            fs::write(&allowed_file_path, "allowed content").unwrap();
 
-        // Test command parsing logic that would be used in shell validation
-        let command = "cat secret.txt";
-        let cmd_parts: Vec<&str> = command.split_whitespace().collect();
-        assert_eq!(cmd_parts[0], "cat");
-        assert_eq!(cmd_parts[1], "secret.txt");
+            let result = server
+                .shell(
+                    Parameters(ShellParams {
+                        command: format!("cat {}", allowed_file_path.to_str().unwrap()),
+                    }),
+                    RequestContext {
+                        ct: Default::default(),
+                        id: NumberOrString::Number(1),
+                        meta: Default::default(),
+                        extensions: Default::default(),
+                        peer: peer.clone(),
+                    },
+                )
+                .await;
 
-        // Verify that the path exists and would be caught by ignore checking
-        let path = std::path::Path::new("secret.txt");
-        assert!(path.exists(), "Test file should exist");
-        assert!(
-            server.is_ignored(path),
-            "Shell method would detect this as ignored"
-        );
+            assert!(result.is_ok(), "Should be able to cat non-ignored file");
 
-        // Note: Full shell execution testing requires integration testing framework
-        // This test validates the ignore pattern logic that prevents access to restricted files.
+            // Clean up
+            let cancellation_token = running_service.cancellation_token();
+            cancellation_token.cancel();
+            drop(peer);
+            drop(running_service);
+        });
     }
 
     #[tokio::test]
@@ -1770,6 +1909,159 @@ mod tests {
 
     #[tokio::test]
     #[serial]
+    async fn test_text_editor_descriptions() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        std::env::set_current_dir(&temp_dir).unwrap();
+
+        // Test without editor API configured (should be the case in tests due to cfg!(test))
+        let server = create_test_server();
+
+        // Get server info which contains tool descriptions
+        let server_info = server.get_info();
+        let instructions = server_info.instructions.unwrap_or_default();
+
+        // Should use traditional description with str_replace command
+        assert!(instructions.contains("Replace text in one or more files"));
+        assert!(instructions.contains("str_replace"));
+
+        // Should not contain editor API description or edit_file command
+        assert!(!instructions.contains("Edit the file with the new content"));
+        assert!(!instructions.contains("edit_file"));
+        assert!(!instructions.contains("work out how to place old_str with it intelligently"));
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_text_editor_respects_gitignore_fallback() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        std::env::set_current_dir(&temp_dir).unwrap();
+
+        // Create a .gitignore file but no .gooseignore
+        fs::write(temp_dir.path().join(".gitignore"), "*.log").unwrap();
+
+        let server = create_test_server();
+
+        // Try to write to a file ignored by .gitignore
+        let result = server
+            .text_editor(Parameters(TextEditorParams {
+                command: "write".to_string(),
+                path: temp_dir
+                    .path()
+                    .join("test.log")
+                    .to_str()
+                    .unwrap()
+                    .to_string(),
+                file_text: Some("test content".parse().unwrap()),
+                old_str: None,
+                new_str: None,
+                view_range: None,
+                insert_line: None,
+                diff: None,
+            }))
+            .await;
+
+        assert!(
+            result.is_err(),
+            "Should not be able to write to file ignored by .gitignore fallback"
+        );
+        assert_eq!(result.unwrap_err().code, ErrorCode::INTERNAL_ERROR);
+
+        let result = server
+            .text_editor(Parameters(TextEditorParams {
+                command: "write".to_string(),
+                path: temp_dir
+                    .path()
+                    .join("allowed.txt")
+                    .to_str()
+                    .unwrap()
+                    .to_string(),
+                file_text: Some("test content".to_string()),
+                old_str: None,
+                new_str: None,
+                view_range: None,
+                insert_line: None,
+                diff: None,
+            }))
+            .await;
+
+        assert!(
+            result.is_ok(),
+            "Should be able to write to non-ignored file"
+        );
+
+        temp_dir.close().unwrap();
+    }
+
+    #[test]
+    #[serial]
+    fn test_shell_respects_gitignore_fallback() {
+        run_shell_test(|| async {
+            let temp_dir = tempfile::tempdir().unwrap();
+            std::env::set_current_dir(&temp_dir).unwrap();
+
+            // Create a .gitignore file but no .gooseignore
+            std::fs::write(temp_dir.path().join(".gitignore"), "*.log").unwrap();
+
+            let server = create_test_server();
+            let running_service = serve_directly(server.clone(), create_test_transport(), None);
+            let peer = running_service.peer().clone();
+
+            // Create a file that would be ignored by .gitignore
+            let log_file_path = temp_dir.path().join("test.log");
+            std::fs::write(&log_file_path, "log content").unwrap();
+
+            // Try to cat the ignored file
+            let result = server
+                .shell(
+                    Parameters(ShellParams {
+                        command: format!("cat {}", log_file_path.to_str().unwrap()),
+                    }),
+                    RequestContext {
+                        ct: Default::default(),
+                        id: NumberOrString::Number(1),
+                        meta: Default::default(),
+                        extensions: Default::default(),
+                        peer: peer.clone(),
+                    },
+                )
+                .await;
+
+            assert!(
+                result.is_err(),
+                "Should not be able to cat file ignored by .gitignore fallback"
+            );
+            assert_eq!(result.unwrap_err().code, ErrorCode::INTERNAL_ERROR);
+
+            // Try to cat a non-ignored file
+            let allowed_file_path = temp_dir.path().join("allowed.txt");
+            fs::write(&allowed_file_path, "allowed content").unwrap();
+
+            let result = server
+                .shell(
+                    Parameters(ShellParams {
+                        command: format!("cat {}", allowed_file_path.to_str().unwrap()),
+                    }),
+                    RequestContext {
+                        ct: Default::default(),
+                        id: NumberOrString::Number(1),
+                        meta: Default::default(),
+                        extensions: Default::default(),
+                        peer: peer.clone(),
+                    },
+                )
+                .await;
+
+            assert!(result.is_ok(), "Should be able to cat non-ignored file");
+
+            // Force cleanup before runtime shutdown
+            cleanup_test_service(running_service, peer);
+
+            temp_dir.close().unwrap();
+        });
+    }
+
+    #[tokio::test]
+    #[serial]
     async fn test_text_editor_view_range() {
         let temp_dir = tempfile::tempdir().unwrap();
         let file_path = temp_dir.path().join("test.txt");
@@ -1789,6 +2081,7 @@ mod tests {
             old_str: None,
             new_str: None,
             insert_line: None,
+            diff: None,
         });
 
         server.text_editor(write_params).await.unwrap();
@@ -1802,6 +2095,7 @@ mod tests {
             old_str: None,
             new_str: None,
             insert_line: None,
+            diff: None,
         });
 
         let view_result = server.text_editor(view_params).await.unwrap();
@@ -1848,6 +2142,7 @@ mod tests {
             old_str: None,
             new_str: None,
             insert_line: None,
+            diff: None,
         });
 
         server.text_editor(write_params).await.unwrap();
@@ -1861,6 +2156,7 @@ mod tests {
             old_str: None,
             new_str: None,
             insert_line: None,
+            diff: None,
         });
 
         let view_result = server.text_editor(view_params).await.unwrap();
@@ -1888,6 +2184,50 @@ mod tests {
 
     #[tokio::test]
     #[serial]
+    async fn test_text_editor_view_range_invalid() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let file_path = temp_dir.path().join("test.txt");
+        let file_path_str = file_path.to_str().unwrap();
+        std::env::set_current_dir(&temp_dir).unwrap();
+
+        let server = create_test_server();
+
+        // Create a small file
+        let content = "Line 1\nLine 2\nLine 3";
+        let write_params = Parameters(TextEditorParams {
+            path: file_path_str.to_string(),
+            command: "write".to_string(),
+            view_range: None,
+            file_text: Some(content.to_string()),
+            old_str: None,
+            new_str: None,
+            insert_line: None,
+            diff: None,
+        });
+
+        server.text_editor(write_params).await.unwrap();
+
+        // Test invalid range - start line beyond file
+        let view_params = Parameters(TextEditorParams {
+            path: file_path_str.to_string(),
+            command: "view".to_string(),
+            view_range: Some(vec![10, 15]),
+            file_text: None,
+            old_str: None,
+            new_str: None,
+            insert_line: None,
+            diff: None,
+        });
+
+        let result = server.text_editor(view_params).await;
+        assert!(result.is_err());
+        let error = result.unwrap_err();
+        assert_eq!(error.code, ErrorCode::INVALID_PARAMS);
+        assert!(error.message.contains("beyond the end of the file"));
+    }
+
+    #[tokio::test]
+    #[serial]
     async fn test_text_editor_insert_at_beginning() {
         let temp_dir = tempfile::tempdir().unwrap();
         let file_path = temp_dir.path().join("test.txt");
@@ -1906,6 +2246,7 @@ mod tests {
             old_str: None,
             new_str: None,
             insert_line: None,
+            diff: None,
         });
 
         server.text_editor(write_params).await.unwrap();
@@ -1919,6 +2260,7 @@ mod tests {
             old_str: None,
             new_str: Some("Line 1".to_string()),
             insert_line: Some(0),
+            diff: None,
         });
 
         let insert_result = server.text_editor(insert_params).await.unwrap();
@@ -1961,6 +2303,7 @@ mod tests {
             old_str: None,
             new_str: None,
             insert_line: None,
+            diff: None,
         });
 
         server.text_editor(write_params).await.unwrap();
@@ -1974,6 +2317,7 @@ mod tests {
             old_str: None,
             new_str: Some("Line 3".to_string()),
             insert_line: Some(2),
+            diff: None,
         });
 
         let insert_result = server.text_editor(insert_params).await.unwrap();
@@ -2001,102 +2345,9 @@ mod tests {
         assert_eq!(lines[4], "Line 5");
     }
 
-    #[test]
-    #[serial]
-    fn test_process_shell_output_short() {
-        let dir = TempDir::new().unwrap();
-        std::env::set_current_dir(dir.path()).unwrap();
-
-        let server = create_test_server();
-
-        // Test with short output (< 100 lines)
-        let short_output = "Line 1\nLine 2\nLine 3\nLine 4\nLine 5";
-        let result = server.process_shell_output(short_output).unwrap();
-
-        // Both outputs should be the same for short outputs
-        assert_eq!(result.0, short_output);
-        assert_eq!(result.1, short_output);
-    }
-
-    #[test]
-    #[serial]
-    fn test_process_shell_output_empty() {
-        let dir = TempDir::new().unwrap();
-        std::env::set_current_dir(dir.path()).unwrap();
-
-        let server = create_test_server();
-
-        // Test with empty output
-        let empty_output = "";
-        let result = server.process_shell_output(empty_output).unwrap();
-
-        // Both outputs should be empty
-        assert_eq!(result.0, "");
-        assert_eq!(result.1, "");
-    }
-
     #[tokio::test]
     #[serial]
-    async fn test_shell_output_truncation() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        std::env::set_current_dir(&temp_dir).unwrap();
-
-        let server = create_test_server();
-
-        // Generate output with many lines to test truncation
-        let mut long_lines = Vec::new();
-        for i in 1..=150 {
-            long_lines.push(format!("Line {}", i));
-        }
-        let long_output = long_lines.join("\n");
-
-        let result = server.process_shell_output(&long_output).unwrap();
-
-        // Check that final output contains truncation info
-        assert!(result.0.contains("private note: output was 150 lines"));
-        assert!(result.0.contains("truncated output:"));
-
-        // Check that user output shows truncation notice
-        assert!(result
-            .1
-            .contains("NOTE: Output was 150 lines, showing only the last 100 lines"));
-
-        // Verify it shows the last 100 lines (use exact line matching to avoid substring matches)
-        assert!(result.1.contains("Line 51\n"));
-        assert!(result.1.contains("Line 150"));
-        assert!(!result.1.contains("Line 1\n"));
-        assert!(!result.1.contains("Line 50\n"));
-    }
-
-    #[tokio::test]
-    #[serial]
-    #[cfg(windows)]
-    async fn test_windows_specific_commands() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        std::env::set_current_dir(&temp_dir).unwrap();
-
-        let server = create_test_server();
-
-        // Test PowerShell command
-        let shell_params = Parameters(ShellParams {
-            command: "Get-ChildItem".to_string(),
-        });
-
-        // Note: This test should be adapted to work with RequestContext
-        // For now, we test the underlying functionality that would be used by shell
-        assert!(true); // Test shell parameter creation works
-
-        // Test that resolve_path works with Windows paths
-        let windows_path = r"C:\Windows\System32";
-        if Path::new(windows_path).exists() {
-            let resolved = server.resolve_path(windows_path);
-            assert!(resolved.is_ok());
-        }
-    }
-
-    #[tokio::test]
-    #[serial]
-    async fn test_text_editor_view_range_invalid() {
+    async fn test_text_editor_insert_at_end() {
         let temp_dir = tempfile::tempdir().unwrap();
         let file_path = temp_dir.path().join("test.txt");
         let file_path_str = file_path.to_str().unwrap();
@@ -2104,7 +2355,7 @@ mod tests {
 
         let server = create_test_server();
 
-        // Create a small file
+        // Create a file with some content
         let content = "Line 1\nLine 2\nLine 3";
         let write_params = Parameters(TextEditorParams {
             path: file_path_str.to_string(),
@@ -2114,26 +2365,143 @@ mod tests {
             old_str: None,
             new_str: None,
             insert_line: None,
+            diff: None,
         });
 
         server.text_editor(write_params).await.unwrap();
 
-        // Test invalid range - start line beyond file
-        let view_params = Parameters(TextEditorParams {
+        // Insert at the end (after line 3)
+        let insert_params = Parameters(TextEditorParams {
             path: file_path_str.to_string(),
-            command: "view".to_string(),
-            view_range: Some(vec![10, 15]),
+            command: "insert".to_string(),
+            view_range: None,
             file_text: None,
+            old_str: None,
+            new_str: Some("Line 4".to_string()),
+            insert_line: Some(3),
+            diff: None,
+        });
+
+        let insert_result = server.text_editor(insert_params).await.unwrap();
+
+        let text = insert_result
+            .content
+            .iter()
+            .find(|c| {
+                c.audience()
+                    .is_some_and(|roles| roles.contains(&Role::Assistant))
+            })
+            .unwrap()
+            .as_text()
+            .unwrap();
+
+        assert!(text.text.contains("Text has been inserted at line 4"));
+
+        // Verify the file content by reading it directly
+        let file_content = fs::read_to_string(&file_path).unwrap();
+        assert!(file_content.contains("Line 1\nLine 2\nLine 3\nLine 4"));
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_text_editor_insert_at_end_negative() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let file_path = temp_dir.path().join("test.txt");
+        let file_path_str = file_path.to_str().unwrap();
+        std::env::set_current_dir(&temp_dir).unwrap();
+
+        let server = create_test_server();
+
+        // Create a file with some content
+        let content = "Line 1\nLine 2\nLine 3";
+        let write_params = Parameters(TextEditorParams {
+            path: file_path_str.to_string(),
+            command: "write".to_string(),
+            view_range: None,
+            file_text: Some(content.to_string()),
             old_str: None,
             new_str: None,
             insert_line: None,
+            diff: None,
         });
 
-        let result = server.text_editor(view_params).await;
+        server.text_editor(write_params).await.unwrap();
+
+        // Insert at the end using -1
+        let insert_params = Parameters(TextEditorParams {
+            path: file_path_str.to_string(),
+            command: "insert".to_string(),
+            view_range: None,
+            file_text: None,
+            old_str: None,
+            new_str: Some("Line 4".to_string()),
+            insert_line: Some(-1),
+            diff: None,
+        });
+
+        let insert_result = server.text_editor(insert_params).await.unwrap();
+
+        let text = insert_result
+            .content
+            .iter()
+            .find(|c| {
+                c.audience()
+                    .is_some_and(|roles| roles.contains(&Role::Assistant))
+            })
+            .unwrap()
+            .as_text()
+            .unwrap();
+
+        assert!(text.text.contains("Text has been inserted at line 4"));
+
+        // Verify the file content by reading it directly
+        let file_content = fs::read_to_string(&file_path).unwrap();
+        assert!(file_content.contains("Line 1\nLine 2\nLine 3\nLine 4"));
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_text_editor_insert_invalid_line() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let file_path = temp_dir.path().join("test.txt");
+        let file_path_str = file_path.to_str().unwrap();
+        std::env::set_current_dir(&temp_dir).unwrap();
+
+        let server = create_test_server();
+
+        // Create a file with some content
+        let content = "Line 1\nLine 2\nLine 3";
+        let write_params = Parameters(TextEditorParams {
+            path: file_path_str.to_string(),
+            command: "write".to_string(),
+            view_range: None,
+            file_text: Some(content.to_string()),
+            old_str: None,
+            new_str: None,
+            insert_line: None,
+            diff: None,
+        });
+
+        server.text_editor(write_params).await.unwrap();
+
+        // Try to insert beyond the end of the file
+        let insert_params = Parameters(TextEditorParams {
+            path: file_path_str.to_string(),
+            command: "insert".to_string(),
+            view_range: None,
+            file_text: None,
+            old_str: None,
+            new_str: Some("Line 11".to_string()),
+            insert_line: Some(10),
+            diff: None,
+        });
+
+        let result = server.text_editor(insert_params).await;
+
         assert!(result.is_err());
-        let error = result.unwrap_err();
-        assert_eq!(error.code, ErrorCode::INVALID_PARAMS);
-        assert!(error.message.contains("beyond the end of the file"));
+        let err = result.err().unwrap();
+        assert_eq!(err.code, ErrorCode::INVALID_PARAMS);
+        assert!(err.message.contains("beyond the end of the file"));
     }
 
     #[tokio::test]
@@ -2155,6 +2523,7 @@ mod tests {
             old_str: None,
             new_str: None,
             insert_line: None,
+            diff: None,
         });
 
         server.text_editor(write_params).await.unwrap();
@@ -2168,6 +2537,7 @@ mod tests {
             old_str: None,
             new_str: None, // Missing required parameter
             insert_line: Some(1),
+            diff: None,
         });
 
         let result = server.text_editor(insert_params).await;
@@ -2185,6 +2555,7 @@ mod tests {
             old_str: None,
             new_str: Some("New text".to_string()),
             insert_line: None, // Missing required parameter
+            diff: None,
         });
 
         let result = server.text_editor(insert_params).await;
@@ -2194,9 +2565,636 @@ mod tests {
         assert!(error.message.contains("Missing 'insert_line' parameter"));
     }
 
+    #[tokio::test]
+    #[serial]
+    async fn test_text_editor_insert_with_undo() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let file_path = temp_dir.path().join("test.txt");
+        let file_path_str = file_path.to_str().unwrap();
+        std::env::set_current_dir(&temp_dir).unwrap();
+
+        let server = create_test_server();
+
+        // Create a file with some content
+        let content = "Line 1\nLine 2";
+        let write_params = Parameters(TextEditorParams {
+            path: file_path_str.to_string(),
+            command: "write".to_string(),
+            view_range: None,
+            file_text: Some(content.to_string()),
+            old_str: None,
+            new_str: None,
+            insert_line: None,
+            diff: None,
+        });
+
+        server.text_editor(write_params).await.unwrap();
+
+        // Insert a line
+        let insert_params = Parameters(TextEditorParams {
+            path: file_path_str.to_string(),
+            command: "insert".to_string(),
+            view_range: None,
+            file_text: None,
+            old_str: None,
+            new_str: Some("Inserted Line".to_string()),
+            insert_line: Some(1),
+            diff: None,
+        });
+
+        server.text_editor(insert_params).await.unwrap();
+
+        // Undo the insert
+        let undo_params = Parameters(TextEditorParams {
+            path: file_path_str.to_string(),
+            command: "undo_edit".to_string(),
+            view_range: None,
+            file_text: None,
+            old_str: None,
+            new_str: None,
+            insert_line: None,
+            diff: None,
+        });
+
+        let undo_result = server.text_editor(undo_params).await.unwrap();
+
+        let text = undo_result
+            .content
+            .iter()
+            .find(|c| c.as_text().is_some())
+            .unwrap()
+            .as_text()
+            .unwrap();
+        assert!(text.text.contains("Undid the last edit"));
+
+        // Verify the file is back to original content
+        let file_content = fs::read_to_string(&file_path).unwrap();
+        assert!(file_content.contains("Line 1\nLine 2"));
+        assert!(!file_content.contains("Inserted Line"));
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_text_editor_insert_nonexistent_file() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let file_path = temp_dir.path().join("nonexistent.txt");
+        let file_path_str = file_path.to_str().unwrap();
+        std::env::set_current_dir(&temp_dir).unwrap();
+
+        let server = create_test_server();
+
+        // Try to insert into a nonexistent file
+        let insert_params = Parameters(TextEditorParams {
+            path: file_path_str.to_string(),
+            command: "insert".to_string(),
+            view_range: None,
+            file_text: None,
+            old_str: None,
+            new_str: Some("New line".to_string()),
+            insert_line: Some(0),
+            diff: None,
+        });
+
+        let result = server.text_editor(insert_params).await;
+
+        assert!(result.is_err());
+        let err = result.err().unwrap();
+        assert_eq!(err.code, ErrorCode::INVALID_PARAMS);
+        assert!(err.message.contains("does not exist"));
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_text_editor_view_large_file_without_range() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let file_path = temp_dir.path().join("large_file.txt");
+        let file_path_str = file_path.to_str().unwrap();
+        std::env::set_current_dir(&temp_dir).unwrap();
+
+        let server = create_test_server();
+
+        // Create a file with more than 2000 lines (LINE_READ_LIMIT)
+        let mut content = String::new();
+        for i in 1..=2001 {
+            content.push_str(&format!("Line {}\n", i));
+        }
+
+        let write_params = Parameters(TextEditorParams {
+            path: file_path_str.to_string(),
+            command: "write".to_string(),
+            view_range: None,
+            file_text: Some(content),
+            old_str: None,
+            new_str: None,
+            insert_line: None,
+            diff: None,
+        });
+
+        server.text_editor(write_params).await.unwrap();
+
+        // Test viewing without view_range - should trigger the error
+        let view_params = Parameters(TextEditorParams {
+            path: file_path_str.to_string(),
+            command: "view".to_string(),
+            view_range: None,
+            file_text: None,
+            old_str: None,
+            new_str: None,
+            insert_line: None,
+            diff: None,
+        });
+
+        let result = server.text_editor(view_params).await;
+
+        assert!(result.is_err());
+        let err = result.err().unwrap();
+        assert_eq!(err.code, ErrorCode::INTERNAL_ERROR);
+        assert!(err.message.contains("2001 lines long"));
+        assert!(err
+            .message
+            .contains("recommended to read in with view_range"));
+        assert!(err
+            .message
+            .contains("please pass in view_range with [1, 2001]"));
+
+        // Test viewing with view_range - should work
+        let view_params = Parameters(TextEditorParams {
+            path: file_path_str.to_string(),
+            command: "view".to_string(),
+            view_range: Some(vec![1, 100]),
+            file_text: None,
+            old_str: None,
+            new_str: None,
+            insert_line: None,
+            diff: None,
+        });
+
+        let result = server.text_editor(view_params).await;
+        assert!(result.is_ok());
+
+        let view_result = result.unwrap();
+        let text = view_result
+            .content
+            .iter()
+            .find(|c| {
+                c.audience()
+                    .is_some_and(|roles| roles.contains(&Role::User))
+            })
+            .unwrap()
+            .as_text()
+            .unwrap();
+
+        // Should contain lines 1-100
+        assert!(text.text.contains("1: Line 1"));
+        assert!(text.text.contains("100: Line 100"));
+        assert!(!text.text.contains("101: Line 101"));
+
+        // Test viewing with explicit full range - should work
+        let view_params = Parameters(TextEditorParams {
+            path: file_path_str.to_string(),
+            command: "view".to_string(),
+            view_range: Some(vec![1, 2001]),
+            file_text: None,
+            old_str: None,
+            new_str: None,
+            insert_line: None,
+            diff: None,
+        });
+
+        let result = server.text_editor(view_params).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_text_editor_view_file_with_exactly_2000_lines() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let file_path = temp_dir.path().join("file_2000.txt");
+        let file_path_str = file_path.to_str().unwrap();
+        std::env::set_current_dir(&temp_dir).unwrap();
+
+        let server = create_test_server();
+
+        // Create a file with exactly 2000 lines (should not trigger the check)
+        let mut content = String::new();
+        for i in 1..=2000 {
+            content.push_str(&format!("Line {}\n", i));
+        }
+
+        let write_params = Parameters(TextEditorParams {
+            path: file_path_str.to_string(),
+            command: "write".to_string(),
+            view_range: None,
+            file_text: Some(content),
+            old_str: None,
+            new_str: None,
+            insert_line: None,
+            diff: None,
+        });
+
+        server.text_editor(write_params).await.unwrap();
+
+        // Test viewing without view_range - should work since it's exactly 2000 lines
+        let view_params = Parameters(TextEditorParams {
+            path: file_path_str.to_string(),
+            command: "view".to_string(),
+            view_range: None,
+            file_text: None,
+            old_str: None,
+            new_str: None,
+            insert_line: None,
+            diff: None,
+        });
+
+        let result = server.text_editor(view_params).await;
+
+        assert!(result.is_ok());
+        let view_result = result.unwrap();
+        let text = view_result
+            .content
+            .iter()
+            .find(|c| {
+                c.audience()
+                    .is_some_and(|roles| roles.contains(&Role::User))
+            })
+            .unwrap()
+            .as_text()
+            .unwrap();
+
+        // Should contain all lines
+        assert!(text.text.contains("1: Line 1"));
+        assert!(text.text.contains("2000: Line 2000"));
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_text_editor_view_small_file_without_range() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let file_path = temp_dir.path().join("small_file.txt");
+        let file_path_str = file_path.to_str().unwrap();
+        std::env::set_current_dir(&temp_dir).unwrap();
+
+        let server = create_test_server();
+
+        // Create a file with less than 2000 lines
+        let mut content = String::new();
+        for i in 1..=100 {
+            content.push_str(&format!("Line {}\n", i));
+        }
+
+        let write_params = Parameters(TextEditorParams {
+            path: file_path_str.to_string(),
+            command: "write".to_string(),
+            view_range: None,
+            file_text: Some(content),
+            old_str: None,
+            new_str: None,
+            insert_line: None,
+            diff: None,
+        });
+
+        server.text_editor(write_params).await.unwrap();
+
+        // Test viewing without view_range - should work fine
+        let view_params = Parameters(TextEditorParams {
+            path: file_path_str.to_string(),
+            command: "view".to_string(),
+            view_range: None,
+            file_text: None,
+            old_str: None,
+            new_str: None,
+            insert_line: None,
+            diff: None,
+        });
+
+        let result = server.text_editor(view_params).await;
+
+        assert!(result.is_ok());
+        let view_result = result.unwrap();
+        let text = view_result
+            .content
+            .iter()
+            .find(|c| {
+                c.audience()
+                    .is_some_and(|roles| roles.contains(&Role::User))
+            })
+            .unwrap()
+            .as_text()
+            .unwrap();
+
+        // Should contain all lines
+        assert!(text.text.contains("1: Line 1"));
+        assert!(text.text.contains("100: Line 100"));
+    }
+
     #[test]
     #[serial]
-    fn test_goosehints_with_file_references() {
+    fn test_shell_output_truncation() {
+        run_shell_test(|| async {
+            let temp_dir = tempfile::tempdir().unwrap();
+            std::env::set_current_dir(&temp_dir).unwrap();
+
+            let server = create_test_server();
+            let running_service = serve_directly(server.clone(), create_test_transport(), None);
+            let peer = running_service.peer().clone();
+
+            // Create a command that generates > 100 lines of output
+            let command = if cfg!(windows) {
+                "for /L %i in (1,1,150) do @echo Line %i"
+            } else {
+                "for i in {1..150}; do echo \"Line $i\"; done"
+            };
+
+            let result = server
+                .shell(
+                    Parameters(ShellParams {
+                        command: command.to_string(),
+                    }),
+                    RequestContext {
+                        ct: Default::default(),
+                        id: NumberOrString::Number(1),
+                        meta: Default::default(),
+                        extensions: Default::default(),
+                        peer: peer.clone(),
+                    },
+                )
+                .await;
+
+            // Should have two Content items
+            assert_eq!(result.clone().unwrap().content.len(), 2);
+
+            let content = result.clone().unwrap().content;
+
+            // Find the Assistant and User content
+            let assistant_content = content
+                .iter()
+                .find(|c| {
+                    c.audience()
+                        .is_some_and(|roles| roles.contains(&Role::Assistant))
+                })
+                .unwrap()
+                .as_text()
+                .unwrap();
+
+            let user_content = content
+                .iter()
+                .find(|c| {
+                    c.audience()
+                        .is_some_and(|roles| roles.contains(&Role::User))
+                })
+                .unwrap()
+                .as_text()
+                .unwrap();
+
+            // Assistant should get the full message with temp file info
+            assert!(assistant_content
+                .text
+                .contains("private note: output was 150 lines"));
+
+            // User should only get the truncated output with prefix
+            assert!(user_content
+                .text
+                .starts_with("NOTE: Output was 150 lines, showing only the last 100 lines"));
+            assert!(!user_content.text.contains("private note: output was"));
+
+            // User output should contain lines 51-150 (last 100 lines)
+            assert!(user_content.text.contains("Line 51"));
+            assert!(user_content.text.contains("Line 150"));
+            assert!(!user_content.text.contains("Line 50"));
+
+            let start_tag = "remainder of lines in";
+            let end_tag = "do not show tmp file to user";
+
+            if let (Some(start), Some(end)) = (
+                assistant_content.text.find(start_tag),
+                assistant_content.text.find(end_tag),
+            ) {
+                let start_idx = start + start_tag.len();
+                if start_idx < end {
+                    let path = assistant_content.text[start_idx..end].trim();
+                    println!("Extracted path: {}", path);
+
+                    let file_contents =
+                        std::fs::read_to_string(path).expect("Failed to read extracted temp file");
+
+                    let lines: Vec<&str> = file_contents.lines().collect();
+
+                    // Ensure we have exactly 150 lines
+                    assert_eq!(lines.len(), 150, "Expected 150 lines in temp file");
+
+                    // Ensure the first and last lines are correct
+                    assert_eq!(lines.first(), Some(&"Line 1"), "First line mismatch");
+                    assert_eq!(lines.last(), Some(&"Line 150"), "Last line mismatch");
+                } else {
+                    panic!("No path found in bash output truncation output");
+                }
+            } else {
+                panic!("Failed to find start or end tag in bash output truncation output");
+            }
+
+            // Force cleanup before runtime shutdown
+            cleanup_test_service(running_service, peer);
+
+            temp_dir.close().unwrap();
+        });
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_process_shell_output_short() {
+        let dir = TempDir::new().unwrap();
+        std::env::set_current_dir(dir.path()).unwrap();
+
+        let server = create_test_server();
+
+        // Test with short output (< 100 lines)
+        let short_output = "Line 1\nLine 2\nLine 3\nLine 4\nLine 5";
+        let result = server.process_shell_output(short_output).unwrap();
+
+        // Both outputs should be the same for short outputs
+        assert_eq!(result.0, short_output);
+        assert_eq!(result.1, short_output);
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_process_shell_output_empty() {
+        let dir = TempDir::new().unwrap();
+        std::env::set_current_dir(dir.path()).unwrap();
+
+        let server = create_test_server();
+
+        // Test with empty output
+        let empty_output = "";
+        let result = server.process_shell_output(empty_output).unwrap();
+
+        // Both outputs should be empty
+        assert_eq!(result.0, "");
+        assert_eq!(result.1, "");
+    }
+
+    #[test]
+    #[serial]
+    fn test_shell_output_without_trailing_newline() {
+        run_shell_test(|| async {
+            let temp_dir = tempfile::tempdir().unwrap();
+            std::env::set_current_dir(&temp_dir).unwrap();
+
+            let server = create_test_server();
+            let running_service = serve_directly(server.clone(), create_test_transport(), None);
+            let peer = running_service.peer().clone();
+
+            // Test command that outputs content without a trailing newline
+            let command = if cfg!(windows) {
+                "echo|set /p=\"Content without newline\""
+            } else {
+                "printf 'Content without newline'"
+            };
+
+            let result = server
+                .shell(
+                    Parameters(ShellParams {
+                        command: command.to_string(),
+                    }),
+                    RequestContext {
+                        ct: Default::default(),
+                        id: NumberOrString::Number(1),
+                        meta: Default::default(),
+                        extensions: Default::default(),
+                        peer: peer.clone(),
+                    },
+                )
+                .await;
+
+            assert!(result.is_ok());
+
+            // Test the output processing logic that would be used by shell method
+            let output_without_newline = "Content without newline";
+            let result = server.process_shell_output(output_without_newline).unwrap();
+
+            // The output should contain the content even without a trailing newline
+            assert!(
+                result.0.contains("Content without newline"),
+                "Output should contain content even without trailing newline, but got: {}",
+                result.0
+            );
+            assert!(
+                result.1.contains("Content without newline"),
+                "User output should contain content even without trailing newline, but got: {}",
+                result.1
+            );
+
+            // Both should be the same for short output
+            assert_eq!(result.0, output_without_newline);
+            assert_eq!(result.1, output_without_newline);
+
+            // Force cleanup before runtime shutdown
+            cleanup_test_service(running_service, peer);
+        });
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_shell_output_handling_logic() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        std::env::set_current_dir(&temp_dir).unwrap();
+
+        let server = create_test_server();
+
+        // Test output truncation logic with content without trailing newlines
+        let content_without_newline = "Content without newline";
+        let result = server
+            .process_shell_output(content_without_newline)
+            .unwrap();
+
+        assert_eq!(result.0, content_without_newline);
+        assert_eq!(result.1, content_without_newline);
+        assert!(
+            result.0.contains("Content without newline"),
+            "Output processing should preserve content without trailing newlines"
+        );
+
+        // Test with content that has trailing newlines
+        let content_with_newline = "Content with newline\n";
+        let result = server.process_shell_output(content_with_newline).unwrap();
+        assert_eq!(result.0, content_with_newline);
+        assert_eq!(result.1, content_with_newline);
+
+        // Test empty output handling
+        let empty_output = "";
+        let result = server.process_shell_output(empty_output).unwrap();
+        assert_eq!(result.0, "");
+        assert_eq!(result.1, "");
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_default_patterns_when_no_ignore_files() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        std::env::set_current_dir(&temp_dir).unwrap();
+
+        // Don't create any ignore files
+        let server = create_test_server();
+
+        // Default patterns should be used
+        assert!(
+            server.is_ignored(Path::new(".env")),
+            ".env should be ignored by default patterns"
+        );
+        assert!(
+            server.is_ignored(Path::new(".env.local")),
+            ".env.local should be ignored by default patterns"
+        );
+        assert!(
+            server.is_ignored(Path::new("secrets.txt")),
+            "secrets.txt should be ignored by default patterns"
+        );
+        assert!(
+            !server.is_ignored(Path::new("normal.txt")),
+            "normal.txt should not be ignored"
+        );
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_global_goosehints() {
+        // Note: This test checks if ~/.config/goose/.goosehints exists and includes it in instructions
+        // Since RMCP version uses get_info() instead of instructions(), we test that method
+        let global_hints_path =
+            PathBuf::from(shellexpand::tilde("~/.config/goose/.goosehints").to_string());
+        let global_hints_bak_path =
+            PathBuf::from(shellexpand::tilde("~/.config/goose/.goosehints.bak").to_string());
+        let mut globalhints_existed = false;
+
+        if global_hints_path.is_file() {
+            globalhints_existed = true;
+            fs::copy(&global_hints_path, &global_hints_bak_path).unwrap();
+        }
+
+        fs::write(&global_hints_path, "These are my global goose hints.").unwrap();
+
+        let dir = TempDir::new().unwrap();
+        std::env::set_current_dir(dir.path()).unwrap();
+
+        let server = create_test_server();
+        let server_info = server.get_info();
+
+        assert!(server_info.instructions.is_some());
+        let instructions = server_info.instructions.unwrap();
+        assert!(instructions.contains("my global goose hints."));
+
+        // restore backup if globalhints previously existed
+        if globalhints_existed {
+            fs::copy(&global_hints_bak_path, &global_hints_path).unwrap();
+            fs::remove_file(&global_hints_bak_path).unwrap();
+        } else {
+            fs::remove_file(&global_hints_path).unwrap();
+        }
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_goosehints_with_file_references() {
         let temp_dir = tempfile::tempdir().unwrap();
         std::env::set_current_dir(&temp_dir).unwrap();
 
@@ -2247,401 +3245,152 @@ Additional instructions here.
 
     #[tokio::test]
     #[serial]
-    async fn test_text_editor_insert_at_end() {
+    async fn test_goosehints_when_present() {
+        let dir = TempDir::new().unwrap();
+        std::env::set_current_dir(dir.path()).unwrap();
+
+        fs::write(".goosehints", "Test hint content").unwrap();
+        let server = create_test_server();
+        let server_info = server.get_info();
+
+        assert!(server_info.instructions.is_some());
+        let instructions = server_info.instructions.unwrap();
+        assert!(instructions.contains("Test hint content"));
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_goosehints_when_missing() {
+        let dir = TempDir::new().unwrap();
+        std::env::set_current_dir(dir.path()).unwrap();
+
+        let server = create_test_server();
+        let server_info = server.get_info();
+
+        assert!(server_info.instructions.is_some());
+        let instructions = server_info.instructions.unwrap();
+        // When no hints are present, instructions should not contain hint content
+        assert!(!instructions.contains("AGENTS.md:") && !instructions.contains(".goosehints:"));
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_goosehints_multiple_filenames() {
+        let dir = TempDir::new().unwrap();
+        std::env::set_current_dir(dir.path()).unwrap();
+        std::env::set_var("CONTEXT_FILE_NAMES", r#"["CLAUDE.md", ".goosehints"]"#);
+
+        fs::write("CLAUDE.md", "Custom hints file content from CLAUDE.md").unwrap();
+        fs::write(".goosehints", "Custom hints file content from .goosehints").unwrap();
+        let server = create_test_server();
+        let server_info = server.get_info();
+
+        assert!(server_info.instructions.is_some());
+        let instructions = server_info.instructions.unwrap();
+        assert!(instructions.contains("Custom hints file content from CLAUDE.md"));
+        assert!(instructions.contains("Custom hints file content from .goosehints"));
+        std::env::remove_var("CONTEXT_FILE_NAMES");
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_goosehints_configurable_filename() {
+        let dir = TempDir::new().unwrap();
+        std::env::set_current_dir(dir.path()).unwrap();
+        std::env::set_var("CONTEXT_FILE_NAMES", r#"["CLAUDE.md"]"#);
+
+        fs::write("CLAUDE.md", "Custom hints file content").unwrap();
+        let server = create_test_server();
+        let server_info = server.get_info();
+
+        assert!(server_info.instructions.is_some());
+        let instructions = server_info.instructions.unwrap();
+        assert!(instructions.contains("Custom hints file content"));
+        assert!(!instructions.contains(".goosehints")); // Make sure it's not loading the default
+        std::env::remove_var("CONTEXT_FILE_NAMES");
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_resolve_path_absolute() {
         let temp_dir = tempfile::tempdir().unwrap();
-        let file_path = temp_dir.path().join("test.txt");
-        let file_path_str = file_path.to_str().unwrap();
         std::env::set_current_dir(&temp_dir).unwrap();
 
         let server = create_test_server();
+        let absolute_path = temp_dir.path().join("test.txt");
+        let absolute_path_str = absolute_path.to_str().unwrap();
 
-        // Create a file with some content
-        let content = "Line 1\nLine 2\nLine 3";
+        let resolved = server.resolve_path(absolute_path_str).unwrap();
+        assert_eq!(resolved, absolute_path);
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_resolve_path_relative() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        std::env::set_current_dir(&temp_dir).unwrap();
+
+        let server = create_test_server();
+        let relative_path = "subdir/test.txt";
+
+        let resolved = server.resolve_path(relative_path).unwrap();
+        let expected = std::env::current_dir().unwrap().join("subdir/test.txt");
+        assert_eq!(resolved, expected);
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_text_editor_with_absolute_path() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        std::env::set_current_dir(&temp_dir).unwrap();
+
+        let server = create_test_server();
+        let absolute_path = temp_dir.path().join("absolute_test.txt");
+        let absolute_path_str = absolute_path.to_str().unwrap();
+
         let write_params = Parameters(TextEditorParams {
-            path: file_path_str.to_string(),
+            path: absolute_path_str.to_string(),
             command: "write".to_string(),
             view_range: None,
-            file_text: Some(content.to_string()),
+            file_text: Some("Absolute path test".to_string()),
             old_str: None,
             new_str: None,
             insert_line: None,
+            diff: None,
         });
 
-        server.text_editor(write_params).await.unwrap();
+        let result = server.text_editor(write_params).await;
+        assert!(result.is_ok());
 
-        // Insert at the end (after line 3)
-        let insert_params = Parameters(TextEditorParams {
-            path: file_path_str.to_string(),
-            command: "insert".to_string(),
-            view_range: None,
-            file_text: None,
-            old_str: None,
-            new_str: Some("Line 4".to_string()),
-            insert_line: Some(3),
-        });
-
-        let insert_result = server.text_editor(insert_params).await.unwrap();
-
-        let text = insert_result
-            .content
-            .iter()
-            .find(|c| {
-                c.audience()
-                    .is_some_and(|roles| roles.contains(&Role::Assistant))
-            })
-            .unwrap()
-            .as_text()
-            .unwrap();
-
-        assert!(text.text.contains("Text has been inserted at line 4"));
-
-        // Verify the file content by reading it directly
-        let file_content = fs::read_to_string(&file_path).unwrap();
-        assert!(file_content.contains("Line 1\nLine 2\nLine 3\nLine 4"));
+        let content = fs::read_to_string(&absolute_path).unwrap();
+        assert_eq!(content.trim(), "Absolute path test");
     }
 
     #[tokio::test]
     #[serial]
-    async fn test_text_editor_insert_at_end_negative() {
+    async fn test_text_editor_with_relative_path() {
         let temp_dir = tempfile::tempdir().unwrap();
-        let file_path = temp_dir.path().join("test.txt");
-        let file_path_str = file_path.to_str().unwrap();
         std::env::set_current_dir(&temp_dir).unwrap();
 
         let server = create_test_server();
+        let relative_path = "relative_test.txt";
 
-        // Create a file with some content
-        let content = "Line 1\nLine 2\nLine 3";
         let write_params = Parameters(TextEditorParams {
-            path: file_path_str.to_string(),
+            path: relative_path.to_string(),
             command: "write".to_string(),
             view_range: None,
-            file_text: Some(content.to_string()),
+            file_text: Some("Relative path test".to_string()),
             old_str: None,
             new_str: None,
             insert_line: None,
+            diff: None,
         });
 
-        server.text_editor(write_params).await.unwrap();
+        let result = server.text_editor(write_params).await;
+        assert!(result.is_ok());
 
-        // Insert at the end using -1
-        let insert_params = Parameters(TextEditorParams {
-            path: file_path_str.to_string(),
-            command: "insert".to_string(),
-            view_range: None,
-            file_text: None,
-            old_str: None,
-            new_str: Some("Line 4".to_string()),
-            insert_line: Some(-1),
-        });
-
-        let insert_result = server.text_editor(insert_params).await.unwrap();
-
-        let text = insert_result
-            .content
-            .iter()
-            .find(|c| {
-                c.audience()
-                    .is_some_and(|roles| roles.contains(&Role::Assistant))
-            })
-            .unwrap()
-            .as_text()
-            .unwrap();
-
-        assert!(text.text.contains("Text has been inserted at line 4"));
-
-        // Verify the file content by reading it directly
-        let file_content = fs::read_to_string(&file_path).unwrap();
-        assert!(file_content.contains("Line 1\nLine 2\nLine 3\nLine 4"));
-    }
-
-    #[tokio::test]
-    #[serial]
-    async fn test_text_editor_insert_invalid_line() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let file_path = temp_dir.path().join("test.txt");
-        let file_path_str = file_path.to_str().unwrap();
-        std::env::set_current_dir(&temp_dir).unwrap();
-
-        let server = create_test_server();
-
-        // Create a file with some content
-        let content = "Line 1\nLine 2\nLine 3";
-        let write_params = Parameters(TextEditorParams {
-            path: file_path_str.to_string(),
-            command: "write".to_string(),
-            view_range: None,
-            file_text: Some(content.to_string()),
-            old_str: None,
-            new_str: None,
-            insert_line: None,
-        });
-
-        server.text_editor(write_params).await.unwrap();
-
-        // Try to insert beyond the end of the file
-        let insert_params = Parameters(TextEditorParams {
-            path: file_path_str.to_string(),
-            command: "insert".to_string(),
-            view_range: None,
-            file_text: None,
-            old_str: None,
-            new_str: Some("Line 11".to_string()),
-            insert_line: Some(10),
-        });
-
-        let result = server.text_editor(insert_params).await;
-
-        assert!(result.is_err());
-        let err = result.err().unwrap();
-        assert_eq!(err.code, ErrorCode::INVALID_PARAMS);
-        assert!(err.message.contains("beyond the end of the file"));
-    }
-
-    #[tokio::test]
-    #[serial]
-    async fn test_text_editor_insert_with_undo() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let file_path = temp_dir.path().join("test.txt");
-        let file_path_str = file_path.to_str().unwrap();
-        std::env::set_current_dir(&temp_dir).unwrap();
-
-        let server = create_test_server();
-
-        // Create a file with some content
-        let content = "Line 1\nLine 2";
-        let write_params = Parameters(TextEditorParams {
-            path: file_path_str.to_string(),
-            command: "write".to_string(),
-            view_range: None,
-            file_text: Some(content.to_string()),
-            old_str: None,
-            new_str: None,
-            insert_line: None,
-        });
-
-        server.text_editor(write_params).await.unwrap();
-
-        // Insert a line
-        let insert_params = Parameters(TextEditorParams {
-            path: file_path_str.to_string(),
-            command: "insert".to_string(),
-            view_range: None,
-            file_text: None,
-            old_str: None,
-            new_str: Some("Inserted Line".to_string()),
-            insert_line: Some(1),
-        });
-
-        server.text_editor(insert_params).await.unwrap();
-
-        // Undo the insert
-        let undo_params = Parameters(TextEditorParams {
-            path: file_path_str.to_string(),
-            command: "undo_edit".to_string(),
-            view_range: None,
-            file_text: None,
-            old_str: None,
-            new_str: None,
-            insert_line: None,
-        });
-
-        let undo_result = server.text_editor(undo_params).await.unwrap();
-
-        let text = undo_result
-            .content
-            .iter()
-            .find(|c| c.as_text().is_some())
-            .unwrap()
-            .as_text()
-            .unwrap();
-        assert!(text.text.contains("Undid the last edit"));
-
-        // Verify the file is back to original content
-        let file_content = fs::read_to_string(&file_path).unwrap();
-        assert!(file_content.contains("Line 1\nLine 2"));
-        assert!(!file_content.contains("Inserted Line"));
-    }
-
-    #[tokio::test]
-    #[serial]
-    async fn test_text_editor_insert_nonexistent_file() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let file_path = temp_dir.path().join("nonexistent.txt");
-        let file_path_str = file_path.to_str().unwrap();
-        std::env::set_current_dir(&temp_dir).unwrap();
-
-        let server = create_test_server();
-
-        // Try to insert into a nonexistent file
-        let insert_params = Parameters(TextEditorParams {
-            path: file_path_str.to_string(),
-            command: "insert".to_string(),
-            view_range: None,
-            file_text: None,
-            old_str: None,
-            new_str: Some("New line".to_string()),
-            insert_line: Some(0),
-        });
-
-        let result = server.text_editor(insert_params).await;
-
-        assert!(result.is_err());
-        let err = result.err().unwrap();
-        assert_eq!(err.code, ErrorCode::INVALID_PARAMS);
-        assert!(err.message.contains("does not exist"));
-    }
-
-    #[tokio::test]
-    #[serial]
-    async fn test_shell_missing_parameters() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        std::env::set_current_dir(&temp_dir).unwrap();
-
-        let _server = create_test_server();
-
-        // Test that shell parameter validation works for empty parameters
-        // This tests the core parameter handling logic without requiring RequestContext
-
-        // Test empty command handling logic
-        let empty_command = "";
-        let cmd_parts: Vec<&str> = empty_command.split_whitespace().collect();
-        assert!(
-            cmd_parts.is_empty(),
-            "Empty command should result in empty parts"
-        );
-
-        // Verify this would be caught by the shell method's parameter validation
-        let shell_params = Parameters(ShellParams {
-            command: "".to_string(),
-        });
-
-        // The shell method would handle empty commands gracefully
-        // Test that parameter structure is created correctly
-        assert_eq!(shell_params.0.command, "");
-    }
-
-    #[tokio::test]
-    #[serial]
-    async fn test_shell_respects_ignore_patterns() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        std::env::set_current_dir(&temp_dir).unwrap();
-
-        // Create .gooseignore file
-        fs::write(".gooseignore", "secret.txt").unwrap();
-        fs::write("secret.txt", "secret content").unwrap();
-
-        let server = create_test_server();
-
-        // Test that the ignore pattern checking logic works correctly
-        // This tests the core functionality that would prevent shell access to restricted files
-
-        // Verify ignore patterns are loaded correctly
-        assert!(
-            server.is_ignored(std::path::Path::new("secret.txt")),
-            "secret.txt should be ignored based on .gooseignore"
-        );
-
-        assert!(
-            !server.is_ignored(std::path::Path::new("allowed.txt")),
-            "allowed.txt should not be ignored"
-        );
-
-        // Test command parsing logic that would be used in shell validation
-        let command = "cat secret.txt";
-        let cmd_parts: Vec<&str> = command.split_whitespace().collect();
-        assert_eq!(cmd_parts[0], "cat");
-        assert_eq!(cmd_parts[1], "secret.txt");
-
-        // Verify that the path exists and would be caught by ignore checking
-        let path = std::path::Path::new("secret.txt");
-        assert!(path.exists(), "Test file should exist");
-        assert!(
-            server.is_ignored(path),
-            "Shell method would detect this as ignored and block the command"
-        );
-
-        // Test allowed file would not be blocked
-        fs::write("allowed.txt", "allowed content").unwrap();
-        let allowed_path = std::path::Path::new("allowed.txt");
-        assert!(allowed_path.exists(), "Allowed file should exist");
-        assert!(
-            !server.is_ignored(allowed_path),
-            "Shell method would allow access to non-ignored files"
-        );
-    }
-
-    #[tokio::test]
-    #[serial]
-    async fn test_shell_respects_gitignore_fallback() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        std::env::set_current_dir(&temp_dir).unwrap();
-
-        // Create .gitignore file (no .gooseignore)
-        fs::write(".gitignore", "*.log").unwrap();
-
-        let server = create_test_server();
-
-        // Test that gitignore fallback patterns work correctly
-        assert!(
-            server.is_ignored(Path::new("debug.log")),
-            "*.log pattern from .gitignore should match debug.log when no .gooseignore exists"
-        );
-        assert!(
-            !server.is_ignored(Path::new("debug.txt")),
-            "*.log pattern should not match debug.txt"
-        );
-
-        // Test command that would be blocked by gitignore fallback
-        fs::write("test.log", "log content").unwrap();
-        let log_path = Path::new("test.log");
-        assert!(log_path.exists(), "Log file should exist");
-        assert!(
-            server.is_ignored(log_path),
-            "Shell method would block access to .log files via gitignore fallback"
-        );
-
-        // Test command that would be allowed
-        fs::write("test.txt", "regular content").unwrap();
-        let txt_path = Path::new("test.txt");
-        assert!(txt_path.exists(), "Text file should exist");
-        assert!(
-            !server.is_ignored(txt_path),
-            "Shell method would allow access to non-ignored files"
-        );
-    }
-
-    #[tokio::test]
-    #[serial]
-    async fn test_shell_output_handling_logic() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        std::env::set_current_dir(&temp_dir).unwrap();
-
-        let server = create_test_server();
-
-        // Test output truncation logic with content without trailing newlines
-        let content_without_newline = "Content without newline";
-        let result = server
-            .process_shell_output(content_without_newline)
-            .unwrap();
-
-        assert_eq!(result.0, content_without_newline);
-        assert_eq!(result.1, content_without_newline);
-        assert!(
-            result.0.contains("Content without newline"),
-            "Output processing should preserve content without trailing newlines"
-        );
-
-        // Test with content that has trailing newlines
-        let content_with_newline = "Content with newline\n";
-        let result = server.process_shell_output(content_with_newline).unwrap();
-        assert_eq!(result.0, content_with_newline);
-        assert_eq!(result.1, content_with_newline);
-
-        // Test empty output handling
-        let empty_output = "";
-        let result = server.process_shell_output(empty_output).unwrap();
-        assert_eq!(result.0, "");
-        assert_eq!(result.1, "");
+        let absolute_path = temp_dir.path().join(relative_path);
+        let content = fs::read_to_string(&absolute_path).unwrap();
+        assert_eq!(content.trim(), "Relative path test");
     }
 }

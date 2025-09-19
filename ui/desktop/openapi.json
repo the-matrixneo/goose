@@ -10,7 +10,7 @@
     "license": {
       "name": "Apache-2.0"
     },
-    "version": "1.7.0"
+    "version": "1.8.0"
   },
   "paths": {
     "/agent/add_sub_recipes": {
@@ -886,6 +886,46 @@
         ]
       }
     },
+    "/handle_openrouter": {
+      "post": {
+        "tags": [
+          "super::routes::setup"
+        ],
+        "operationId": "start_openrouter_setup",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetupResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/handle_tetrate": {
+      "post": {
+        "tags": [
+          "super::routes::setup"
+        ],
+        "operationId": "start_tetrate_setup",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetupResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/recipes/create": {
       "post": {
         "tags": [
@@ -1504,6 +1544,26 @@
           }
         ]
       }
+    },
+    "/status": {
+      "get": {
+        "tags": [
+          "super::routes::health"
+        ],
+        "operationId": "status",
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1559,12 +1619,12 @@
               "$ref": "#/components/schemas/Role"
             }
           },
-          "priority": {
-            "type": "number"
-          },
-          "timestamp": {
+          "lastModified": {
             "type": "string",
             "format": "date-time"
+          },
+          "priority": {
+            "type": "number"
           }
         }
       },
@@ -1681,6 +1741,13 @@
             "allOf": [
               {
                 "$ref": "#/components/schemas/Annotated"
+              }
+            ]
+          },
+          {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RawResource"
               }
             ]
           }
@@ -1902,6 +1969,10 @@
           "resource"
         ],
         "properties": {
+          "_meta": {
+            "type": "object",
+            "additionalProperties": true
+          },
           "annotations": {
             "anyOf": [
               {
@@ -2399,6 +2470,10 @@
           "mimeType"
         ],
         "properties": {
+          "_meta": {
+            "type": "object",
+            "additionalProperties": true
+          },
           "annotations": {
             "anyOf": [
               {
@@ -2495,6 +2570,9 @@
           "id": {
             "type": "string",
             "nullable": true
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/MessageMetadata"
           },
           "role": {
             "$ref": "#/components/schemas/Role"
@@ -2719,6 +2797,20 @@
           "propertyName": "type"
         }
       },
+      "MessageMetadata": {
+        "type": "object",
+        "description": "Metadata for message visibility",
+        "properties": {
+          "agentVisible": {
+            "type": "boolean",
+            "description": "Whether the message should be included in the agent's context window"
+          },
+          "userVisible": {
+            "type": "boolean",
+            "description": "Whether the message should be visible to the user in the UI"
+          }
+        }
+      },
       "ModelInfo": {
         "type": "object",
         "description": "Information about a model's capabilities",
@@ -2886,6 +2978,10 @@
           "resource"
         ],
         "properties": {
+          "_meta": {
+            "type": "object",
+            "additionalProperties": true
+          },
           "resource": {
             "$ref": "#/components/schemas/ResourceContents"
           }
@@ -2898,10 +2994,39 @@
           "mimeType"
         ],
         "properties": {
+          "_meta": {
+            "type": "object",
+            "additionalProperties": true
+          },
           "data": {
             "type": "string"
           },
           "mimeType": {
+            "type": "string"
+          }
+        }
+      },
+      "RawResource": {
+        "type": "object",
+        "required": [
+          "uri",
+          "name"
+        ],
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "mimeType": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "uri": {
             "type": "string"
           }
         }
@@ -2912,6 +3037,10 @@
           "text"
         ],
         "properties": {
+          "_meta": {
+            "type": "object",
+            "additionalProperties": true
+          },
           "text": {
             "type": "string"
           }
@@ -3111,6 +3240,10 @@
               "text"
             ],
             "properties": {
+              "_meta": {
+                "type": "object",
+                "additionalProperties": true
+              },
               "mimeType": {
                 "type": "string"
               },
@@ -3129,6 +3262,10 @@
               "blob"
             ],
             "properties": {
+              "_meta": {
+                "type": "object",
+                "additionalProperties": true
+              },
               "blob": {
                 "type": "string"
               },
@@ -3537,6 +3674,21 @@
           }
         }
       },
+      "SetupResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "message"
+        ],
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
       "StartAgentRequest": {
         "type": "object",
         "required": [
@@ -3652,6 +3804,10 @@
           "text"
         ],
         "properties": {
+          "_meta": {
+            "type": "object",
+            "additionalProperties": true
+          },
           "annotations": {
             "anyOf": [
               {

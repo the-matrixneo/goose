@@ -1,12 +1,7 @@
-use super::utils::verify_secret_key;
 use crate::state::AppState;
-use axum::{
-    extract::State,
-    http::{HeaderMap, StatusCode},
-    routing::post,
-    Json, Router,
-};
+use axum::{extract::State, http::StatusCode, routing::post, Json, Router};
 use goose::conversation::{message::Message, Conversation};
+use goose::session;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use utoipa::ToSchema;
@@ -50,12 +45,8 @@ pub struct ContextManageResponse {
 )]
 async fn manage_context(
     State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
     Json(request): Json<ContextManageRequest>,
 ) -> Result<Json<ContextManageResponse>, StatusCode> {
-    verify_secret_key(&headers, &state)?;
-
-    use goose::session;
     let session_id = session::Identifier::Name(request.session_id.clone());
     let agent = state.get_agent(session_id).await.map_err(|e| {
         tracing::error!("Failed to get agent for session: {}", e);
@@ -78,7 +69,12 @@ async fn manage_context(
     }
 
     Ok(Json(ContextManageResponse {
-        messages: processed_messages.messages().clone(),
+        messages: processed_messages
+            .messages()
+            .iter()
+            .filter(|m| m.is_user_visible())
+            .cloned()
+            .collect(),
         token_counts,
     }))
 }

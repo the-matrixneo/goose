@@ -13,8 +13,8 @@ export type Annotated = RawTextContent | RawImageContent | RawEmbeddedResource;
 
 export type Annotations = {
     audience?: Array<Role>;
+    lastModified?: string;
     priority?: number;
-    timestamp?: string;
 };
 
 export type Author = {
@@ -65,7 +65,7 @@ export type ConfigResponse = {
     };
 };
 
-export type Content = RawTextContent | RawImageContent | RawEmbeddedResource | Annotated;
+export type Content = RawTextContent | RawImageContent | RawEmbeddedResource | Annotated | RawResource;
 
 export type ContextLengthExceeded = {
     msg: string;
@@ -141,6 +141,9 @@ export type DeleteRecipeRequest = {
 };
 
 export type EmbeddedResource = {
+    _meta?: {
+        [key: string]: unknown;
+    };
     annotations?: Annotations | {
         [key: string]: unknown;
     };
@@ -322,6 +325,9 @@ export type GetToolsQuery = {
 };
 
 export type ImageContent = {
+    _meta?: {
+        [key: string]: unknown;
+    };
     annotations?: Annotations | {
         [key: string]: unknown;
     };
@@ -354,6 +360,7 @@ export type Message = {
     content: Array<MessageContent>;
     created?: number;
     id?: string | null;
+    metadata?: MessageMetadata;
     role: Role;
 };
 
@@ -381,6 +388,20 @@ export type MessageContent = (TextContent & {
 }) | (SummarizationRequested & {
     type: 'summarizationRequested';
 });
+
+/**
+ * Metadata for message visibility
+ */
+export type MessageMetadata = {
+    /**
+     * Whether the message should be included in the agent's context window
+     */
+    agentVisible?: boolean;
+    /**
+     * Whether the message should be visible to the user in the UI
+     */
+    userVisible?: boolean;
+};
 
 /**
  * Information about a model's capabilities
@@ -472,15 +493,32 @@ export type ProvidersResponse = {
 };
 
 export type RawEmbeddedResource = {
+    _meta?: {
+        [key: string]: unknown;
+    };
     resource: ResourceContents;
 };
 
 export type RawImageContent = {
+    _meta?: {
+        [key: string]: unknown;
+    };
     data: string;
     mimeType: string;
 };
 
+export type RawResource = {
+    description?: string;
+    mimeType?: string;
+    name: string;
+    size?: number;
+    uri: string;
+};
+
 export type RawTextContent = {
+    _meta?: {
+        [key: string]: unknown;
+    };
     text: string;
 };
 
@@ -580,10 +618,16 @@ export type RedactedThinkingContent = {
 };
 
 export type ResourceContents = {
+    _meta?: {
+        [key: string]: unknown;
+    };
     mimeType?: string;
     text: string;
     uri: string;
 } | {
+    _meta?: {
+        [key: string]: unknown;
+    };
     blob: string;
     mimeType?: string;
     uri: string;
@@ -753,6 +797,11 @@ export type Settings = {
     temperature?: number | null;
 };
 
+export type SetupResponse = {
+    message: string;
+    success: boolean;
+};
+
 export type StartAgentRequest = {
     recipe?: Recipe | null;
     working_dir: string;
@@ -790,6 +839,9 @@ export type SummarizationRequested = {
 };
 
 export type TextContent = {
+    _meta?: {
+        [key: string]: unknown;
+    };
     annotations?: Annotations | {
         [key: string]: unknown;
     };
@@ -1583,6 +1635,32 @@ export type ManageContextResponses = {
 
 export type ManageContextResponse = ManageContextResponses[keyof ManageContextResponses];
 
+export type StartOpenrouterSetupData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/handle_openrouter';
+};
+
+export type StartOpenrouterSetupResponses = {
+    200: SetupResponse;
+};
+
+export type StartOpenrouterSetupResponse = StartOpenrouterSetupResponses[keyof StartOpenrouterSetupResponses];
+
+export type StartTetrateSetupData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/handle_tetrate';
+};
+
+export type StartTetrateSetupResponses = {
+    200: SetupResponse;
+};
+
+export type StartTetrateSetupResponse = StartTetrateSetupResponses[keyof StartTetrateSetupResponses];
+
 export type CreateRecipeData = {
     body: CreateRecipeRequest;
     path?: never;
@@ -2096,6 +2174,22 @@ export type GetSessionHistoryResponses = {
 };
 
 export type GetSessionHistoryResponse = GetSessionHistoryResponses[keyof GetSessionHistoryResponses];
+
+export type StatusData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/status';
+};
+
+export type StatusResponses = {
+    /**
+     * ok
+     */
+    200: string;
+};
+
+export type StatusResponse = StatusResponses[keyof StatusResponses];
 
 export type ClientOptions = {
     baseUrl: `${string}://${string}` | (string & {});

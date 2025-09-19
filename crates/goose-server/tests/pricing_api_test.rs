@@ -7,7 +7,7 @@ use std::sync::Arc;
 use tower::ServiceExt;
 
 async fn create_test_app() -> Router {
-    let state = goose_server::AppState::new("test".to_string()).await;
+    let state = goose_server::AppState::new().await;
 
     // Add scheduler setup like in the existing tests
     let sched_storage_path = etcetera::choose_app_strategy(goose::config::APP_STRATEGY.clone())

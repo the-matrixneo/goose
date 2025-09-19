@@ -1,9 +1,11 @@
 use crate::configuration;
 use crate::state;
 use anyhow::Result;
+use axum::middleware;
 use etcetera::{choose_app_strategy, AppStrategy};
 use goose::config::APP_STRATEGY;
 use goose::scheduler_factory::SchedulerFactory;
+use goose_server::auth::check_token;
 use tower_http::cors::{Any, CorsLayer};
 use tracing::info;
 
@@ -27,7 +29,7 @@ pub async fn run() -> Result<()> {
     let secret_key =
         std::env::var("GOOSE_SERVER__SECRET_KEY").unwrap_or_else(|_| "test".to_string());
 
-    let app_state = state::AppState::new(secret_key.clone()).await;
+    let app_state = state::AppState::new().await;
 
     let schedule_file_path = choose_app_strategy(APP_STRATEGY.clone())?
         .data_dir()
@@ -44,7 +46,12 @@ pub async fn run() -> Result<()> {
         .allow_methods(Any)
         .allow_headers(Any);
 
-    let app = crate::routes::configure(app_state).layer(cors);
+    let app = crate::routes::configure(app_state)
+        .layer(middleware::from_fn_with_state(
+            secret_key.clone(),
+            check_token,
+        ))
+        .layer(cors);
 
     let listener = tokio::net::TcpListener::bind(settings.socket_addr()).await?;
     info!("listening on {}", listener.local_addr()?);

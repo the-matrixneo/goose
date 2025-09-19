@@ -9,13 +9,14 @@ use goose::session::info::SessionInfo;
 use goose::session::SessionMetadata;
 use rmcp::model::{
     Annotations, Content, EmbeddedResource, ImageContent, RawEmbeddedResource, RawImageContent,
-    RawTextContent, ResourceContents, Role, TextContent, Tool, ToolAnnotations,
+    RawResource, RawTextContent, ResourceContents, Role, TextContent, Tool, ToolAnnotations,
 };
 use utoipa::{OpenApi, ToSchema};
 
 use goose::conversation::message::{
-    ContextLengthExceeded, FrontendToolRequest, Message, MessageContent, RedactedThinkingContent,
-    SummarizationRequested, ThinkingContent, ToolConfirmationRequest, ToolRequest, ToolResponse,
+    ContextLengthExceeded, FrontendToolRequest, Message, MessageContent, MessageMetadata,
+    RedactedThinkingContent, SummarizationRequested, ThinkingContent, ToolConfirmationRequest,
+    ToolRequest, ToolResponse,
 };
 use utoipa::openapi::schema::{
     AdditionalProperties, AnyOfBuilder, ArrayBuilder, ObjectBuilder, OneOfBuilder, Schema,
@@ -319,6 +320,7 @@ derive_utoipa!(TextContent as TextContentSchema);
 derive_utoipa!(RawTextContent as RawTextContentSchema);
 derive_utoipa!(RawImageContent as RawImageContentSchema);
 derive_utoipa!(RawEmbeddedResource as RawEmbeddedResourceSchema);
+derive_utoipa!(RawResource as RawResourceSchema);
 derive_utoipa!(Tool as ToolSchema);
 derive_utoipa!(ToolAnnotations as ToolAnnotationsSchema);
 derive_utoipa!(Annotations as AnnotationsSchema);
@@ -354,6 +356,7 @@ impl<'__s> ToSchema<'__s> for AnnotatedSchema {
 #[derive(OpenApi)]
 #[openapi(
     paths(
+        super::routes::health::status,
         super::routes::config_management::backup_config,
         super::routes::config_management::recover_config,
         super::routes::config_management::validate_config,
@@ -398,6 +401,8 @@ impl<'__s> ToSchema<'__s> for AnnotatedSchema {
         super::routes::recipe::scan_recipe,
         super::routes::recipe::list_recipes,
         super::routes::recipe::delete_recipe,
+        super::routes::setup::start_openrouter_setup,
+        super::routes::setup::start_tetrate_setup,
     ),
     components(schemas(
         super::routes::config_management::UpsertConfigQuery,
@@ -417,6 +422,7 @@ impl<'__s> ToSchema<'__s> for AnnotatedSchema {
         super::routes::session::SessionHistoryResponse,
         Message,
         MessageContent,
+        MessageMetadata,
         ContentSchema,
         EmbeddedResourceSchema,
         ImageContentSchema,
@@ -425,6 +431,7 @@ impl<'__s> ToSchema<'__s> for AnnotatedSchema {
         RawTextContentSchema,
         RawImageContentSchema,
         RawEmbeddedResourceSchema,
+        RawResourceSchema,
         AnnotatedSchema,
         ToolResponse,
         ToolRequest,
@@ -493,6 +500,7 @@ impl<'__s> ToSchema<'__s> for AnnotatedSchema {
         super::routes::agent::ResumeAgentRequest,
         super::routes::agent::StartAgentResponse,
         super::routes::agent::ErrorResponse,
+        super::routes::setup::SetupResponse,
     ))
 )]
 pub struct ApiDoc;
