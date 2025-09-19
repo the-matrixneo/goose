@@ -8,7 +8,7 @@ use std::sync::Arc;
 use tower::ServiceExt;
 
 async fn create_test_app() -> (Router, Arc<goose_server::AppState>) {
-    let state = goose_server::AppState::new("test-secret".to_string()).await;
+    let state = goose_server::AppState::new().await;
 
     // Set up scheduler as required
     let sched_storage_path = etcetera::choose_app_strategy(goose::config::APP_STRATEGY.clone())
