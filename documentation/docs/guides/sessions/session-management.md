@@ -309,7 +309,7 @@ You can resume a CLI session in Desktop.
         6. Confirm the deletion in the modal that appears
 
         :::warning Permanent deletion
-        Deleting a session permanently removes it from your system and from both Desktop and CLI interfaces. This action cannot be undone.
+        Deleting a session from Goose Desktop will also delete it from the CLI. This action cannot be undone.
         :::
 
         The session will be immediately removed from your session history and the underlying session file will be deleted from your local storage.
