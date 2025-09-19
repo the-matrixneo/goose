@@ -11,10 +11,12 @@ pub mod autovisualiser;
 pub mod computercontroller;
 pub mod developer;
 mod memory;
+pub mod nostr;
 pub mod tutorial;
 
 pub use autovisualiser::AutoVisualiserRouter;
 pub use computercontroller::ComputerControllerRouter;
 pub use developer::rmcp_developer::DeveloperServer;
 pub use memory::MemoryServer;
+pub use nostr::NostrRouter;
 pub use tutorial::TutorialServer;
