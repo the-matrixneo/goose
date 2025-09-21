@@ -291,7 +291,9 @@ export default function CreateRecipeFromSessionModal({
           </Button>
 
           <div className="flex gap-3">
-            {createdRecipe ? (
+            {isAnalyzing ? (
+              <div />
+            ) : createdRecipe ? (
               <>
                 <Button
                   onClick={handleDone}
