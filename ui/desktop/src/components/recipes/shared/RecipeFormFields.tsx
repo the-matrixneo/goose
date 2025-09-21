@@ -274,8 +274,11 @@ export default function RecipeFormFields({
               htmlFor="recipe-prompt"
               className="block text-sm font-medium text-text-standard mb-2"
             >
-              Initial Prompt (Optional - Instructions or Prompt are required)
+              Initial Prompt
             </label>
+            <p className="text-xs text-text-muted mt-2 mb-2">
+              (Optional - Instructions or Prompt are required)
+            </p>
             <textarea
               id="recipe-prompt"
               value={field.state.value || ''}

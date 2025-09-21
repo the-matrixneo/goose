@@ -222,7 +222,7 @@ export default function CreateRecipeFromSessionModal({
     }
   };
 
-  const handleSaveAndClose = () => {
+  const handleDone = () => {
     onClose();
   };
 
@@ -294,11 +294,10 @@ export default function CreateRecipeFromSessionModal({
             {createdRecipe ? (
               <>
                 <Button
-                  onClick={handleSaveAndClose}
+                  onClick={handleDone}
                   variant="outline"
                   className="px-4 py-2 border border-borderStandard rounded-lg hover:bg-bgSubtle transition-colors"
                 >
-                  <Save className="w-4 h-4 mr-2" />
                   Done
                 </Button>
                 <Button
