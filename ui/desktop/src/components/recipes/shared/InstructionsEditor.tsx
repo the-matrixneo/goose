@@ -90,9 +90,7 @@ Use {{parameter_name}} syntax for any user-provided values.`;
         <div className="flex-1 flex flex-col min-h-0">
           <div className="mb-4">
             <div className="flex items-center justify-between mb-2">
-              <label className="block text-sm font-medium text-text-standard">
-                Instructions <span className="text-red-500">*</span>
-              </label>
+              <label className="block text-sm font-medium text-text-standard">Instructions</label>
               <Button
                 type="button"
                 onClick={insertExample}
@@ -116,7 +114,7 @@ Use {{parameter_name}} syntax for any user-provided values.`;
               className={`w-full h-full min-h-[500px] p-3 border rounded-lg bg-background-default text-text-standard focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none font-mono text-sm ${
                 error ? 'border-red-500' : 'border-border-subtle'
               }`}
-              placeholder="Detailed instructions for the AI agent..."
+              placeholder="Detailed instructions for the AI, hidden from the user..."
             />
             {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
           </div>

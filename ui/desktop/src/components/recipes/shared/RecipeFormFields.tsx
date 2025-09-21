@@ -240,7 +240,7 @@ export default function RecipeFormFields({
               className={`w-full p-3 border rounded-lg bg-background-default text-text-standard focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none font-mono text-sm ${
                 field.state.meta.errors.length > 0 ? 'border-red-500' : 'border-border-subtle'
               }`}
-              placeholder="Detailed instructions for the AI agent..."
+              placeholder="Detailed instructions for the AI, hidden from the user..."
               rows={8}
             />
             <p className="text-xs text-text-muted mt-1">
@@ -288,7 +288,7 @@ export default function RecipeFormFields({
                 updateParametersFromFields();
               }}
               className="w-full p-3 border border-border-subtle rounded-lg bg-background-default text-text-standard focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-              placeholder="First message to send when the recipe starts..."
+              placeholder="Pre-filled prompt when the recipe starts..."
               rows={3}
             />
           </div>
@@ -358,7 +358,11 @@ export default function RecipeFormFields({
 
           return (
             <div>
-              <h3 className="text-sm font-medium text-text-standard mb-2">Parameters</h3>
+              <label className="block text-md text-textProminent mb-2 font-bold">Parameters</label>
+              <p className="text-textSubtle text-sm space-y-2 pb-4">
+                Parameters will be automatically detected from {`{{parameter_name}}`} syntax in
+                instructions/prompt/activities or you can manually add them below.
+              </p>
 
               {/* Add Parameter Input - Always Visible */}
               <div className="flex gap-2 mb-4">
@@ -380,7 +384,7 @@ export default function RecipeFormFields({
                 </button>
               </div>
 
-              {field.state.value.length > 0 ? (
+              {field.state.value.length > 0 &&
                 field.state.value
                   .filter((parameter: Parameter) => parameter.key && parameter.key.trim()) // Filter out empty parameters
                   .map((parameter: Parameter) => {
@@ -408,16 +412,7 @@ export default function RecipeFormFields({
                         }}
                       />
                     );
-                  })
-              ) : (
-                <div className="border border-border-subtle rounded-lg p-4 bg-background-muted">
-                  <p className="text-sm text-text-muted text-left">
-                    No parameters defined. Parameters will be automatically detected from{' '}
-                    {`{{parameter_name}}`} syntax in instructions/prompt, or you can manually add
-                    them using the input above.
-                  </p>
-                </div>
-              )}
+                  })}
             </div>
           );
         }}
@@ -427,10 +422,13 @@ export default function RecipeFormFields({
       <form.Field name="jsonSchema">
         {(field: FormFieldApi<string | undefined>) => (
           <div>
+            <label className="block text-md text-textProminent mb-2 font-bold">
+              Response JSON Schema
+            </label>
+            <p className="text-textSubtle text-sm space-y-2 pb-4">
+              Define the expected structure of the AI's response using JSON Schema format
+            </p>
             <div className="flex items-center justify-between mb-2">
-              <label className="block text-sm font-medium text-text-standard">
-                Response JSON Schema (Optional)
-              </label>
               <Button
                 type="button"
                 onClick={() => setShowJsonSchemaEditor(true)}
@@ -442,25 +440,18 @@ export default function RecipeFormFields({
               </Button>
             </div>
 
-            <div
-              className={`border rounded-lg p-3 bg-background-muted ${
-                field.state.meta.errors.length > 0 ? 'border-red-500' : 'border-border-subtle'
-              }`}
-            >
-              {field.state.value && field.state.value.trim() ? (
+            {field.state.value && field.state.value.trim() && (
+              <div
+                className={`border rounded-lg p-3 bg-background-muted ${
+                  field.state.meta.errors.length > 0 ? 'border-red-500' : 'border-border-subtle'
+                }`}
+              >
                 <pre className="text-xs font-mono text-text-standard whitespace-pre-wrap break-words max-h-32 overflow-y-auto">
                   {field.state.value}
                 </pre>
-              ) : (
-                <p className="text-xs text-text-muted italic">
-                  No JSON schema defined. Click "Open Editor" to add one.
-                </p>
-              )}
-            </div>
+              </div>
+            )}
 
-            <p className="text-xs text-text-muted mt-1">
-              Define the expected structure of the AI's response using JSON Schema format
-            </p>
             {field.state.meta.errors.length > 0 && (
               <p className="text-red-500 text-sm mt-1">{field.state.meta.errors[0]}</p>
             )}

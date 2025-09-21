@@ -111,7 +111,7 @@ export default function JsonSchemaEditor({
           <div className="mb-4">
             <div className="flex items-center justify-between mb-2">
               <label className="block text-sm font-medium text-text-standard">
-                Response JSON Schema (Optional)
+                Response JSON Schema
               </label>
               <Button
                 type="button"

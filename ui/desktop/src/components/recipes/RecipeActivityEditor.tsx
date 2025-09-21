@@ -59,14 +59,14 @@ export default function RecipeActivityEditor({
       <label htmlFor="activities" className="block text-md text-textProminent mb-2 font-bold">
         Activities
       </label>
-      <p className="text-textSubtle space-y-2 pb-4">
-        The top-line prompts and activities that will display within your goose home page.
+      <p className="text-sm text-textSubtle space-y-2 pb-4">
+        The top-line prompts and activity buttons that will display in the recipe chat window.
       </p>
 
       {/* Message Field */}
-      <div className="mb-6">
+      <div>
         <label htmlFor="message" className="block text-sm font-medium text-textStandard mb-2">
-          Message (Optional)
+          Message
         </label>
         <p className="text-xs text-textSubtle mb-2">
           A formatted message that will appear at the top of the recipe. Supports markdown
@@ -78,7 +78,7 @@ export default function RecipeActivityEditor({
           onChange={(e) => handleMessageChange(e.target.value)}
           onBlur={onBlur}
           className="w-full px-4 py-3 border rounded-lg bg-background-default text-textStandard placeholder-textPlaceholder focus:outline-none focus:ring-2 focus:ring-borderProminent resize-vertical"
-          placeholder="Enter a message for your recipe (supports **bold**, *italic*, `code`, etc.)"
+          placeholder="Enter a user facing introduction message for your recipe (supports **bold**, *italic*, `code`, etc.)"
           rows={3}
           autoCorrect="off"
           autoCapitalize="off"
@@ -93,30 +93,33 @@ export default function RecipeActivityEditor({
             Activity Buttons
           </label>
           <p className="text-xs text-textSubtle mb-3">
-            Clickable buttons that will appear below the message.
+            Clickable buttons that will appear below the message to help users interact with your
+            recipe.
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-3">
-          {nonMessageActivities.map((activity, index) => (
-            <div
-              key={index}
-              className="inline-flex items-center bg-background-default border-2 border-borderSubtle rounded-full px-4 py-2 text-sm text-textStandard"
-              title={activity.length > 100 ? activity : undefined}
-            >
-              <span>{activity.length > 100 ? activity.slice(0, 100) + '...' : activity}</span>
-              <Button
-                type="button"
-                onClick={() => handleRemoveActivity(activity)}
-                variant="ghost"
-                size="sm"
-                className="ml-2 text-textStandard hover:text-textSubtle transition-colors p-0 h-auto"
+        {nonMessageActivities.length > 0 && (
+          <div className="flex flex-wrap gap-3">
+            {nonMessageActivities.map((activity, index) => (
+              <div
+                key={index}
+                className="inline-flex items-center bg-background-default border-2 border-borderSubtle rounded-full px-4 py-2 text-sm text-textStandard"
+                title={activity.length > 100 ? activity : undefined}
               >
-                ×
-              </Button>
-            </div>
-          ))}
-        </div>
+                <span>{activity.length > 100 ? activity.slice(0, 100) + '...' : activity}</span>
+                <Button
+                  type="button"
+                  onClick={() => handleRemoveActivity(activity)}
+                  variant="ghost"
+                  size="sm"
+                  className="ml-2 text-textStandard hover:text-textSubtle transition-colors p-0 h-auto"
+                >
+                  ×
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
         <div className="flex gap-2 mt-3">
           <input
             type="text"
