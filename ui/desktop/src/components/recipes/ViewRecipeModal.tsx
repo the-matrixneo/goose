@@ -67,14 +67,28 @@ export default function ViewRecipeModal({
     },
   });
 
-  // Helper functions to get values from form
-  const title = form.state.values.title;
-  const description = form.state.values.description;
-  const instructions = form.state.values.instructions;
-  const prompt = form.state.values.prompt;
-  const activities = form.state.values.activities;
-  const parameters = form.state.values.parameters;
-  const jsonSchema = form.state.values.jsonSchema;
+  // Helper functions to get values from form - using state to trigger re-renders
+  const [title, setTitle] = useState(form.state.values.title);
+  const [description, setDescription] = useState(form.state.values.description);
+  const [instructions, setInstructions] = useState(form.state.values.instructions);
+  const [prompt, setPrompt] = useState(form.state.values.prompt);
+  const [activities, setActivities] = useState(form.state.values.activities);
+  const [parameters, setParameters] = useState(form.state.values.parameters);
+  const [jsonSchema, setJsonSchema] = useState(form.state.values.jsonSchema);
+
+  // Subscribe to form changes to update local state
+  useEffect(() => {
+    const unsubscribe = form.store.subscribe(() => {
+      setTitle(form.state.values.title);
+      setDescription(form.state.values.description);
+      setInstructions(form.state.values.instructions);
+      setPrompt(form.state.values.prompt);
+      setActivities(form.state.values.activities);
+      setParameters(form.state.values.parameters);
+      setJsonSchema(form.state.values.jsonSchema);
+    });
+    return unsubscribe;
+  }, [form]);
   const [extensionOptions, setExtensionOptions] = useState<FixedExtensionEntry[]>([]);
   const [extensionsLoaded, setExtensionsLoaded] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -157,13 +171,13 @@ export default function ViewRecipeModal({
       }
     }
 
-    const updatedConfig = {
+    return {
       ...recipeConfig,
       title,
       description,
       instructions,
       activities,
-      prompt,
+      prompt: prompt || undefined,
       parameters: formattedParameters,
       response: responseConfig,
       extensions: recipeExtensions
@@ -183,8 +197,6 @@ export default function ViewRecipeModal({
         })
         .filter(Boolean) as ExtensionConfig[],
     };
-
-    return updatedConfig;
   }, [
     recipeConfig,
     title,
@@ -199,11 +211,11 @@ export default function ViewRecipeModal({
   ]);
 
   const requiredFieldsAreFilled = () => {
-    return title.trim() && description.trim() && instructions.trim();
+    return title.trim() && description.trim() && (instructions.trim() || (prompt || '').trim());
   };
 
   const validateForm = () => {
-    return title.trim() && description.trim() && instructions.trim();
+    return title.trim() && description.trim() && (instructions.trim() || (prompt || '').trim());
   };
 
   const [deeplink, setDeeplink] = useState('');
@@ -214,7 +226,11 @@ export default function ViewRecipeModal({
     let isCancelled = false;
 
     const generateLink = async () => {
-      if (!title.trim() || !description.trim() || !instructions.trim()) {
+      if (
+        !title.trim() ||
+        !description.trim() ||
+        (!instructions.trim() && !(prompt || '').trim())
+      ) {
         setDeeplink('');
         return;
       }
@@ -291,9 +307,13 @@ export default function ViewRecipeModal({
               <Geese className="w-6 h-6 text-iconProminent" />
             </div>
             <div>
-              <h1 className="text-xl font-medium text-textProminent">View/edit recipe</h1>
+              <h1 className="text-xl font-medium text-textProminent">
+                {_isCreateMode ? 'Create Recipe' : 'View/edit recipe'}
+              </h1>
               <p className="text-textSubtle text-sm">
-                You can edit the recipe below to change the agent's behavior in a new session.
+                {_isCreateMode
+                  ? 'Create a new recipe to define agent behavior and capabilities.'
+                  : "You can edit the recipe below to change the agent's behavior in a new session."}
               </p>
             </div>
           </div>

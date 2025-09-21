@@ -274,7 +274,7 @@ export default function RecipeFormFields({
               htmlFor="recipe-prompt"
               className="block text-sm font-medium text-text-standard mb-2"
             >
-              Initial Prompt (Optional)
+              Initial Prompt (Optional - Instructions or Prompt are required)
             </label>
             <textarea
               id="recipe-prompt"
