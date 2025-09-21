@@ -306,15 +306,15 @@ export function AppInner() {
 
   const { addExtension } = useConfig();
   const { agentState, loadCurrentChat, resetChat } = useAgent();
-  const resetChatIfNecessary = useCallback(() => {
-    if (chat.messages.length > 0) {
-      setSearchParams((prev) => {
-        prev.delete('resumeSessionId');
-        return prev;
-      });
-      resetChat();
-    }
-  }, [chat.messages.length, setSearchParams, resetChat]);
+  const resetChatForNewConversation = useCallback(() => {
+    // Always reset chat when starting from home, regardless of message count
+    // This ensures recipes are cleared even if no messages were sent
+    setSearchParams((prev) => {
+      prev.delete('resumeSessionId');
+      return prev;
+    });
+    resetChat();
+  }, [setSearchParams, resetChat]);
 
   useEffect(() => {
     console.log('Sending reactReady signal to Electron');
@@ -540,7 +540,7 @@ export function AppInner() {
                 <HubRouteWrapper
                   setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
                   isExtensionsLoading={isExtensionsLoading}
-                  resetChat={resetChatIfNecessary}
+                  resetChat={resetChatForNewConversation}
                 />
               }
             />
