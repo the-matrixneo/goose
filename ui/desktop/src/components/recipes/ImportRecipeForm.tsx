@@ -518,7 +518,7 @@ export default function ImportRecipeForm({ isOpen, onClose, onSuccess }: ImportR
         <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/50">
           <div className="bg-background-default border border-border-subtle rounded-lg p-6 w-[800px] max-w-[90vw] max-h-[80vh] flex flex-col">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-medium text-text-standard">Recipe Schema</h3>
+              <h3 className="text-lg font-medium text-text-standard">Expected Recipe Structure</h3>
               <button
                 type="button"
                 onClick={() => setShowSchemaModal(false)}
@@ -527,15 +527,14 @@ export default function ImportRecipeForm({ isOpen, onClose, onSuccess }: ImportR
                 ✕
               </button>
             </div>
+            <p className="mt-4 text-blue-700 text-sm">
+              Your YAML or JSON file should follow this structure. Required fields are: title,
+              description, and either instructions or prompt.
+            </p>
             <div className="flex-1 overflow-auto">
-              <p className="font-medium mb-3 text-text-standard">Expected Recipe Structure:</p>
-              <pre className="text-xs bg-gray-800 p-4 rounded overflow-auto whitespace-pre font-mono">
+              <pre className="text-xs bg-whitedark:bg-gray-800 p-4 rounded overflow-auto whitespace-pre font-mono">
                 {JSON.stringify(getRecipeJsonSchema(), null, 2)}
               </pre>
-              <p className="mt-4 text-blue-700 text-sm">
-                Your YAML or JSON file should follow this structure. Required fields are: title,
-                description, and either instructions or prompt.
-              </p>
             </div>
           </div>
         </div>

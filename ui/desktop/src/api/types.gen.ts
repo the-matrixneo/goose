@@ -109,11 +109,8 @@ export type CreateCustomProviderRequest = {
 };
 
 export type CreateRecipeRequest = {
-    activities?: Array<string> | null;
     author?: AuthorRequest | null;
-    description: string;
-    messages: Array<Message>;
-    title: string;
+    session_id: string;
 };
 
 export type CreateRecipeResponse = {

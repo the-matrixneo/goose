@@ -30,6 +30,7 @@ export interface InitializationContext {
   resumeSessionId?: string;
   setAgentWaitingMessage: (msg: string | null) => void;
   setIsExtensionsLoading?: (isLoading: boolean) => void;
+  forceReset?: boolean;
 }
 
 interface UseAgentReturn {
@@ -59,12 +60,19 @@ export function useAgent(): UseAgentReturn {
     setSessionId(null);
     setAgentState(AgentState.UNINITIALIZED);
     setRecipeFromAppConfig(null);
+    initPromiseRef.current = null; // Clear any pending initialization
   }, []);
 
   const agentIsInitialized = agentState === AgentState.INITIALIZED;
   const currentChat = useCallback(
     async (initContext: InitializationContext): Promise<ChatType> => {
-      if (agentIsInitialized && sessionId) {
+      // If forceReset is true, always reinitialize
+      if (initContext.forceReset) {
+        setSessionId(null);
+        setAgentState(AgentState.UNINITIALIZED);
+        initPromiseRef.current = null;
+        // Don't return early, continue to initialization
+      } else if (agentIsInitialized && sessionId) {
         const agentResponse = await resumeAgent({
           body: {
             session_id: sessionId,
@@ -154,14 +162,24 @@ export function useAgent(): UseAgentReturn {
           }
 
           const sessionMetadata = agentSessionInfo.metadata;
+          // Use the recipe config from initContext if available, otherwise fall back to session metadata
+          const recipeConfig = initContext.recipeConfig || sessionMetadata.recipe;
+
+          // If we're loading a recipe from initContext (new recipe load), start with empty messages
+          // Otherwise, use the messages from the session
+          const messages =
+            initContext.recipeConfig && !initContext.resumeSessionId
+              ? []
+              : agentSessionInfo.messages.map((message: ApiMessage) =>
+                  convertApiMessageToFrontendMessage(message)
+                );
+
           let initChat: ChatType = {
             sessionId: agentSessionInfo.session_id,
-            title: sessionMetadata.recipe?.title || sessionMetadata.description,
+            title: recipeConfig?.title || sessionMetadata.description,
             messageHistoryIndex: 0,
-            messages: agentSessionInfo.messages.map((message: ApiMessage) =>
-              convertApiMessageToFrontendMessage(message)
-            ),
-            recipeConfig: sessionMetadata.recipe,
+            messages: messages,
+            recipeConfig: recipeConfig,
           };
 
           setAgentState(AgentState.INITIALIZED);

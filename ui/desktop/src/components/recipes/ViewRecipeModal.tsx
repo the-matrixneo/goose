@@ -1,51 +1,85 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Recipe, generateDeepLink } from '../../recipe';
-import { Parameter } from '../../recipe/index';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useForm } from '@tanstack/react-form';
+import { Recipe, generateDeepLink, Parameter } from '../../recipe';
 import { Geese } from '../icons/Geese';
 import Copy from '../icons/Copy';
 import { Check, Save, Calendar, X } from 'lucide-react';
 import { ExtensionConfig, useConfig } from '../ConfigContext';
 import { FixedExtensionEntry } from '../ConfigContext';
-import RecipeActivityEditor from './RecipeActivityEditor';
-import RecipeInfoModal from './RecipeInfoModal';
-import RecipeExpandableInfo from './RecipeExpandableInfo';
 import { ScheduleFromRecipeModal } from '../schedule/ScheduleFromRecipeModal';
-import ParameterInput from '../parameter/ParameterInput';
-import { saveRecipe, generateRecipeFilename } from '../../recipe/recipeStorage';
-import { toastSuccess, toastError } from '../../toasts';
 import { Button } from '../ui/button';
-import { filterValidUsedParameters } from '../../utils/providerUtils';
+import SaveRecipeDialog from './shared/SaveRecipeDialog';
+import RecipeFormFields from './shared/RecipeFormFields';
+import { RecipeFormData } from './shared/recipeFormSchema';
 
 interface ViewRecipeModalProps {
   isOpen: boolean;
-  onClose: () => void;
-  config: Recipe;
+  onClose: (wasSaved?: boolean) => void;
+  config?: Recipe;
+  isCreateMode?: boolean;
 }
 
-export default function ViewRecipeModal({ isOpen, onClose, config }: ViewRecipeModalProps) {
+export default function ViewRecipeModal({
+  isOpen,
+  onClose,
+  config,
+  isCreateMode: _isCreateMode = false,
+}: ViewRecipeModalProps) {
   const { getExtensions } = useConfig();
   const [recipeConfig] = useState<Recipe | undefined>(config);
-  const [title, setTitle] = useState(config?.title || '');
-  const [description, setDescription] = useState(config?.description || '');
-  const [instructions, setInstructions] = useState(config?.instructions || '');
-  const [prompt, setPrompt] = useState(config?.prompt || '');
-  const [activities, setActivities] = useState<string[]>(config?.activities || []);
-  const [parameters, setParameters] = useState<Parameter[]>(config?.parameters || []);
 
+  // Initialize form with TanStack Form
+  const getInitialValues = React.useCallback((): RecipeFormData => {
+    if (config) {
+      return {
+        title: config.title || '',
+        description: config.description || '',
+        instructions: config.instructions || '',
+        prompt: config.prompt || '',
+        activities: config.activities || [],
+        parameters: config.parameters || [],
+        jsonSchema: config.response?.json_schema
+          ? JSON.stringify(config.response.json_schema, null, 2)
+          : '',
+        recipeName: '',
+        global: true,
+      };
+    }
+    return {
+      title: '',
+      description: '',
+      instructions: '',
+      prompt: '',
+      activities: [],
+      parameters: [],
+      jsonSchema: '',
+      recipeName: '',
+      global: true,
+    };
+  }, [config]);
+
+  // Create TanStack form
+  const form = useForm({
+    defaultValues: getInitialValues(),
+    onSubmit: async ({ value }) => {
+      // This won't be used in ViewRecipeModal since we handle saving differently
+      console.log('Form submitted:', value);
+    },
+  });
+
+  // Helper functions to get values from form
+  const title = form.state.values.title;
+  const description = form.state.values.description;
+  const instructions = form.state.values.instructions;
+  const prompt = form.state.values.prompt;
+  const activities = form.state.values.activities;
+  const parameters = form.state.values.parameters;
+  const jsonSchema = form.state.values.jsonSchema;
   const [extensionOptions, setExtensionOptions] = useState<FixedExtensionEntry[]>([]);
   const [extensionsLoaded, setExtensionsLoaded] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [isRecipeInfoModalOpen, setRecipeInfoModalOpen] = useState(false);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
-  const [saveRecipeName, setSaveRecipeName] = useState('');
-  const [saveGlobal, setSaveGlobal] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [recipeInfoModelProps, setRecipeInfoModelProps] = useState<{
-    label: string;
-    value: string;
-    setValue: (value: string) => void;
-  } | null>(null);
 
   // Initialize selected extensions for the recipe from config
   const [recipeExtensions] = useState<string[]>(() => {
@@ -58,14 +92,10 @@ export default function ViewRecipeModal({ isOpen, onClose, config }: ViewRecipeM
   // Reset form when config changes
   useEffect(() => {
     if (config) {
-      setTitle(config.title || '');
-      setDescription(config.description || '');
-      setInstructions(config.instructions || '');
-      setPrompt(config.prompt || '');
-      setActivities(config.activities || []);
-      setParameters(config.parameters || []);
+      const newValues = getInitialValues();
+      form.reset(newValues);
     }
-  }, [config]);
+  }, [config, form, getInitialValues]);
 
   // Load extensions when modal opens
   useEffect(() => {
@@ -92,41 +122,6 @@ export default function ViewRecipeModal({ isOpen, onClose, config }: ViewRecipeM
     }
   }, [isOpen, getExtensions, recipeExtensions, extensionsLoaded]);
 
-  // Auto-detect new parameters from instructions and prompt
-  // This adds new parameters without overwriting existing ones
-  useEffect(() => {
-    const instructionsParams = parseParametersFromInstructions(instructions);
-    const promptParams = parseParametersFromInstructions(prompt);
-
-    // Combine all detected parameters, ensuring no duplicates by key
-    const detectedParamsMap = new Map<string, Parameter>();
-
-    // Add instruction parameters
-    instructionsParams.forEach((param) => {
-      detectedParamsMap.set(param.key, param);
-    });
-
-    // Add prompt parameters (won't overwrite existing keys)
-    promptParams.forEach((param) => {
-      if (!detectedParamsMap.has(param.key)) {
-        detectedParamsMap.set(param.key, param);
-      }
-    });
-
-    const existingParamKeys = new Set(parameters.map((param) => param.key));
-
-    // Only add parameters that don't already exist
-    const newParams = Array.from(detectedParamsMap.values()).filter(
-      (detectedParam) => !existingParamKeys.has(detectedParam.key)
-    );
-
-    if (newParams.length > 0) {
-      setParameters((prev) => [...prev, ...newParams]);
-    }
-  }, [instructions, prompt, parameters]);
-
-  // Filter parameters to only show valid ones that are actually used
-  const filteredParameters = filterValidUsedParameters(parameters, { instructions, prompt });
   const getCurrentConfig = useCallback((): Recipe => {
     // Transform the internal parameters state into the desired output format.
     const formattedParameters = parameters.map((param) => {
@@ -150,6 +145,18 @@ export default function ViewRecipeModal({ isOpen, onClose, config }: ViewRecipeM
       return formattedParam;
     });
 
+    // Parse response schema if provided
+    let responseConfig = undefined;
+    if (jsonSchema && jsonSchema.trim()) {
+      try {
+        const parsedSchema = JSON.parse(jsonSchema);
+        responseConfig = { json_schema: parsedSchema };
+      } catch (error) {
+        console.warn('Invalid JSON schema provided:', error);
+        // If JSON is invalid, don't include response config
+      }
+    }
+
     const updatedConfig = {
       ...recipeConfig,
       title,
@@ -158,6 +165,7 @@ export default function ViewRecipeModal({ isOpen, onClose, config }: ViewRecipeM
       activities,
       prompt,
       parameters: formattedParameters,
+      response: responseConfig,
       extensions: recipeExtensions
         .map((name) => {
           const extension = extensionOptions.find((e) => e.name === name);
@@ -185,39 +193,17 @@ export default function ViewRecipeModal({ isOpen, onClose, config }: ViewRecipeM
     activities,
     prompt,
     parameters,
+    jsonSchema,
     recipeExtensions,
     extensionOptions,
   ]);
-
-  const [errors, setErrors] = useState<{
-    title?: string;
-    description?: string;
-    instructions?: string;
-  }>({});
 
   const requiredFieldsAreFilled = () => {
     return title.trim() && description.trim() && instructions.trim();
   };
 
   const validateForm = () => {
-    const newErrors: { title?: string; description?: string; instructions?: string } = {};
-    if (!title.trim()) {
-      newErrors.title = 'Title is required';
-    }
-    if (!description.trim()) {
-      newErrors.description = 'Description is required';
-    }
-    if (!instructions.trim()) {
-      newErrors.instructions = 'Instructions are required';
-    }
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleParameterChange = (name: string, value: Partial<Parameter>) => {
-    setParameters((prev) =>
-      prev.map((param) => (param.key === name ? { ...param, ...value } : param))
-    );
+    return title.trim() && description.trim() && instructions.trim();
   };
 
   const [deeplink, setDeeplink] = useState('');
@@ -264,6 +250,7 @@ export default function ViewRecipeModal({ isOpen, onClose, config }: ViewRecipeM
     prompt,
     activities,
     parameters,
+    jsonSchema,
     recipeExtensions,
     getCurrentConfig,
   ]);
@@ -284,87 +271,13 @@ export default function ViewRecipeModal({ isOpen, onClose, config }: ViewRecipeM
       });
   };
 
-  const handleSaveRecipe = async () => {
-    if (!saveRecipeName.trim()) {
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const currentRecipe = getCurrentConfig();
-
-      if (!currentRecipe.title || !currentRecipe.description || !currentRecipe.instructions) {
-        throw new Error('Invalid recipe configuration: missing required fields');
-      }
-
-      await saveRecipe(currentRecipe, {
-        name: saveRecipeName.trim(),
-        global: saveGlobal,
-      });
-
-      // Reset dialog state
-      setShowSaveDialog(false);
-      setSaveRecipeName('');
-
-      toastSuccess({
-        title: saveRecipeName.trim(),
-        msg: `Recipe saved successfully`,
-      });
-    } catch (error) {
-      console.error('Failed to save recipe:', error);
-
-      toastError({
-        title: 'Save Failed',
-        msg: `Failed to save recipe: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        traceback: error instanceof Error ? error.message : String(error),
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const handleSaveRecipeClick = () => {
     if (!validateForm()) {
       return;
     }
 
-    const currentRecipe = getCurrentConfig();
-    // Generate a suggested name from the recipe title
-    const suggestedName = generateRecipeFilename(currentRecipe);
-    setSaveRecipeName(suggestedName);
     setShowSaveDialog(true);
   };
-
-  const onClickEditTextArea = ({
-    label,
-    value,
-    setValue,
-  }: {
-    label: string;
-    value: string;
-    setValue: (value: string) => void;
-  }) => {
-    setRecipeInfoModalOpen(true);
-    setRecipeInfoModelProps({
-      label,
-      value,
-      setValue,
-    });
-  };
-
-  function parseParametersFromInstructions(instructions: string): Parameter[] {
-    const regex = /\{\{(.*?)\}\}/g;
-    const matches = [...instructions.matchAll(regex)];
-
-    return matches.map((match) => {
-      return {
-        key: match[1].trim(),
-        description: `Enter value for ${match[1].trim()}`,
-        requirement: 'required',
-        input_type: 'string',
-      };
-    });
-  }
 
   if (!isOpen) return null;
 
@@ -378,14 +291,14 @@ export default function ViewRecipeModal({ isOpen, onClose, config }: ViewRecipeM
               <Geese className="w-6 h-6 text-iconProminent" />
             </div>
             <div>
-              <h1 className="text-xl font-medium text-textProminent">View/edit current recipe</h1>
+              <h1 className="text-xl font-medium text-textProminent">View/edit recipe</h1>
               <p className="text-textSubtle text-sm">
                 You can edit the recipe below to change the agent's behavior in a new session.
               </p>
             </div>
           </div>
           <Button
-            onClick={onClose}
+            onClick={() => onClose(false)}
             variant="ghost"
             size="sm"
             className="p-2 hover:bg-bgSubtle rounded-lg transition-colors"
@@ -396,148 +309,55 @@ export default function ViewRecipeModal({ isOpen, onClose, config }: ViewRecipeM
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-6 py-4">
-          <div className="space-y-6">
-            <div className="pb-6 border-b border-borderSubtle">
-              <label htmlFor="title" className="block text-md text-textProminent mb-2 font-bold">
-                Title <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => {
-                  setTitle(e.target.value);
-                  if (errors.title) {
-                    setErrors({ ...errors, title: undefined });
-                  }
-                }}
-                className={`w-full p-3 border rounded-lg bg-background-default text-textStandard focus:outline-none focus:ring-2 focus:ring-borderProminent ${
-                  errors.title ? 'border-red-500' : 'border-borderSubtle'
-                }`}
-                placeholder="Agent Recipe Title (required)"
-              />
-              {errors.title && <div className="text-red-500 text-sm mt-1">{errors.title}</div>}
-            </div>
+          <RecipeFormFields
+            form={form}
+            showRecipeNameField={false}
+            showSaveLocationField={false}
+            autoGenerateRecipeName={false}
+          />
 
-            <div className="pb-6 border-b border-borderSubtle">
-              <label
-                htmlFor="description"
-                className="block text-md text-textProminent mb-2 font-bold"
-              >
-                Description <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={description}
-                onChange={(e) => {
-                  setDescription(e.target.value);
-                  if (errors.description) {
-                    setErrors({ ...errors, description: undefined });
-                  }
-                }}
-                className={`w-full p-3 border rounded-lg bg-background-default text-textStandard focus:outline-none focus:ring-2 focus:ring-borderProminent ${
-                  errors.description ? 'border-red-500' : 'border-borderSubtle'
-                }`}
-                placeholder="Description (required)"
-              />
-              {errors.description && (
-                <div className="text-red-500 text-sm mt-1">{errors.description}</div>
-              )}
-            </div>
-
-            <div className="pb-6 border-b border-borderSubtle">
-              <RecipeExpandableInfo
-                infoLabel="Instructions"
-                infoValue={instructions}
-                required={true}
-                onClickEdit={() =>
-                  onClickEditTextArea({
-                    label: 'Instructions',
-                    value: instructions,
-                    setValue: setInstructions,
-                  })
-                }
-              />
-              {errors.instructions && (
-                <div className="text-red-500 text-sm mt-1">{errors.instructions}</div>
-              )}
-            </div>
-
-            {filteredParameters.map((parameter: Parameter) => (
-              <ParameterInput
-                key={parameter.key}
-                parameter={parameter}
-                onChange={(name, value) => handleParameterChange(name, value)}
-              />
-            ))}
-
-            <div className="pb-6 border-b border-borderSubtle">
-              <RecipeExpandableInfo
-                infoLabel="Initial Prompt"
-                infoValue={prompt}
-                required={false}
-                onClickEdit={() =>
-                  onClickEditTextArea({
-                    label: 'Initial Prompt',
-                    value: prompt,
-                    setValue: setPrompt,
-                  })
-                }
-              />
-            </div>
-
-            <div className="pb-6 border-b border-borderSubtle">
-              <RecipeActivityEditor activities={activities} setActivities={setActivities} />
-            </div>
-
-            {/* Deep Link Display */}
-            <div className="w-full p-4 bg-bgSubtle rounded-lg">
-              {!requiredFieldsAreFilled() ? (
+          {/* Deep Link Display */}
+          {requiredFieldsAreFilled() && (
+            <div className="w-full p-4 bg-bgSubtle rounded-lg mt-6">
+              <div className="flex items-center justify-between mb-2">
                 <div className="text-sm text-textSubtle">
-                  Fill in required fields to generate link
+                  Copy this link to share with friends or paste directly in Chrome to open
                 </div>
-              ) : (
-                <div className="flex items-center justify-between mb-2">
-                  <div className="text-sm text-textSubtle">
-                    Copy this link to share with friends or paste directly in Chrome to open
-                  </div>
-                  <Button
-                    onClick={() => validateForm() && handleCopy()}
-                    variant="ghost"
-                    size="sm"
-                    disabled={
-                      !deeplink || isGeneratingDeeplink || deeplink === 'Error generating deeplink'
-                    }
-                    className="ml-4 p-2 hover:bg-background-default rounded-lg transition-colors flex items-center disabled:opacity-50 disabled:hover:bg-transparent"
-                  >
-                    {copied ? (
-                      <Check className="w-4 h-4 text-green-500" />
-                    ) : (
-                      <Copy className="w-4 h-4 text-iconSubtle" />
-                    )}
-                    <span className="ml-1 text-sm text-textSubtle">
-                      {copied ? 'Copied!' : 'Copy'}
-                    </span>
-                  </Button>
-                </div>
-              )}
-              {requiredFieldsAreFilled() && (
-                <div
-                  onClick={() => validateForm() && handleCopy()}
-                  className={`text-sm truncate font-mono cursor-pointer ${!title.trim() || !description.trim() ? 'text-textDisabled' : 'text-textStandard'}`}
+                <Button
+                  onClick={handleCopy}
+                  variant="ghost"
+                  size="sm"
+                  disabled={
+                    !deeplink || isGeneratingDeeplink || deeplink === 'Error generating deeplink'
+                  }
+                  className="ml-4 p-2 hover:bg-background-default rounded-lg transition-colors flex items-center disabled:opacity-50 disabled:hover:bg-transparent"
                 >
-                  {isGeneratingDeeplink
-                    ? 'Generating deeplink...'
-                    : deeplink || 'Click to generate deeplink'}
-                </div>
-              )}
+                  {copied ? (
+                    <Check className="w-4 h-4 text-green-500" />
+                  ) : (
+                    <Copy className="w-4 h-4 text-iconSubtle" />
+                  )}
+                  <span className="ml-1 text-sm text-textSubtle">
+                    {copied ? 'Copied!' : 'Copy'}
+                  </span>
+                </Button>
+              </div>
+              <div
+                onClick={handleCopy}
+                className="text-sm truncate font-mono cursor-pointer text-textStandard"
+              >
+                {isGeneratingDeeplink
+                  ? 'Generating deeplink...'
+                  : deeplink || 'Click to generate deeplink'}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Footer */}
         <div className="flex items-center justify-between p-6 border-t border-borderSubtle">
           <Button
-            onClick={onClose}
+            onClick={() => onClose(false)}
             variant="ghost"
             className="px-4 py-2 text-textSubtle rounded-lg hover:bg-bgSubtle transition-colors"
           >
@@ -545,35 +365,29 @@ export default function ViewRecipeModal({ isOpen, onClose, config }: ViewRecipeM
           </Button>
 
           <div className="flex gap-3">
-            <button
-              onClick={handleSaveRecipeClick}
-              disabled={!requiredFieldsAreFilled() || saving}
-              className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-bgStandard text-textStandard border border-borderStandard rounded-lg hover:bg-bgSubtle transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Save className="w-4 h-4" />
-              {saving ? 'Saving...' : 'Save Recipe'}
-            </button>
             <Button
               onClick={() => setIsScheduleModalOpen(true)}
               disabled={!requiredFieldsAreFilled()}
               variant="outline"
               size="default"
-              className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-textProminent text-bgApp rounded-lg hover:bg-opacity-90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center justify-center gap-2 px-4 py-2"
             >
               <Calendar className="w-4 h-4" />
               Create Schedule
             </Button>
+            <Button
+              onClick={handleSaveRecipeClick}
+              disabled={!requiredFieldsAreFilled()}
+              variant="outline"
+              size="default"
+              className="inline-flex items-center justify-center gap-2 px-4 py-2"
+            >
+              <Save className="w-4 h-4" />
+              Save Recipe
+            </Button>
           </div>
         </div>
       </div>
-
-      <RecipeInfoModal
-        infoLabel={recipeInfoModelProps?.label}
-        originalValue={recipeInfoModelProps?.value}
-        isOpen={isRecipeInfoModalOpen}
-        onClose={() => setRecipeInfoModalOpen(false)}
-        onSaveValue={recipeInfoModelProps?.setValue}
-      />
 
       <ScheduleFromRecipeModal
         isOpen={isScheduleModalOpen}
@@ -596,83 +410,16 @@ export default function ViewRecipeModal({ isOpen, onClose, config }: ViewRecipeM
 
       {/* Save Recipe Dialog */}
       {showSaveDialog && (
-        <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/50">
-          <div className="bg-background-default border border-borderSubtle rounded-lg p-6 w-96 max-w-[90vw]">
-            <h3 className="text-lg font-medium text-textProminent mb-4">Save Recipe</h3>
-
-            <div className="space-y-4">
-              <div>
-                <label
-                  htmlFor="recipe-name"
-                  className="block text-sm font-medium text-textStandard mb-2"
-                >
-                  Recipe Name
-                </label>
-                <input
-                  id="recipe-name"
-                  type="text"
-                  value={saveRecipeName}
-                  onChange={(e) => setSaveRecipeName(e.target.value)}
-                  className="w-full p-3 border border-borderSubtle rounded-lg bg-background-default text-textStandard focus:outline-none focus:ring-2 focus:ring-borderProminent"
-                  placeholder="Enter recipe name"
-                  autoFocus
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-textStandard mb-2">
-                  Save Location
-                </label>
-                <div className="space-y-2">
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      name="save-location"
-                      checked={saveGlobal}
-                      onChange={() => setSaveGlobal(true)}
-                      className="mr-2"
-                    />
-                    <span className="text-sm text-textStandard">
-                      Global - Available across all Goose sessions
-                    </span>
-                  </label>
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      name="save-location"
-                      checked={!saveGlobal}
-                      onChange={() => setSaveGlobal(false)}
-                      className="mr-2"
-                    />
-                    <span className="text-sm text-textStandard">
-                      Directory - Available in the working directory
-                    </span>
-                  </label>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-end space-x-3 mt-6">
-              <button
-                onClick={() => {
-                  setShowSaveDialog(false);
-                  setSaveRecipeName('');
-                }}
-                className="px-4 py-2 text-textSubtle hover:text-textStandard transition-colors"
-                disabled={saving}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveRecipe}
-                disabled={!saveRecipeName.trim() || saving}
-                className="px-4 py-2 bg-textProminent text-bgApp rounded-lg hover:bg-opacity-90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {saving ? 'Saving...' : 'Save Recipe'}
-              </button>
-            </div>
-          </div>
-        </div>
+        <SaveRecipeDialog
+          isOpen={showSaveDialog}
+          onClose={(wasSaved) => {
+            setShowSaveDialog(false);
+            if (wasSaved) {
+              onClose(true); // Pass through that recipe was saved
+            }
+          }}
+          recipe={getCurrentConfig()}
+        />
       )}
     </div>
   );

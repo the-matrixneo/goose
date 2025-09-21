@@ -71,7 +71,6 @@ interface ChatInputProps {
   inputTokens?: number;
   outputTokens?: number;
   messages?: Message[];
-  setMessages: (messages: Message[]) => void;
   sessionCosts?: {
     [key: string]: {
       inputTokens: number;
@@ -104,7 +103,7 @@ export default function ChatInput({
   inputTokens,
   outputTokens,
   messages = [],
-  setMessages,
+
   disableAnimation = false,
   sessionCosts,
   setIsGoosehintsModalOpen,
@@ -568,7 +567,7 @@ export default function ChatInput({
           // Hide the alert popup by dispatching a custom event that the popover can listen to
           // Importantly, this leaves the alert so the dot still shows up, but hides the popover
           window.dispatchEvent(new CustomEvent('hide-alert-popover'));
-          handleManualCompaction(messages, setMessages, append);
+          handleManualCompaction(messages, () => {}, append);
         },
         compactIcon: <ScrollText size={12} />,
         autoCompactThreshold: autoCompactThreshold,

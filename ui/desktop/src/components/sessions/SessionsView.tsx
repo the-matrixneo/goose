@@ -1,16 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, ViewOptions } from '../../utils/navigationUtils';
 import { fetchSessionDetails, type SessionDetails } from '../../sessions';
 import SessionListView from './SessionListView';
 import SessionHistoryView from './SessionHistoryView';
 import { toastError } from '../../toasts';
 import { useLocation } from 'react-router-dom';
 
-interface SessionsViewProps {
-  setView: (view: View, viewOptions?: ViewOptions) => void;
-}
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+interface SessionsViewProps {}
 
-const SessionsView: React.FC<SessionsViewProps> = ({ setView }) => {
+const SessionsView: React.FC<SessionsViewProps> = () => {
   const [selectedSession, setSelectedSession] = useState<SessionDetails | null>(null);
   const [showSessionHistory, setShowSessionHistory] = useState(false);
   const [isLoadingSession, setIsLoadingSession] = useState(false);
@@ -95,7 +93,6 @@ const SessionsView: React.FC<SessionsViewProps> = ({ setView }) => {
     />
   ) : (
     <SessionListView
-      setView={setView}
       onSelectSession={handleSelectSession}
       selectedSessionId={selectedSession?.sessionId ?? null}
     />

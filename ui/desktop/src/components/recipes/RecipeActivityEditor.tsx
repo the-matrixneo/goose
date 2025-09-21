@@ -4,9 +4,11 @@ import { Button } from '../ui/button';
 export default function RecipeActivityEditor({
   activities,
   setActivities,
+  onBlur,
 }: {
   activities: string[];
   setActivities: (prev: string[]) => void;
+  onBlur?: () => void;
 }) {
   const [newActivity, setNewActivity] = useState('');
   const [messageContent, setMessageContent] = useState('');
@@ -74,6 +76,7 @@ export default function RecipeActivityEditor({
           id="message"
           value={messageContent}
           onChange={(e) => handleMessageChange(e.target.value)}
+          onBlur={onBlur}
           className="w-full px-4 py-3 border rounded-lg bg-background-default text-textStandard placeholder-textPlaceholder focus:outline-none focus:ring-2 focus:ring-borderProminent resize-vertical"
           placeholder="Enter a message for your recipe (supports **bold**, *italic*, `code`, etc.)"
           rows={3}
@@ -103,6 +106,7 @@ export default function RecipeActivityEditor({
             >
               <span>{activity.length > 100 ? activity.slice(0, 100) + '...' : activity}</span>
               <Button
+                type="button"
                 onClick={() => handleRemoveActivity(activity)}
                 variant="ghost"
                 size="sm"
@@ -113,21 +117,24 @@ export default function RecipeActivityEditor({
             </div>
           ))}
         </div>
-        <div className="flex gap-3 mt-6">
+        <div className="flex gap-2 mt-3">
           <input
             type="text"
             value={newActivity}
             onChange={(e) => setNewActivity(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleAddActivity()}
-            className="flex-1 px-4 py-3 border rounded-lg bg-background-default text-textStandard placeholder-textPlaceholder focus:outline-none focus:ring-2 focus:ring-borderProminent"
+            onBlur={onBlur}
+            className="flex-1 px-3 py-2 border border-border-subtle rounded-lg bg-background-default text-text-standard focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
             placeholder="Add new activity..."
           />
-          <Button
+          <button
+            type="button"
             onClick={handleAddActivity}
-            className="px-5 py-1.5 text-sm bg-background-defaultInverse text-textProminentInverse rounded-xl hover:bg-bgStandardInverse transition-colors"
+            disabled={!newActivity.trim()}
+            className="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
             Add activity
-          </Button>
+          </button>
         </div>
       </div>
     </div>

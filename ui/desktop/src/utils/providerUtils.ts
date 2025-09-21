@@ -79,7 +79,7 @@ const isValidParameterName = (variable: string): boolean => {
 // Helper function to filter recipe parameters to only show valid ones that are actually used
 export const filterValidUsedParameters = (
   parameters: RecipeParameter[] | undefined,
-  recipeContent: { prompt?: string; instructions?: string }
+  recipeContent: { prompt?: string; instructions?: string; activities?: string[] }
 ): RecipeParameter[] => {
   if (!parameters || !Array.isArray(parameters)) {
     return [];
@@ -92,7 +92,19 @@ export const filterValidUsedParameters = (
   const instructionVariables = recipeContent.instructions
     ? extractTemplateVariables(recipeContent.instructions)
     : [];
-  const allUsedVariables = [...new Set([...promptVariables, ...instructionVariables])];
+
+  // Extract variables from activities
+  const activityVariables: string[] = [];
+  if (recipeContent.activities && Array.isArray(recipeContent.activities)) {
+    recipeContent.activities.forEach((activity) => {
+      const vars = extractTemplateVariables(activity);
+      activityVariables.push(...vars);
+    });
+  }
+
+  const allUsedVariables = [
+    ...new Set([...promptVariables, ...instructionVariables, ...activityVariables]),
+  ];
 
   // Filter parameters to only include:
   // 1. Parameters with valid names (no spaces, dots, pipes, etc.)

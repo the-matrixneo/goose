@@ -71,6 +71,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     setChat({
       ...chat,
       recipeConfig: recipe,
+      recipeParameters: null,
     });
   };
 
