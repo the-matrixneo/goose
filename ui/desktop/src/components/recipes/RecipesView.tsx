@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { listSavedRecipes, convertToLocaleDateString } from '../../recipe/recipeStorage';
-import { FileText, Edit, Trash2, Bot, Calendar, AlertCircle } from 'lucide-react';
+import { FileText, Edit, Trash2, Play, Calendar, AlertCircle, Link } from 'lucide-react';
 import { ScrollArea } from '../ui/scroll-area';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
@@ -12,6 +12,7 @@ import { deleteRecipe, RecipeManifestResponse } from '../../api';
 import ImportRecipeForm, { ImportRecipeButton } from './ImportRecipeForm';
 import ViewRecipeModal from './ViewRecipeModal';
 import { View, ViewOptions } from '../../utils/navigationUtils';
+import { generateDeepLink } from '../../recipe';
 
 interface RecipesViewProps {
   setView: (view: View, viewOptions?: ViewOptions) => void;
@@ -125,6 +126,23 @@ export default function RecipesView({ setView }: RecipesViewProps) {
     }
   };
 
+  const handleCopyDeeplink = async (recipeManifest: RecipeManifestResponse) => {
+    try {
+      const deeplink = await generateDeepLink(recipeManifest.recipe);
+      await navigator.clipboard.writeText(deeplink);
+      toastSuccess({
+        title: 'Deeplink copied',
+        msg: 'Recipe deeplink has been copied to clipboard',
+      });
+    } catch (error) {
+      console.error('Failed to copy deeplink:', error);
+      toastSuccess({
+        title: 'Copy failed',
+        msg: 'Failed to copy deeplink to clipboard',
+      });
+    }
+  };
+
   // Render a recipe item
   const RecipeItem = ({
     recipeManifestResponse,
@@ -132,7 +150,7 @@ export default function RecipesView({ setView }: RecipesViewProps) {
   }: {
     recipeManifestResponse: RecipeManifestResponse;
   }) => (
-    <Card className="py-2 px-4 mb-2 bg-background-default border-none hover:bg-background-muted cursor-pointer transition-all duration-150">
+    <Card className="py-2 px-4 mb-2 bg-background-default border-none hover:bg-background-muted transition-all duration-150">
       <div className="flex justify-between items-start gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-1">
@@ -152,10 +170,10 @@ export default function RecipesView({ setView }: RecipesViewProps) {
               handleLoadRecipe(recipeManifestResponse);
             }}
             size="sm"
-            className="h-8"
+            className="h-8 w-8 p-0"
+            title="Use recipe"
           >
-            <Bot className="w-4 h-4 mr-1" />
-            Use
+            <Play className="w-4 h-4" />
           </Button>
           <Button
             onClick={(e) => {
@@ -164,10 +182,22 @@ export default function RecipesView({ setView }: RecipesViewProps) {
             }}
             variant="outline"
             size="sm"
-            className="h-8"
+            className="h-8 w-8 p-0"
+            title="Edit recipe"
           >
-            <Edit className="w-4 h-4 mr-1" />
-            Edit Recipe
+            <Edit className="w-4 h-4" />
+          </Button>
+          <Button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleCopyDeeplink(recipeManifestResponse);
+            }}
+            variant="outline"
+            size="sm"
+            className="h-8 w-8 p-0"
+            title="Copy deeplink"
+          >
+            <Link className="w-4 h-4" />
           </Button>
           <Button
             onClick={(e) => {
@@ -176,7 +206,8 @@ export default function RecipesView({ setView }: RecipesViewProps) {
             }}
             variant="ghost"
             size="sm"
-            className="h-8 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+            className="h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+            title="Delete recipe"
           >
             <Trash2 className="w-4 h-4" />
           </Button>
@@ -195,8 +226,9 @@ export default function RecipesView({ setView }: RecipesViewProps) {
           <Skeleton className="h-4 w-24" />
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <Skeleton className="h-8 w-16" />
-          <Skeleton className="h-8 w-20" />
+          <Skeleton className="h-8 w-8" />
+          <Skeleton className="h-8 w-8" />
+          <Skeleton className="h-8 w-8" />
           <Skeleton className="h-8 w-8" />
         </div>
       </div>
