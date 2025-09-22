@@ -96,7 +96,8 @@ fn process_extensions(
     _loaded_extensions: &[String],
 ) -> Option<Vec<ExtensionConfig>> {
     // First try to deserialize as ExtensionConfig array
-    if let Ok(ext_configs) = serde_json::from_value::<Vec<ExtensionConfig>>(extensions.clone()) {
+    let ext_configs = serde_json::from_value::<Vec<ExtensionConfig>>(extensions.clone()).unwrap_or_default();
+    if !ext_configs.is_empty() {
         return Some(ext_configs);
     }
 
@@ -111,9 +112,9 @@ fn process_extensions(
         let mut converted_extensions = Vec::new();
 
         for ext in arr {
-            if let Some(name_str) = ext.as_str() {
+            if let Some(name_str) = get_extension_name(&ext) {
                 // Look up the full extension config by name
-                match crate::config::ExtensionConfigManager::get_config_by_name(name_str) {
+                match crate::config::ExtensionConfigManager::get_config_by_name(&name_str) {
                     Ok(Some(config)) => {
                         // Check if the extension is enabled
                         if crate::config::ExtensionConfigManager::is_enabled(&config.key())
@@ -155,6 +156,15 @@ fn apply_if_ok<T: serde::de::DeserializeOwned>(
     }
 }
 
+fn get_extension_name(ext: &Value) -> Option<String> {
+    if let Some(name_str) = ext.as_str() {
+        return Some(name_str.to_string());
+    }
+    if let Some(obj) = ext.as_object() {
+        return obj.get("name").and_then(|v| v.as_str()).map(|s| s.to_string());
+    }
+    None
+}
 pub fn task_params_to_inline_recipe(
     task_param: &Value,
     loaded_extensions: &[String],
