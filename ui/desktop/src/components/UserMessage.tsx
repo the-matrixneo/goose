@@ -9,6 +9,7 @@ import MessageCopyLink from './MessageCopyLink';
 import { formatMessageTimestamp } from '../utils/timeUtils';
 import Edit from './icons/Edit';
 import { Button } from './ui/button';
+import { cn } from '../utils';
 
 interface UserMessageProps {
   message: Message;
@@ -150,8 +151,17 @@ export default function UserMessage({ message, onMessageUpdate }: UserMessagePro
     }
   }, [editContent, isEditing]);
 
+  // Check if this message was part of a summarization (user visible but not agent visible)
+  const isSummarizedMessage =
+    message.metadata?.userVisible === true && message.metadata?.agentVisible === false;
+
   return (
-    <div className="w-full mt-[16px] opacity-0 animate-[appear_150ms_ease-in_forwards]">
+    <div
+      className={cn(
+        'w-full mt-[16px] opacity-0 animate-[appear_150ms_ease-in_forwards]',
+        isSummarizedMessage && 'opacity-50 italic'
+      )}
+    >
       <div className="flex flex-col group">
         {isEditing ? (
           // Truly wide, centered, in-place edit box replacing the bubble

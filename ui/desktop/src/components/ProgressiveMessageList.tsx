@@ -172,6 +172,11 @@ export default function ProgressiveMessageList({
     const messagesToRender = messages.slice(0, renderedCount);
     return messagesToRender
       .map((message, index) => {
+        // Filter out messages that are not user-visible
+        if (message.metadata?.userVisible === false) {
+          return null;
+        }
+
         // Use custom render function if provided
         if (renderMessage) {
           return renderMessage(message, index);

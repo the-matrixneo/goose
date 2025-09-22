@@ -108,6 +108,10 @@ export interface Message {
   role: Role;
   created: number;
   content: MessageContent[];
+  metadata?: {
+    userVisible?: boolean;
+    agentVisible?: boolean;
+  };
 }
 
 // Helper functions to create messages

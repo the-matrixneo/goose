@@ -58,6 +58,13 @@ export function convertApiMessageToFrontendMessage(apiMessage: ApiMessage): Fron
     content: apiMessage.content
       .map((apiContent) => mapApiContentToFrontendMessageContent(apiContent))
       .filter((content): content is FrontendMessageContent => content !== null),
+    // Preserve metadata from the API message
+    metadata: apiMessage.metadata
+      ? {
+          userVisible: apiMessage.metadata.userVisible,
+          agentVisible: apiMessage.metadata.agentVisible,
+        }
+      : undefined,
   };
 }
 

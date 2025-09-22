@@ -317,10 +317,9 @@ async fn reply_handler(
 
                             all_messages.push(message.clone());
 
-                            // Only send message to client if it's user_visible
-                            if message.is_user_visible() {
-                                stream_event(MessageEvent::Message { message }, &tx, &cancel_token).await;
-                            }
+                            // Always send the message to client with metadata preserved
+                            // The frontend will handle visibility based on metadata
+                            stream_event(MessageEvent::Message { message }, &tx, &cancel_token).await;
                         }
                         Ok(Some(Ok(AgentEvent::HistoryReplaced(new_messages)))) => {
                             // Replace the message history with the compacted messages
