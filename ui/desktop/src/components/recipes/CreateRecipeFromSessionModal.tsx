@@ -80,13 +80,11 @@ export default function CreateRecipeFromSessionModal({
         body: { session_id: sessionId },
       })
         .then((response) => {
-          console.log('Recipe analysis response:', response);
           clearInterval(stageInterval);
           setAnalysisStage('Complete!');
 
           if (response.data?.recipe) {
             const recipe = response.data.recipe;
-            console.log('Prefilling form with recipe:', recipe);
 
             // Prefill the form with the analyzed recipe information
             form.setFieldValue('title', recipe.title || '');
@@ -313,20 +311,6 @@ export default function CreateRecipeFromSessionModal({
             ) : (
               <Button
                 onClick={() => {
-                  console.log('=== Create Recipe Button Click Debug ===');
-                  console.log(
-                    'Button click state:',
-                    JSON.stringify(
-                      {
-                        isFormValid: isFormValid,
-                        isCreating: isCreating,
-                        disabled: !isFormValid || isCreating,
-                        currentFormValues: form.state.values,
-                      },
-                      null,
-                      2
-                    )
-                  );
                   form.handleSubmit();
                 }}
                 disabled={!isFormValid || isCreating}
