@@ -72,6 +72,7 @@ export default function Hub({
           droppedFiles={[]}
           onFilesProcessed={() => {}}
           messages={[]}
+          setMessages={() => {}}
           disableAnimation={false}
           sessionCosts={undefined}
           setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
