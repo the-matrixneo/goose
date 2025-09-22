@@ -190,12 +190,13 @@ impl Agent {
     pub fn run_standalone_task(
         text_instruction: String,
         task_config: TaskConfig,
+        event_sender: Option<tokio::sync::mpsc::UnboundedSender<Message>>,
     ) -> BoxFuture<'static, Result<Conversation>> {
         Box::pin(async move {
             let agent = Agent::new();
             agent.initialize_for_task(&task_config).await?;
             agent
-                .execute_task_sequence(text_instruction, task_config)
+                .execute_task_sequence(text_instruction, task_config, event_sender)
                 .await
         })
     }
@@ -232,6 +233,7 @@ impl Agent {
         &self,
         instruction: String,
         task_config: TaskConfig,
+        event_sender: Option<tokio::sync::mpsc::UnboundedSender<Message>>,
     ) -> BoxFuture<'_, Result<Conversation>> {
         Box::pin(async move {
             let user_message = Message::user().with_text(instruction);
@@ -266,6 +268,9 @@ impl Agent {
             while let Some(event) = stream.next().await {
                 match event? {
                     AgentEvent::Message(message) => {
+                        if let Some(sender) = &event_sender {
+                            let _ = sender.send(message.clone());
+                        }
                         if message.role == Role::Assistant {
                             assistant_turns = assistant_turns.saturating_add(1);
                             if assistant_turns >= max_turns {

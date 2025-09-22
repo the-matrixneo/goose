@@ -96,7 +96,8 @@ fn process_extensions(
     _loaded_extensions: &[String],
 ) -> Option<Vec<ExtensionConfig>> {
     // First try to deserialize as ExtensionConfig array
-    let ext_configs = serde_json::from_value::<Vec<ExtensionConfig>>(extensions.clone()).unwrap_or_default();
+    let ext_configs =
+        serde_json::from_value::<Vec<ExtensionConfig>>(extensions.clone()).unwrap_or_default();
     if !ext_configs.is_empty() {
         return Some(ext_configs);
     }
@@ -161,7 +162,10 @@ fn get_extension_name(ext: &Value) -> Option<String> {
         return Some(name_str.to_string());
     }
     if let Some(obj) = ext.as_object() {
-        return obj.get("name").and_then(|v| v.as_str()).map(|s| s.to_string());
+        return obj
+            .get("name")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
     }
     None
 }
