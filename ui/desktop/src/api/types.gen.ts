@@ -836,6 +836,7 @@ export type SuccessCheck = {
 
 export type SummarizationRequested = {
     msg: string;
+    summary?: string | null;
 };
 
 export type TextContent = {

@@ -1,6 +1,6 @@
 use anyhow::Ok;
 
-use crate::conversation::message::{Message, MessageMetadata};
+use crate::conversation::message::{Message, MessageContent, MessageMetadata};
 use crate::conversation::Conversation;
 use crate::token_counter::create_async_token_counter;
 
@@ -91,11 +91,13 @@ impl Agent {
         }
 
         // Add the compaction marker with summary (user_visible=true, agent_visible=false)
-        // Include the summary text in the marker so it can be displayed in the UI
+        // Include the summary in a structured way
         let summary_text = summary_message.as_concat_text();
         let compaction_marker = Message::assistant()
-            .with_summarization_requested("Conversation compacted and summarized")
-            .with_text(format!("__SUMMARY__: {}", summary_text))
+            .with_content(MessageContent::summarization_requested_with_summary(
+                "Conversation compacted and summarized",
+                summary_text,
+            ))
             .with_metadata(MessageMetadata::user_only());
         let compaction_marker_tokens: usize = 0; // Not counted since agent_visible=false
         final_messages.push(compaction_marker);

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Message, SummarizationRequestedContent, getTextContent } from '../../types/message';
+import { Message, SummarizationRequestedContent } from '../../types/message';
 import { Search } from 'lucide-react';
 import { Button } from '../ui/button';
 import SummaryViewModal from '../SummaryViewModal';
@@ -16,11 +16,7 @@ export const CompactionMarker: React.FC<CompactionMarkerProps> = ({ message }) =
   ) as SummarizationRequestedContent | undefined;
 
   const markerText = compactionContent?.msg || 'Conversation compacted';
-
-  // Extract the summary from the text content if it exists
-  const textContent = getTextContent(message);
-  const summaryMatch = textContent.match(/__SUMMARY__:\s*([\s\S]*)/);
-  const summaryText = summaryMatch ? summaryMatch[1].trim() : null;
+  const summaryText = compactionContent?.summary || null;
 
   return (
     <div className="flex items-center justify-between py-2">

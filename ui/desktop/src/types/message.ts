@@ -92,6 +92,7 @@ export interface ContextLengthExceededContent {
 export interface SummarizationRequestedContent {
   type: 'summarizationRequested';
   msg: string;
+  summary?: string;
 }
 
 export type MessageContent =

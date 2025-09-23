@@ -1,6 +1,6 @@
 import React from 'react';
 import { X, FileText } from 'lucide-react';
-import { Message, getTextContent } from '../types/message';
+import { Message, SummarizationRequestedContent } from '../types/message';
 import MarkdownContent from './MarkdownContent';
 import { formatMessageTimestamp } from '../utils/timeUtils';
 
@@ -38,17 +38,14 @@ export const SummaryViewModal: React.FC<SummaryViewModalProps> = ({
     // Look for compaction marker with embedded summary
     for (let i = messages.length - 1; i >= 0; i--) {
       const msg = messages[i];
-      const summaryContent = msg.content.find((c) => c.type === 'summarizationRequested');
-      if (summaryContent) {
-        // Check if the message also has text content with __SUMMARY__ marker
-        const textContent = getTextContent(msg);
-        const summaryMatch = textContent.match(/__SUMMARY__:\s*([\s\S]*)/);
-        if (summaryMatch) {
-          return {
-            message: msg,
-            content: summaryMatch[1].trim(),
-          };
-        }
+      const summaryContent = msg.content.find((c) => c.type === 'summarizationRequested') as
+        | SummarizationRequestedContent
+        | undefined;
+      if (summaryContent && summaryContent.summary) {
+        return {
+          message: msg,
+          content: summaryContent.summary,
+        };
       }
     }
 

@@ -113,6 +113,8 @@ pub struct ContextLengthExceeded {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct SummarizationRequested {
     pub msg: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -239,7 +241,17 @@ impl MessageContent {
     }
 
     pub fn summarization_requested<S: Into<String>>(msg: S) -> Self {
-        MessageContent::SummarizationRequested(SummarizationRequested { msg: msg.into() })
+        MessageContent::SummarizationRequested(SummarizationRequested { 
+            msg: msg.into(),
+            summary: None,
+        })
+    }
+    
+    pub fn summarization_requested_with_summary<S1: Into<String>, S2: Into<String>>(msg: S1, summary: S2) -> Self {
+        MessageContent::SummarizationRequested(SummarizationRequested { 
+            msg: msg.into(),
+            summary: Some(summary.into()),
+        })
     }
 
     // Add this new method to check for summarization requested content
