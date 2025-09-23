@@ -1,30 +1,58 @@
 import React from 'react';
 import { X, FileText } from 'lucide-react';
-import { Message, SummarizationRequestedContent } from '../types/message';
+import { Message, getTextContent } from '../types/message';
 import MarkdownContent from './MarkdownContent';
 import { formatMessageTimestamp } from '../utils/timeUtils';
 
 interface SummaryViewModalProps {
   isOpen: boolean;
   onClose: () => void;
-  messages: Message[];
+  messages?: Message[];
+  summaryText?: string;
 }
 
 export const SummaryViewModal: React.FC<SummaryViewModalProps> = ({
   isOpen,
   onClose,
   messages,
+  summaryText,
 }) => {
   if (!isOpen) return null;
 
   // Find the most recent summary message
-  // It should be agent visible but not user visible (the actual summary)
-  // OR user visible but not agent visible (the compaction marker)
   const findLatestSummary = (): {
-    message: Message;
-    content: SummarizationRequestedContent;
+    message?: Message;
+    content: string;
   } | null => {
-    // First, try to find the actual summary (agent visible but not user visible)
+    // If summaryText is provided directly, use it
+    if (summaryText) {
+      return {
+        content: summaryText,
+      };
+    }
+
+    if (!messages) {
+      return null;
+    }
+
+    // Look for compaction marker with embedded summary
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i];
+      const summaryContent = msg.content.find((c) => c.type === 'summarizationRequested');
+      if (summaryContent) {
+        // Check if the message also has text content with __SUMMARY__ marker
+        const textContent = getTextContent(msg);
+        const summaryMatch = textContent.match(/__SUMMARY__:\s*([\s\S]*)/);
+        if (summaryMatch) {
+          return {
+            message: msg,
+            content: summaryMatch[1].trim(),
+          };
+        }
+      }
+    }
+
+    // Fallback: Look for agent-visible but not user-visible messages (actual summary)
     for (let i = messages.length - 1; i >= 0; i--) {
       const msg = messages[i];
       if (msg.metadata?.agentVisible === true && msg.metadata?.userVisible === false) {
@@ -33,24 +61,9 @@ export const SummaryViewModal: React.FC<SummaryViewModalProps> = ({
         if (textContent && 'text' in textContent && textContent.text.includes('summary')) {
           return {
             message: msg,
-            content: {
-              type: 'summarizationRequested',
-              msg: textContent.text,
-            },
+            content: textContent.text,
           };
         }
-      }
-    }
-
-    // Fallback: Look for summarization requested content in any message
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const msg = messages[i];
-      const summaryContent = msg.content.find((c) => c.type === 'summarizationRequested');
-      if (summaryContent && 'msg' in summaryContent) {
-        return {
-          message: msg,
-          content: summaryContent as SummarizationRequestedContent,
-        };
       }
     }
 
@@ -81,15 +94,17 @@ export const SummaryViewModal: React.FC<SummaryViewModalProps> = ({
         <div className="flex-1 overflow-y-auto p-6">
           {summaryData ? (
             <div className="space-y-4">
-              <div className="flex items-center gap-2 text-sm text-textSubtle">
-                <span>Created:</span>
-                <span className="font-mono">
-                  {formatMessageTimestamp(summaryData.message.created)}
-                </span>
-              </div>
+              {summaryData.message && (
+                <div className="flex items-center gap-2 text-sm text-textSubtle">
+                  <span>Created:</span>
+                  <span className="font-mono">
+                    {formatMessageTimestamp(summaryData.message.created)}
+                  </span>
+                </div>
+              )}
 
               <div className="prose prose-sm dark:prose-invert max-w-none">
-                <MarkdownContent content={summaryData.content.msg} />
+                <MarkdownContent content={summaryData.content} />
               </div>
             </div>
           ) : (

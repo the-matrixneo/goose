@@ -90,9 +90,12 @@ impl Agent {
             final_token_counts.push(0);
         }
 
-        // Add the compaction marker (user_visible=true, agent_visible=false)
+        // Add the compaction marker with summary (user_visible=true, agent_visible=false)
+        // Include the summary text in the marker so it can be displayed in the UI
+        let summary_text = summary_message.as_concat_text();
         let compaction_marker = Message::assistant()
             .with_summarization_requested("Conversation compacted and summarized")
+            .with_text(format!("__SUMMARY__: {}", summary_text))
             .with_metadata(MessageMetadata::user_only());
         let compaction_marker_tokens: usize = 0; // Not counted since agent_visible=false
         final_messages.push(compaction_marker);
