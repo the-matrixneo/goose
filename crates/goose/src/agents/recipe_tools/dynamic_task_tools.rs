@@ -21,7 +21,7 @@ pub const DYNAMIC_TASK_TOOL_NAME_PREFIX: &str = "dynamic_task__create_task";
 pub fn create_dynamic_task_tool() -> Tool {
     Tool::new(
         DYNAMIC_TASK_TOOL_NAME_PREFIX.to_string(),
-        "Create tasks with instructions or prompt. For simple tasks, only include the instructions field. Extensions control: omit field = use all current extensions; empty array [] = no extensions; array with names = only those extensions. Specify extensions as shortnames (the prefixes for your tools). Optional: title, description, extensions, settings, retry, response schema, context, activities. Arrays for multiple tasks.".to_string(),
+        "Create tasks with instructions. Extensions control: omit field = use all current extensions; empty array [] = no extensions; array with names = only those extensions. Specify extensions as shortnames (the prefixes for your tools). Optional: title, description, extensions, settings, retry, response schema, context, activities. Arrays for multiple tasks.".to_string(),
         object!({
             "type": "object",
             "properties": {
@@ -31,14 +31,9 @@ pub fn create_dynamic_task_tool() -> Tool {
                     "items": {
                         "type": "object",
                         "properties": {
-                            // Required (one of these)
                             "instructions": {
                                 "type": "string",
                                 "description": "Task instructions"
-                            },
-                            "prompt": {
-                                "type": "string",
-                                "description": "Initial prompt"
                             },
                             // Optional - auto-generated if not provided
                             "title": {"type": "string"},
@@ -67,10 +62,7 @@ pub fn create_dynamic_task_tool() -> Tool {
                                 "description": "If true, return only the last message from the subagent (default: false, returns full conversation)"
                             }
                         },
-                        "anyOf": [
-                            {"required": ["instructions"]},
-                            {"required": ["prompt"]}
-                        ]
+                        "required": ["instructions"]
                     },
                     "minItems": 1
                 },
@@ -175,10 +167,9 @@ pub fn task_params_to_inline_recipe(
 ) -> Result<Recipe> {
     // Extract and validate core fields
     let instructions = task_param.get("instructions").and_then(|v| v.as_str());
-    let prompt = task_param.get("prompt").and_then(|v| v.as_str());
 
-    if instructions.is_none() && prompt.is_none() {
-        return Err(anyhow!("Either 'instructions' or 'prompt' is required"));
+    if instructions.is_none() {
+        return Err(anyhow!("'instructions' is required"));
     }
 
     // Build recipe with auto-generated defaults
@@ -201,10 +192,6 @@ pub fn task_params_to_inline_recipe(
     if let Some(inst) = instructions {
         builder = builder.instructions(inst);
     }
-    if let Some(p) = prompt {
-        builder = builder.prompt(p);
-    }
-
     // Handle extensions
     if let Some(extensions) = task_param.get("extensions") {
         if let Some(ext_configs) = process_extensions(extensions, loaded_extensions) {

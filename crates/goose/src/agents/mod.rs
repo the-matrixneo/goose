@@ -17,6 +17,7 @@ mod schedule_tool;
 pub mod sub_recipe_manager;
 pub mod subagent_execution_tool;
 pub mod subagent_handler;
+pub mod recipe_agent_runner;
 mod subagent_task_config;
 pub mod todo_tools;
 mod tool_execution;

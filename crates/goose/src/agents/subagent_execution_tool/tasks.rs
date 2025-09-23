@@ -11,6 +11,8 @@ use crate::agents::subagent_execution_tool::task_types::{Task, TaskResult, TaskS
 use crate::agents::subagent_execution_tool::utils::strip_ansi_codes;
 use crate::agents::subagent_task_config::TaskConfig;
 use crate::conversation::message::Message;
+use crate::agents::subagent_handler::run_complete_subagent_task_with_options_stream;
+use crate::recipe::Recipe;
 
 pub async fn process_task(
     task: &Task,
@@ -93,9 +95,6 @@ async fn handle_inline_recipe_task(
     cancellation_token: CancellationToken,
     event_sender: Option<mpsc::UnboundedSender<Message>>,
 ) -> Result<Value, String> {
-    use crate::agents::subagent_handler::run_complete_subagent_task_with_options_stream;
-    use crate::recipe::Recipe;
-
     let recipe_value = task
         .payload
         .get("recipe")
@@ -104,23 +103,22 @@ async fn handle_inline_recipe_task(
     let recipe: Recipe = serde_json::from_value(recipe_value.clone())
         .map_err(|e| format!("Invalid recipe in payload: {}", e))?;
 
-    let return_last_only = task
-        .payload
-        .get("return_last_only")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false);
+    // let return_last_only = task
+    //     .payload
+    //     .get("return_last_only")
+    //     .and_then(|v| v.as_bool())
+    //     .unwrap_or(false);
 
-    task_config.extensions = recipe.extensions.clone();
+    // task_config.extensions = recipe.extensions.clone();
 
-    let instruction = recipe
-        .instructions
-        .or(recipe.prompt)
-        .ok_or_else(|| "No instructions or prompt in recipe".to_string())?;
+    // let instruction = recipe
+    //     .instructions
+    //     .or(recipe.prompt)
+    //     .ok_or_else(|| "No instructions or prompt in recipe".to_string())?;
     let result = tokio::select! {
         result = run_complete_subagent_task_with_options_stream(
-            instruction,
+            &recipe,
             task_config,
-            return_last_only,
             event_sender,
         ) => result,
         _ = cancellation_token.cancelled() => {
