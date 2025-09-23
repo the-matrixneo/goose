@@ -1,7 +1,7 @@
 ---
 title: "Agent Client Protocol: Connecting Goose to Next-Gen Editors and Clients"
-description: Introducing Goose's support for Agent Client Protocol (ACP), enabling seamless integration with modern editors and development tools.
-authors: 
+description: Introducing Goose's support for Agent Client Protocol (ACP)
+authors:
     - mic
 ---
 
@@ -9,37 +9,46 @@ authors:
 
 # Agent Client Protocol: Connecting Goose to Next-Gen Editors and Clients
 
-The future of AI-assisted development is here. With Agent Client Protocol (ACP) support, Goose can now integrate directly with your favorite editors and development tools, creating a seamless coding experience.
+Agent Client Protocol (ACP) is an emerging spec started by the Zed editor: https://agentclientprotocol.com/overview/introduction
+
+This lets and clients (especially editors) work with any compatible agent that implements the ACP.
+This makes things easier for implementers of agents, and implementers of clients (especially editors which can be quite fiddly).
 
 <!--truncate-->
 
-## What is Agent Client Protocol?
+## Goose Support
 
-[PLACEHOLDER: Explain ACP and its importance]
+Goose now supports acp currently via the `goose acp` subcommand.
 
-## Why ACP Matters
+This means you can use it in editors like Zed natively:
 
-[PLACEHOLDER: Benefits of ACP for developers]
+![goose in zed](editor.png)
 
-## Goose's ACP Implementation
 
-[PLACEHOLDER: Technical details of how Goose implements ACP]
+## Getting Started with Zed
 
-## Supported Editors and Clients
+To use with zed, the configuration should look like this:
 
-[PLACEHOLDER: List of compatible editors and tools]
+```
+{
+  "agent_servers": {
+    "Goose 🪿": {
+      "command": "goose",
+      "args": ["acp"],
+      "env": {}
+    }
+  },
+  "ui_font_size": 16,
+  "buffer_font_size": 16
+}
+```
 
-## Getting Started
+You can then open the agent sizebar, and start a new discussion thread with goose.
 
-[PLACEHOLDER: Setup instructions for ACP]
+## Next up
 
-## Real-World Examples
+We are interested in ACP as a general protocol for connecting clients of all kinds (desktop, editors, web, cli) to agents like goose, adopting it as a new standard even for goose to goose type interaction. Watch this space!
 
-[PLACEHOLDER: Practical use cases and examples]
-
-## Future Roadmap
-
-[PLACEHOLDER: What's coming next for ACP support]
 
 <head>
   <meta property="og:title" content="Agent Client Protocol: Connecting Goose to Next-Gen Editors and Clients" />
