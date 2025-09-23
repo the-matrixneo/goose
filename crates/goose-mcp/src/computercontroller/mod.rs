@@ -1,28 +1,20 @@
-use base64::Engine;
 use etcetera::{choose_app_strategy, AppStrategy};
 use indoc::{formatdoc, indoc};
 use reqwest::{Client, Url};
+use rmcp::{
+    handler::server::router::tool::ToolRouter,
+    model::{
+        AnnotateAble, Content, ErrorCode, ErrorData, Implementation, RawResource, Resource,
+        ServerCapabilities, ServerInfo, Tool, ToolAnnotations,
+    },
+    object, tool_handler, tool_router, ServerHandler,
+};
 use serde_json::Value;
 use std::borrow::Cow;
-use std::{
-    collections::HashMap, fs, future::Future, path::PathBuf, pin::Pin, sync::Arc, sync::Mutex,
-};
-use tokio::{process::Command, sync::mpsc};
-
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
-
-use mcp_core::{
-    handler::{require_str_parameter, require_u64_parameter, PromptError, ResourceError},
-    protocol::ServerCapabilities,
-};
-use mcp_server::router::CapabilitiesBuilder;
-use mcp_server::Router;
-use rmcp::model::{
-    AnnotateAble, Content, ErrorCode, ErrorData, JsonRpcMessage, Prompt, RawResource, Resource,
-    Tool, ToolAnnotations,
-};
-use rmcp::object;
+use std::{collections::HashMap, fs, path::PathBuf, sync::Arc, sync::Mutex};
+use tokio::process::Command;
 
 mod docx_tool;
 mod pdf_tool;
@@ -35,6 +27,7 @@ use platform::{create_system_automation, SystemAutomation};
 /// web scraping, data processing, and automation.
 #[derive(Clone)]
 pub struct ComputerControllerRouter {
+    tool_router: ToolRouter<Self>,
     tools: Vec<Tool>,
     cache_dir: PathBuf,
     active_resources: Arc<Mutex<HashMap<String, Resource>>>,
@@ -49,6 +42,7 @@ impl Default for ComputerControllerRouter {
     }
 }
 
+#[tool_router]
 impl ComputerControllerRouter {
     pub fn new() -> Self {
         let web_scrape_tool = Tool::new(
@@ -540,6 +534,7 @@ impl ComputerControllerRouter {
         };
 
         Self {
+            tool_router: Self::tool_router(),
             tools: vec![
                 web_scrape_tool,
                 quick_script_tool,
@@ -1032,10 +1027,30 @@ impl ComputerControllerRouter {
                 ))])
             }
             "update_cell" => {
-                let row = require_u64_parameter(&params, "row")?;
-                let col = require_u64_parameter(&params, "col")?;
-                let value = require_str_parameter(&params, "value")?;
-
+                let row = params
+                    .get("row")
+                    .and_then(|v| v.as_u64())
+                    .ok_or_else(|| ErrorData {
+                        code: ErrorCode::INVALID_PARAMS,
+                        message: Cow::from("Missing 'row' parameter"),
+                        data: None,
+                    })?;
+                let col = params
+                    .get("col")
+                    .and_then(|v| v.as_u64())
+                    .ok_or_else(|| ErrorData {
+                        code: ErrorCode::INVALID_PARAMS,
+                        message: Cow::from("Missing 'col' parameter"),
+                        data: None,
+                    })?;
+                let value = params
+                    .get("value")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| ErrorData {
+                        code: ErrorCode::INVALID_PARAMS,
+                        message: Cow::from("Missing 'value' parameter"),
+                        data: None,
+                    })?;
                 let worksheet_name = params
                     .get("worksheet")
                     .and_then(|v| v.as_str())
@@ -1287,118 +1302,20 @@ impl ComputerControllerRouter {
     }
 }
 
-impl Router for ComputerControllerRouter {
-    fn name(&self) -> String {
-        "ComputerControllerExtension".to_string()
-    }
-
-    fn instructions(&self) -> String {
-        self.instructions.clone()
-    }
-
-    fn capabilities(&self) -> ServerCapabilities {
-        CapabilitiesBuilder::new()
-            .with_tools(false)
-            .with_resources(false, false)
-            .build()
-    }
-
-    fn list_tools(&self) -> Vec<Tool> {
-        self.tools.clone()
-    }
-
-    fn call_tool(
-        &self,
-        tool_name: &str,
-        arguments: Value,
-        _notifier: mpsc::Sender<JsonRpcMessage>,
-    ) -> Pin<Box<dyn Future<Output = Result<Vec<Content>, ErrorData>> + Send + 'static>> {
-        let this = self.clone();
-        let tool_name = tool_name.to_string();
-        Box::pin(async move {
-            match tool_name.as_str() {
-                "web_scrape" => this.web_scrape(arguments).await,
-                "automation_script" => this.quick_script(arguments).await,
-                "computer_control" => this.computer_control(arguments).await,
-                "cache" => this.cache(arguments).await,
-                "pdf_tool" => this.pdf_tool(arguments).await,
-                "docx_tool" => this.docx_tool(arguments).await,
-                "xlsx_tool" => this.xlsx_tool(arguments).await,
-                _ => Err(ErrorData {
-                    code: ErrorCode::INVALID_REQUEST,
-                    message: Cow::from(format!("Tool {} not found", tool_name)),
-                    data: None,
-                }),
-            }
-        })
-    }
-
-    fn list_resources(&self) -> Vec<Resource> {
-        let active_resources = self.active_resources.lock().unwrap();
-        let resources = active_resources.values().cloned().collect();
-        tracing::info!("Listing resources: {:?}", resources);
-        resources
-    }
-
-    fn read_resource(
-        &self,
-        uri: &str,
-    ) -> Pin<Box<dyn Future<Output = Result<String, ResourceError>> + Send + 'static>> {
-        let uri = uri.to_string();
-        let this = self.clone();
-
-        Box::pin(async move {
-            let active_resources = this.active_resources.lock().unwrap();
-            let resource = active_resources
-                .get(&uri)
-                .ok_or_else(|| ResourceError::NotFound(format!("Resource not found: {}", uri)))?
-                .clone();
-
-            let url = Url::parse(&uri)
-                .map_err(|e| ResourceError::NotFound(format!("Invalid URI: {}", e)))?;
-
-            if url.scheme() != "file" {
-                return Err(ResourceError::NotFound(
-                    "Only file:// URIs are supported".into(),
-                ));
-            }
-
-            let path = url
-                .to_file_path()
-                .map_err(|_| ResourceError::NotFound("Invalid file path in URI".into()))?;
-
-            match resource.raw.mime_type.as_deref() {
-                Some("text") | Some("json") | None => fs::read_to_string(&path).map_err(|e| {
-                    ResourceError::ExecutionError(format!("Failed to read file: {}", e))
-                }),
-                Some("binary") => {
-                    let bytes = fs::read(&path).map_err(|e| {
-                        ResourceError::ExecutionError(format!("Failed to read file: {}", e))
-                    })?;
-                    Ok(base64::prelude::BASE64_STANDARD.encode(bytes))
-                }
-                Some(mime_type) => Err(ResourceError::NotFound(format!(
-                    "Unsupported mime type: {}",
-                    mime_type
-                ))),
-            }
-        })
-    }
-
-    fn list_prompts(&self) -> Vec<Prompt> {
-        vec![]
-    }
-
-    fn get_prompt(
-        &self,
-        prompt_name: &str,
-    ) -> Pin<Box<dyn Future<Output = Result<String, PromptError>> + Send + 'static>> {
-        let prompt_name = prompt_name.to_string();
-        Box::pin(async move {
-            Err(PromptError::NotFound(format!(
-                "Prompt {} not found",
-                prompt_name
-            )))
-        })
+#[tool_handler(router = self.tool_router)]
+impl ServerHandler for ComputerControllerRouter {
+    fn get_info(&self) -> ServerInfo {
+        ServerInfo {
+            server_info: Implementation {
+                name: "goose-computercontroller".to_string(),
+                version: env!("CARGO_PKG_VERSION").to_owned(),
+            },
+            capabilities: ServerCapabilities::builder()
+                .enable_tools()
+                .enable_resources()
+                .build(),
+            instructions: Some(self.instructions.clone()),
+            ..Default::default()
+        }
     }
 }

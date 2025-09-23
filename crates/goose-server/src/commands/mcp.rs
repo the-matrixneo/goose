@@ -2,10 +2,7 @@ use anyhow::{anyhow, Result};
 use goose_mcp::{
     AutoVisualiserRouter, ComputerControllerRouter, DeveloperServer, MemoryServer, TutorialServer,
 };
-use mcp_server::router::RouterService;
-use mcp_server::{BoundedService, ByteTransport, Server};
 use rmcp::{transport::stdio, ServiceExt};
-use tokio::io::{stdin, stdout};
 
 pub async fn run(name: &str) -> Result<()> {
     crate::logging::setup_logging(Some(&format!("mcp-{name}")))?;
@@ -18,7 +15,30 @@ pub async fn run(name: &str) -> Result<()> {
 
     tracing::info!("Starting MCP server");
 
-    // Handle RMCP-based servers
+    if name == "autovisualiser" {
+        let service = AutoVisualiserRouter::new()
+            .serve(stdio())
+            .await
+            .inspect_err(|e| {
+                tracing::error!("serving error: {:?}", e);
+            })?;
+
+        service.waiting().await?;
+        return Ok(());
+    }
+
+    if name == "computercontroller" {
+        let service = ComputerControllerRouter::new()
+            .serve(stdio())
+            .await
+            .inspect_err(|e| {
+                tracing::error!("serving error: {:?}", e);
+            })?;
+
+        service.waiting().await?;
+        return Ok(());
+    }
+
     if name == "developer" {
         let service = DeveloperServer::new()
             .serve(stdio())
@@ -31,13 +51,10 @@ pub async fn run(name: &str) -> Result<()> {
         return Ok(());
     }
 
-    if name == "autovisualiser" {
-        let service = AutoVisualiserRouter::new()
-            .serve(stdio())
-            .await
-            .inspect_err(|e| {
-                tracing::error!("serving error: {:?}", e);
-            })?;
+    if name == "memory" {
+        let service = MemoryServer::new().serve(stdio()).await.inspect_err(|e| {
+            tracing::error!("serving error: {:?}", e);
+        })?;
 
         service.waiting().await?;
         return Ok(());
@@ -55,23 +72,5 @@ pub async fn run(name: &str) -> Result<()> {
         return Ok(());
     }
 
-    if name == "memory" {
-        let service = MemoryServer::new().serve(stdio()).await.inspect_err(|e| {
-            tracing::error!("serving error: {:?}", e);
-        })?;
-        service.waiting().await?;
-        return Ok(());
-    }
-
-    // Handle old MCP-based servers
-    let router: Option<Box<dyn BoundedService>> = match name {
-        "computercontroller" => Some(Box::new(RouterService(ComputerControllerRouter::new()))),
-        _ => None,
-    };
-
-    let server = Server::new(router.unwrap_or_else(|| panic!("Unknown server requested {}", name)));
-    let transport = ByteTransport::new(stdin(), stdout());
-
-    tracing::info!("Server initialized and ready to handle requests");
-    Ok(server.run(transport).await?)
+    return Ok(());
 }
