@@ -119,7 +119,7 @@ async fn create_recipe(
                     recipe: None,
                     error: Some(error_message),
                 };
-                return Err((StatusCode::BAD_REQUEST, Json(error_response)));
+                return Ok(Json(error_response));
             }
         };
 
@@ -131,7 +131,7 @@ async fn create_recipe(
                 recipe: None,
                 error: Some(error_message),
             };
-            return Err((StatusCode::BAD_REQUEST, Json(error_response)));
+            return Ok(Json(error_response));
         }
     };
 
@@ -156,7 +156,11 @@ async fn create_recipe(
         }
         Err(e) => {
             tracing::error!("Error details: {:?}", e);
-            Err(StatusCode::BAD_REQUEST)
+            let error_response = CreateRecipeResponse {
+                recipe: None,
+                error: Some(format!("Failed to create recipe: {}", e)),
+            };
+            Ok(Json(error_response))
         }
     }
 }
