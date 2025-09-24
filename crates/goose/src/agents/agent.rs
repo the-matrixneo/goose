@@ -10,11 +10,11 @@ use uuid::Uuid;
 
 use crate::agents::extension::{ExtensionConfig, ExtensionError, ExtensionResult, ToolInfo};
 use crate::agents::extension_manager::{get_parameter_names, ExtensionManager};
+use mcp_client::client::McpClientTrait;
 use crate::agents::final_output_tool::{FINAL_OUTPUT_CONTINUATION_MESSAGE, FINAL_OUTPUT_TOOL_NAME};
 use crate::agents::platform_tools::{
-    PLATFORM_LIST_RESOURCES_TOOL_NAME, PLATFORM_MANAGE_EXTENSIONS_TOOL_NAME,
+    PlatformTools, PLATFORM_LIST_RESOURCES_TOOL_NAME, PLATFORM_MANAGE_EXTENSIONS_TOOL_NAME,
     PLATFORM_MANAGE_SCHEDULE_TOOL_NAME, PLATFORM_READ_RESOURCE_TOOL_NAME,
-    PLATFORM_SEARCH_AVAILABLE_EXTENSIONS_TOOL_NAME,
 };
 use crate::agents::prompt_manager::PromptManager;
 use crate::agents::recipe_tools::dynamic_task_tools::{
@@ -89,7 +89,8 @@ pub struct ToolCategorizeResult {
 /// The main goose Agent
 pub struct Agent {
     pub(super) provider: Mutex<Option<Arc<dyn Provider>>>,
-    pub extension_manager: ExtensionManager,
+    pub extension_manager: Arc<ExtensionManager>,
+    pub(super) platform_tools: Option<Arc<PlatformTools>>,
     pub(super) sub_recipe_manager: Mutex<SubRecipeManager>,
     pub(super) tasks_manager: TasksManager,
     pub(super) final_output_tool: Arc<Mutex<Option<FinalOutputTool>>>,
@@ -164,7 +165,8 @@ impl Agent {
 
         Self {
             provider: Mutex::new(None),
-            extension_manager: ExtensionManager::new(),
+            extension_manager: Arc::new(ExtensionManager::new()),
+            platform_tools: None,
             sub_recipe_manager: Mutex::new(SubRecipeManager::new()),
             tasks_manager: TasksManager::new(),
             final_output_tool: Arc::new(Mutex::new(None)),
@@ -181,6 +183,47 @@ impl Agent {
             tool_inspection_manager: Self::create_default_tool_inspection_manager(),
             autopilot: Mutex::new(AutoPilot::new()),
         }
+    }
+
+    /// Initialize platform tools and add them to the extension manager
+    pub async fn initialize_platform_tools(&mut self) -> Result<()> {
+        if self.platform_tools.is_some() {
+            return Ok(()); // Already initialized
+        }
+
+        // Create the PlatformTools client
+        let platform_tools = Arc::new(PlatformTools::new(self.extension_manager.clone()));
+
+        // Create the extension config for platform tools
+        let config = ExtensionConfig::Builtin {
+            name: "platform".to_string(),
+            display_name: Some("Platform Tools".to_string()),
+            description: Some("Built-in Goose platform tools for managing extensions and resources".to_string()),
+            timeout: None,
+            bundled: Some(true),
+            available_tools: vec![
+                "manage_extensions".to_string(),
+                "search_available_extensions".to_string(),
+            ],
+        };
+        
+        
+
+        // Add the client to the extension manager
+        self.extension_manager
+            .add_client(
+                "platform".to_string(),
+                config,
+                Arc::new(tokio::sync::Mutex::new(Box::new(PlatformTools::new(self.extension_manager.clone())) as Box<dyn McpClientTrait>)),
+                None, // no server info
+                None, // no temp dir
+            )
+            .await;
+
+        // Store the platform tools instance
+        self.platform_tools = Some(platform_tools);
+
+        Ok(())
     }
 
     /// Create a tool inspection manager with default inspectors
@@ -495,9 +538,11 @@ impl Agent {
                     )
                     .await,
             )
-        } else if tool_call.name == PLATFORM_SEARCH_AVAILABLE_EXTENSIONS_TOOL_NAME {
-            ToolCallResult::from(self.extension_manager.search_available_extensions().await)
-        } else if self.is_frontend_tool(&tool_call.name).await {
+        } 
+        // else if tool_call.name == PLATFORM_SEARCH_AVAILABLE_EXTENSIONS_TOOL_NAME {
+        //     ToolCallResult::from(self.extension_manager.search_available_extensions().await)
+        // } 
+        else if self.is_frontend_tool(&tool_call.name).await {
             // For frontend tools, return an error indicating we need frontend execution
             ToolCallResult::from(Err(ErrorData::new(
                 ErrorCode::INTERNAL_ERROR,

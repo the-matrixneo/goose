@@ -16,7 +16,12 @@ async fn main() {
     let provider = Arc::new(DatabricksProvider::default());
 
     // Setup an agent with the developer extension
-    let agent = Agent::new();
+    let mut agent = Agent::new();
+    
+    // Initialize platform tools
+    agent.initialize_platform_tools().await
+        .expect("Failed to initialize platform tools");
+    
     let _ = agent.update_provider(provider).await;
 
     let config = ExtensionConfig::stdio(

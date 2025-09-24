@@ -103,7 +103,12 @@ pub async fn handle_web(port: u16, host: String, open: bool) -> Result<()> {
     let model_config = goose::model::ModelConfig::new(&model)?;
 
     // Create the agent
-    let agent = Agent::new();
+    let mut agent = Agent::new();
+    
+    // Initialize platform tools
+    agent.initialize_platform_tools().await
+        .expect("Failed to initialize platform tools");
+    
     let provider = goose::providers::create(&provider_name, model_config)?;
     agent.update_provider(provider).await?;
 

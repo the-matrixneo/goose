@@ -6,7 +6,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use mcp_client::client::{McpClientTrait, Error};
 use rmcp::model::{
-    CallToolResult, GetPromptResult, InitializeResult, ListPromptsResult,
+    CallToolResult, Content, GetPromptResult, InitializeResult, ListPromptsResult,
     ListResourcesResult, ListToolsResult, ReadResourceResult, ServerNotification,
 };
 use serde_json::Value;
@@ -14,12 +14,12 @@ use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
 use super::extension_manager::ExtensionManager;
+use crate::config::ExtensionConfigManager;
 
 pub const PLATFORM_READ_RESOURCE_TOOL_NAME: &str = "platform__read_resource";
 pub const PLATFORM_LIST_RESOURCES_TOOL_NAME: &str = "platform__list_resources";
-pub const PLATFORM_SEARCH_AVAILABLE_EXTENSIONS_TOOL_NAME: &str =
-    "platform__search_available_extensions";
-pub const PLATFORM_MANAGE_EXTENSIONS_TOOL_NAME: &str = "platform__manage_extensions";
+pub const PLATFORM_SEARCH_AVAILABLE_EXTENSIONS_TOOL_NAME: &str = "search_available_extensions";
+pub const PLATFORM_MANAGE_EXTENSIONS_TOOL_NAME: &str = "manage_extensions";
 pub const PLATFORM_MANAGE_SCHEDULE_TOOL_NAME: &str = "platform__manage_schedule";
 
 pub fn read_resource_tool() -> Tool {
@@ -177,6 +177,130 @@ impl PlatformTools {
     pub fn new(extension_manager: Arc<ExtensionManager>) -> Self {
         Self { extension_manager }
     }
+
+    async fn handle_manage_extensions(&self, arguments: Value) -> Result<CallToolResult, Error> {
+        // Extract parameters from arguments
+        let extension_name = arguments
+            .get("extension_name")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        
+        let action = arguments
+            .get("action")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+
+        if extension_name.is_empty() || action.is_empty() {
+            return Ok(CallToolResult {
+                content: vec![Content::text("Error: Both extension_name and action are required")],
+                is_error: Some(true),
+                meta: None,
+                structured_content: None,
+            });
+        }
+
+        let result = if action == "disable" {
+            // Handle disable action
+            match self.extension_manager.remove_extension(&extension_name).await {
+                Ok(_) => vec![Content::text(format!(
+                    "The extension '{}' has been disabled successfully",
+                    extension_name
+                ))],
+                Err(e) => {
+                    return Ok(CallToolResult {
+                        content: vec![Content::text(format!(
+                            "Failed to disable extension '{}': {}",
+                            extension_name, e
+                        ))],
+                        is_error: Some(true),
+                        meta: None,
+                        structured_content: None,
+                    });
+                }
+            }
+        } else if action == "enable" {
+            // Handle enable action
+            let config = match ExtensionConfigManager::get_config_by_name(&extension_name) {
+                Ok(Some(config)) => config,
+                Ok(None) => {
+                    return Ok(CallToolResult {
+                        content: vec![Content::text(format!(
+                            "Extension '{}' not found. Please check the extension name and try again.",
+                            extension_name
+                        ))],
+                        is_error: Some(true),
+                        meta: None,
+                        structured_content: None,
+                    });
+                }
+                Err(e) => {
+                    return Ok(CallToolResult {
+                        content: vec![Content::text(format!(
+                            "Failed to get extension config: {}",
+                            e
+                        ))],
+                        is_error: Some(true),
+                        meta: None,
+                        structured_content: None,
+                    });
+                }
+            };
+
+            match self.extension_manager.add_extension(config).await {
+                Ok(_) => vec![Content::text(format!(
+                    "The extension '{}' has been installed successfully",
+                    extension_name
+                ))],
+                Err(e) => {
+                    return Ok(CallToolResult {
+                        content: vec![Content::text(format!(
+                            "Failed to enable extension '{}': {}",
+                            extension_name, e
+                        ))],
+                        is_error: Some(true),
+                        meta: None,
+                        structured_content: None,
+                    });
+                }
+            }
+        } else {
+            return Ok(CallToolResult {
+                content: vec![Content::text(format!(
+                    "Invalid action '{}'. Valid actions are 'enable' or 'disable'",
+                    action
+                ))],
+                is_error: Some(true),
+                meta: None,
+                structured_content: None,
+            });
+        };
+
+        Ok(CallToolResult {
+            content: result,
+            is_error: Some(false),
+            meta: None,
+            structured_content: None,
+        })
+    }
+
+    async fn handle_search_available_extensions(&self) -> Result<CallToolResult, Error> {
+        match self.extension_manager.search_available_extensions().await {
+            Ok(content) => Ok(CallToolResult {
+                content,
+                is_error: Some(false),
+                meta: None,
+                structured_content: None,
+            }),
+            Err(e) => Ok(CallToolResult {
+                content: vec![Content::text(format!("Failed to search available extensions: {}", e))],
+                is_error: Some(true),
+                meta: None,
+                structured_content: None,
+            }),
+        }
+    }
 }
 
 #[async_trait]
@@ -207,21 +331,36 @@ impl McpClientTrait for PlatformTools {
         _next_cursor: Option<String>,
         _cancel_token: CancellationToken,
     ) -> Result<ListToolsResult, Error> {
-        // Default implementation - to be implemented later
+        // Return platform tools that are managed by this client
+        let tools = vec![
+            manage_extensions_tool(),
+            search_available_extensions_tool(),
+        ];
+        
         Ok(ListToolsResult {
-            tools: vec![],
+            tools,
             next_cursor: None,
         })
     }
 
     async fn call_tool(
         &self,
-        _name: &str,
-        _arguments: Value,
+        name: &str,
+        arguments: Value,
         _cancel_token: CancellationToken,
     ) -> Result<CallToolResult, Error> {
-        // Default implementation - to be implemented later
-        Err(Error::UnexpectedResponse)
+        match name {
+            tool_name if tool_name == PLATFORM_MANAGE_EXTENSIONS_TOOL_NAME => {
+                self.handle_manage_extensions(arguments).await
+            }
+            tool_name if tool_name == PLATFORM_SEARCH_AVAILABLE_EXTENSIONS_TOOL_NAME => {
+                self.handle_search_available_extensions().await
+            }
+            _ => {
+                // Tool not handled by this client
+                Err(Error::UnexpectedResponse)
+            }
+        }
     }
 
     async fn list_prompts(

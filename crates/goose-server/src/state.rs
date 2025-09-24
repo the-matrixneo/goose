@@ -54,7 +54,11 @@ impl AppState {
 
     pub async fn reset(&self) {
         let mut agent = self.agent.write().await;
-        let new_agent = Agent::new();
+        let mut new_agent = Agent::new();
+        
+        // Initialize platform tools
+        new_agent.initialize_platform_tools().await
+            .expect("Failed to initialize platform tools");
 
         // Only initialize provider when running in standalone goosed mode
         // This prevents breaking the Electron app which manages its own provider setup

@@ -210,7 +210,11 @@ pub async fn build_session(session_config: SessionBuilderConfig) -> Session {
         .with_temperature(temperature);
 
     // Create the agent
-    let agent: Agent = Agent::new();
+    let mut agent: Agent = Agent::new();
+    
+    // Initialize platform tools
+    agent.initialize_platform_tools().await
+        .expect("Failed to initialize platform tools");
 
     if let Some(sub_recipes) = session_config.sub_recipes {
         agent.add_sub_recipes(sub_recipes).await;
