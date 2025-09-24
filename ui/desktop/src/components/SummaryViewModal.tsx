@@ -4,7 +4,6 @@ import { Message, SummarizationRequestedContent } from '../types/message';
 import MarkdownContent from './MarkdownContent';
 import { formatMessageTimestamp } from '../utils/timeUtils';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
-import { ScrollArea } from './ui/scroll-area';
 
 interface SummaryViewModalProps {
   isOpen: boolean;
@@ -81,7 +80,7 @@ export const SummaryViewModal: React.FC<SummaryViewModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[80%] sm:max-h-[80%] overflow-hidden flex flex-col">
+      <DialogContent className="sm:max-w-[80%] sm:max-h-[80%] overflow-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileText className="w-5 h-5" />
@@ -94,36 +93,35 @@ export const SummaryViewModal: React.FC<SummaryViewModalProps> = ({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 overflow-hidden">
-          <ScrollArea className="h-full max-h-[60vh]">
-            <div className="pr-4">
-              {summaryData ? (
-                <div className="space-y-4">
-                  {summaryData.message && (
-                    <div className="flex items-center gap-2 text-sm text-textSubtle">
-                      <span>Created:</span>
-                      <span className="font-mono">
-                        {formatMessageTimestamp(summaryData.message.created)}
-                      </span>
-                    </div>
-                  )}
-
-                  <div className="prose prose-sm dark:prose-invert max-w-none text-textStandard">
-                    <MarkdownContent content={summaryData.content} />
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-12 text-textSubtle">
-                  <FileText className="w-12 h-12 mb-4 opacity-50" />
-                  <p className="text-lg mb-2 text-textStandard">No Summary Available</p>
-                  <p className="text-sm text-center max-w-md text-textSubtle">
-                    Summaries are automatically created when the conversation context window reaches
-                    its limit and needs to be compacted.
-                  </p>
+        <div className="py-4">
+          {summaryData ? (
+            <div className="space-y-4">
+              {summaryData.message && (
+                <div className="flex items-center gap-2 text-sm text-textSubtle mb-4">
+                  <span>Created:</span>
+                  <span className="font-mono">
+                    {formatMessageTimestamp(summaryData.message.created)}
+                  </span>
                 </div>
               )}
+
+              {/* Scrollable summary content area with fixed height */}
+              <div className="border rounded-md p-4 h-[400px] overflow-auto bg-background-subtle">
+                <div className="prose prose-sm dark:prose-invert max-w-none text-textStandard">
+                  <MarkdownContent content={summaryData.content} />
+                </div>
+              </div>
             </div>
-          </ScrollArea>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-12 text-textSubtle">
+              <FileText className="w-12 h-12 mb-4 opacity-50" />
+              <p className="text-lg mb-2 text-textStandard">No Summary Available</p>
+              <p className="text-sm text-center max-w-md text-textSubtle">
+                Summaries are automatically created when the conversation context window reaches its
+                limit and needs to be compacted.
+              </p>
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>
