@@ -1,5 +1,4 @@
-use crate::agents::recipe_agent_runner::RecipeAgentRunner;
-use crate::{agents::subagent_task_config::TaskConfig, recipe::Recipe};
+use crate::agents::subagent_task_config::TaskConfig;
 use crate::agents::Agent;
 use crate::conversation::message::Message;
 use anyhow::Result;
@@ -7,13 +6,13 @@ use rmcp::model::{ErrorCode, ErrorData};
 use tokio::sync::mpsc::UnboundedSender;
 
 pub async fn run_complete_subagent_task_with_options_stream(
-    recipe: &Recipe,
+    text_instruction: String,
     task_config: TaskConfig,
+    return_last_only: bool,
     event_sender: Option<UnboundedSender<Message>>,
 ) -> Result<String, anyhow::Error> {
-    let recipe_agent_runner = RecipeAgentRunner::new(recipe.clone(), task_config);
     // Execute the task using a standalone agent instance
-    let messages = recipe_agent_runner.run_recipe(event_sender)
+    let messages = Agent::run_standalone_task(text_instruction, task_config, event_sender)
         .await
         .map_err(|e| {
             ErrorData::new(
@@ -23,8 +22,6 @@ pub async fn run_complete_subagent_task_with_options_stream(
             )
         })?;
 
-    // TODO: lifei: use recipe final output
-    let return_last_only = true;
     // Extract text content based on return_last_only flag
     let response_text = if return_last_only {
         // Get only the last message's text content

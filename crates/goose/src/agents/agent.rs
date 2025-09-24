@@ -245,8 +245,14 @@ impl Agent {
                 .await
                 .unwrap_or_default();
             let system_prompt = build_subagent_system_prompt(&task_config, &tools)?;
-            let mut prompt_manager = self.prompt_manager.lock().await;
+            let previous_override = {
+                let prompt_manager = self.prompt_manager.lock().await;
+                prompt_manager.system_prompt_override()
+            };
+            {
+                let mut prompt_manager = self.prompt_manager.lock().await;
                 prompt_manager.set_system_prompt_override(system_prompt);
+            }
 
             let mut stream = self
                 .reply_internal(conversation.clone(), None, None)
@@ -257,12 +263,19 @@ impl Agent {
                 .max_turns
                 .map(|turns| turns as u32)
                 .unwrap_or(DEFAULT_SUBAGENT_MAX_TURNS as u32);
+            let mut stop_after_message = false;
 
             while let Some(event) = stream.next().await {
                 match event? {
                     AgentEvent::Message(message) => {
                         if let Some(sender) = &event_sender {
                             let _ = sender.send(message.clone());
+                        }
+                        if message.role == Role::Assistant {
+                            assistant_turns = assistant_turns.saturating_add(1);
+                            if assistant_turns >= max_turns {
+                                stop_after_message = true;
+                            }
                         }
                         final_conversation.push(message);
                     }
@@ -271,7 +284,21 @@ impl Agent {
                     }
                     AgentEvent::McpNotification(_) | AgentEvent::ModelChange { .. } => {}
                 }
+
+                if stop_after_message {
+                    break;
+                }
             }
+
+            {
+                let mut prompt_manager = self.prompt_manager.lock().await;
+                if let Some(override_text) = previous_override {
+                    prompt_manager.set_system_prompt_override(override_text);
+                } else {
+                    prompt_manager.clear_system_prompt_override();
+                }
+            }
+
             Ok(final_conversation)
         })
     }
