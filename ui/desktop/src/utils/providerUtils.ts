@@ -8,6 +8,7 @@ import type { ExtensionConfig, FixedExtensionEntry } from '../components/ConfigC
 import { addSubRecipesToAgent } from '../recipe/add_sub_recipe_on_agent';
 import {
   extendPrompt,
+  Recipe,
   RecipeParameter,
   SubRecipe,
   updateAgentProvider,
@@ -204,6 +205,7 @@ export const initializeSystem = async (
     getExtensions?: (b: boolean) => Promise<FixedExtensionEntry[]>;
     addExtension?: (name: string, config: ExtensionConfig, enabled: boolean) => Promise<void>;
     setIsExtensionsLoading?: (loading: boolean) => void;
+    recipeConfig?: Recipe; // Recipe config from agent session metadata
   }
 ) => {
   try {
@@ -228,8 +230,8 @@ export const initializeSystem = async (
       console.log('This will not end well');
     }
 
-    // Get recipeConfig directly here
-    const recipeConfig = window.appConfig?.get?.('recipe');
+    // Get recipeConfig from options (passed from agent session) or fallback to window.appConfig
+    const recipeConfig = options?.recipeConfig || window.appConfig?.get?.('recipe');
     const recipe_instructions = (recipeConfig as { instructions?: string })?.instructions;
     const responseConfig = (recipeConfig as { response?: { json_schema?: unknown } })?.response;
     const subRecipes = (recipeConfig as { sub_recipes?: SubRecipe[] })?.sub_recipes;
@@ -237,7 +239,7 @@ export const initializeSystem = async (
     const hasParameters = parameters && parameters?.length > 0;
     const hasSubRecipes = subRecipes && subRecipes?.length > 0;
     let prompt = desktopPrompt;
-    if (!hasParameters && recipe_instructions) {
+    if (recipe_instructions) {
       prompt = `${desktopPromptBot}\nIMPORTANT instructions for you to operate as agent:\n${recipe_instructions}`;
     }
     // Extend the system prompt with desktop-specific information
