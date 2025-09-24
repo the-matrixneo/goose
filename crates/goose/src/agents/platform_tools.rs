@@ -14,10 +14,12 @@ use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
 use super::extension_manager::ExtensionManager;
+use super::tool_route_manager::ToolRouteManager;
+use super::tool_router_index_manager::ToolRouterIndexManager;
 use crate::config::ExtensionConfigManager;
 
-pub const PLATFORM_READ_RESOURCE_TOOL_NAME: &str = "platform__read_resource";
-pub const PLATFORM_LIST_RESOURCES_TOOL_NAME: &str = "platform__list_resources";
+pub const PLATFORM_READ_RESOURCE_TOOL_NAME: &str = "read_resource";
+pub const PLATFORM_LIST_RESOURCES_TOOL_NAME: &str = "list_resources";
 pub const PLATFORM_SEARCH_AVAILABLE_EXTENSIONS_TOOL_NAME: &str = "search_available_extensions";
 pub const PLATFORM_MANAGE_EXTENSIONS_TOOL_NAME: &str = "manage_extensions";
 pub const PLATFORM_MANAGE_SCHEDULE_TOOL_NAME: &str = "platform__manage_schedule";
@@ -171,11 +173,12 @@ pub fn manage_schedule_tool() -> Tool {
 /// Platform tools client that provides access to goose platform functionality
 pub struct PlatformTools {
     extension_manager: Arc<ExtensionManager>,
+    tool_route_manager: Arc<ToolRouteManager>,
 }
 
 impl PlatformTools {
-    pub fn new(extension_manager: Arc<ExtensionManager>) -> Self {
-        Self { extension_manager }
+    pub fn new(extension_manager: Arc<ExtensionManager>, tool_route_manager: Arc<ToolRouteManager>) -> Self {
+        Self { extension_manager, tool_route_manager }
     }
 
     async fn handle_manage_extensions(&self, arguments: Value) -> Result<CallToolResult, Error> {
@@ -201,13 +204,48 @@ impl PlatformTools {
             });
         }
 
-        let result = if action == "disable" {
-            // Handle disable action
+        // Handle tool router index updates if router is functional
+        if self.tool_route_manager.is_router_functional().await {
+            let selector = self.tool_route_manager.get_router_tool_selector().await;
+            if let Some(selector) = selector {
+                let selector_action = if action == "disable" { "remove" } else { "add" };
+                let selector = Arc::new(selector);
+                if let Err(e) = ToolRouterIndexManager::update_extension_tools(
+                    &selector,
+                    &self.extension_manager,
+                    &extension_name,
+                    selector_action,
+                )
+                .await
+                {
+                    return Ok(CallToolResult {
+                        content: vec![Content::text(format!(
+                            "Failed to update LLM index: {}",
+                            e
+                        ))],
+                        is_error: Some(true),
+                        meta: None,
+                        structured_content: None,
+                    });
+                }
+            }
+        }
+
+        // Handle disable action
+        if action == "disable" {
             match self.extension_manager.remove_extension(&extension_name).await {
-                Ok(_) => vec![Content::text(format!(
-                    "The extension '{}' has been disabled successfully",
-                    extension_name
-                ))],
+                Ok(_) => {
+                    let content = vec![Content::text(format!(
+                        "The extension '{}' has been disabled successfully",
+                        extension_name
+                    ))];
+                    return Ok(CallToolResult {
+                        content,
+                        is_error: Some(false),
+                        meta: None,
+                        structured_content: None,
+                    });
+                }
                 Err(e) => {
                     return Ok(CallToolResult {
                         content: vec![Content::text(format!(
@@ -220,8 +258,10 @@ impl PlatformTools {
                     });
                 }
             }
-        } else if action == "enable" {
-            // Handle enable action
+        }
+
+        // Handle enable action
+        if action == "enable" {
             let config = match ExtensionConfigManager::get_config_by_name(&extension_name) {
                 Ok(Some(config)) => config,
                 Ok(None) => {
@@ -248,11 +288,47 @@ impl PlatformTools {
                 }
             };
 
-            match self.extension_manager.add_extension(config).await {
-                Ok(_) => vec![Content::text(format!(
-                    "The extension '{}' has been installed successfully",
-                    extension_name
-                ))],
+            let result = self.extension_manager.add_extension(config).await;
+            
+            // Handle post-enable tool router updates if the extension was successfully added
+            if result.is_ok() && self.tool_route_manager.is_router_functional().await {
+                let selector = self.tool_route_manager.get_router_tool_selector().await;
+                if let Some(selector) = selector {
+                    let selector = Arc::new(selector);
+                    if let Err(e) = ToolRouterIndexManager::update_extension_tools(
+                        &selector,
+                        &self.extension_manager,
+                        &extension_name,
+                        "add",
+                    )
+                    .await
+                    {
+                        return Ok(CallToolResult {
+                            content: vec![Content::text(format!(
+                                "Extension enabled but failed to update LLM index: {}",
+                                e
+                            ))],
+                            is_error: Some(true),
+                            meta: None,
+                            structured_content: None,
+                        });
+                    }
+                }
+            }
+
+            match result {
+                Ok(_) => {
+                    let content = vec![Content::text(format!(
+                        "The extension '{}' has been installed successfully",
+                        extension_name
+                    ))];
+                    return Ok(CallToolResult {
+                        content,
+                        is_error: Some(false),
+                        meta: None,
+                        structured_content: None,
+                    });
+                }
                 Err(e) => {
                     return Ok(CallToolResult {
                         content: vec![Content::text(format!(
@@ -265,21 +341,15 @@ impl PlatformTools {
                     });
                 }
             }
-        } else {
-            return Ok(CallToolResult {
-                content: vec![Content::text(format!(
-                    "Invalid action '{}'. Valid actions are 'enable' or 'disable'",
-                    action
-                ))],
-                is_error: Some(true),
-                meta: None,
-                structured_content: None,
-            });
-        };
+        }
 
+        // Invalid action
         Ok(CallToolResult {
-            content: result,
-            is_error: Some(false),
+            content: vec![Content::text(format!(
+                "Invalid action '{}'. Valid actions are 'enable' or 'disable'",
+                action
+            ))],
+            is_error: Some(true),
             meta: None,
             structured_content: None,
         })
@@ -295,6 +365,58 @@ impl PlatformTools {
             }),
             Err(e) => Ok(CallToolResult {
                 content: vec![Content::text(format!("Failed to search available extensions: {}", e))],
+                is_error: Some(true),
+                meta: None,
+                structured_content: None,
+            }),
+        }
+    }
+
+    async fn handle_read_resource(
+        &self,
+        arguments: Value,
+        cancellation_token: CancellationToken,
+    ) -> Result<CallToolResult, Error> {
+        match self.extension_manager.read_resource(arguments, cancellation_token).await {
+            Ok(content) => Ok(CallToolResult {
+                content,
+                is_error: Some(false),
+                meta: None,
+                structured_content: None,
+            }),
+            Err(e) => Ok(CallToolResult {
+                content: vec![Content::text(format!("Failed to read resource: {}", e))],
+                is_error: Some(true),
+                meta: None,
+                structured_content: None,
+            }),
+        }
+    }
+
+    async fn handle_list_resources(
+        &self,
+        arguments: Value,
+        cancellation_token: CancellationToken,
+    ) -> Result<CallToolResult, Error> {
+        // Fix parameter name mismatch: tool expects "extension_name" but extension_manager expects "extension"
+        let mut fixed_arguments = arguments.clone();
+        if let Some(extension_name) = arguments.get("extension_name") {
+            fixed_arguments["extension"] = extension_name.clone();
+            // Remove the old parameter name to avoid confusion
+            if let Some(obj) = fixed_arguments.as_object_mut() {
+                obj.remove("extension_name");
+            }
+        }
+
+        match self.extension_manager.list_resources(fixed_arguments, cancellation_token).await {
+            Ok(content) => Ok(CallToolResult {
+                content,
+                is_error: Some(false),
+                meta: None,
+                structured_content: None,
+            }),
+            Err(e) => Ok(CallToolResult {
+                content: vec![Content::text(format!("Failed to list resources: {}", e))],
                 is_error: Some(true),
                 meta: None,
                 structured_content: None,
@@ -335,6 +457,8 @@ impl McpClientTrait for PlatformTools {
         let tools = vec![
             manage_extensions_tool(),
             search_available_extensions_tool(),
+            read_resource_tool(),
+            list_resources_tool(),
         ];
         
         Ok(ListToolsResult {
@@ -347,7 +471,7 @@ impl McpClientTrait for PlatformTools {
         &self,
         name: &str,
         arguments: Value,
-        _cancel_token: CancellationToken,
+        cancel_token: CancellationToken,
     ) -> Result<CallToolResult, Error> {
         match name {
             tool_name if tool_name == PLATFORM_MANAGE_EXTENSIONS_TOOL_NAME => {
@@ -355,6 +479,12 @@ impl McpClientTrait for PlatformTools {
             }
             tool_name if tool_name == PLATFORM_SEARCH_AVAILABLE_EXTENSIONS_TOOL_NAME => {
                 self.handle_search_available_extensions().await
+            }
+            tool_name if tool_name == PLATFORM_READ_RESOURCE_TOOL_NAME => {
+                self.handle_read_resource(arguments, cancel_token).await
+            }
+            tool_name if tool_name == PLATFORM_LIST_RESOURCES_TOOL_NAME => {
+                self.handle_list_resources(arguments, cancel_token).await
             }
             _ => {
                 // Tool not handled by this client

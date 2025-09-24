@@ -13,8 +13,8 @@ use crate::agents::extension_manager::{get_parameter_names, ExtensionManager};
 use mcp_client::client::McpClientTrait;
 use crate::agents::final_output_tool::{FINAL_OUTPUT_CONTINUATION_MESSAGE, FINAL_OUTPUT_TOOL_NAME};
 use crate::agents::platform_tools::{
-    PlatformTools, PLATFORM_LIST_RESOURCES_TOOL_NAME, PLATFORM_MANAGE_EXTENSIONS_TOOL_NAME,
-    PLATFORM_MANAGE_SCHEDULE_TOOL_NAME, PLATFORM_READ_RESOURCE_TOOL_NAME,
+    PlatformTools, PLATFORM_MANAGE_EXTENSIONS_TOOL_NAME,
+    PLATFORM_MANAGE_SCHEDULE_TOOL_NAME,
 };
 use crate::agents::prompt_manager::PromptManager;
 use crate::agents::recipe_tools::dynamic_task_tools::{
@@ -102,7 +102,7 @@ pub struct Agent {
     pub(super) tool_result_tx: mpsc::Sender<(String, ToolResult<Vec<Content>>)>,
     pub(super) tool_result_rx: ToolResultReceiver,
 
-    pub(super) tool_route_manager: ToolRouteManager,
+    pub(super) tool_route_manager: Arc<ToolRouteManager>,
     pub(super) scheduler_service: Mutex<Option<Arc<dyn SchedulerTrait>>>,
     pub(super) retry_manager: RetryManager,
     pub(super) tool_inspection_manager: ToolInspectionManager,
@@ -177,7 +177,7 @@ impl Agent {
             confirmation_rx: Mutex::new(confirm_rx),
             tool_result_tx: tool_tx,
             tool_result_rx: Arc::new(Mutex::new(tool_rx)),
-            tool_route_manager: ToolRouteManager::new(),
+            tool_route_manager: Arc::new(ToolRouteManager::new()),
             scheduler_service: Mutex::new(None),
             retry_manager: RetryManager::new(),
             tool_inspection_manager: Self::create_default_tool_inspection_manager(),
@@ -192,7 +192,7 @@ impl Agent {
         }
 
         // Create the PlatformTools client
-        let platform_tools = Arc::new(PlatformTools::new(self.extension_manager.clone()));
+        let platform_tools = Arc::new(PlatformTools::new(self.extension_manager.clone(), self.tool_route_manager.clone()));
 
         // Create the extension config for platform tools
         let config = ExtensionConfig::Builtin {
@@ -204,6 +204,8 @@ impl Agent {
             available_tools: vec![
                 "manage_extensions".to_string(),
                 "search_available_extensions".to_string(),
+                "read_resource".to_string(),
+                "list_resources".to_string(),
             ],
         };
         
@@ -214,7 +216,7 @@ impl Agent {
             .add_client(
                 "platform".to_string(),
                 config,
-                Arc::new(tokio::sync::Mutex::new(Box::new(PlatformTools::new(self.extension_manager.clone())) as Box<dyn McpClientTrait>)),
+                Arc::new(tokio::sync::Mutex::new(Box::new(PlatformTools::new(self.extension_manager.clone(), self.tool_route_manager.clone())) as Box<dyn McpClientTrait>)),
                 None, // no server info
                 None, // no temp dir
             )
@@ -444,25 +446,42 @@ impl Agent {
             return (request_id, Ok(ToolCallResult::from(result)));
         }
 
-        if tool_call.name == PLATFORM_MANAGE_EXTENSIONS_TOOL_NAME {
-            let extension_name = tool_call
-                .arguments
-                .get("extension_name")
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .to_string();
-            let action = tool_call
-                .arguments
-                .get("action")
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .to_string();
-            let (request_id, result) = self
-                .manage_extensions(action, extension_name, request_id)
-                .await;
-
-            return (request_id, Ok(ToolCallResult::from(result)));
-        }
+        // if tool_call.name == PLATFORM_MANAGE_EXTENSIONS_TOOL_NAME {
+        //     // Delegate to platform_tools which now handles tool router functionality
+        //     if let Some(platform_tools) = &self.platform_tools {
+        //         match platform_tools
+        //             .call_tool(
+        //                 &tool_call.name,
+        //                 tool_call.arguments.clone(),
+        //                 cancellation_token.unwrap_or_default(),
+        //             )
+        //             .await
+        //         {
+        //             Ok(result) => {
+        //                 return (request_id, Ok(ToolCallResult::from(Ok(result.content))));
+        //             }
+        //             Err(e) => {
+        //                 return (
+        //                     request_id,
+        //                     Ok(ToolCallResult::from(Err(ErrorData::new(
+        //                         ErrorCode::INTERNAL_ERROR,
+        //                         format!("Platform tool error: {:?}", e),
+        //                         None,
+        //                     )))),
+        //                 );
+        //             }
+        //         }
+        //     } else {
+        //         return (
+        //             request_id,
+        //             Ok(ToolCallResult::from(Err(ErrorData::new(
+        //                 ErrorCode::INTERNAL_ERROR,
+        //                 "Platform tools not initialized".to_string(),
+        //                 None,
+        //             )))),
+        //         );
+        //     }
+        // }
 
         if tool_call.name == FINAL_OUTPUT_TOOL_NAME {
             return if let Some(final_output_tool) = self.final_output_tool.lock().await.as_mut() {
@@ -519,29 +538,7 @@ impl Agent {
                 loaded_extensions,
             )
             .await
-        } else if tool_call.name == PLATFORM_READ_RESOURCE_TOOL_NAME {
-            // Check if the tool is read_resource and handle it separately
-            ToolCallResult::from(
-                self.extension_manager
-                    .read_resource(
-                        tool_call.arguments.clone(),
-                        cancellation_token.unwrap_or_default(),
-                    )
-                    .await,
-            )
-        } else if tool_call.name == PLATFORM_LIST_RESOURCES_TOOL_NAME {
-            ToolCallResult::from(
-                self.extension_manager
-                    .list_resources(
-                        tool_call.arguments.clone(),
-                        cancellation_token.unwrap_or_default(),
-                    )
-                    .await,
-            )
         } 
-        // else if tool_call.name == PLATFORM_SEARCH_AVAILABLE_EXTENSIONS_TOOL_NAME {
-        //     ToolCallResult::from(self.extension_manager.search_available_extensions().await)
-        // } 
         else if self.is_frontend_tool(&tool_call.name).await {
             // For frontend tools, return an error indicating we need frontend execution
             ToolCallResult::from(Err(ErrorData::new(
@@ -682,117 +679,6 @@ impl Agent {
         )
     }
 
-    #[allow(clippy::too_many_lines)]
-    pub(super) async fn manage_extensions(
-        &self,
-        action: String,
-        extension_name: String,
-        request_id: String,
-    ) -> (String, Result<Vec<Content>, ErrorData>) {
-        if self.tool_route_manager.is_router_functional().await {
-            let selector = self.tool_route_manager.get_router_tool_selector().await;
-            if let Some(selector) = selector {
-                let selector_action = if action == "disable" { "remove" } else { "add" };
-                let selector = Arc::new(selector);
-                if let Err(e) = ToolRouterIndexManager::update_extension_tools(
-                    &selector,
-                    &self.extension_manager,
-                    &extension_name,
-                    selector_action,
-                )
-                .await
-                {
-                    return (
-                        request_id,
-                        Err(ErrorData::new(
-                            ErrorCode::INTERNAL_ERROR,
-                            format!("Failed to update LLM index: {}", e),
-                            None,
-                        )),
-                    );
-                }
-            }
-        }
-        if action == "disable" {
-            let result = self
-                .extension_manager
-                .remove_extension(&extension_name)
-                .await
-                .map(|_| {
-                    vec![Content::text(format!(
-                        "The extension '{}' has been disabled successfully",
-                        extension_name
-                    ))]
-                })
-                .map_err(|e| ErrorData::new(ErrorCode::INTERNAL_ERROR, e.to_string(), None));
-            return (request_id, result);
-        }
-
-        let config = match ExtensionConfigManager::get_config_by_name(&extension_name) {
-            Ok(Some(config)) => config,
-            Ok(None) => {
-                return (
-                    request_id,
-                    Err(ErrorData::new(
-                        ErrorCode::RESOURCE_NOT_FOUND,
-                        format!(
-                        "Extension '{}' not found. Please check the extension name and try again.",
-                        extension_name
-                    ),
-                        None,
-                    )),
-                )
-            }
-            Err(e) => {
-                return (
-                    request_id,
-                    Err(ErrorData::new(
-                        ErrorCode::INTERNAL_ERROR,
-                        format!("Failed to get extension config: {}", e),
-                        None,
-                    )),
-                )
-            }
-        };
-        let result = self
-            .extension_manager
-            .add_extension(config)
-            .await
-            .map(|_| {
-                vec![Content::text(format!(
-                    "The extension '{}' has been installed successfully",
-                    extension_name
-                ))]
-            })
-            .map_err(|e| ErrorData::new(ErrorCode::INTERNAL_ERROR, e.to_string(), None));
-
-        // Update LLM index if operation was successful and LLM routing is functional
-        if result.is_ok() && self.tool_route_manager.is_router_functional().await {
-            let selector = self.tool_route_manager.get_router_tool_selector().await;
-            if let Some(selector) = selector {
-                let llm_action = if action == "disable" { "remove" } else { "add" };
-                let selector = Arc::new(selector);
-                if let Err(e) = ToolRouterIndexManager::update_extension_tools(
-                    &selector,
-                    &self.extension_manager,
-                    &extension_name,
-                    llm_action,
-                )
-                .await
-                {
-                    return (
-                        request_id,
-                        Err(ErrorData::new(
-                            ErrorCode::INTERNAL_ERROR,
-                            format!("Failed to update LLM index: {}", e),
-                            None,
-                        )),
-                    );
-                }
-            }
-        }
-        (request_id, result)
-    }
 
     pub async fn add_extension(&self, extension: ExtensionConfig) -> ExtensionResult<()> {
         match &extension {
@@ -865,8 +751,6 @@ impl Agent {
         if extension_name.is_none() || extension_name.as_deref() == Some("platform") {
             // Add platform tools
             prefixed_tools.extend([
-                platform_tools::search_available_extensions_tool(),
-                platform_tools::manage_extensions_tool(),
                 platform_tools::manage_schedule_tool(),
             ]);
 
