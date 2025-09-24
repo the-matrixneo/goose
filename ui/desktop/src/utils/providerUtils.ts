@@ -205,7 +205,8 @@ export const initializeSystem = async (
     getExtensions?: (b: boolean) => Promise<FixedExtensionEntry[]>;
     addExtension?: (name: string, config: ExtensionConfig, enabled: boolean) => Promise<void>;
     setIsExtensionsLoading?: (loading: boolean) => void;
-    recipeConfig?: Recipe; // Recipe config from agent session metadata
+    recipeParameters?: Record<string, string> | null;
+    recipeConfig?: Recipe;
   }
 ) => {
   try {
@@ -230,18 +231,26 @@ export const initializeSystem = async (
       console.log('This will not end well');
     }
 
-    // Get recipeConfig from options (passed from agent session) or fallback to window.appConfig
+    // Get recipeConfig - prefer from options (session metadata) over app config
     const recipeConfig = options?.recipeConfig || window.appConfig?.get?.('recipe');
     const recipe_instructions = (recipeConfig as { instructions?: string })?.instructions;
     const responseConfig = (recipeConfig as { response?: { json_schema?: unknown } })?.response;
     const subRecipes = (recipeConfig as { sub_recipes?: SubRecipe[] })?.sub_recipes;
-    const parameters = (recipeConfig as { parameters?: RecipeParameter[] })?.parameters;
-    const hasParameters = parameters && parameters?.length > 0;
     const hasSubRecipes = subRecipes && subRecipes?.length > 0;
+    const recipeParameters = options?.recipeParameters;
+
+    // Determine the system prompt
     let prompt = desktopPrompt;
+
+    // If we have recipe instructions, add them to the system prompt with parameter substitution
     if (recipe_instructions) {
-      prompt = `${desktopPromptBot}\nIMPORTANT instructions for you to operate as agent:\n${recipe_instructions}`;
+      const substitutedInstructions = recipeParameters
+        ? substituteParameters(recipe_instructions, recipeParameters)
+        : recipe_instructions;
+
+      prompt = `${desktopPromptBot}\nIMPORTANT instructions for you to operate as agent:\n${substitutedInstructions}`;
     }
+
     // Extend the system prompt with desktop-specific information
     await extendPrompt({
       body: {
@@ -250,9 +259,27 @@ export const initializeSystem = async (
       },
     });
 
-    if (!hasParameters && hasSubRecipes) {
-      await addSubRecipesToAgent(sessionId, subRecipes);
+    if (hasSubRecipes) {
+      let finalSubRecipes = subRecipes;
+
+      // If we have parameters, substitute them in sub-recipe values
+      if (recipeParameters) {
+        finalSubRecipes = subRecipes.map((subRecipe) => ({
+          ...subRecipe,
+          values: subRecipe.values
+            ? Object.fromEntries(
+                Object.entries(subRecipe.values).map(([key, value]) => [
+                  key,
+                  substituteParameters(value, recipeParameters),
+                ])
+              )
+            : subRecipe.values,
+        }));
+      }
+
+      await addSubRecipesToAgent(sessionId, finalSubRecipes);
     }
+
     // Configure session with response config if present
     if (responseConfig?.json_schema) {
       const sessionConfigResponse = await updateSessionConfig({
@@ -308,5 +335,30 @@ export const initializeSystem = async (
     console.error('Failed to initialize agent:', error);
     options?.setIsExtensionsLoading?.(false);
     throw error;
+  }
+};
+
+/**
+ * Updates session metadata with recipe parameters
+ * This ensures parameters are persisted across session resumption
+ */
+export const updateSessionMetadataWithParameters = async (
+  sessionId: string,
+  recipeParameters: Record<string, string>
+): Promise<void> => {
+  try {
+    const { updateSessionRecipeParameters } = await import('../api');
+
+    await updateSessionRecipeParameters({
+      path: {
+        session_id: sessionId,
+      },
+      body: {
+        recipeParameters,
+      },
+      throwOnError: true,
+    });
+  } catch (error) {
+    console.error('Failed to save recipe parameters to session metadata:', error);
   }
 };
