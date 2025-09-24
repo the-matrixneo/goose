@@ -19,10 +19,16 @@ export const CompactionMarker: React.FC<CompactionMarkerProps> = ({ message, mes
   const markerText = compactionContent?.msg || 'Conversation compacted';
   const summaryText = compactionContent?.summary || null;
 
+  // Check if this is a compaction message that mentions summarization
+  // Show button if:
+  // 1. There's an embedded summary in this message, OR
+  // 2. The message text indicates a summary was created (even if stored elsewhere)
+  const showSummaryButton = summaryText || markerText.toLowerCase().includes('summarized');
+
   return (
     <div className="flex items-center justify-between py-2">
       <div className="text-xs text-gray-400 text-left">{markerText}</div>
-      {summaryText && (
+      {showSummaryButton && (
         <Button
           onClick={() => setShowSummaryModal(true)}
           size="sm"

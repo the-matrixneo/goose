@@ -94,33 +94,37 @@ export const SummaryViewModal: React.FC<SummaryViewModalProps> = ({
           </DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 max-h-[60vh] pr-4">
-          {summaryData ? (
-            <div className="space-y-4">
-              {summaryData.message && (
-                <div className="flex items-center gap-2 text-sm text-textSubtle">
-                  <span>Created:</span>
-                  <span className="font-mono">
-                    {formatMessageTimestamp(summaryData.message.created)}
-                  </span>
+        <div className="flex-1 overflow-hidden">
+          <ScrollArea className="h-full max-h-[60vh]">
+            <div className="pr-4">
+              {summaryData ? (
+                <div className="space-y-4">
+                  {summaryData.message && (
+                    <div className="flex items-center gap-2 text-sm text-textSubtle">
+                      <span>Created:</span>
+                      <span className="font-mono">
+                        {formatMessageTimestamp(summaryData.message.created)}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="prose prose-sm dark:prose-invert max-w-none text-textStandard">
+                    <MarkdownContent content={summaryData.content} />
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 text-textSubtle">
+                  <FileText className="w-12 h-12 mb-4 opacity-50" />
+                  <p className="text-lg mb-2 text-textStandard">No Summary Available</p>
+                  <p className="text-sm text-center max-w-md text-textSubtle">
+                    Summaries are automatically created when the conversation context window reaches
+                    its limit and needs to be compacted.
+                  </p>
                 </div>
               )}
-
-              <div className="prose prose-sm dark:prose-invert max-w-none text-textStandard">
-                <MarkdownContent content={summaryData.content} />
-              </div>
             </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-12 text-textSubtle">
-              <FileText className="w-12 h-12 mb-4 opacity-50" />
-              <p className="text-lg mb-2 text-textStandard">No Summary Available</p>
-              <p className="text-sm text-center max-w-md text-textSubtle">
-                Summaries are automatically created when the conversation context window reaches its
-                limit and needs to be compacted.
-              </p>
-            </div>
-          )}
-        </ScrollArea>
+          </ScrollArea>
+        </div>
       </DialogContent>
     </Dialog>
   );
