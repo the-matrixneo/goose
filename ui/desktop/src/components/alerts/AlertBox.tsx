@@ -53,12 +53,22 @@ export const AlertBox = ({ alert, className, messages }: AlertBoxProps) => {
     }
 
     // Fallback: Look for agent-visible but not user-visible messages (actual summary)
+    // Skip messages that contain the "summary that was prepared" text
     for (let i = messages.length - 1; i >= 0; i--) {
       const msg = messages[i];
       if (msg.metadata?.agentVisible === true && msg.metadata?.userVisible === false) {
-        // Check if it contains text that looks like a summary
+        // Check if it contains text content
         const textContent = msg.content.find((c) => c.type === 'text');
-        if (textContent && 'text' in textContent && textContent.text.includes('summary')) {
+        if (textContent && 'text' in textContent) {
+          const text = textContent.text;
+          // Skip the "summary that was prepared" message
+          if (
+            text.includes('summary that was prepared') ||
+            text.includes('Do not mention that you read a summary')
+          ) {
+            continue;
+          }
+          // If we found text that doesn't match the skip patterns, it's likely a summary
           return true;
         }
       }

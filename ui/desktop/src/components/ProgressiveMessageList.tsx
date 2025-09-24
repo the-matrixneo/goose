@@ -201,7 +201,7 @@ export default function ProgressiveMessageList({
             {isUser ? (
               <>
                 {hasCompactionMarker && hasCompactionMarker(message) ? (
-                  <CompactionMarker message={message} />
+                  <CompactionMarker message={message} messages={messages} />
                 ) : (
                   !hasOnlyToolResponses(message) && (
                     <UserMessage
@@ -216,7 +216,7 @@ export default function ProgressiveMessageList({
             ) : (
               <>
                 {hasCompactionMarker && hasCompactionMarker(message) ? (
-                  <CompactionMarker message={message} />
+                  <CompactionMarker message={message} messages={messages} />
                 ) : (
                   <GooseMessage
                     sessionId={chat.sessionId}

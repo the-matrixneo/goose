@@ -6,9 +6,10 @@ import SummaryViewModal from '../SummaryViewModal';
 
 interface CompactionMarkerProps {
   message: Message;
+  messages?: Message[];
 }
 
-export const CompactionMarker: React.FC<CompactionMarkerProps> = ({ message }) => {
+export const CompactionMarker: React.FC<CompactionMarkerProps> = ({ message, messages }) => {
   const [showSummaryModal, setShowSummaryModal] = useState(false);
 
   const compactionContent = message.content.find(
@@ -32,11 +33,12 @@ export const CompactionMarker: React.FC<CompactionMarkerProps> = ({ message }) =
           View Summary
         </Button>
       )}
-      {showSummaryModal && summaryText && (
+      {showSummaryModal && (
         <SummaryViewModal
           isOpen={showSummaryModal}
           onClose={() => setShowSummaryModal(false)}
-          summaryText={summaryText}
+          messages={messages}
+          summaryText={summaryText || undefined}
         />
       )}
     </div>
