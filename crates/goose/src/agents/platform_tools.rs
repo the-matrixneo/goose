@@ -2,6 +2,19 @@ use indoc::indoc;
 use rmcp::model::{Tool, ToolAnnotations};
 use rmcp::object;
 
+use std::sync::Arc;
+use async_trait::async_trait;
+use mcp_client::client::{McpClientTrait, Error};
+use rmcp::model::{
+    CallToolResult, GetPromptResult, InitializeResult, ListPromptsResult,
+    ListResourcesResult, ListToolsResult, ReadResourceResult, ServerNotification,
+};
+use serde_json::Value;
+use tokio::sync::mpsc;
+use tokio_util::sync::CancellationToken;
+
+use super::extension_manager::ExtensionManager;
+
 pub const PLATFORM_READ_RESOURCE_TOOL_NAME: &str = "platform__read_resource";
 pub const PLATFORM_LIST_RESOURCES_TOOL_NAME: &str = "platform__list_resources";
 pub const PLATFORM_SEARCH_AVAILABLE_EXTENSIONS_TOOL_NAME: &str =
@@ -153,4 +166,94 @@ pub fn manage_schedule_tool() -> Tool {
         idempotent_hint: Some(false),
         open_world_hint: Some(false),
     })
+}
+
+/// Platform tools client that provides access to goose platform functionality
+pub struct PlatformTools {
+    extension_manager: Arc<ExtensionManager>,
+}
+
+impl PlatformTools {
+    pub fn new(extension_manager: Arc<ExtensionManager>) -> Self {
+        Self { extension_manager }
+    }
+}
+
+#[async_trait]
+impl McpClientTrait for PlatformTools {
+    async fn list_resources(
+        &self,
+        _next_cursor: Option<String>,
+        _cancel_token: CancellationToken,
+    ) -> Result<ListResourcesResult, Error> {
+        // Default implementation - to be implemented later
+        Ok(ListResourcesResult {
+            resources: vec![],
+            next_cursor: None,
+        })
+    }
+
+    async fn read_resource(
+        &self,
+        _uri: &str,
+        _cancel_token: CancellationToken,
+    ) -> Result<ReadResourceResult, Error> {
+        // Default implementation - to be implemented later
+        Err(Error::UnexpectedResponse)
+    }
+
+    async fn list_tools(
+        &self,
+        _next_cursor: Option<String>,
+        _cancel_token: CancellationToken,
+    ) -> Result<ListToolsResult, Error> {
+        // Default implementation - to be implemented later
+        Ok(ListToolsResult {
+            tools: vec![],
+            next_cursor: None,
+        })
+    }
+
+    async fn call_tool(
+        &self,
+        _name: &str,
+        _arguments: Value,
+        _cancel_token: CancellationToken,
+    ) -> Result<CallToolResult, Error> {
+        // Default implementation - to be implemented later
+        Err(Error::UnexpectedResponse)
+    }
+
+    async fn list_prompts(
+        &self,
+        _next_cursor: Option<String>,
+        _cancel_token: CancellationToken,
+    ) -> Result<ListPromptsResult, Error> {
+        // Default implementation - to be implemented later
+        Ok(ListPromptsResult {
+            prompts: vec![],
+            next_cursor: None,
+        })
+    }
+
+    async fn get_prompt(
+        &self,
+        _name: &str,
+        _arguments: Value,
+        _cancel_token: CancellationToken,
+    ) -> Result<GetPromptResult, Error> {
+        // Default implementation - to be implemented later
+        Err(Error::UnexpectedResponse)
+    }
+
+    async fn subscribe(&self) -> mpsc::Receiver<ServerNotification> {
+        // Default implementation - to be implemented later
+        let (_tx, rx) = mpsc::channel(1);
+        rx
+    }
+
+    fn get_info(&self) -> Option<&InitializeResult> {
+        // Default implementation - to be implemented later
+        None
+    }
 }
