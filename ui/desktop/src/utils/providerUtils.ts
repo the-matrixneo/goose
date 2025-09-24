@@ -295,6 +295,7 @@ export const initializeSystem = async (
           addToConfig: options.addExtension!,
           extensionConfig,
           toastOptions: { silent: false },
+          sessionId,
         });
       } catch (error) {
         console.error(`Failed to load extension ${extensionName}:`, error);

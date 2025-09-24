@@ -256,7 +256,7 @@ export const useRecipeManager = (chat: ChatType, recipeConfig?: Recipe | null) =
     return () => {
       window.removeEventListener('make-agent-from-chat', handleMakeAgent);
     };
-  }, []);
+  }, [chat.sessionId]);
 
   const handleRecipeCreated = (recipe: Recipe) => {
     toastSuccess({
