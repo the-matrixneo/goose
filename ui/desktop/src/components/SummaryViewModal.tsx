@@ -1,8 +1,10 @@
 import React from 'react';
-import { X, FileText } from 'lucide-react';
+import { FileText } from 'lucide-react';
 import { Message, SummarizationRequestedContent } from '../types/message';
 import MarkdownContent from './MarkdownContent';
 import { formatMessageTimestamp } from '../utils/timeUtils';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
+import { ScrollArea } from './ui/scroll-area';
 
 interface SummaryViewModalProps {
   isOpen: boolean;
@@ -17,8 +19,6 @@ export const SummaryViewModal: React.FC<SummaryViewModalProps> = ({
   messages,
   summaryText,
 }) => {
-  if (!isOpen) return null;
-
   // Find the most recent summary message
   const findLatestSummary = (): {
     message?: Message;
@@ -70,25 +70,21 @@ export const SummaryViewModal: React.FC<SummaryViewModalProps> = ({
   const summaryData = findLatestSummary();
 
   return (
-    <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/50 animate-fadeIn">
-      <div className="bg-background-default border border-borderSubtle rounded-lg w-[90vw] max-w-4xl max-h-[80vh] flex flex-col animate-slideUp">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-borderSubtle">
-          <div className="flex items-center gap-3">
-            <FileText className="w-5 h-5 text-textStandard" />
-            <h2 className="text-xl font-medium text-textProminent">Latest Conversation Summary</h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-bgSubtle rounded-lg transition-colors"
-            aria-label="Close modal"
-          >
-            <X className="w-5 h-5 text-textSubtle" />
-          </button>
-        </div>
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[80%] sm:max-h-[80%] overflow-hidden flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <FileText className="w-5 h-5" />
+            Latest Conversation Summary
+          </DialogTitle>
+          <DialogDescription>
+            {summaryData
+              ? 'View the most recent summary of your conversation'
+              : 'No summary available yet'}
+          </DialogDescription>
+        </DialogHeader>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <ScrollArea className="flex-1 max-h-[60vh] pr-4">
           {summaryData ? (
             <div className="space-y-4">
               {summaryData.message && (
@@ -100,33 +96,23 @@ export const SummaryViewModal: React.FC<SummaryViewModalProps> = ({
                 </div>
               )}
 
-              <div className="prose prose-sm dark:prose-invert max-w-none">
+              <div className="prose prose-sm dark:prose-invert max-w-none text-textStandard">
                 <MarkdownContent content={summaryData.content} />
               </div>
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-12 text-textSubtle">
               <FileText className="w-12 h-12 mb-4 opacity-50" />
-              <p className="text-lg mb-2">No Summary Available</p>
-              <p className="text-sm text-center max-w-md">
+              <p className="text-lg mb-2 text-textStandard">No Summary Available</p>
+              <p className="text-sm text-center max-w-md text-textSubtle">
                 Summaries are automatically created when the conversation context window reaches its
                 limit and needs to be compacted.
               </p>
             </div>
           )}
-        </div>
-
-        {/* Footer */}
-        <div className="flex justify-end gap-3 p-6 border-t border-borderSubtle">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-bgSubtle text-textStandard rounded-lg hover:bg-bgSecondary transition-colors"
-          >
-            Close
-          </button>
-        </div>
-      </div>
-    </div>
+        </ScrollArea>
+      </DialogContent>
+    </Dialog>
   );
 };
 

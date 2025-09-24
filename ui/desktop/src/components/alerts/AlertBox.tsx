@@ -5,7 +5,7 @@ import { Search } from 'lucide-react';
 import { cn } from '../../utils';
 import { Alert, AlertType } from './types';
 import { getApiUrl } from '../../config';
-import { Message } from '../../types/message';
+import { Message, SummarizationRequestedContent } from '../../types/message';
 import SummaryViewModal from '../SummaryViewModal';
 
 const alertIcons: Record<AlertType, React.ReactNode> = {
@@ -34,6 +34,40 @@ export const AlertBox = ({ alert, className, messages }: AlertBoxProps) => {
   );
   const [isSaving, setIsSaving] = useState(false);
   const [showSummaryModal, setShowSummaryModal] = useState(false);
+
+  // Check if a summary exists
+  const hasSummary = (): boolean => {
+    if (!messages || messages.length === 0) {
+      return false;
+    }
+
+    // Look for compaction marker with embedded summary
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i];
+      const summaryContent = msg.content.find((c) => c.type === 'summarizationRequested') as
+        | SummarizationRequestedContent
+        | undefined;
+      if (summaryContent && summaryContent.summary) {
+        return true;
+      }
+    }
+
+    // Fallback: Look for agent-visible but not user-visible messages (actual summary)
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i];
+      if (msg.metadata?.agentVisible === true && msg.metadata?.userVisible === false) {
+        // Check if it contains text that looks like a summary
+        const textContent = msg.content.find((c) => c.type === 'text');
+        if (textContent && 'text' in textContent && textContent.text.includes('summary')) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  };
+
+  const summaryAvailable = hasSummary();
 
   const handleSaveThreshold = async () => {
     if (isSaving) return; // Prevent double-clicks
@@ -284,10 +318,18 @@ export const AlertBox = ({ alert, className, messages }: AlertBoxProps) => {
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  setShowSummaryModal(true);
+                  if (summaryAvailable) {
+                    setShowSummaryModal(true);
+                  }
                 }}
-                className="flex items-center gap-1.5 text-[11px] outline-none hover:opacity-80 cursor-pointer ml-auto"
-                title="View latest summary"
+                disabled={!summaryAvailable}
+                className={cn(
+                  'flex items-center gap-1.5 text-[11px] outline-none ml-auto',
+                  summaryAvailable
+                    ? 'hover:opacity-80 cursor-pointer'
+                    : 'opacity-40 cursor-not-allowed'
+                )}
+                title={summaryAvailable ? 'View latest summary' : 'No summary available yet'}
               >
                 <Search className="w-3 h-3" />
                 <span>View summary</span>
