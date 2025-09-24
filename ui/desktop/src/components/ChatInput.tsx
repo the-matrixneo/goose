@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, useMemo, useCallback } from 'react';
-import { FolderKey, ScrollText, Search } from 'lucide-react';
+import { FolderKey, ScrollText } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/Tooltip';
 import { Button } from './ui/button';
 import type { View } from '../utils/navigationUtils';
@@ -29,7 +29,6 @@ import { Recipe } from '../recipe';
 import MessageQueue from './MessageQueue';
 import { detectInterruption } from '../utils/interruptionDetector';
 import { getApiUrl } from '../config';
-import SummaryViewModal from './SummaryViewModal';
 
 interface QueuedMessage {
   id: string;
@@ -352,7 +351,6 @@ export default function ChatInput({
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
   const timeoutRefsRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
   const [didAutoSubmit, setDidAutoSubmit] = useState<boolean>(false);
-  const [showSummaryModal, setShowSummaryModal] = useState(false);
 
   // Use shared file drop hook for ChatInput
   const {
@@ -1628,6 +1626,7 @@ export default function ChatInput({
                 alerts={alerts}
                 recipeConfig={recipeConfig}
                 hasMessages={messages.length > 0}
+                messages={messages}
               />
             </div>
           </Tooltip>
@@ -1649,23 +1648,6 @@ export default function ChatInput({
               <TooltipContent>Configure goosehints</TooltipContent>
             </Tooltip>
           </div>
-          <div className="w-px h-4 bg-border-default mx-2" />
-          <div className="flex items-center h-full">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  onClick={() => setShowSummaryModal(true)}
-                  variant="ghost"
-                  size="sm"
-                  className="flex items-center justify-center text-text-default/70 hover:text-text-default text-xs cursor-pointer"
-                  title="View latest summary"
-                >
-                  <Search size={16} />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>View latest summary</TooltipContent>
-            </Tooltip>
-          </div>
         </div>
 
         <MentionPopover
@@ -1681,13 +1663,6 @@ export default function ChatInput({
           }
         />
       </div>
-
-      {/* Summary View Modal */}
-      <SummaryViewModal
-        isOpen={showSummaryModal}
-        onClose={() => setShowSummaryModal(false)}
-        messages={messages}
-      />
     </div>
   );
 }

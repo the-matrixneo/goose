@@ -204,7 +204,12 @@ export default function ProgressiveMessageList({
                   <CompactionMarker message={message} />
                 ) : (
                   !hasOnlyToolResponses(message) && (
-                    <UserMessage message={message} onMessageUpdate={onMessageUpdate} />
+                    <UserMessage
+                      message={message}
+                      onMessageUpdate={onMessageUpdate}
+                      messages={messages}
+                      sessionId={chat?.sessionId}
+                    />
                   )
                 )}
               </>

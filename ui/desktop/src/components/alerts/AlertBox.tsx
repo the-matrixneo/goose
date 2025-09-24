@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
 import { IoIosCloseCircle, IoIosWarning, IoIosInformationCircle } from 'react-icons/io';
 import { FaPencilAlt, FaSave } from 'react-icons/fa';
+import { Search } from 'lucide-react';
 import { cn } from '../../utils';
 import { Alert, AlertType } from './types';
 import { getApiUrl } from '../../config';
+import { Message } from '../../types/message';
+import SummaryViewModal from '../SummaryViewModal';
 
 const alertIcons: Record<AlertType, React.ReactNode> = {
   [AlertType.Error]: <IoIosCloseCircle className="h-5 w-5" />,
@@ -15,6 +18,7 @@ interface AlertBoxProps {
   alert: Alert;
   className?: string;
   compactButtonEnabled?: boolean;
+  messages?: Message[];
 }
 
 const alertStyles: Record<AlertType, string> = {
@@ -23,12 +27,13 @@ const alertStyles: Record<AlertType, string> = {
   [AlertType.Info]: 'dark:bg-white dark:text-black bg-black text-white',
 };
 
-export const AlertBox = ({ alert, className }: AlertBoxProps) => {
+export const AlertBox = ({ alert, className, messages }: AlertBoxProps) => {
   const [isEditingThreshold, setIsEditingThreshold] = useState(false);
   const [thresholdValue, setThresholdValue] = useState(
     alert.autoCompactThreshold ? Math.round(alert.autoCompactThreshold * 100) : 80
   );
   const [isSaving, setIsSaving] = useState(false);
+  const [showSummaryModal, setShowSummaryModal] = useState(false);
 
   const handleSaveThreshold = async () => {
     if (isSaving) return; // Prevent double-clicks
@@ -254,25 +259,41 @@ export const AlertBox = ({ alert, className }: AlertBoxProps) => {
                 : alert.progress!.total}
             </span>
           </div>
-          {alert.showCompactButton && alert.onCompact && (
-            <button
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                alert.onCompact!();
-              }}
-              disabled={alert.compactButtonDisabled}
-              className={cn(
-                'flex items-center gap-1.5 text-[11px] outline-none mt-1',
-                alert.compactButtonDisabled
-                  ? 'opacity-50 cursor-not-allowed'
-                  : 'hover:opacity-80 cursor-pointer'
-              )}
-            >
-              {alert.compactIcon}
-              <span>Compact now</span>
-            </button>
-          )}
+          <div className="flex justify-between items-center gap-2">
+            {alert.showCompactButton && alert.onCompact && (
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  alert.onCompact!();
+                }}
+                disabled={alert.compactButtonDisabled}
+                className={cn(
+                  'flex items-center gap-1.5 text-[11px] outline-none',
+                  alert.compactButtonDisabled
+                    ? 'opacity-50 cursor-not-allowed'
+                    : 'hover:opacity-80 cursor-pointer'
+                )}
+              >
+                {alert.compactIcon}
+                <span>Compact now</span>
+              </button>
+            )}
+            {messages && (
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setShowSummaryModal(true);
+                }}
+                className="flex items-center gap-1.5 text-[11px] outline-none hover:opacity-80 cursor-pointer ml-auto"
+                title="View latest summary"
+              >
+                <Search className="w-3 h-3" />
+                <span>View summary</span>
+              </button>
+            )}
+          </div>
         </div>
       ) : (
         <>
@@ -296,6 +317,15 @@ export const AlertBox = ({ alert, className }: AlertBoxProps) => {
             </div>
           </div>
         </>
+      )}
+
+      {/* Summary View Modal */}
+      {showSummaryModal && messages && (
+        <SummaryViewModal
+          isOpen={showSummaryModal}
+          onClose={() => setShowSummaryModal(false)}
+          messages={messages}
+        />
       )}
     </div>
   );
