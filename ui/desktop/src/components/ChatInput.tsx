@@ -1665,7 +1665,7 @@ export default function ChatInput({
       {/* Secondary actions and controls row below input */}
       <div className="flex flex-row items-center gap-1 p-2 relative">
         {/* Directory path */}
-        <DirSwitcher className="mr-0" />
+        <DirSwitcher />
         <div className="w-px h-4 bg-border-default mx-2" />
 
         {/* Action button */}
@@ -1676,9 +1676,10 @@ export default function ChatInput({
               onClick={handleActionButtonClick}
               variant="ghost"
               size="sm"
-              className="flex items-center justify-center text-text-default/70 hover:text-text-default text-xs cursor-pointer transition-colors"
+              className="flex items-center text-text-default/70 hover:text-text-default text-xs cursor-pointer transition-colors px-0"
             >
-              <Action className="w-4 h-4" />
+              <Action className="w-4 h-4 min-[1050px]:mr-1" />
+              <span className="text-xs hidden min-[1050px]:inline">Actions</span>
             </Button>
           </TooltipTrigger>
           <TooltipContent>Quick Actions</TooltipContent>
@@ -1693,9 +1694,10 @@ export default function ChatInput({
               onClick={handleFileSelect}
               variant="ghost"
               size="sm"
-              className="flex items-center justify-center text-text-default/70 hover:text-text-default text-xs cursor-pointer transition-colors"
+              className="flex items-center text-text-default/70 hover:text-text-default text-xs cursor-pointer transition-colors px-0"
             >
-              <Attach className="w-4 h-4" />
+              <Attach className="w-4 h-4 min-[1050px]:mr-1" />
+              <span className="text-xs hidden min-[1050px]:inline">Attach</span>
             </Button>
           </TooltipTrigger>
           <TooltipContent>Attach file or directory</TooltipContent>
@@ -1707,13 +1709,11 @@ export default function ChatInput({
           {/* Cost Tracker */}
           {COST_TRACKING_ENABLED && (
             <>
-              <div className="flex items-center h-full ml-1 mr-1">
-                <CostTracker
-                  inputTokens={inputTokens}
-                  outputTokens={outputTokens}
-                  sessionCosts={sessionCosts}
-                />
-              </div>
+              <CostTracker
+                inputTokens={inputTokens}
+                outputTokens={outputTokens}
+                sessionCosts={sessionCosts}
+              />
             </>
           )}
           <Tooltip>
@@ -1731,21 +1731,20 @@ export default function ChatInput({
           <div className="w-px h-4 bg-border-default mx-2" />
           <BottomMenuModeSelection />
           <div className="w-px h-4 bg-border-default mx-2" />
-          <div className="flex items-center h-full">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  onClick={() => setIsGoosehintsModalOpen?.(true)}
-                  variant="ghost"
-                  size="sm"
-                  className="flex items-center justify-center text-text-default/70 hover:text-text-default text-xs cursor-pointer"
-                >
-                  <FolderKey size={16} />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Configure goosehints</TooltipContent>
-            </Tooltip>
-          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                onClick={() => setIsGoosehintsModalOpen?.(true)}
+                variant="ghost"
+                size="sm"
+                className="flex items-center text-text-default/70 hover:text-text-default text-xs cursor-pointer transition-colors px-0"
+              >
+                <FolderKey size={16} className="min-[1050px]:mr-1" />
+                <span className="text-xs hidden min-[1050px]:inline">Hints</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Configure goosehints</TooltipContent>
+          </Tooltip>
         </div>
 
         <MentionPopover
