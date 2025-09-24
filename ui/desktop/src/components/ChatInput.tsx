@@ -1676,7 +1676,7 @@ export default function ChatInput({
               onClick={handleActionButtonClick}
               variant="ghost"
               size="sm"
-              className="flex items-center text-text-default/70 hover:text-text-default text-xs cursor-pointer transition-colors px-0"
+              className="flex items-center text-text-default/70 hover:text-text-default text-xs cursor-pointer transition-colors !px-0"
             >
               <Action className="w-4 h-4 min-[1050px]:mr-1" />
               <span className="text-xs hidden min-[1050px]:inline">Actions</span>
@@ -1694,7 +1694,7 @@ export default function ChatInput({
               onClick={handleFileSelect}
               variant="ghost"
               size="sm"
-              className="flex items-center text-text-default/70 hover:text-text-default text-xs cursor-pointer transition-colors px-0"
+              className="flex items-center text-text-default/70 hover:text-text-default text-xs cursor-pointer transition-colors !px-0"
             >
               <Attach className="w-4 h-4 min-[1050px]:mr-1" />
               <span className="text-xs hidden min-[1050px]:inline">Attach</span>
