@@ -318,6 +318,7 @@ mod tests {
             accumulated_output_tokens: Some(50),
             extension_data: crate::session::ExtensionData::new(),
             recipe: None,
+            recipe_parameters: None,
         }
     }
 
