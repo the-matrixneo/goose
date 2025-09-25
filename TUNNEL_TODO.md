@@ -27,8 +27,10 @@ The goosed server uses a two-layer extension system:
 
 ### Session Initialization (Every new session)
 1. **Start agent session**: `POST /agent/start` with working_dir and optional recipe
-2. **Get enabled extensions from config**: `GET /config/extensions`
-3. **Add each enabled extension to the session**:
+2. **Update provider and model**: `POST /agent/update_provider` with provider and model settings
+3. **Extend system prompt**: `POST /agent/extend_prompt` with desktop-specific instructions
+4. **Get enabled extensions from config**: `GET /config/extensions`
+5. **Add each enabled extension to the session**:
    ```json
    POST /extensions/add
    {
@@ -84,7 +86,30 @@ curl -X POST http://localhost:PORT/agent/start \
 # Returns: {"session_id": "xxx", ...}
 ```
 
-### Step 3: Add Extensions to Session
+### Step 3: Configure Provider and Model
+```bash
+curl -X POST http://localhost:PORT/agent/update_provider \
+  -H "Content-Type: application/json" \
+  -H "X-Secret-Key: YOUR_SECRET" \
+  -d '{
+    "session_id": "SESSION_ID_FROM_STEP_2",
+    "provider": "openai",
+    "model": "gpt-4o"
+  }'
+```
+
+### Step 4: Extend System Prompt (Optional)
+```bash
+curl -X POST http://localhost:PORT/agent/extend_prompt \
+  -H "Content-Type: application/json" \
+  -H "X-Secret-Key: YOUR_SECRET" \
+  -d '{
+    "session_id": "SESSION_ID_FROM_STEP_2",
+    "extension": "You are being accessed through a remote client..."
+  }'
+```
+
+### Step 5: Add Extensions to Session
 ```bash
 # For each enabled extension from config
 curl -X POST http://localhost:PORT/extensions/add \
@@ -100,8 +125,12 @@ curl -X POST http://localhost:PORT/extensions/add \
 ## Key Points
 - Extensions must be added to EACH new session
 - The config.yaml is just storage - it doesn't automatically load extensions
-- The desktop app orchestrates this flow client-side
+- The desktop app orchestrates this flow client-side, including:
+  - Setting the provider/model after session creation
+  - Extending the system prompt
+  - Loading all enabled extensions
 - There's no server-side automatic extension loading currently
+- Provider and model MUST be configured via `/agent/update_provider` after starting the session
 
 ## Potential Improvements
 1. **Quick fix**: Document this process for remote clients
