@@ -170,10 +170,31 @@ export default function ProgressiveMessageList({
   // Render messages up to the current rendered count
   const renderMessages = useCallback(() => {
     const messagesToRender = messages.slice(0, renderedCount);
+
+    // Debug logging for messages with metadata
+    const messagesWithMetadata = messagesToRender.filter(
+      (m) => m.metadata && (m.metadata.userVisible === false || m.metadata.agentVisible === false)
+    );
+    if (messagesWithMetadata.length > 0) {
+      console.log('[ProgressiveMessageList] Rendering messages with metadata:', {
+        total: messagesToRender.length,
+        withMetadata: messagesWithMetadata.length,
+        samples: messagesWithMetadata.slice(0, 3).map((m) => ({
+          role: m.role,
+          metadata: m.metadata,
+          contentTypes: m.content.map((c) => c.type),
+        })),
+      });
+    }
+
     return messagesToRender
       .map((message, index) => {
         // Filter out messages that are not user-visible
         if (message.metadata?.userVisible === false) {
+          console.log('[ProgressiveMessageList] Filtering out non-user-visible message:', {
+            role: message.role,
+            metadata: message.metadata,
+          });
           return null;
         }
 

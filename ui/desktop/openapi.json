@@ -2794,11 +2794,13 @@
         "properties": {
           "agentVisible": {
             "type": "boolean",
-            "description": "Whether the message should be included in the agent's context window"
+            "description": "Whether the message should be included in the agent's context window",
+            "example": true
           },
           "userVisible": {
             "type": "boolean",
-            "description": "Whether the message should be visible to the user in the UI"
+            "description": "Whether the message should be visible to the user in the UI",
+            "example": true
           }
         }
       },

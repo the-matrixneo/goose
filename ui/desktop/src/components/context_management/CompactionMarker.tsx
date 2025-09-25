@@ -3,6 +3,7 @@ import { Message, SummarizationRequestedContent } from '../../types/message';
 import { Search } from 'lucide-react';
 import { Button } from '../ui/button';
 import SummaryViewModal from '../SummaryViewModal';
+import { cn } from '../../utils';
 
 interface CompactionMarkerProps {
   message: Message;
@@ -25,8 +26,17 @@ export const CompactionMarker: React.FC<CompactionMarkerProps> = ({ message, mes
   // 2. The message text indicates a summary was created (even if stored elsewhere)
   const showSummaryButton = summaryText || markerText.toLowerCase().includes('summarized');
 
+  // Check if this message was part of a summarization (user visible but not agent visible)
+  const isSummarizedMessage =
+    message.metadata?.userVisible === true && message.metadata?.agentVisible === false;
+
   return (
-    <div className="flex items-center justify-between py-2">
+    <div
+      className={cn(
+        'flex items-center justify-between py-2',
+        isSummarizedMessage && 'opacity-50 italic'
+      )}
+    >
       <div className="text-xs text-gray-400 text-left">{markerText}</div>
       {showSummaryButton && (
         <Button
