@@ -39,9 +39,14 @@ export const useRecipeManager = (chat: ChatType, recipeConfig?: Recipe | null) =
     // If we have a recipe from navigation state, always set it and reset acceptance state
     // This ensures that when loading a new recipe, we start fresh
     if (recipeConfig) {
-      // Check if this is actually a different recipe (by comparing title)
+      // Check if this is actually a different recipe (by comparing title and content)
       const currentRecipe = chatContext.chat.recipeConfig;
-      const isNewRecipe = !currentRecipe || currentRecipe.title !== recipeConfig.title;
+      const isNewRecipe =
+        !currentRecipe ||
+        currentRecipe.title !== recipeConfig.title ||
+        currentRecipe.instructions !== recipeConfig.instructions ||
+        currentRecipe.prompt !== recipeConfig.prompt ||
+        JSON.stringify(currentRecipe.activities) !== JSON.stringify(recipeConfig.activities);
 
       if (isNewRecipe) {
         console.log('Setting new recipe config:', recipeConfig.title);

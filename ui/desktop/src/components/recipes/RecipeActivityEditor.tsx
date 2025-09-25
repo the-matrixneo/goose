@@ -32,6 +32,10 @@ export default function RecipeActivityEditor({
     if (newActivity.trim()) {
       setActivities([...activities, newActivity.trim()]);
       setNewActivity('');
+      // Trigger parameter extraction after adding activity
+      if (onBlur) {
+        onBlur();
+      }
     }
   };
 
