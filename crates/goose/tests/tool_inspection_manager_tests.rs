@@ -1,7 +1,9 @@
-use goose::tool_inspection::{InspectionAction, InspectionResult, ToolInspectionManager, ToolInspector};
-use goose::conversation::message::{Message, ToolRequest};
 use anyhow::Result;
 use async_trait::async_trait;
+use goose::conversation::message::{Message, ToolRequest};
+use goose::tool_inspection::{
+    InspectionAction, InspectionResult, ToolInspectionManager, ToolInspector,
+};
 
 struct MockInspector {
     name: &'static str,
