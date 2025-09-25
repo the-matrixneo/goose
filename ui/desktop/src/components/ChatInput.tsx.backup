@@ -1226,9 +1226,6 @@ export default function ChatInput({
   const handleActionButtonClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     const buttonRect = event.currentTarget.getBoundingClientRect();
     
-    // Get the current cursor position from the RichChatInput
-    const currentCursorPosition = textAreaRef.current?.getBoundingClientRect ? displayValue.length : 0;
-    
     setActionPopover({
       isOpen: true,
       position: {
@@ -1236,7 +1233,7 @@ export default function ChatInput({
         y: buttonRect.top,
       },
       selectedIndex: 0,
-      cursorPosition: currentCursorPosition,
+      cursorPosition: textAreaRef.current?.getBoundingClientRect ? 0 : 0, // Will be set by RichChatInput
     });
   };
 
