@@ -4,13 +4,11 @@ use llama_cpp::{
     standard_sampler::{SamplerStage, StandardSampler},
     LlamaModel, LlamaParams, LlamaSession, SessionParams,
 };
-use regex::Regex;
 use rmcp::model::{Role, Tool};
 use serde_json::json;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
-use tempfile::NamedTempFile;
 use tokio::sync::Mutex;
 use tracing::{error, info};
 
@@ -20,7 +18,6 @@ use super::utils::emit_debug_trace;
 use crate::conversation::message::{Message, MessageContent};
 use crate::impl_provider_default;
 use crate::model::ModelConfig;
-use std::io::Write;
 
 pub const EMBEDDED_DEFAULT_MODEL: &str = "qwen2.5-7b-instruct";
 pub const EMBEDDED_KNOWN_MODELS: &[&str] = &[
@@ -30,7 +27,7 @@ pub const EMBEDDED_KNOWN_MODELS: &[&str] = &[
     "mistral-7b",
 ];
 
-pub const EMBEDDED_DOC_URL: &str = "https://github.com/block/goose/docs/embedded";
+
 
 const DEFAULT_MODEL_URL: &str =
     "https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF/resolve/main/qwen2.5-7b-instruct-q3_k_m.gguf";
@@ -46,92 +43,127 @@ pub struct EmbeddedProvider {
     enable_tools: bool,
 }
 
-// Simple code executor for tool execution
-struct SimpleCodeExecutor;
+// JSON tool call executor - like g3
+struct ToolExecutor;
 
-impl SimpleCodeExecutor {
-    /// Execute code blocks found in the response
-    async fn execute_code_blocks(text: &str) -> String {
-        let mut result = text.to_string();
+impl ToolExecutor {
+    /// Parse and execute JSON tool calls from the response
+    async fn execute_tool_calls(text: &str) -> String {
+        let mut result = String::new();
+        let mut remaining = text;
         
-        // Pattern for markdown code blocks
-        let code_re = Regex::new(r"```(\w+)?\n(.*?)```").unwrap();
-        
-        for cap in code_re.captures_iter(text) {
-            let language = cap.get(1).map(|m| m.as_str()).unwrap_or("bash");
-            let code = cap.get(2).map(|m| m.as_str()).unwrap_or("");
+        // Look for JSON tool calls in the format: {"tool": "name", "args": {...}}
+        while let Some(start_idx) = remaining.find(r#"{"tool":"#) {
+            // Add everything before the JSON
+            result.push_str(&remaining[..start_idx]);
             
-            if !code.is_empty() {
-                match Self::execute_code(language, code).await {
-                    Ok(output) => {
-                        // Append execution result after the code block
-                        let execution_result = format!(
-                            "\n[Execution Result]:\n{}\n",
-                            output.trim()
-                        );
-                        result = result.replace(
-                            &cap[0],
-                            &format!("{}\n{}", &cap[0], execution_result),
-                        );
+            // Find the end of the JSON object
+            let json_start = &remaining[start_idx..];
+            if let Some(end_idx) = Self::find_json_end(json_start) {
+                let json_str = &json_start[..=end_idx];
+                
+                // Try to parse and execute the tool call
+                match serde_json::from_str::<serde_json::Value>(json_str) {
+                    Ok(json) => {
+                        // Add the original JSON to result
+                        result.push_str(json_str);
+                        
+                        // Execute the tool call
+                        if let Some(tool_result) = Self::execute_tool_call(&json).await {
+                            result.push_str(&format!("\n\n{}\n", tool_result));
+                        }
                     }
-                    Err(e) => {
-                        let error_msg = format!("\n[Execution Error]: {}\n", e);
-                        result = result.replace(
-                            &cap[0],
-                            &format!("{}\n{}", &cap[0], error_msg),
-                        );
+                    Err(_) => {
+                        // Not valid JSON, just add it as-is
+                        result.push_str(&json_start[..=end_idx]);
                     }
                 }
+                
+                remaining = &json_start[end_idx + 1..];
+            } else {
+                // Couldn't find end of JSON, add the rest as-is
+                result.push_str(remaining);
+                break;
             }
         }
         
-        result
+        // Add any remaining text
+        result.push_str(remaining);
+        
+        if result.is_empty() {
+            text.to_string()
+        } else {
+            result
+        }
     }
     
-    /// Execute code in the specified language
-    async fn execute_code(language: &str, code: &str) -> Result<String> {
-        match language.to_lowercase().as_str() {
-            "python" | "py" => Self::execute_python(code).await,
-            "bash" | "shell" | "sh" => Self::execute_bash(code).await,
-            "javascript" | "js" => Self::execute_javascript(code).await,
+    /// Find the end of a JSON object
+    fn find_json_end(text: &str) -> Option<usize> {
+        let mut depth = 0;
+        let mut in_string = false;
+        let mut escape_next = false;
+        
+        for (i, ch) in text.char_indices() {
+            if escape_next {
+                escape_next = false;
+                continue;
+            }
+            
+            match ch {
+                '\\' if in_string => escape_next = true,
+                '"' => in_string = !in_string,
+                '{' if !in_string => depth += 1,
+                '}' if !in_string => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return Some(i);
+                    }
+                }
+                _ => {}
+            }
+        }
+        
+        None
+    }
+    
+    /// Execute a single tool call
+    async fn execute_tool_call(json: &serde_json::Value) -> Option<String> {
+        let tool_name = json.get("tool")?.as_str()?;
+        let args = json.get("args")?;
+        
+        match tool_name {
+            "shell" => {
+                if let Some(command) = args.get("command").and_then(|v| v.as_str()) {
+                    match Command::new("sh").arg("-c").arg(command).output() {
+                        Ok(output) => {
+                            let stdout = String::from_utf8_lossy(&output.stdout);
+                            let stderr = String::from_utf8_lossy(&output.stderr);
+                            
+                            if output.status.success() {
+                                if !stdout.is_empty() {
+                                    Some(format!("✓ Command executed successfully:\n{}", stdout))
+                                } else {
+                                    Some("✓ Command executed successfully".to_string())
+                                }
+                            } else {
+                                Some(format!("✗ Command failed:\n{}", 
+                                    if !stderr.is_empty() { stderr.to_string() } else { stdout.to_string() }))
+                            }
+                        }
+                        Err(e) => Some(format!("✗ Failed to execute command: {}", e)),
+                    }
+                } else {
+                    Some("✗ Missing 'command' parameter for shell tool".to_string())
+                }
+            }
+            "final_output" => {
+                // For final_output, we don't execute anything, just acknowledge
+                None
+            }
             _ => {
-                // Default to bash
-                Self::execute_bash(code).await
+                Some(format!("✗ Unknown tool: {}", tool_name))
             }
         }
-    }
-    
-    async fn execute_python(code: &str) -> Result<String> {
-        let mut temp_file = NamedTempFile::new()?;
-        temp_file.write_all(code.as_bytes())?;
-        let temp_path = temp_file.path();
-        
-        let output = Command::new("python3")
-            .arg(temp_path)
-            .output()?;
-        
-        Ok(String::from_utf8_lossy(&output.stdout).to_string())
-    }
-    
-    async fn execute_bash(code: &str) -> Result<String> {
-        let output = Command::new("bash")
-            .arg("-c")
-            .arg(code)
-            .output()?;
-        
-        Ok(String::from_utf8_lossy(&output.stdout).to_string())
-    }
-    
-    async fn execute_javascript(code: &str) -> Result<String> {
-        let mut temp_file = NamedTempFile::new()?;
-        temp_file.write_all(code.as_bytes())?;
-        let temp_path = temp_file.path();
-        
-        let output = Command::new("node")
-            .arg(temp_path)
-            .output()?;
-        
-        Ok(String::from_utf8_lossy(&output.stdout).to_string())
     }
 }
 
@@ -155,7 +187,7 @@ impl EmbeddedProvider {
         
         let context_length: u32 = config
             .get_param("EMBEDDED_CONTEXT_LENGTH")
-            .unwrap_or(4096);
+            .unwrap_or(32768);  // Match g3's default
         
         let max_tokens: u32 = config
             .get_param("EMBEDDED_MAX_TOKENS")
@@ -167,11 +199,11 @@ impl EmbeddedProvider {
         
         let gpu_layers: u32 = config
             .get_param("EMBEDDED_GPU_LAYERS")
-            .unwrap_or(0);
+            .unwrap_or(32);  // Use GPU by default like g3!
         
         let threads: u32 = config
             .get_param("EMBEDDED_THREADS")
-            .unwrap_or(4);
+            .unwrap_or(8);  // Match g3's thread count
         
         // Check if tools should be enabled (similar to claude-cli's permission mode)
         let goose_mode: String = config
@@ -453,38 +485,7 @@ impl EmbeddedProvider {
         Ok(result)
     }
     
-    /// Generate a simple session description without using the model
-    fn generate_simple_session_description(
-        &self,
-        messages: &[Message],
-    ) -> Result<(Message, ProviderUsage), ProviderError> {
-        // Extract the first user message text for a simple description
-        let description = messages
-            .iter()
-            .find(|m| m.role == Role::User)
-            .map(|m| m.as_concat_text())
-            .map(|text| {
-                // Take first few words, limit to 4 words
-                text.split_whitespace()
-                    .take(4)
-                    .collect::<Vec<_>>()
-                    .join(" ")
-            })
-            .unwrap_or_else(|| "Chat session".to_string());
-        
-        let message = Message::new(
-            Role::Assistant,
-            chrono::Utc::now().timestamp(),
-            vec![MessageContent::text(description)],
-        );
-        
-        let usage = Usage::default();
-        
-        Ok((
-            message,
-            ProviderUsage::new(self.model.model_name.clone(), usage),
-        ))
-    }
+
 }
 
 #[async_trait]
@@ -496,7 +497,7 @@ impl Provider for EmbeddedProvider {
             "Run local language models with optional tool execution",
             EMBEDDED_DEFAULT_MODEL,
             EMBEDDED_KNOWN_MODELS.to_vec(),
-            EMBEDDED_DOC_URL,
+            "",
             vec![],
         )
     }
@@ -512,24 +513,54 @@ impl Provider for EmbeddedProvider {
     async fn complete_with_model(
         &self,
         model_config: &ModelConfig,
-        system: &str,
+        system: &str, // Ignored - we use g3's system prompt for embedded
         messages: &[Message],
-        _tools: &[Tool], // Tools are handled internally if enabled
+        _tools: &[Tool], // Ignored - embedded provider doesn't use tool definitions
     ) -> Result<(Message, ProviderUsage), ProviderError> {
-        // Check if this is a session description request
-        if system.contains("four words or less") || system.contains("4 words or less") {
-            return self.generate_simple_session_description(messages);
-        }
-        
-        // Combine system prompt and messages
+        // Use g3's approach: simple system prompt with JSON tool format instructions
         let mut full_messages = Vec::new();
         
-        // Add system message if present
-        if !system.is_empty() {
-            full_messages.push(Message::user().with_text(system));
-        }
+        // Use g3's system prompt for embedded providers (with JSON tool format)
+        let g3_system_prompt = if self.enable_tools {
+            "You are Goose, a general-purpose AI agent. Your goal is to analyze and solve problems by writing code.
+
+# Tool Call Format
+
+When you need to execute a tool, write ONLY the JSON tool call on a new line:
+
+{\"tool\": \"tool_name\", \"args\": {\"param\": \"value\"}}
+
+The tool will execute immediately and you'll receive the result (success or error) to continue with.
+
+# Available Tools
+
+- **shell**: Execute shell commands
+  - Format: {\"tool\": \"shell\", \"args\": {\"command\": \"your_command_here\"}}
+  - Example: {\"tool\": \"shell\", \"args\": {\"command\": \"ls ~/Downloads\"}}
+
+- **final_output**: Signal task completion with a detailed summary of work done
+  - Format: {\"tool\": \"final_output\", \"args\": {\"summary\": \"what_was_accomplished\"}}
+
+# Instructions
+
+1. Analyze the request and break down into smaller tasks if appropriate
+2. Execute ONE tool at a time
+3. STOP when the original request was satisfied
+4. Call the final_output tool when done
+
+# Response Guidelines
+
+- Use Markdown formatting for all responses except tool calls.
+- Whenever taking actions, use the pronoun 'I'"
+        } else {
+            // Without tools, just be a simple assistant
+            "You are Goose, a general-purpose AI assistant. Provide helpful responses using markdown formatting."
+        };
         
-        // Add conversation messages
+        // Add the system prompt as the first user message (works better for embedded models)
+        full_messages.push(Message::user().with_text(g3_system_prompt));
+        
+        // Add conversation messages directly
         full_messages.extend_from_slice(messages);
         
         // Format for the model
@@ -540,9 +571,10 @@ impl Provider for EmbeddedProvider {
             .generate_completion(&prompt, self.max_tokens, self.temperature)
             .await?;
         
-        // If tools are enabled, execute any code blocks found in the response
+        // If tools are enabled, parse and execute JSON tool calls in the response
+        // This is built-in functionality like g3, not exposed as tool definitions
         if self.enable_tools {
-            generated_text = SimpleCodeExecutor::execute_code_blocks(&generated_text).await;
+            generated_text = ToolExecutor::execute_tool_calls(&generated_text).await;
         }
         
         // Create response message
@@ -565,7 +597,7 @@ impl Provider for EmbeddedProvider {
         // Debug tracing
         let payload = json!({
             "model": model_config.model_name,
-            "system": system,
+            "system_length": system.len(),
             "messages": messages.len(),
             "tools_enabled": self.enable_tools,
         });
