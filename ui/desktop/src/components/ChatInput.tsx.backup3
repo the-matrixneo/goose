@@ -27,7 +27,6 @@ import { useChatContext } from '../contexts/ChatContext';
 import { COST_TRACKING_ENABLED } from '../updates';
 import { CostTracker } from './bottom_menu/CostTracker';
 import { DroppedFile, useFileDrop } from '../hooks/useFileDrop';
-import { RichChatInput, RichChatInputRef } from './RichChatInput';
 import { Recipe } from '../recipe';
 import MessageQueue from './MessageQueue';
 import { detectInterruption } from '../utils/interruptionDetector';
@@ -239,12 +238,10 @@ export default function ChatInput({
     isOpen: boolean;
     position: { x: number; y: number };
     selectedIndex: number;
-    cursorPosition?: number;
   }>({
     isOpen: false,
     position: { x: 0, y: 0 },
     selectedIndex: 0,
-    cursorPosition: 0,
   });
   const actionPopoverRef = useRef<{
     getDisplayActions: () => any[];
@@ -368,7 +365,7 @@ export default function ChatInput({
   const [savedInput, setSavedInput] = useState('');
   const [isInGlobalHistory, setIsInGlobalHistory] = useState(false);
   const [hasUserTyped, setHasUserTyped] = useState(false);
-  const textAreaRef = useRef<RichChatInputRef>(null);
+  const textAreaRef = useRef<HTMLTextAreaElement>(null);
   const timeoutRefsRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
   const [didAutoSubmit, setDidAutoSubmit] = useState<boolean>(false);
 
@@ -659,7 +656,7 @@ export default function ChatInput({
 
   const debouncedAutosize = useMemo(
     () =>
-      debounce((element: HTMLElement) => {
+      debounce((element: HTMLTextAreaElement) => {
         element.style.height = '0px'; // Reset height
         const scrollHeight = element.scrollHeight;
         element.style.height = Math.min(scrollHeight, maxHeight) + 'px';
@@ -669,32 +666,32 @@ export default function ChatInput({
 
   useEffect(() => {
     if (textAreaRef.current) {
-      const element = (textAreaRef.current as any).contentRef?.current; if (element) { debouncedAutosize(element); }
+      debouncedAutosize(textAreaRef.current);
     }
   }, [debouncedAutosize, displayValue]);
 
   // Reset textarea height when displayValue is empty
   useEffect(() => {
     if (textAreaRef.current && displayValue === '') {
-      const element = (textAreaRef.current as any)?.contentRef?.current; if (element && element.style) { element.style.height = 'auto'; }
+      textAreaRef.current.style.height = 'auto';
     }
   }, [displayValue]);
 
-  //   const handleChange = (evt: React.ChangeEvent<HTMLTextAreaElement>) => {
-  //     const val = evt.target.value;
-  //     const cursorPosition = evt.target.selectionStart;
-  // 
-  //     setDisplayValue(val); // Update display immediately
-  //     updateValue(val); // Update actual value immediately for better responsiveness
-  //     debouncedSaveDraft(val); // Save draft with debounce
-  //     // Mark that the user has typed something
-  //     setHasUserTyped(true);
-  // 
-  //     // Check for @ mention
-  //     checkForMention(val, cursorPosition, evt.target);
-  //   };
+  const handleChange = (evt: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = evt.target.value;
+    const cursorPosition = evt.target.selectionStart;
 
-  const checkForMention = (text: string, cursorPosition: number, textArea: any) => {
+    setDisplayValue(val); // Update display immediately
+    updateValue(val); // Update actual value immediately for better responsiveness
+    debouncedSaveDraft(val); // Save draft with debounce
+    // Mark that the user has typed something
+    setHasUserTyped(true);
+
+    // Check for @ mention
+    checkForMention(val, cursorPosition, evt.target);
+  };
+
+  const checkForMention = (text: string, cursorPosition: number, textArea: HTMLTextAreaElement) => {
     // Find the last @ and / before the cursor
     const beforeCursor = text.slice(0, cursorPosition);
     const lastAtIndex = beforeCursor.lastIndexOf('@');
@@ -732,7 +729,6 @@ export default function ChatInput({
           y: textAreaRect.top,
         },
         selectedIndex: 0,
-        cursorPosition: cursorPosition,
       });
     } else {
       // Open mention popover for @ trigger (existing functionality)
@@ -751,7 +747,7 @@ export default function ChatInput({
     }
   };
 
-  const handlePaste = async (evt: React.ClipboardEvent<HTMLDivElement>) => {
+  const handlePaste = async (evt: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const files = Array.from(evt.clipboardData.files || []);
     const imageFiles = files.filter((file) => file.type.startsWith('image/'));
 
@@ -880,7 +876,7 @@ export default function ChatInput({
     setIsComposing(false);
   };
 
-  const handleHistoryNavigation = (evt: React.KeyboardEvent<HTMLDivElement>) => {
+  const handleHistoryNavigation = (evt: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const isUp = evt.key === 'ArrowUp';
     const isDown = evt.key === 'ArrowDown';
 
@@ -1101,7 +1097,7 @@ export default function ChatInput({
     }
   }, [autoSubmit, didAutoSubmit, initialValue, performSubmit]);
 
-  const handleKeyDown = (evt: React.KeyboardEvent<HTMLDivElement>) => {
+  const handleKeyDown = (evt: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // If mention popover is open, handle arrow keys and enter
     if (mentionPopover.isOpen && mentionPopoverRef.current) {
       if (evt.key === 'ArrowDown') {
@@ -1189,36 +1185,23 @@ export default function ChatInput({
   };
 
   const handleMentionFileSelect = (filePath: string) => {
-    console.log('📁 handleMentionFileSelect called with:', filePath);
-    
-    // Extract just the filename from the full path for the pill
-    const fileName = filePath.split('/').pop() || filePath;
-    console.log('📁 Extracted filename:', fileName);
-    
-    // Create @filename format for pill detection
-    const mentionText = `@${fileName}`;
-    console.log('📁 Creating mention text:', mentionText);
-    
-    // Replace the @ mention with @filename format
+    // Replace the @ mention with the file path
     const beforeMention = displayValue.slice(0, mentionPopover.mentionStart);
     const afterMention = displayValue.slice(
       mentionPopover.mentionStart + 1 + mentionPopover.query.length
     );
-    const newValue = `${beforeMention}${mentionText} ${afterMention}`;
-    
-    console.log('📁 New value will be:', newValue);
+    const newValue = `${beforeMention}${filePath}${afterMention}`;
 
     setDisplayValue(newValue);
     setValue(newValue);
     setMentionPopover((prev) => ({ ...prev, isOpen: false }));
     textAreaRef.current?.focus();
 
-    // Set cursor position after the inserted mention and space
-    const newCursorPosition = beforeMention.length + mentionText.length + 1;
+    // Set cursor position after the inserted file path
     setTimeout(() => {
       if (textAreaRef.current) {
+        const newCursorPosition = beforeMention.length + filePath.length;
         textAreaRef.current.setSelectionRange(newCursorPosition, newCursorPosition);
-        textAreaRef.current.focus();
       }
     }, 0);
   };
@@ -1233,7 +1216,6 @@ export default function ChatInput({
         y: buttonRect.top,
       },
       selectedIndex: 0,
-      cursorPosition: textAreaRef.current?.getBoundingClientRect ? 0 : 0, // Will be set by RichChatInput
     });
   };
 
@@ -1253,37 +1235,38 @@ export default function ChatInput({
   const handleActionSelect = (actionId: string) => {
     const actionInfo = getActionInfo(actionId);
     
-    // Get current cursor position from the RichChatInput
+    // Replace / with [Action] text inline
     const currentValue = displayValue;
-    const cursorPosition = actionPopover.cursorPosition || 0;
+    const cursorPosition = textAreaRef.current?.selectionStart || 0;
     const beforeCursor = currentValue.slice(0, cursorPosition);
-    const afterCursor = currentValue.slice(cursorPosition);
     const lastSlashIndex = beforeCursor.lastIndexOf('/');
     
     if (lastSlashIndex !== -1) {
       const afterSlash = beforeCursor.slice(lastSlashIndex + 1);
-      // Check if we're still in the same "word" after the slash
       if (!afterSlash.includes(' ') && !afterSlash.includes('\n')) {
-        // Replace the /query with [Action] text
+        // Replace / with [Action] text
         const beforeSlash = currentValue.slice(0, lastSlashIndex);
+        const afterCursor = currentValue.slice(cursorPosition);
         const actionText = `[${actionInfo.label}]`;
-        const newValue = beforeSlash + actionText + " " + afterCursor;
+        const newValue = beforeSlash + actionText + afterCursor;
         
         setDisplayValue(newValue);
         setValue(newValue);
         
-        // Set cursor position after the action text and space
-        const newCursorPosition = lastSlashIndex + actionText.length + 1;
+        // Track selected action for pill display
+        
+        
+        // Set cursor position after the action text
         setTimeout(() => {
           if (textAreaRef.current) {
+            const newCursorPosition = lastSlashIndex + actionText.length;
             textAreaRef.current.setSelectionRange(newCursorPosition, newCursorPosition);
-            textAreaRef.current.focus();
           }
         }, 0);
       }
     }
     
-    console.log('Action selected:', actionId, 'at position:', cursorPosition);
+    console.log('Action selected:', actionId);
     setActionPopover(prev => ({ ...prev, isOpen: false }));
   };
 
@@ -1415,28 +1398,13 @@ export default function ChatInput({
         <div className="relative flex-1">
                   
 
-        <RichChatInput
+        <textarea
             data-testid="chat-input"
             autoFocus
+            id="dynamic-textarea"
             placeholder={isRecording ? '' : '⌘↑/⌘↓ to navigate messages'}
             value={displayValue}
-            onChange={(newValue, cursorPos) => {
-              setDisplayValue(newValue);
-              updateValue(newValue);
-              debouncedSaveDraft(newValue);
-              setHasUserTyped(true);
-              
-              // Check for @ mention and / action triggers
-              if (cursorPos !== undefined) {
-                const syntheticTarget = {
-                  getBoundingClientRect: () => textAreaRef.current?.getBoundingClientRect?.() || new DOMRect(),
-                  selectionStart: cursorPos,
-                  selectionEnd: cursorPos,
-                  value: newValue,
-                };
-                checkForMention(newValue, cursorPos, syntheticTarget as HTMLTextAreaElement);
-              }
-            }}
+            onChange={handleChange}
             onCompositionStart={handleCompositionStart}
             onCompositionEnd={handleCompositionEnd}
             onKeyDown={handleKeyDown}
