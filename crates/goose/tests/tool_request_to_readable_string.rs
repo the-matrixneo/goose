@@ -21,8 +21,16 @@ fn tool_request_to_readable_string_formats_success_and_error() {
     // Should contain the tool name
     assert!(readable_ok.starts_with("Tool: example_tool, Args: "));
     // Should contain pretty-printed JSON keys and values
-    assert!(readable_ok.contains("\"x\": 1"), "readable_ok was: {}", readable_ok);
-    assert!(readable_ok.contains("\"y\": \"z\""), "readable_ok was: {}", readable_ok);
+    assert!(
+        readable_ok.contains("\"x\": 1"),
+        "readable_ok was: {}",
+        readable_ok
+    );
+    assert!(
+        readable_ok.contains("\"y\": \"z\""),
+        "readable_ok was: {}",
+        readable_ok
+    );
 
     // Error case: includes error display with code and message
     let err_request = ToolRequest {
@@ -36,7 +44,15 @@ fn tool_request_to_readable_string_formats_success_and_error() {
 
     let readable_err = err_request.to_readable_string();
     assert!(readable_err.starts_with("Invalid tool call: "));
-    assert!(readable_err.contains("Oops"), "readable_err was: {}", readable_err);
+    assert!(
+        readable_err.contains("Oops"),
+        "readable_err was: {}",
+        readable_err
+    );
     // INTERNAL_ERROR is JSON-RPC -32603; ensure code is surfaced
-    assert!(readable_err.contains("-32603"), "readable_err was: {}", readable_err);
+    assert!(
+        readable_err.contains("-32603"),
+        "readable_err was: {}",
+        readable_err
+    );
 }
