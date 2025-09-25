@@ -1,4 +1,4 @@
-import * as ngrok from '@ngrok/ngrok';
+import { CloudflareTunnel } from './cloudflare-tunnel';
 import * as QRCode from 'qrcode';
 import * as crypto from 'crypto';
 import { Buffer } from 'node:buffer';
@@ -24,7 +24,7 @@ export interface TunnelConnectionInfo {
 }
 
 export class TunnelManager {
-  private ngrokListener: any | null = null;
+  private cloudflaredTunnel: CloudflareTunnel | null = null;
   private config: TunnelConfig | null = null;
   private isStarting = false;
   private tunnelUrl: string | null = null;
@@ -32,10 +32,10 @@ export class TunnelManager {
   constructor() {}
 
   /**
-   * Start an ngrok tunnel for the given port with a secret
+   * Start a Cloudflare tunnel for the given port with a secret
    */
   async start(port: number, secret: string): Promise<TunnelConnectionInfo> {
-    if (this.ngrokListener) {
+    if (this.cloudflaredTunnel && this.cloudflaredTunnel.isRunning()) {
       throw new Error('Tunnel is already running');
     }
 
@@ -54,9 +54,9 @@ export class TunnelManager {
         secret: tunnelSecret,
       };
 
-      // Start ngrok tunnel
-      log.info(`Starting ngrok tunnel on port ${port}`);
-      this.tunnelUrl = await this.startNgrokTunnel(port);
+      // Start Cloudflare tunnel
+      log.info(`Starting Cloudflare tunnel on port ${port}`);
+      this.tunnelUrl = await this.startCloudflareTunnel(port);
 
       if (!this.tunnelUrl) {
         throw new Error('Failed to get tunnel URL');
@@ -106,37 +106,30 @@ export class TunnelManager {
   }
 
   /**
-   * Start ngrok tunnel and return the URL
+   * Start Cloudflare tunnel and return the URL
    */
-  private async startNgrokTunnel(port: number): Promise<string> {
+  private async startCloudflareTunnel(port: number): Promise<string> {
     try {
-      // Get ngrok auth token from environment
-      const authToken = process.env.NGROK_AUTHTOKEN;
-      if (authToken) {
-        await ngrok.authtoken(authToken);
+      // Create or get the Cloudflare tunnel instance
+      if (!this.cloudflaredTunnel) {
+        this.cloudflaredTunnel = new CloudflareTunnel();
       }
 
-      // Connect to ngrok with the specified port
-      this.ngrokListener = await ngrok.forward({
-        addr: port,
-        authtoken: authToken,
-      });
-
-      // Get the URL from the listener
-      const url = this.ngrokListener.url();
+      // Start the tunnel
+      const url = await this.cloudflaredTunnel.start(port);
 
       if (!url) {
-        throw new Error('Failed to get ngrok URL');
+        throw new Error('Failed to get Cloudflare tunnel URL');
       }
 
       this.tunnelUrl = url;
-      log.info(`Ngrok tunnel established: ${url}`);
+      log.info(`Cloudflare tunnel established: ${url}`);
 
       return url;
     } catch (error) {
-      log.error('Failed to start ngrok tunnel:', error);
-      this.ngrokListener = null;
-      throw new Error(`Failed to start ngrok tunnel: ${error}`);
+      log.error('Failed to start Cloudflare tunnel:', error);
+      this.cloudflaredTunnel = null;
+      throw new Error(`Failed to start Cloudflare tunnel: ${error}`);
     }
   }
 
@@ -192,14 +185,14 @@ export class TunnelManager {
    * Stop the tunnel
    */
   async stop(): Promise<void> {
-    if (this.ngrokListener) {
-      log.info('Stopping ngrok tunnel');
+    if (this.cloudflaredTunnel) {
+      log.info('Stopping Cloudflare tunnel');
       try {
-        await this.ngrokListener.close();
+        this.cloudflaredTunnel.stop();
       } catch (error) {
-        log.error('Error stopping ngrok tunnel:', error);
+        log.error('Error stopping Cloudflare tunnel:', error);
       }
-      this.ngrokListener = null;
+      this.cloudflaredTunnel = null;
     }
 
     this.config = null;
@@ -210,7 +203,7 @@ export class TunnelManager {
    * Get current tunnel status
    */
   isRunning(): boolean {
-    return this.ngrokListener !== null;
+    return this.cloudflaredTunnel !== null && this.cloudflaredTunnel.isRunning();
   }
 
   /**

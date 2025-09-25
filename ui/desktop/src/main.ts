@@ -547,9 +547,14 @@ const createChat = async (
     updateSchedulingEngineEnvironment(settings.schedulingEngine);
 
     // Start new Goosed process for regular windows
-    // Pass through scheduling engine environment variables
-    const envVars = {
+    // Pass through scheduling engine and provider environment variables
+    const envVars: Record<string, string | undefined> = {
       GOOSE_SCHEDULER_TYPE: process.env.GOOSE_SCHEDULER_TYPE,
+      // Pass through provider configuration from development .env file
+      GOOSE_PROVIDER__TYPE: process.env.GOOSE_PROVIDER__TYPE,
+      GOOSE_PROVIDER__HOST: process.env.GOOSE_PROVIDER__HOST,
+      GOOSE_PROVIDER__MODEL: process.env.GOOSE_PROVIDER__MODEL,
+      GOOSE_PROVIDER__API_KEY: process.env.GOOSE_PROVIDER__API_KEY,
     };
     const [newPort, newWorkingDir, newGoosedProcess] = await startGoosed(
       app,

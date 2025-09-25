@@ -2,9 +2,6 @@ import { defineConfig } from 'vite';
 
 // https://vitejs.dev/config
 export default defineConfig({
-  build: {
-    rollupOptions: {
-      external: ['qrcode', '@ngrok/ngrok'],
-    },
-  },
+  // No external dependencies needed anymore!
+  // cloudflared binary is downloaded at runtime, not bundled
 });
