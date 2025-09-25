@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../..
 import ThemeSelector from '../../GooseSidebar/ThemeSelector';
 import BlockLogoBlack from './icons/block-lockup_black.png';
 import BlockLogoWhite from './icons/block-lockup_white.png';
+import TunnelSection from './TunnelSection';
 
 interface AppSettingsSectionProps {
   scrollToSection?: string;
@@ -383,6 +384,8 @@ export default function AppSettingsSection({ scrollToSection }: AppSettingsSecti
           )}
         </CardContent>
       </Card>
+
+      <TunnelSection />
 
       <Card className="rounded-lg">
         <CardHeader className="pb-0">

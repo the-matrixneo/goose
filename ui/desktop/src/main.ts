@@ -52,6 +52,13 @@ import { Recipe } from './recipe';
 import './utils/recipeHash';
 import { decodeRecipe } from './api/sdk.gen';
 import { client } from './api/client.gen';
+import {
+  startTunnel,
+  stopTunnel,
+  isTunnelRunning,
+  getTunnelConfig,
+  cleanupTunnel,
+} from './utils/tunnel';
 
 async function decodeRecipeMain(deeplink: string): Promise<Recipe | null> {
   try {
@@ -1891,6 +1898,48 @@ async function appMain() {
     );
   }
 
+  // Add Tunnel menu
+  const tunnelMenu = new MenuItem({
+    label: 'Tunnel',
+    submenu: Menu.buildFromTemplate([
+      {
+        label: 'Start Tunnel',
+        click: async () => {
+          const focusedWindow = BrowserWindow.getFocusedWindow();
+          if (focusedWindow) {
+            focusedWindow.webContents.send('tunnel-start');
+          }
+        },
+      },
+      {
+        label: 'Stop Tunnel',
+        click: () => {
+          const focusedWindow = BrowserWindow.getFocusedWindow();
+          if (focusedWindow) {
+            focusedWindow.webContents.send('tunnel-stop');
+          }
+        },
+      },
+      {
+        label: 'Show QR Code',
+        click: () => {
+          const focusedWindow = BrowserWindow.getFocusedWindow();
+          if (focusedWindow) {
+            focusedWindow.webContents.send('tunnel-show-qr');
+          }
+        },
+      },
+    ]),
+  });
+
+  // Insert Tunnel menu before Help menu
+  const helpMenuIndex = menu?.items.findIndex((item) => item.label === 'Help') ?? -1;
+  if (helpMenuIndex > 0) {
+    menu?.insert(helpMenuIndex, tunnelMenu);
+  } else {
+    menu?.append(tunnelMenu);
+  }
+
   // on macOS, the topbar is hidden
   if (menu && process.platform !== 'darwin') {
     let helpMenu = menu.items.find((item) => item.label === 'Help');
@@ -2141,6 +2190,56 @@ async function appMain() {
       return false;
     }
   });
+
+  // Tunnel IPC handlers
+  ipcMain.handle('tunnel-start', async (_event, port: number, secret?: string) => {
+    try {
+      const tunnelInfo = await startTunnel(port, secret);
+      log.info('Tunnel started:', tunnelInfo.url);
+
+      // Open QR code image
+      if (tunnelInfo.qrCodePath) {
+        shell.openPath(tunnelInfo.qrCodePath);
+      }
+
+      return tunnelInfo;
+    } catch (error) {
+      log.error('Failed to start tunnel:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('tunnel-stop', () => {
+    try {
+      stopTunnel();
+      log.info('Tunnel stopped');
+      return true;
+    } catch (error) {
+      log.error('Failed to stop tunnel:', error);
+      return false;
+    }
+  });
+
+  ipcMain.handle('tunnel-status', () => {
+    return {
+      isRunning: isTunnelRunning(),
+      config: getTunnelConfig(),
+    };
+  });
+
+  ipcMain.handle('tunnel-show-qr', () => {
+    try {
+      const config = getTunnelConfig();
+      if (config?.qrCodePath) {
+        shell.openPath(config.qrCodePath);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      log.error('Failed to show QR code:', error);
+      return false;
+    }
+  });
 }
 
 app.whenReady().then(async () => {
@@ -2183,6 +2282,9 @@ async function getAllowList(): Promise<string[]> {
 }
 
 app.on('will-quit', async () => {
+  // Clean up tunnel on app quit
+  await cleanupTunnel();
+
   for (const [windowId, blockerId] of windowPowerSaveBlockers.entries()) {
     try {
       powerSaveBlocker.stop(blockerId);
