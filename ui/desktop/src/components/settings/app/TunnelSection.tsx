@@ -34,26 +34,10 @@ export default function TunnelSection() {
   const [showQRModal, setShowQRModal] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [port, setPort] = useState<number | null>(null);
 
   useEffect(() => {
     checkTunnelStatus();
-    // Get the current port
-    getPort();
   }, []);
-
-  const getPort = async () => {
-    try {
-      const hostPort = await window.electron.getGoosedHostPort();
-      if (hostPort) {
-        const url = new URL(hostPort);
-        const portNum = parseInt(url.port || '80');
-        setPort(portNum);
-      }
-    } catch (error) {
-      console.error('Failed to get port:', error);
-    }
-  };
 
   const checkTunnelStatus = async () => {
     try {
@@ -74,20 +58,15 @@ export default function TunnelSection() {
   };
 
   const startTunnel = async () => {
-    if (!port) {
-      setError('Unable to determine port. Please ensure Goose is running.');
-      return;
-    }
-
     setIsStarting(true);
     setError(null);
     try {
-      const info = await window.electron.tunnelStart(port);
+      const info = await window.electron.tunnelStart();
       setTunnelInfo(info);
       setTunnelStatus({
         isRunning: true,
         config: {
-          port,
+          port: 0, // Port is now managed internally
           secret: info.secret,
           url: info.url,
           qrCodeDataUrl: info.qrCodeDataUrl,
@@ -152,11 +131,7 @@ export default function TunnelSection() {
                   Start a tunnel to expose your local Goose instance to the internet securely. You
                   can then scan a QR code with your iOS device to connect.
                 </p>
-                <Button
-                  onClick={startTunnel}
-                  disabled={isStarting || !port}
-                  className="w-full sm:w-auto"
-                >
+                <Button onClick={startTunnel} disabled={isStarting} className="w-full sm:w-auto">
                   {isStarting ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />

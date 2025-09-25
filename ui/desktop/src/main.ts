@@ -560,6 +560,9 @@ const createChat = async (
     port = newPort;
     working_dir = newWorkingDir;
     goosedProcess = newGoosedProcess;
+
+    // Update the global appConfig port
+    appConfig.GOOSE_PORT = newPort;
   }
 
   // Create window config with loading state for recipe deeplinks
@@ -2192,10 +2195,13 @@ async function appMain() {
   });
 
   // Tunnel IPC handlers
-  ipcMain.handle('tunnel-start', async (_event, port: number) => {
+  ipcMain.handle('tunnel-start', async () => {
     try {
-      // Use the same secret that goosed was launched with
-      const tunnelInfo = await startTunnel(port, SERVER_SECRET);
+      // Use the port and secret that goosed was launched with
+      if (!appConfig.GOOSE_PORT || appConfig.GOOSE_PORT === 0) {
+        throw new Error('Goosed server is not running');
+      }
+      const tunnelInfo = await startTunnel(appConfig.GOOSE_PORT, SERVER_SECRET);
       log.info('Tunnel started:', tunnelInfo.url);
 
       // Open QR code image
