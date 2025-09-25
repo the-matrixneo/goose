@@ -115,7 +115,7 @@ type ElectronAPI = {
   recordRecipeHash: (recipeConfig: Recipe) => Promise<boolean>;
   openDirectoryInExplorer: (directoryPath: string) => Promise<boolean>;
   // Tunnel functions
-  tunnelStart: (port: number, secret?: string) => Promise<any>;
+  tunnelStart: (port: number) => Promise<any>;
   tunnelStop: () => Promise<boolean>;
   tunnelStatus: () => Promise<any>;
   tunnelShowQr: () => Promise<boolean>;
@@ -243,7 +243,7 @@ const electronAPI: ElectronAPI = {
     ipcRenderer.invoke('record-recipe-hash', recipeConfig),
   openDirectoryInExplorer: (directoryPath: string) =>
     ipcRenderer.invoke('open-directory-in-explorer', directoryPath),
-  tunnelStart: (port: number, secret?: string) => ipcRenderer.invoke('tunnel-start', port, secret),
+  tunnelStart: (port: number) => ipcRenderer.invoke('tunnel-start', port),
   tunnelStop: () => ipcRenderer.invoke('tunnel-stop'),
   tunnelStatus: () => ipcRenderer.invoke('tunnel-status'),
   tunnelShowQr: () => ipcRenderer.invoke('tunnel-show-qr'),

@@ -1,4 +1,4 @@
-import { spawn, ChildProcess } from 'child_process';
+import * as ngrok from '@ngrok/ngrok';
 import * as QRCode from 'qrcode';
 import * as crypto from 'crypto';
 import { Buffer } from 'node:buffer';
@@ -24,7 +24,7 @@ export interface TunnelConnectionInfo {
 }
 
 export class TunnelManager {
-  private tunnelProcess: ChildProcess | null = null;
+  private ngrokListener: any | null = null;
   private config: TunnelConfig | null = null;
   private isStarting = false;
   private tunnelUrl: string | null = null;
@@ -32,10 +32,10 @@ export class TunnelManager {
   constructor() {}
 
   /**
-   * Start a localtunnel for the given port with a secret
+   * Start an ngrok tunnel for the given port with a secret
    */
-  async start(port: number, secret?: string): Promise<TunnelConnectionInfo> {
-    if (this.tunnelProcess) {
+  async start(port: number, secret: string): Promise<TunnelConnectionInfo> {
+    if (this.ngrokListener) {
       throw new Error('Tunnel is already running');
     }
 
@@ -46,17 +46,17 @@ export class TunnelManager {
     this.isStarting = true;
 
     try {
-      // Generate secret if not provided
-      const tunnelSecret = secret || crypto.randomBytes(24).toString('base64');
+      // Use the provided secret (from goosed)
+      const tunnelSecret = secret;
 
       this.config = {
         port,
         secret: tunnelSecret,
       };
 
-      // Start localtunnel
-      log.info(`Starting localtunnel on port ${port}`);
-      this.tunnelUrl = await this.startLocaltunnel(port);
+      // Start ngrok tunnel
+      log.info(`Starting ngrok tunnel on port ${port}`);
+      this.tunnelUrl = await this.startNgrokTunnel(port);
 
       if (!this.tunnelUrl) {
         throw new Error('Failed to get tunnel URL');
@@ -106,68 +106,38 @@ export class TunnelManager {
   }
 
   /**
-   * Start localtunnel process and capture the URL
+   * Start ngrok tunnel and return the URL
    */
-  private startLocaltunnel(port: number): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const lt = spawn('npx', ['localtunnel', '--port', port.toString()], {
-        shell: true,
-        stdio: ['ignore', 'pipe', 'pipe'],
+  private async startNgrokTunnel(port: number): Promise<string> {
+    try {
+      // Get ngrok auth token from environment
+      const authToken = process.env.NGROK_AUTHTOKEN;
+      if (authToken) {
+        await ngrok.authtoken(authToken);
+      }
+
+      // Connect to ngrok with the specified port
+      this.ngrokListener = await ngrok.forward({
+        addr: port,
+        authtoken: authToken,
       });
 
-      this.tunnelProcess = lt;
+      // Get the URL from the listener
+      const url = this.ngrokListener.url();
 
-      let output = '';
-      let errorOutput = '';
-      let urlFound = false;
-      const timeout = setTimeout(() => {
-        if (!urlFound) {
-          this.stop();
-          reject(new Error('Timeout waiting for tunnel URL'));
-        }
-      }, 30000); // 30 second timeout
+      if (!url) {
+        throw new Error('Failed to get ngrok URL');
+      }
 
-      lt.stdout?.on('data', (data) => {
-        const text = data.toString();
-        output += text;
-        log.info('localtunnel stdout:', text);
+      this.tunnelUrl = url;
+      log.info(`Ngrok tunnel established: ${url}`);
 
-        // Look for the URL in the output
-        const urlMatch = text.match(/your url is: (https:\/\/.*\.loca\.lt)/);
-        if (urlMatch && !urlFound) {
-          urlFound = true;
-          clearTimeout(timeout);
-          this.tunnelUrl = urlMatch[1];
-          resolve(urlMatch[1]);
-        }
-      });
-
-      lt.stderr?.on('data', (data) => {
-        errorOutput += data.toString();
-        log.error('localtunnel stderr:', data.toString());
-      });
-
-      lt.on('error', (error) => {
-        clearTimeout(timeout);
-        log.error('Failed to start localtunnel:', error);
-        this.tunnelProcess = null;
-        reject(error);
-      });
-
-      lt.on('close', (code) => {
-        clearTimeout(timeout);
-        log.info(`localtunnel process exited with code ${code}`);
-        this.tunnelProcess = null;
-
-        if (!urlFound) {
-          reject(
-            new Error(
-              `Localtunnel exited without providing URL. Output: ${output}, Error: ${errorOutput}`
-            )
-          );
-        }
-      });
-    });
+      return url;
+    } catch (error) {
+      log.error('Failed to start ngrok tunnel:', error);
+      this.ngrokListener = null;
+      throw new Error(`Failed to start ngrok tunnel: ${error}`);
+    }
   }
 
   /**
@@ -221,15 +191,15 @@ export class TunnelManager {
   /**
    * Stop the tunnel
    */
-  stop(): void {
-    if (this.tunnelProcess) {
-      log.info('Stopping localtunnel');
+  async stop(): Promise<void> {
+    if (this.ngrokListener) {
+      log.info('Stopping ngrok tunnel');
       try {
-        this.tunnelProcess.kill();
+        await this.ngrokListener.close();
       } catch (error) {
-        log.error('Error stopping tunnel:', error);
+        log.error('Error stopping ngrok tunnel:', error);
       }
-      this.tunnelProcess = null;
+      this.ngrokListener = null;
     }
 
     this.config = null;
@@ -240,7 +210,7 @@ export class TunnelManager {
    * Get current tunnel status
    */
   isRunning(): boolean {
-    return this.tunnelProcess !== null;
+    return this.ngrokListener !== null;
   }
 
   /**
@@ -288,7 +258,7 @@ export function getTunnelManager(): TunnelManager {
 /**
  * Start a tunnel for the given port
  */
-export async function startTunnel(port: number, secret?: string): Promise<TunnelConnectionInfo> {
+export async function startTunnel(port: number, secret: string): Promise<TunnelConnectionInfo> {
   const manager = getTunnelManager();
   return manager.start(port, secret);
 }
@@ -296,9 +266,9 @@ export async function startTunnel(port: number, secret?: string): Promise<Tunnel
 /**
  * Stop the current tunnel
  */
-export function stopTunnel(): void {
+export async function stopTunnel(): Promise<void> {
   const manager = getTunnelManager();
-  manager.stop();
+  await manager.stop();
 }
 
 /**
@@ -322,6 +292,6 @@ export function getTunnelConfig(): TunnelConfig | null {
  */
 export async function cleanupTunnel(): Promise<void> {
   const manager = getTunnelManager();
-  manager.stop();
+  await manager.stop();
   await manager.cleanupQRCodes();
 }

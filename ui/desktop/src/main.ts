@@ -2192,9 +2192,10 @@ async function appMain() {
   });
 
   // Tunnel IPC handlers
-  ipcMain.handle('tunnel-start', async (_event, port: number, secret?: string) => {
+  ipcMain.handle('tunnel-start', async (_event, port: number) => {
     try {
-      const tunnelInfo = await startTunnel(port, secret);
+      // Use the same secret that goosed was launched with
+      const tunnelInfo = await startTunnel(port, SERVER_SECRET);
       log.info('Tunnel started:', tunnelInfo.url);
 
       // Open QR code image
@@ -2209,9 +2210,9 @@ async function appMain() {
     }
   });
 
-  ipcMain.handle('tunnel-stop', () => {
+  ipcMain.handle('tunnel-stop', async () => {
     try {
-      stopTunnel();
+      await stopTunnel();
       log.info('Tunnel stopped');
       return true;
     } catch (error) {
