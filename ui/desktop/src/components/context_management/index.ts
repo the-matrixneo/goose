@@ -121,6 +121,8 @@ function mapApiContentToFrontendMessageContent(
     return {
       type: 'summarizationRequested',
       msg: apiContent.msg,
+      // Preserve the summary field if it exists (convert null to undefined)
+      summary: apiContent.summary || undefined,
     };
   }
 
