@@ -3,10 +3,10 @@ use clap::{Args, Parser, Subcommand};
 
 use goose::config::{Config, ExtensionConfig};
 
+use crate::commands::acp::run_acp_agent;
 use crate::commands::bench::agent_generator;
 use crate::commands::configure::handle_configure;
 use crate::commands::info::handle_info;
-use crate::commands::mcp::run_server;
 use crate::commands::project::{handle_project_default, handle_projects_interactive};
 use crate::commands::recipe::{handle_deeplink, handle_list, handle_validate};
 // Import the new handlers from commands::schedule
@@ -290,6 +290,10 @@ enum Command {
     /// Manage system prompts and behaviors
     #[command(about = "Run one of the mcp servers bundled with goose")]
     Mcp { name: String },
+
+    /// Run Goose as an ACP (Agent Client Protocol) agent
+    #[command(about = "Run Goose as an ACP agent server on stdio")]
+    Acp {},
 
     /// Start or resume interactive chat sessions
     #[command(
@@ -605,7 +609,7 @@ enum Command {
         #[arg(
             long = "model",
             value_name = "MODEL",
-            help = "Specify the model to use (e.g., 'gpt-4o', 'claude-3.5-sonnet')",
+            help = "Specify the model to use (e.g., 'gpt-4o', 'claude-sonnet-4-20250514')",
             long_help = "Override the GOOSE_MODEL environment variable for this run. The model must be supported by the specified provider."
         )]
         model: Option<String>,
@@ -709,6 +713,7 @@ pub async fn cli() -> Result<()> {
         Some(Command::Configure {}) => "configure",
         Some(Command::Info { .. }) => "info",
         Some(Command::Mcp { .. }) => "mcp",
+        Some(Command::Acp {}) => "acp",
         Some(Command::Session { .. }) => "session",
         Some(Command::Project {}) => "project",
         Some(Command::Projects) => "projects",
@@ -737,7 +742,12 @@ pub async fn cli() -> Result<()> {
             return Ok(());
         }
         Some(Command::Mcp { name }) => {
-            let _ = run_server(&name).await;
+            crate::logging::setup_logging(Some(&format!("mcp-{name}")), None)?;
+            let _ = goose_mcp::mcp_server_runner::run_mcp_server(&name).await;
+        }
+        Some(Command::Acp {}) => {
+            let _ = run_acp_agent().await;
+            return Ok(());
         }
         Some(Command::Session {
             command,
@@ -954,15 +964,6 @@ pub async fn cli() -> Result<()> {
                             })
                             .unwrap_or_else(|| "unknown".to_string());
 
-                    tracing::info!(
-                        counter.goose.recipe_runs = 1,
-                        recipe_name = %recipe_display_name,
-                        recipe_version = %recipe_version,
-                        session_type = "recipe",
-                        interface = "cli",
-                        "Recipe execution started"
-                    );
-
                     if explain {
                         explain_recipe(&recipe_name, params)?;
                         return Ok(());
@@ -974,6 +975,16 @@ pub async fn cli() -> Result<()> {
                         }
                         return Ok(());
                     }
+
+                    tracing::info!(
+                        counter.goose.recipe_runs = 1,
+                        recipe_name = %recipe_display_name,
+                        recipe_version = %recipe_version,
+                        session_type = "recipe",
+                        interface = "cli",
+                        "Recipe execution started"
+                    );
+
                     let (input_config, recipe_info) =
                         extract_recipe_info_from_cli(recipe_name, params, additional_sub_recipes)?;
                     (input_config, Some(recipe_info))
