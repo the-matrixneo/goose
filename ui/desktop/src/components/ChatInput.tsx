@@ -33,6 +33,8 @@ import MessageQueue from './MessageQueue';
 import { detectInterruption } from '../utils/interruptionDetector';
 import { getApiUrl } from '../config';
 import { useCustomCommands } from '../hooks/useCustomCommands';
+import { AddCustomCommandModal } from './AddCustomCommandModal';
+import { CustomCommand } from '../types/customCommands';
 
 interface QueuedMessage {
   id: string;
@@ -241,11 +243,13 @@ export default function ChatInput({
     position: { x: number; y: number };
     selectedIndex: number;
     cursorPosition?: number;
+    query?: string;
   }>({
     isOpen: false,
     position: { x: 0, y: 0 },
     selectedIndex: 0,
     cursorPosition: 0,
+    query: '',
   });
   const actionPopoverRef = useRef<{
     getDisplayActions: () => any[];
@@ -296,6 +300,44 @@ export default function ChatInput({
   
   // Custom commands hook
   const { getCommand, expandCommandPrompt, incrementUsage } = useCustomCommands();
+
+  // Add Custom Command Modal state
+  const [isAddCommandModalOpen, setIsAddCommandModalOpen] = useState(false);
+  const [customCommands, setCustomCommands] = useState<CustomCommand[]>([]);
+
+  // Load custom commands on mount
+  useEffect(() => {
+    const loadCustomCommands = () => {
+      try {
+        const stored = localStorage.getItem('goose-custom-commands');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          setCustomCommands(parsed.map((cmd: any) => ({
+            ...cmd,
+            createdAt: new Date(cmd.createdAt),
+            updatedAt: new Date(cmd.updatedAt)
+          })));
+        }
+      } catch (error) {
+        console.error('Failed to load custom commands:', error);
+      }
+    };
+
+    loadCustomCommands();
+  }, []);
+
+  // Handle modal save
+  const handleModalSave = (command: CustomCommand) => {
+    const now = new Date();
+    const updatedCommands = [...customCommands, { ...command, createdAt: now, updatedAt: now }];
+    
+    try {
+      localStorage.setItem('goose-custom-commands', JSON.stringify(updatedCommands));
+      setCustomCommands(updatedCommands);
+    } catch (error) {
+      console.error('Failed to save custom commands:', error);
+    }
+  };
 
   // Update internal value when initialValue changes
   useEffect(() => {
@@ -737,6 +779,7 @@ export default function ChatInput({
         },
         selectedIndex: 0,
         cursorPosition: cursorPosition,
+        query: afterTrigger,
       });
     } else {
       // Open mention popover for @ trigger (existing functionality)
@@ -1078,9 +1121,6 @@ export default function ChatInput({
 
       let textToSend = text ?? displayValue.trim();
 
-      // Expand custom command pills before sending
-      textToSend = expandCustomCommandPills(textToSend);
-
       // Combine pasted images and dropped files
       const allFilePaths = [...validPastedImageFilesPaths, ...droppedFilePaths];
       if (allFilePaths.length > 0) {
@@ -1158,6 +1198,38 @@ export default function ChatInput({
   }, [autoSubmit, didAutoSubmit, initialValue, performSubmit]);
 
   const handleKeyDown = (evt: React.KeyboardEvent<HTMLDivElement>) => {
+    // If action popover is open, handle arrow keys and enter
+    if (actionPopover.isOpen && actionPopoverRef.current) {
+      if (evt.key === 'ArrowDown') {
+        evt.preventDefault();
+        const displayActions = actionPopoverRef.current.getDisplayActions();
+        const maxIndex = Math.max(0, displayActions.length - 1);
+        setActionPopover((prev) => ({
+          ...prev,
+          selectedIndex: Math.min(prev.selectedIndex + 1, maxIndex),
+        }));
+        return;
+      }
+      if (evt.key === 'ArrowUp') {
+        evt.preventDefault();
+        setActionPopover((prev) => ({
+          ...prev,
+          selectedIndex: Math.max(prev.selectedIndex - 1, 0),
+        }));
+        return;
+      }
+      if (evt.key === 'Enter') {
+        evt.preventDefault();
+        actionPopoverRef.current.selectAction(actionPopover.selectedIndex);
+        return;
+      }
+      if (evt.key === 'Escape') {
+        evt.preventDefault();
+        setActionPopover((prev) => ({ ...prev, isOpen: false }));
+        return;
+      }
+    }
+
     // If mention popover is open, handle arrow keys and enter
     if (mentionPopover.isOpen && mentionPopoverRef.current) {
       if (evt.key === 'ArrowDown') {
@@ -1884,8 +1956,20 @@ export default function ChatInput({
           onSelectedIndexChange={(index) =>
             setActionPopover((prev) => ({ ...prev, selectedIndex: index }))
           }
+          query={actionPopover.query}
+          onCreateCommand={() => {
+            setIsAddCommandModalOpen(true);
+            setActionPopover((prev) => ({ ...prev, isOpen: false }));
+          }}
         />
       </div>
+
+      {/* Add Custom Command Modal */}
+      <AddCustomCommandModal
+        isOpen={isAddCommandModalOpen}
+        onClose={() => setIsAddCommandModalOpen(false)}
+        onSave={handleModalSave}
+      />
     </div>
   );
 }
