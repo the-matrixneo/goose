@@ -10,7 +10,7 @@ import { toastSuccess } from '../../toasts';
 import { useEscapeKey } from '../../hooks/useEscapeKey';
 import { deleteRecipe, RecipeManifestResponse } from '../../api';
 import ImportRecipeForm, { ImportRecipeButton } from './ImportRecipeForm';
-import ViewRecipeModal from './ViewRecipeModal';
+import CreateEditRecipeModal from './CreateEditRecipeModal';
 import { View, ViewOptions } from '../../utils/navigationUtils';
 import { generateDeepLink } from '../../recipe';
 
@@ -328,7 +328,7 @@ export default function RecipesView({ setView }: RecipesViewProps) {
       </MainPanelLayout>
 
       {showEditor && selectedRecipe && (
-        <ViewRecipeModal
+        <CreateEditRecipeModal
           isOpen={showEditor}
           onClose={handleEditorClose}
           config={selectedRecipe.recipe}
@@ -342,7 +342,7 @@ export default function RecipesView({ setView }: RecipesViewProps) {
       />
 
       {showCreateDialog && (
-        <ViewRecipeModal
+        <CreateEditRecipeModal
           isOpen={showCreateDialog}
           onClose={() => {
             setShowCreateDialog(false);

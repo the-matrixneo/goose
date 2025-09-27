@@ -17,7 +17,7 @@ import { getProviderMetadata } from '../modelInterface';
 import { Alert } from '../../../alerts';
 import BottomMenuAlertPopover from '../../../bottom_menu/BottomMenuAlertPopover';
 import { Recipe } from '../../../../recipe';
-import ViewRecipeModal from '../../../recipes/ViewRecipeModal';
+import CreateEditRecipeModal from '../../../recipes/CreateEditRecipeModal';
 import SaveRecipeDialog from '../../../recipes/shared/SaveRecipeDialog';
 
 interface ModelsBottomBarProps {
@@ -266,7 +266,7 @@ export default function ModelsBottomBar({
 
       {/* View Recipe Modal */}
       {recipeConfig && (
-        <ViewRecipeModal
+        <CreateEditRecipeModal
           isOpen={showViewRecipeModal}
           onClose={() => setShowViewRecipeModal(false)}
           config={recipeConfig}

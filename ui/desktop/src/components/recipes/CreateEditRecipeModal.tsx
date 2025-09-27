@@ -12,19 +12,19 @@ import SaveRecipeDialog from './shared/SaveRecipeDialog';
 import { RecipeFormFields } from './shared/RecipeFormFields';
 import { RecipeFormData } from './shared/recipeFormSchema';
 
-interface ViewRecipeModalProps {
+interface CreateEditRecipeModalProps {
   isOpen: boolean;
   onClose: (wasSaved?: boolean) => void;
   config?: Recipe;
   isCreateMode?: boolean;
 }
 
-export default function ViewRecipeModal({
+export default function CreateEditRecipeModal({
   isOpen,
   onClose,
   config,
   isCreateMode = false,
-}: ViewRecipeModalProps) {
+}: CreateEditRecipeModalProps) {
   const { getExtensions } = useConfig();
   const [recipeConfig] = useState<Recipe | undefined>(config);
 
