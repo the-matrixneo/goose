@@ -26,10 +26,8 @@ export default function SaveRecipeDialog({
   const [saveGlobal, setSaveGlobal] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // Handle Esc key for modal
   useEscapeKey(isOpen, onClose);
 
-  // Reset form when modal opens
   React.useEffect(() => {
     if (isOpen) {
       setSaveRecipeName(suggestedName || generateRecipeFilename(recipe));
@@ -54,16 +52,14 @@ export default function SaveRecipeDialog({
         global: saveGlobal,
       });
 
-      // Reset dialog state
       setSaveRecipeName('');
-      onClose(true); // Pass true to indicate recipe was saved
+      onClose(true);
 
       toastSuccess({
         title: saveRecipeName.trim(),
         msg: 'Recipe saved successfully',
       });
 
-      // Call success callback if provided
       onSuccess?.();
     } catch (error) {
       console.error('Failed to save recipe:', error);

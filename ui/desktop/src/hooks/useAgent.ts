@@ -147,7 +147,6 @@ export function useAgent(): UseAgentReturn {
 
           agentWaitingMessage('Extensions are loading');
 
-          // Pass the recipe config to initializeSystem so it can inject instructions
           const recipeConfigForInit = initContext.recipeConfig || agentSession.recipe || undefined;
           await initializeSystem(agentSession.id, provider as string, model as string, {
             getExtensions,
@@ -164,7 +163,7 @@ export function useAgent(): UseAgentReturn {
               console.error('Failed to initialize cost database:', error);
             }
           }
-          // Use the recipe config from initContext if available, otherwise fall back to session metadata
+
           const recipeConfig = initContext.recipeConfig || agentSession.recipe;
           const conversation = agentSession.conversation || [];
           // If we're loading a recipe from initContext (new recipe load), start with empty messages

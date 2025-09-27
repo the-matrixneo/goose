@@ -46,22 +46,13 @@ export function RecipeFormFields({
   onRecipeNameChange,
   onGlobalChange,
 }: RecipeFormFieldsProps) {
-  // JSON Schema Editor state
   const [showJsonSchemaEditor, setShowJsonSchemaEditor] = useState(false);
-
-  // Instructions Editor state
   const [showInstructionsEditor, setShowInstructionsEditor] = useState(false);
-
-  // New parameter name state
   const [newParameterName, setNewParameterName] = useState('');
-
-  // Parameter expansion state
   const [expandedParameters, setExpandedParameters] = useState<Set<string>>(new Set());
 
-  // Function to parse parameters from instructions, prompt, and activities using existing utility
   const parseParametersFromInstructions = React.useCallback(
     (instructions: string, prompt?: string, activities?: string[]): Parameter[] => {
-      // Extract template variables from each content type
       const instructionVars = extractTemplateVariables(instructions);
       const promptVars = prompt ? extractTemplateVariables(prompt) : [];
       const activityVars = activities
@@ -114,7 +105,6 @@ export function RecipeFormFields({
     }
   }, [form, parseParametersFromInstructions]);
 
-  // Helper function to check if a parameter is used in instructions/prompt/activities
   const isParameterUsed = (
     paramKey: string,
     instructions: string,

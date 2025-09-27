@@ -55,12 +55,11 @@ export const useRecipeManager = (chat: ChatType, recipeConfig?: Recipe | null) =
         setIsParameterModalOpen(false);
         setIsRecipeWarningModalOpen(false);
 
-        // Clear messages and set new recipe config
         chatContext.setChat({
           ...chatContext.chat,
           recipeConfig: recipeConfig,
           recipeParameters: null,
-          messages: [], // Clear existing messages when loading new recipe
+          messages: [],
         });
       }
       return;
@@ -250,7 +249,6 @@ export const useRecipeManager = (chat: ChatType, recipeConfig?: Recipe | null) =
         ? substituteParameters(finalRecipeConfig.prompt, recipeParameters)
         : finalRecipeConfig.prompt;
 
-      // Auto-sending substituted prompt for scheduled execution
       const userMessage = createUserMessage(finalPrompt);
       append(userMessage);
       onAutoExecute?.();
@@ -286,16 +284,14 @@ export const useRecipeManager = (chat: ChatType, recipeConfig?: Recipe | null) =
 
   const handleStartRecipe = (recipe: Recipe) => {
     if (chatContext) {
-      // Reset all recipe-related state first
       setRecipeAccepted(false);
       setIsParameterModalOpen(false);
 
-      // Update chat with new recipe and cleared state in a single operation
       chatContext.setChat({
         ...chatContext.chat,
-        messages: [], // Clear messages
-        recipeConfig: recipe, // Set new recipe
-        recipeParameters: null, // Clear parameters
+        messages: [],
+        recipeConfig: recipe,
+        recipeParameters: null,
       });
     }
   };

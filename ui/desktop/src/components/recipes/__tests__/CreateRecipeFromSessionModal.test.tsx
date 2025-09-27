@@ -5,12 +5,10 @@ import CreateRecipeFromSessionModal from '../CreateRecipeFromSessionModal';
 import { createRecipe } from '../../../api/sdk.gen';
 import type { CreateRecipeResponse } from '../../../api/types.gen';
 
-// Mock the API
 vi.mock('../../../api/sdk.gen', () => ({
   createRecipe: vi.fn(),
 }));
 
-// Mock other dependencies
 vi.mock('../../../toasts', () => ({
   toastError: vi.fn(),
 }));
@@ -110,7 +108,6 @@ describe('CreateRecipeFromSessionModal', () => {
       expect(screen.getByTestId('analysis-stage')).toBeInTheDocument();
       expect(screen.getByText('Reading your conversation...')).toBeInTheDocument();
 
-      // Wait for stage progression - the real component cycles through stages faster
       await waitFor(
         () => {
           const stageElement = screen.getByTestId('analysis-stage');
@@ -129,7 +126,6 @@ describe('CreateRecipeFromSessionModal', () => {
     it('transitions to form state after analysis', async () => {
       render(<CreateRecipeFromSessionModal {...defaultProps} />);
 
-      // Wait for analysis to complete
       await waitFor(
         () => {
           expect(screen.getByTestId('form-state')).toBeInTheDocument();
@@ -155,10 +151,8 @@ describe('CreateRecipeFromSessionModal', () => {
 
       expect(screen.getByDisplayValue('Analyzed description')).toBeInTheDocument();
       expect(screen.getByDisplayValue('Analyzed instructions with {{param1}}')).toBeInTheDocument();
-      // Check for prompt field - it's optional and might not be filled
       const promptInput = screen.getByTestId('prompt-input');
       expect(promptInput).toBeInTheDocument();
-      // Check for recipe name input - it should be auto-generated
       const recipeNameInput = screen.getByTestId('recipe-name-input');
       expect(recipeNameInput).toBeInTheDocument();
     });
@@ -240,7 +234,6 @@ describe('CreateRecipeFromSessionModal', () => {
         { timeout: 2000 }
       );
 
-      // Clear required field
       const titleInput = screen.getByTestId('title-input');
       await user.clear(titleInput);
 
@@ -362,11 +355,9 @@ describe('CreateRecipeFromSessionModal', () => {
       const user = userEvent.setup();
       render(<CreateRecipeFromSessionModal {...defaultProps} />);
 
-      // During analysis - only cancel button
       expect(screen.getByTestId('cancel-button')).toBeInTheDocument();
       expect(screen.queryByTestId('create-recipe-button')).not.toBeInTheDocument();
 
-      // After analysis - create button appears
       await waitFor(
         () => {
           expect(screen.getByTestId('create-recipe-button')).toBeInTheDocument();
@@ -374,7 +365,6 @@ describe('CreateRecipeFromSessionModal', () => {
         { timeout: 2000 }
       );
 
-      // After creation - success buttons appear
       await user.click(screen.getByTestId('create-recipe-button'));
 
       await waitFor(() => {
@@ -386,10 +376,8 @@ describe('CreateRecipeFromSessionModal', () => {
 
   describe('Error Handling', () => {
     it('handles analysis errors gracefully', async () => {
-      // Mock analysis failure
       render(<CreateRecipeFromSessionModal {...defaultProps} sessionId="" />);
 
-      // Should still show the modal structure
       expect(screen.getByTestId('create-recipe-modal')).toBeInTheDocument();
     });
 
@@ -404,7 +392,6 @@ describe('CreateRecipeFromSessionModal', () => {
         { timeout: 2000 }
       );
 
-      // Clear all required fields
       await user.clear(screen.getByTestId('title-input'));
       await user.clear(screen.getByTestId('description-input'));
       await user.clear(screen.getByTestId('instructions-input'));

@@ -7,6 +7,7 @@ import { Button } from '../ui/button';
 import { RecipeFormFields } from './shared/RecipeFormFields';
 import { RecipeFormData } from './shared/recipeFormSchema';
 import { createRecipe } from '../../api/sdk.gen';
+import { RecipeParameter } from './shared/recipeFormSchema';
 import { toastError } from '../../toasts';
 
 interface CreateRecipeFromSessionModalProps {
@@ -38,8 +39,7 @@ export default function CreateRecipeFromSessionModal({
       instructions: '',
       prompt: '',
       activities: [] as string[],
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      parameters: [] as any[],
+      parameters: [] as RecipeParameter[],
       jsonSchema: '',
       recipeName: '',
       global: true,

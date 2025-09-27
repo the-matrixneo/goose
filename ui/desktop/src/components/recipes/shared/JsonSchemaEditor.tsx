@@ -20,10 +20,8 @@ export default function JsonSchemaEditor({
   const [localValue, setLocalValue] = useState(value);
   const [localError, setLocalError] = useState('');
 
-  // Handle Esc key for modal
   useEscapeKey(isOpen, onClose);
 
-  // Update local value when prop changes
   React.useEffect(() => {
     if (isOpen) {
       setLocalValue(value);
@@ -32,7 +30,6 @@ export default function JsonSchemaEditor({
   }, [isOpen, value]);
 
   const handleSave = () => {
-    // Validate JSON if provided
     if (localValue.trim()) {
       try {
         JSON.parse(localValue.trim());
@@ -48,7 +45,7 @@ export default function JsonSchemaEditor({
   };
 
   const handleCancel = () => {
-    setLocalValue(value); // Reset to original value
+    setLocalValue(value);
     setLocalError('');
     onClose();
   };

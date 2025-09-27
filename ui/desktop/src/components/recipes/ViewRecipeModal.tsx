@@ -23,12 +23,11 @@ export default function ViewRecipeModal({
   isOpen,
   onClose,
   config,
-  isCreateMode: _isCreateMode = false,
+  isCreateMode = false,
 }: ViewRecipeModalProps) {
   const { getExtensions } = useConfig();
   const [recipeConfig] = useState<Recipe | undefined>(config);
 
-  // Initialize form with TanStack Form
   const getInitialValues = React.useCallback((): RecipeFormData => {
     if (config) {
       return {
@@ -58,13 +57,8 @@ export default function ViewRecipeModal({
     };
   }, [config]);
 
-  // Create TanStack form
   const form = useForm({
     defaultValues: getInitialValues(),
-    onSubmit: async ({ value }) => {
-      // This won't be used in ViewRecipeModal since we handle saving differently
-      console.log('Form submitted:', value);
-    },
   });
 
   // Helper functions to get values from form - using state to trigger re-renders
@@ -78,7 +72,7 @@ export default function ViewRecipeModal({
 
   // Subscribe to form changes to update local state
   useEffect(() => {
-    const unsubscribe = form.store.subscribe(() => {
+    return form.store.subscribe(() => {
       setTitle(form.state.values.title);
       setDescription(form.state.values.description);
       setInstructions(form.state.values.instructions);
@@ -87,7 +81,6 @@ export default function ViewRecipeModal({
       setParameters(form.state.values.parameters);
       setJsonSchema(form.state.values.jsonSchema);
     });
-    return unsubscribe;
   }, [form]);
   const [extensionOptions, setExtensionOptions] = useState<FixedExtensionEntry[]>([]);
   const [extensionsLoaded, setExtensionsLoaded] = useState(false);
@@ -215,7 +208,19 @@ export default function ViewRecipeModal({
   };
 
   const validateForm = () => {
-    return title.trim() && description.trim() && (instructions.trim() || (prompt || '').trim());
+    const basicValidation =
+      title.trim() && description.trim() && (instructions.trim() || (prompt || '').trim());
+
+    // If JSON schema is provided, it must be valid
+    if (jsonSchema && jsonSchema.trim()) {
+      try {
+        JSON.parse(jsonSchema);
+      } catch {
+        return false; // Invalid JSON schema fails validation
+      }
+    }
+
+    return basicValidation;
   };
 
   const [deeplink, setDeeplink] = useState('');
@@ -308,10 +313,10 @@ export default function ViewRecipeModal({
             </div>
             <div>
               <h1 className="text-xl font-medium text-textProminent">
-                {_isCreateMode ? 'Create Recipe' : 'View/edit recipe'}
+                {isCreateMode ? 'Create Recipe' : 'View/edit recipe'}
               </h1>
               <p className="text-textSubtle text-sm">
-                {_isCreateMode
+                {isCreateMode
                   ? 'Create a new recipe to define agent behavior and capabilities.'
                   : "You can edit the recipe below to change the agent's behavior in a new session."}
               </p>

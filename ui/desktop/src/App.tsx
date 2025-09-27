@@ -306,8 +306,6 @@ export function AppInner() {
   const { addExtension } = useConfig();
   const { agentState, loadCurrentChat, resetChat } = useAgent();
   const resetChatForNewConversation = useCallback(() => {
-    // Always reset chat when starting from home, regardless of message count
-    // This ensures recipes are cleared even if no messages were sent
     setSearchParams((prev) => {
       prev.delete('resumeSessionId');
       return prev;

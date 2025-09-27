@@ -321,7 +321,8 @@ impl sqlx::FromRow<'_, sqlx::sqlite::SqliteRow> for Session {
         let recipe = recipe_json.and_then(|json| serde_json::from_str(&json).ok());
 
         let recipe_parameters_json: Option<String> = row.try_get("recipe_parameters_json")?;
-        let recipe_parameters = recipe_parameters_json.and_then(|json| serde_json::from_str(&json).ok());
+        let recipe_parameters =
+            recipe_parameters_json.and_then(|json| serde_json::from_str(&json).ok());
 
         Ok(Session {
             id: row.try_get("id")?,
@@ -617,7 +618,6 @@ impl SessionStorage {
                 .await?;
             }
             2 => {
-                // Add recipe_parameters_json column to sessions table
                 sqlx::query(
                     r#"
                     ALTER TABLE sessions ADD COLUMN recipe_parameters_json TEXT
@@ -745,7 +745,9 @@ impl SessionStorage {
             q = q.bind(recipe_json);
         }
         if let Some(recipe_parameters) = builder.recipe_parameters {
-            let recipe_parameters_json = recipe_parameters.map(|rp| serde_json::to_string(&rp)).transpose()?;
+            let recipe_parameters_json = recipe_parameters
+                .map(|rp| serde_json::to_string(&rp))
+                .transpose()?;
             q = q.bind(recipe_parameters_json);
         }
 

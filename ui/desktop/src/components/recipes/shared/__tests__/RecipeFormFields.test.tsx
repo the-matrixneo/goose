@@ -3,9 +3,6 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useForm } from '@tanstack/react-form';
 
-// No mocking needed - the component uses the real extractTemplateVariables function
-
-// Import the actual component and its dependencies
 import { RecipeFormFields } from '../RecipeFormFields';
 import { type RecipeFormData } from '../recipeFormSchema';
 
@@ -16,7 +13,6 @@ describe('RecipeFormFields', () => {
     autoGenerateRecipeName: false,
   };
 
-  // Helper to create a real form instance for testing
   const useTestForm = (initialValues?: Partial<RecipeFormData>) => {
     const defaultValues: RecipeFormData = {
       title: '',
@@ -39,7 +35,6 @@ describe('RecipeFormFields', () => {
     });
   };
 
-  // Test wrapper component to use the real form
   const TestWrapper = ({
     initialValues,
     ...props
@@ -58,7 +53,6 @@ describe('RecipeFormFields', () => {
   describe('Basic Rendering', () => {
     it('renders the component without crashing', () => {
       render(<TestWrapper {...defaultProps} />);
-      // Just check that it renders without throwing
       expect(screen.getByText('Title')).toBeInTheDocument();
     });
 
@@ -139,20 +133,15 @@ describe('RecipeFormFields', () => {
       const parameterInput = screen.getByPlaceholderText('Enter parameter name...');
       const addButton = screen.getByText('Add parameter');
 
-      // Initially button should be disabled
       expect(addButton).toBeDisabled();
 
-      // Type parameter name
       await user.type(parameterInput, 'test_param');
       expect(addButton).toBeEnabled();
 
-      // Add parameter
       await user.click(addButton);
 
-      // Parameter should appear
       expect(screen.getByText('test_param')).toBeInTheDocument();
 
-      // Input should be cleared
       expect(parameterInput).toHaveValue('');
       expect(addButton).toBeDisabled();
     });
@@ -198,7 +187,6 @@ describe('RecipeFormFields', () => {
     it('shows editor buttons for instructions and JSON schema', () => {
       render(<TestWrapper {...defaultProps} />);
 
-      // Should have "Open Editor" buttons
       const editorButtons = screen.getAllByText('Open Editor');
       expect(editorButtons.length).toBeGreaterThan(0);
     });

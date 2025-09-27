@@ -18,11 +18,8 @@ export default function InstructionsEditor({
   error,
 }: InstructionsEditorProps) {
   const [localValue, setLocalValue] = useState(value);
-
-  // Handle Esc key for modal
   useEscapeKey(isOpen, onClose);
 
-  // Update local value when prop changes
   React.useEffect(() => {
     if (isOpen) {
       setLocalValue(value);

@@ -59,10 +59,8 @@ export default function ImportRecipeForm({ isOpen, onClose, onSuccess }: ImportR
   const [importing, setImporting] = useState(false);
   const [showSchemaModal, setShowSchemaModal] = useState(false);
 
-  // Handle Esc key for modal
   useEscapeKey(isOpen, onClose);
 
-  // Function to parse deeplink and extract recipe
   const parseDeeplink = async (deeplink: string): Promise<Recipe | null> => {
     try {
       const cleanLink = deeplink.trim();
@@ -221,7 +219,6 @@ export default function ImportRecipeForm({ isOpen, onClose, onSuccess }: ImportR
   });
 
   const handleClose = () => {
-    // Reset form to default values
     importRecipeForm.reset({
       deeplink: '',
       recipeUploadFile: null,
@@ -231,22 +228,18 @@ export default function ImportRecipeForm({ isOpen, onClose, onSuccess }: ImportR
     onClose();
   };
 
-  // Store reference to recipe title field for programmatic updates
   let recipeTitleFieldRef: { handleChange: (value: string) => void } | null = null;
 
-  // Auto-populate recipe title when deeplink changes
   const handleDeeplinkChange = async (
     value: string,
     field: { handleChange: (value: string) => void }
   ) => {
-    // Use the proper field change handler to trigger validation
     field.handleChange(value);
 
     if (value.trim()) {
       try {
         const recipe = await parseDeeplink(value.trim());
         if (recipe && recipe.title) {
-          // Use the recipe title field's handleChange method if available
           if (recipeTitleFieldRef) {
             recipeTitleFieldRef.handleChange(recipe.title);
           } else {
@@ -254,11 +247,12 @@ export default function ImportRecipeForm({ isOpen, onClose, onSuccess }: ImportR
           }
         }
       } catch (error) {
-        // Silently handle parsing errors during auto-suggest
-        console.log('Could not parse deeplink for auto-suggest:', error);
+        toastError({
+          title: 'Invalid Deeplink',
+          msg: `The deeplink format is invalid: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        });
       }
     } else {
-      // Clear the recipe title when deeplink is empty
       if (recipeTitleFieldRef) {
         recipeTitleFieldRef.handleChange('');
       } else {
@@ -275,7 +269,6 @@ export default function ImportRecipeForm({ isOpen, onClose, onSuccess }: ImportR
         const fileContent = await file.text();
         const recipe = await parseRecipeUploadFile(fileContent, file.name);
         if (recipe.title) {
-          // Use the recipe title field's handleChange method if available
           if (recipeTitleFieldRef) {
             recipeTitleFieldRef.handleChange(recipe.title);
           } else {
@@ -283,11 +276,12 @@ export default function ImportRecipeForm({ isOpen, onClose, onSuccess }: ImportR
           }
         }
       } catch (error) {
-        // Silently handle parsing errors during auto-suggest
-        console.log('Could not parse recipe file for auto-suggest:', error);
+        toastError({
+          title: 'Invalid Recipe File',
+          msg: `The recipe file format is invalid: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        });
       }
     } else {
-      // Clear the recipe title when file is removed
       if (recipeTitleFieldRef) {
         recipeTitleFieldRef.handleChange('');
       } else {
@@ -543,7 +537,6 @@ export default function ImportRecipeForm({ isOpen, onClose, onSuccess }: ImportR
   );
 }
 
-// Export the button component for easy access
 export function ImportRecipeButton({ onClick }: { onClick: () => void }) {
   return (
     <Button onClick={onClick} variant="default" size="sm" className="flex items-center gap-2">

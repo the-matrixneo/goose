@@ -11,6 +11,9 @@ const parameterSchema = z.object({
   options: z.array(z.string()).nullable().optional(),
 });
 
+// Export the parameter type for use in components
+export type RecipeParameter = z.infer<typeof parameterSchema>;
+
 // Main recipe form schema
 export const recipeFormSchema = z.object({
   title: z
