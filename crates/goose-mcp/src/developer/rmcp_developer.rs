@@ -214,7 +214,10 @@ impl ServerHandler for DeveloperServer {
                 cwd=cwd.to_string_lossy(),
                 container_info=if in_container { "container: true" } else { "" },
             },
-            _ => formatdoc! {r#"
+            _ => {
+                let shell_info = std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string());
+
+                formatdoc! {r#"
                 The developer extension gives you the capabilities to edit code files and run shell commands,
                 and can be used to solve a wide range of problems.
 
@@ -231,12 +234,15 @@ impl ServerHandler for DeveloperServer {
 
             operating system: {os}
             current directory: {cwd}
+            shell: {shell}
             {container_info}
                 "#,
                 os=os,
                 cwd=cwd.to_string_lossy(),
+                shell=shell_info,
                 container_info=if in_container { "container: true" } else { "" },
-            },
+                }
+            }
         };
 
         let hints_filenames: Vec<String> = std::env::var("CONTEXT_FILE_NAMES")
@@ -2970,7 +2976,7 @@ mod tests {
         let temp_path = temp_dir.path();
 
         // Set the current directory before creating the server
-        std::env::set_current_dir(&temp_path).unwrap();
+        std::env::set_current_dir(temp_path).unwrap();
 
         // Create some test files and directories
         fs::create_dir(temp_path.join("subdir1")).unwrap();
@@ -3029,7 +3035,7 @@ mod tests {
         let temp_path = temp_dir.path();
 
         // Set the current directory before creating the server
-        std::env::set_current_dir(&temp_path).unwrap();
+        std::env::set_current_dir(temp_path).unwrap();
 
         // Create more than 50 files to test the limit
         for i in 0..60 {
@@ -3085,7 +3091,7 @@ mod tests {
         let temp_path = temp_dir.path();
 
         // Set the current directory before creating the server
-        std::env::set_current_dir(&temp_path).unwrap();
+        std::env::set_current_dir(temp_path).unwrap();
 
         let server = create_test_server();
 
@@ -3666,7 +3672,7 @@ Additional instructions here.
 
             // Cancel the command
             let cancel_params = CancelledNotificationParam {
-                request_id: request_id,
+                request_id,
                 reason: Some("test cancellation".to_string()),
             };
 
@@ -3748,7 +3754,7 @@ Additional instructions here.
 
             // Cancel the command
             let cancel_params = CancelledNotificationParam {
-                request_id: request_id,
+                request_id,
                 reason: Some("test cancellation".to_string()),
             };
 

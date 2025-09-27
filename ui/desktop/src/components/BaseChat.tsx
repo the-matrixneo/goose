@@ -264,7 +264,7 @@ function BaseChatContent({
     sessionOutputTokens,
     localInputTokens,
     localOutputTokens,
-    sessionMetadata,
+    session: sessionMetadata,
   });
 
   // Auto-scroll when messages are loaded (for session resuming)

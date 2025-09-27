@@ -6,7 +6,7 @@ use axum::routing::get;
 use axum::{extract::State, http::StatusCode, routing::post, Json, Router};
 use goose::recipe::Recipe;
 use goose::recipe_deeplink;
-use goose::session;
+use goose::session::SessionManager;
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -110,23 +110,22 @@ async fn create_recipe(
     );
 
     // Load messages from session
-    let session_path =
-        match session::get_path(session::Identifier::Name(request.session_id.clone())) {
-            Ok(path) => path,
-            Err(e) => {
-                let error_message = format!("Failed to get session path: {}", e);
-                let error_response = CreateRecipeResponse {
-                    recipe: None,
-                    error: Some(error_message),
-                };
-                return Ok(Json(error_response));
-            }
-        };
-
-    let conversation = match session::read_messages(&session_path) {
-        Ok(messages) => messages,
+    let session = match SessionManager::get_session(&request.session_id, true).await {
+        Ok(session) => session,
         Err(e) => {
-            let error_message = format!("Failed to read session messages: {}", e);
+            let error_message = format!("Failed to get session: {}", e);
+            let error_response = CreateRecipeResponse {
+                recipe: None,
+                error: Some(error_message),
+            };
+            return Ok(Json(error_response));
+        }
+    };
+
+    let conversation = match session.conversation {
+        Some(conversation) => conversation,
+        None => {
+            let error_message = "Session has no conversation".to_string();
             let error_response = CreateRecipeResponse {
                 recipe: None,
                 error: Some(error_message),
