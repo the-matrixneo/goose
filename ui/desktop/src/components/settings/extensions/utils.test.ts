@@ -153,6 +153,7 @@ describe('Extension Utils', () => {
       const extension: FixedExtensionEntry = {
         type: 'stdio',
         name: 'legacy-extension',
+        description: 'legacy',
         cmd: 'node',
         args: ['app.js'],
         enabled: true,
@@ -176,6 +177,7 @@ describe('Extension Utils', () => {
       const extension: FixedExtensionEntry = {
         type: 'builtin',
         name: 'developer',
+        description: 'developer',
         enabled: true,
       };
 
@@ -345,6 +347,7 @@ describe('Extension Utils', () => {
       const fixedEntry: FixedExtensionEntry = {
         type: 'stdio',
         name: 'test-extension',
+        description: 'test-extension',
         cmd: 'python',
         args: ['script.py'],
         enabled: true,

@@ -1,16 +1,17 @@
-use std::collections::HashMap;
-
-use mcp_client::client::Error as ClientError;
-use rmcp::model::Tool;
-use rmcp::service::ClientInitializeError;
-use serde::{Deserialize, Serialize};
-use thiserror::Error;
-use tracing::warn;
-use utoipa::ToSchema;
-
+use crate::agents::todo_extension;
 use crate::config;
 use crate::config::extensions::name_to_key;
 use crate::config::permission::PermissionLevel;
+use mcp_client::client::Error as ClientError;
+use mcp_client::McpClientTrait;
+use once_cell::sync::Lazy;
+use rmcp::model::Tool;
+use rmcp::service::ClientInitializeError;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use thiserror::Error;
+use tracing::warn;
+use utoipa::ToSchema;
 
 #[derive(Error, Debug)]
 #[error("process quit before initialization: stderr = {stderr}")]
@@ -30,6 +31,37 @@ impl ProcessExit {
             source,
         }
     }
+}
+
+pub static PLATFORM_EXTENSIONS: Lazy<HashMap<&'static str, PlatformExtensionDef>> =
+    Lazy::new(|| {
+        let mut map = HashMap::new();
+
+        map.insert(
+            todo_extension::EXTENSION_NAME,
+            PlatformExtensionDef {
+                name: todo_extension::EXTENSION_NAME,
+                description:
+                    "Enable a todo list for Goose so it can keep track of what it is doing",
+                default_enabled: true,
+                client_factory: |ctx| Box::new(todo_extension::TodoClient::new(ctx).unwrap()),
+            },
+        );
+
+        map
+    });
+
+#[derive(Debug, Clone)]
+pub struct PlatformExtensionContext {
+    pub session_id: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct PlatformExtensionDef {
+    pub name: &'static str,
+    pub description: &'static str,
+    pub default_enabled: bool,
+    pub client_factory: fn(PlatformExtensionContext) -> Box<dyn McpClientTrait>,
 }
 
 /// Errors from Extension operation
@@ -151,16 +183,15 @@ pub enum ExtensionConfig {
     Sse {
         /// The name used to identify this extension
         name: String,
+        description: String,
         uri: String,
         #[serde(default)]
         envs: Envs,
         #[serde(default)]
         env_keys: Vec<String>,
-        description: Option<String>,
         // NOTE: set timeout to be optional for compatibility.
         // However, new configurations should include this field.
         timeout: Option<u64>,
-        /// Whether this extension is bundled with goose
         #[serde(default)]
         bundled: Option<bool>,
         #[serde(default)]
@@ -171,6 +202,7 @@ pub enum ExtensionConfig {
     Stdio {
         /// The name used to identify this extension
         name: String,
+        description: String,
         cmd: String,
         args: Vec<String>,
         #[serde(default)]
@@ -178,22 +210,30 @@ pub enum ExtensionConfig {
         #[serde(default)]
         env_keys: Vec<String>,
         timeout: Option<u64>,
-        description: Option<String>,
-        /// Whether this extension is bundled with goose
         #[serde(default)]
         bundled: Option<bool>,
         #[serde(default)]
         available_tools: Vec<String>,
     },
-    /// Built-in extension that is part of the goose binary
+    /// Built-in extension that is part of the bundled goose MCP server
     #[serde(rename = "builtin")]
     Builtin {
         /// The name used to identify this extension
         name: String,
+        description: String,
         display_name: Option<String>, // needed for the UI
-        description: Option<String>,
         timeout: Option<u64>,
-        /// Whether this extension is bundled with goose
+        #[serde(default)]
+        bundled: Option<bool>,
+        #[serde(default)]
+        available_tools: Vec<String>,
+    },
+    /// Platform extensions that have direct access to the agent etc and are part of the  the goose binary
+    #[serde(rename = "platform")]
+    Platform {
+        /// The name used to identify this extension
+        name: String,
+        description: String,
         #[serde(default)]
         bundled: Option<bool>,
         #[serde(default)]
@@ -204,6 +244,7 @@ pub enum ExtensionConfig {
     StreamableHttp {
         /// The name used to identify this extension
         name: String,
+        description: String,
         uri: String,
         #[serde(default)]
         envs: Envs,
@@ -211,11 +252,9 @@ pub enum ExtensionConfig {
         env_keys: Vec<String>,
         #[serde(default)]
         headers: HashMap<String, String>,
-        description: Option<String>,
         // NOTE: set timeout to be optional for compatibility.
         // However, new configurations should include this field.
         timeout: Option<u64>,
-        /// Whether this extension is bundled with goose
         #[serde(default)]
         bundled: Option<bool>,
         #[serde(default)]
@@ -226,11 +265,11 @@ pub enum ExtensionConfig {
     Frontend {
         /// The name used to identify this extension
         name: String,
+        description: String,
         /// The tools provided by the frontend
         tools: Vec<Tool>,
         /// Instructions for how to use these tools
         instructions: Option<String>,
-        /// Whether this extension is bundled with goose
         #[serde(default)]
         bundled: Option<bool>,
         #[serde(default)]
@@ -241,10 +280,9 @@ pub enum ExtensionConfig {
     InlinePython {
         /// The name used to identify this extension
         name: String,
+        description: String,
         /// The Python code to execute
         code: String,
-        /// Description of what the extension does
-        description: Option<String>,
         /// Timeout in seconds
         timeout: Option<u64>,
         /// Python package dependencies required by this extension
@@ -260,7 +298,7 @@ impl Default for ExtensionConfig {
         Self::Builtin {
             name: config::DEFAULT_EXTENSION.to_string(),
             display_name: Some(config::DEFAULT_DISPLAY_NAME.to_string()),
-            description: None,
+            description: "default".to_string(),
             timeout: Some(config::DEFAULT_EXTENSION_TIMEOUT),
             bundled: Some(true),
             available_tools: Vec::new(),
@@ -275,7 +313,7 @@ impl ExtensionConfig {
             uri: uri.into(),
             envs: Envs::default(),
             env_keys: Vec::new(),
-            description: Some(description.into()),
+            description: description.into(),
             timeout: Some(timeout.into()),
             bundled: None,
             available_tools: Vec::new(),
@@ -294,7 +332,7 @@ impl ExtensionConfig {
             envs: Envs::default(),
             env_keys: Vec::new(),
             headers: HashMap::new(),
-            description: Some(description.into()),
+            description: description.into(),
             timeout: Some(timeout.into()),
             bundled: None,
             available_tools: Vec::new(),
@@ -313,7 +351,7 @@ impl ExtensionConfig {
             args: vec![],
             envs: Envs::default(),
             env_keys: Vec::new(),
-            description: Some(description.into()),
+            description: description.into(),
             timeout: Some(timeout.into()),
             bundled: None,
             available_tools: Vec::new(),
@@ -329,7 +367,7 @@ impl ExtensionConfig {
         Self::InlinePython {
             name: name.into(),
             code: code.into(),
-            description: Some(description.into()),
+            description: description.into(),
             timeout: Some(timeout.into()),
             dependencies: None,
             available_tools: Vec::new(),
@@ -379,6 +417,7 @@ impl ExtensionConfig {
             Self::StreamableHttp { name, .. } => name,
             Self::Stdio { name, .. } => name,
             Self::Builtin { name, .. } => name,
+            Self::Platform { name, .. } => name,
             Self::Frontend { name, .. } => name,
             Self::InlinePython { name, .. } => name,
         }
@@ -398,6 +437,9 @@ impl ExtensionConfig {
                 available_tools, ..
             }
             | Self::Builtin {
+                available_tools, ..
+            }
+            | Self::Platform {
                 available_tools, ..
             }
             | Self::InlinePython {
@@ -427,6 +469,7 @@ impl std::fmt::Display for ExtensionConfig {
                 write!(f, "Stdio({}: {} {})", name, cmd, args.join(" "))
             }
             ExtensionConfig::Builtin { name, .. } => write!(f, "Builtin({})", name),
+            ExtensionConfig::Platform { name, .. } => write!(f, "Platform({})", name),
             ExtensionConfig::Frontend { name, tools, .. } => {
                 write!(f, "Frontend({}: {} tools)", name, tools.len())
             }

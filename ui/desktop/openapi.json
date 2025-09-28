@@ -2185,6 +2185,7 @@
             "description": "Server-sent events client with a URI endpoint",
             "required": [
               "name",
+              "description",
               "uri",
               "type"
             ],
@@ -2197,12 +2198,10 @@
               },
               "bundled": {
                 "type": "boolean",
-                "description": "Whether this extension is bundled with Goose",
                 "nullable": true
               },
               "description": {
-                "type": "string",
-                "nullable": true
+                "type": "string"
               },
               "env_keys": {
                 "type": "array",
@@ -2239,6 +2238,7 @@
             "description": "Standard I/O client with command and arguments",
             "required": [
               "name",
+              "description",
               "cmd",
               "args",
               "type"
@@ -2258,15 +2258,13 @@
               },
               "bundled": {
                 "type": "boolean",
-                "description": "Whether this extension is bundled with Goose",
                 "nullable": true
               },
               "cmd": {
                 "type": "string"
               },
               "description": {
-                "type": "string",
-                "nullable": true
+                "type": "string"
               },
               "env_keys": {
                 "type": "array",
@@ -2297,9 +2295,10 @@
           },
           {
             "type": "object",
-            "description": "Built-in extension that is part of the goose binary",
+            "description": "Built-in extension that is part of the bundled goose MCP server",
             "required": [
               "name",
+              "description",
               "type"
             ],
             "properties": {
@@ -2311,12 +2310,10 @@
               },
               "bundled": {
                 "type": "boolean",
-                "description": "Whether this extension is bundled with Goose",
                 "nullable": true
               },
               "description": {
-                "type": "string",
-                "nullable": true
+                "type": "string"
               },
               "display_name": {
                 "type": "string",
@@ -2342,9 +2339,44 @@
           },
           {
             "type": "object",
+            "description": "Platform extensions that have direct access to the agent etc and are part of the  the goose binary",
+            "required": [
+              "name",
+              "description",
+              "type"
+            ],
+            "properties": {
+              "available_tools": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "bundled": {
+                "type": "boolean",
+                "nullable": true
+              },
+              "description": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string",
+                "description": "The name used to identify this extension"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "platform"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
             "description": "Streamable HTTP client with a URI endpoint using MCP Streamable HTTP specification",
             "required": [
               "name",
+              "description",
               "uri",
               "type"
             ],
@@ -2357,12 +2389,10 @@
               },
               "bundled": {
                 "type": "boolean",
-                "description": "Whether this extension is bundled with Goose",
                 "nullable": true
               },
               "description": {
-                "type": "string",
-                "nullable": true
+                "type": "string"
               },
               "env_keys": {
                 "type": "array",
@@ -2405,6 +2435,7 @@
             "description": "Frontend-provided tools that will be called through the frontend",
             "required": [
               "name",
+              "description",
               "tools",
               "type"
             ],
@@ -2417,8 +2448,10 @@
               },
               "bundled": {
                 "type": "boolean",
-                "description": "Whether this extension is bundled with Goose",
                 "nullable": true
+              },
+              "description": {
+                "type": "string"
               },
               "instructions": {
                 "type": "string",
@@ -2449,6 +2482,7 @@
             "description": "Inline Python code that will be executed using uvx",
             "required": [
               "name",
+              "description",
               "code",
               "type"
             ],
@@ -2472,9 +2506,7 @@
                 "nullable": true
               },
               "description": {
-                "type": "string",
-                "description": "Description of what the extension does",
-                "nullable": true
+                "type": "string"
               },
               "name": {
                 "type": "string",
@@ -3172,7 +3204,7 @@
       },
       "Recipe": {
         "type": "object",
-        "description": "A Recipe represents a personalized, user-generated agent configuration that defines\nspecific behaviors and capabilities within the Goose system.\n\n# Fields\n\n## Required Fields\n* `version` - Semantic version of the Recipe file format (defaults to \"1.0.0\")\n* `title` - Short, descriptive name of the Recipe\n* `description` - Detailed description explaining the Recipe's purpose and functionality\n* `Instructions` - Instructions that defines the Recipe's behavior\n\n## Optional Fields\n* `prompt` - the initial prompt to the session to start with\n* `extensions` - List of extension configurations required by the Recipe\n* `context` - Supplementary context information for the Recipe\n* `activities` - Activity labels that appear when loading the Recipe\n* `author` - Information about the Recipe's creator and metadata\n* `parameters` - Additional parameters for the Recipe\n* `response` - Response configuration including JSON schema validation\n* `retry` - Retry configuration for automated validation and recovery\n# Example\n\n\nuse goose::recipe::Recipe;\n\n// Using the builder pattern\nlet recipe = Recipe::builder()\n.title(\"Example Agent\")\n.description(\"An example Recipe configuration\")\n.instructions(\"Act as a helpful assistant\")\n.build()\n.expect(\"Missing required fields\");\n\n// Or using struct initialization\nlet recipe = Recipe {\nversion: \"1.0.0\".to_string(),\ntitle: \"Example Agent\".to_string(),\ndescription: \"An example Recipe configuration\".to_string(),\ninstructions: Some(\"Act as a helpful assistant\".to_string()),\nprompt: None,\nextensions: None,\ncontext: None,\nactivities: None,\nauthor: None,\nsettings: None,\nparameters: None,\nresponse: None,\nsub_recipes: None,\nretry: None,\n};\n",
+        "description": "A Recipe represents a personalized, user-generated agent configuration that defines\nspecific behaviors and capabilities within the goose system.\n\n# Fields\n\n## Required Fields\n* `version` - Semantic version of the Recipe file format (defaults to \"1.0.0\")\n* `title` - Short, descriptive name of the Recipe\n* `description` - Detailed description explaining the Recipe's purpose and functionality\n* `Instructions` - Instructions that defines the Recipe's behavior\n\n## Optional Fields\n* `prompt` - the initial prompt to the session to start with\n* `extensions` - List of extension configurations required by the Recipe\n* `context` - Supplementary context information for the Recipe\n* `activities` - Activity labels that appear when loading the Recipe\n* `author` - Information about the Recipe's creator and metadata\n* `parameters` - Additional parameters for the Recipe\n* `response` - Response configuration including JSON schema validation\n* `retry` - Retry configuration for automated validation and recovery\n# Example\n\n\nuse goose::recipe::Recipe;\n\n// Using the builder pattern\nlet recipe = Recipe::builder()\n.title(\"Example Agent\")\n.description(\"An example Recipe configuration\")\n.instructions(\"Act as a helpful assistant\")\n.build()\n.expect(\"Missing required fields\");\n\n// Or using struct initialization\nlet recipe = Recipe {\nversion: \"1.0.0\".to_string(),\ntitle: \"Example Agent\".to_string(),\ndescription: \"An example Recipe configuration\".to_string(),\ninstructions: Some(\"Act as a helpful assistant\".to_string()),\nprompt: None,\nextensions: None,\ncontext: None,\nactivities: None,\nauthor: None,\nsettings: None,\nparameters: None,\nresponse: None,\nsub_recipes: None,\nretry: None,\n};\n",
         "required": [
           "title",
           "description"

@@ -1,4 +1,5 @@
 use super::base::Config;
+use crate::agents::extension::PLATFORM_EXTENSIONS;
 use crate::agents::ExtensionConfig;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -29,10 +30,29 @@ pub struct ExtensionConfigManager;
 
 impl ExtensionConfigManager {
     fn get_extensions_map() -> Result<HashMap<String, ExtensionEntry>> {
-        let config = Config::global();
-        Ok(config
+        let mut extensions_map = Config::global()
             .get_param(EXTENSIONS_CONFIG_KEY)
-            .unwrap_or_else(|_| HashMap::new()))
+            .unwrap_or_else(|_| HashMap::new());
+
+        if !extensions_map.is_empty() {
+            for (name, def) in PLATFORM_EXTENSIONS.iter() {
+                if !extensions_map.contains_key(*name) {
+                    extensions_map.insert(
+                        name.to_string(),
+                        ExtensionEntry {
+                            config: ExtensionConfig::Platform {
+                                name: def.name.to_string(),
+                                description: def.description.to_string(),
+                                bundled: Some(true),
+                                available_tools: Vec::new(),
+                            },
+                            enabled: true,
+                        },
+                    );
+                }
+            }
+        }
+        Ok(extensions_map)
     }
 
     fn save_extensions_map(extensions: HashMap<String, ExtensionEntry>) -> Result<()> {

@@ -1,6 +1,7 @@
 //! Agent lifecycle management with session isolation
 
 use super::SessionExecutionMode;
+use crate::agents::extension::PlatformExtensionContext;
 use crate::agents::Agent;
 use crate::config::APP_STRATEGY;
 use crate::model::ModelConfig;
@@ -119,6 +120,13 @@ impl AgentManager {
                 );
             }
         }
+
+        agent
+            .extension_manager
+            .set_context(PlatformExtensionContext {
+                session_id: session_id.clone(),
+            })
+            .await;
 
         if let Some(provider) = &*self.default_provider.read().await {
             debug!(

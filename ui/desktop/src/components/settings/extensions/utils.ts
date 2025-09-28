@@ -96,12 +96,11 @@ export function extensionToFormData(extension: FixedExtensionEntry): ExtensionFo
 
   return {
     name: extension.name || '',
-    description:
-      extension.type === 'stdio' || extension.type === 'sse' || extension.type === 'streamable_http'
-        ? extension.description || ''
-        : '',
+    description: extension.description || '',
     type:
-      extension.type === 'frontend' || extension.type === 'inline_python'
+      extension.type === 'frontend' ||
+      extension.type === 'inline_python' ||
+      extension.type === 'platform'
         ? 'stdio'
         : extension.type,
     cmd: extension.type === 'stdio' ? combineCmdAndArgs(extension.cmd, extension.args) : undefined,
@@ -166,6 +165,7 @@ export function createExtensionConfig(formData: ExtensionFormData): ExtensionCon
     return {
       type: formData.type,
       name: formData.name,
+      description: formData.description,
       timeout: formData.timeout,
     };
   }
