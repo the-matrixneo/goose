@@ -130,12 +130,6 @@ async fn start_agent(
         recipe_execution_status.get_or_insert(RecipeExecutionStatus::ReadyForExecution);
         SessionManager::update_session(&session.id)
             .recipe(Some(recipe))
-            .apply()
-            .await
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-        // TODO: Lifei better to chain in the above call (it does not work now)
-        SessionManager::update_session(&session.id)
             .recipe_execution_status(recipe_execution_status)
             .apply()
             .await

@@ -65,6 +65,7 @@ import { Message } from '../types/message';
 import { ChatState } from '../types/chatState';
 import { ChatType } from '../types/chat';
 import { useToolCount } from './alerts/useToolCount';
+import RecipeApprovalPrompt from './RecipeApprovalPrompt';
 
 // Context for sharing current model info
 const CurrentModelContext = createContext<{ model: string; mode: string } | null>(null);
@@ -116,6 +117,7 @@ function BaseChatContent({
   const [hasStartedUsingRecipe, setHasStartedUsingRecipe] = React.useState(false);
   const [currentRecipeTitle, setCurrentRecipeTitle] = React.useState<string | null>(null);
   const { isCompacting, handleManualCompaction } = useContextManager();
+  const [isApprovingRecipe, setIsApprovingRecipe] = React.useState(false);
 
   // Timeout ref for debouncing auto-scroll
   const autoScrollTimeoutRef = useRef<number | null>(null);
@@ -160,6 +162,34 @@ function BaseChatContent({
       }
     };
   }, []);
+
+  const handleRecipeApprove = React.useCallback(async () => {
+    if (!chat.recipeConfig) {
+      setChat((prev) => ({ ...prev, recipeExecutionStatus: 'ReadyForExecution' }));
+      return;
+    }
+
+    try {
+      setIsApprovingRecipe(true);
+      if (window.electron?.recordRecipeHash) {
+        await window.electron.recordRecipeHash(chat.recipeConfig);
+      }
+    } catch (error) {
+      console.error('Failed to record recipe approval:', error);
+    } finally {
+      setIsApprovingRecipe(false);
+      setChat((prev) => ({ ...prev, recipeExecutionStatus: 'ReadyForExecution' }));
+    }
+  }, [chat.recipeConfig, setChat]);
+
+  const handleRecipeReject = React.useCallback(() => {
+    setChat((prev) => ({
+      ...prev,
+      recipeExecutionStatus: null,
+      recipeConfig: null,
+      recipeId: null,
+    }));
+  }, [setChat]);
 
   // Use shared chat engine
   const {
@@ -371,6 +401,17 @@ function BaseChatContent({
 
             {/* Custom content before messages */}
             {renderBeforeMessages && renderBeforeMessages()}
+
+            {chat.recipeExecutionStatus === 'PendingTrust' && (
+              <div className="mb-6">
+                <RecipeApprovalPrompt
+                  recipe={recipeConfig ?? chat.recipeConfig ?? null}
+                  onApprove={handleRecipeApprove}
+                  onReject={handleRecipeReject}
+                  isSubmitting={isApprovingRecipe}
+                />
+              </div>
+            )}
 
             {/* Recipe Activities - always show when recipe is active and accepted */}
             {recipeConfig && recipeAccepted && !suppressEmptyState && (

@@ -325,6 +325,8 @@ export function AppInner() {
     messages: [],
     messageHistoryIndex: 0,
     recipeConfig: null,
+    recipeId: null,
+    recipeExecutionStatus: null,
   });
 
   const { addExtension } = useConfig();
@@ -411,7 +413,13 @@ export function AppInner() {
         try {
           const workingDir = window.appConfig?.get('GOOSE_WORKING_DIR');
           console.log(`Creating new chat window with working dir: ${workingDir}`);
-          window.electron.createChatWindow(undefined, workingDir as string);
+          window.electron.createChatWindow(
+            undefined,
+            workingDir as string,
+            undefined,
+            undefined,
+            undefined
+          );
         } catch (error) {
           console.error('Error creating new window:', error);
         }

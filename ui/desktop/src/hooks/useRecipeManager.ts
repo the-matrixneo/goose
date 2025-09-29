@@ -51,8 +51,14 @@ export const useRecipeManager = (chat: ChatType, recipeConfig?: Recipe | null) =
 
   useEffect(() => {
     const checkRecipeAcceptance = async () => {
-      console.log('============finalRecipeConfig', finalRecipeConfig);
       if (finalRecipeConfig) {
+        if (chat.recipeExecutionStatus === 'PendingTrust') {
+          setRecipeAccepted(false);
+          setHasSecurityWarnings(false);
+          setIsRecipeWarningModalOpen(false);
+          return;
+        }
+
         try {
           const hasAccepted = await window.electron.hasAcceptedRecipeBefore(finalRecipeConfig);
 
@@ -72,7 +78,7 @@ export const useRecipeManager = (chat: ChatType, recipeConfig?: Recipe | null) =
     };
 
     checkRecipeAcceptance();
-  }, [finalRecipeConfig]);
+  }, [chat.recipeExecutionStatus, finalRecipeConfig]);
 
   // Filter parameters to only show valid ones that are actually used in the recipe
   const filteredParameters = useMemo(() => {
@@ -214,6 +220,7 @@ export const useRecipeManager = (chat: ChatType, recipeConfig?: Recipe | null) =
         window.sessionStorage.setItem('ignoreRecipeConfigChanges', 'true');
 
         window.electron.createChatWindow(
+          undefined,
           undefined,
           undefined,
           undefined,

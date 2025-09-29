@@ -76,7 +76,6 @@ export function useAgent(): UseAgentReturn {
           },
           throwOnError: true,
         });
-
         const agentSession = agentResponse.data;
         const messages = agentSession.conversation || [];
         const recipeExecutionStatus =

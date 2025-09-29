@@ -8,4 +8,6 @@ export interface ChatType {
   messages: Message[];
   recipeConfig?: Recipe | null; // Add recipe configuration to chat state
   recipeParameters?: Record<string, string> | null; // Add recipe parameters to chat state
+  recipeId?: string | null;
+  recipeExecutionStatus?: 'PendingTrust' | 'ParametersRequired' | 'PendingConfirmExecution' | 'ReadyForExecution' | null;
 }

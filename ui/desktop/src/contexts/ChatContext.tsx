@@ -60,6 +60,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       messageHistoryIndex: 0,
       recipeConfig: null,
       recipeParameters: null,
+      recipeId: null,
+      recipeExecutionStatus: null,
     });
     clearDraft();
   };
