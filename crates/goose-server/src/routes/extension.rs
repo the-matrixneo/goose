@@ -454,7 +454,7 @@ fn is_command_allowed_with_allowlist(
                     return true;
                 }
                 // If the path doesn't match, don't allow it
-                println!("Goosed not in expected directory: {}", cmd);
+                println!("goosed not in expected directory: {}", cmd);
                 println!("Expected path: {}", expected_path);
                 return false;
             } else {
@@ -474,20 +474,20 @@ fn is_command_allowed_with_allowlist(
 
         // Check against the allowlist
         Some(extensions) => {
-            // Strip out the Goose app resources/bin prefix if present (handle both macOS and Windows paths)
+            // Strip out the goose app resources/bin prefix if present (handle both macOS and Windows paths)
             let mut cmd_to_check = cmd.to_string();
             let mut is_goose_path = false;
 
-            // Check for macOS-style Goose.app path
-            if cmd_to_check.contains("Goose.app/Contents/Resources/bin/") {
-                if let Some(idx) = cmd_to_check.find("Goose.app/Contents/Resources/bin/") {
+            // Check for macOS-style goose.app path
+            if cmd_to_check.contains("goose.app/Contents/Resources/bin/") {
+                if let Some(idx) = cmd_to_check.find("goose.app/Contents/Resources/bin/") {
                     cmd_to_check = cmd_to_check
-                        [(idx + "Goose.app/Contents/Resources/bin/".len())..]
+                        [(idx + "goose.app/Contents/Resources/bin/".len())..]
                         .to_string();
                     is_goose_path = true;
                 }
             }
-            // Check for Windows-style Goose path with resources\bin
+            // Check for Windows-style goose path with resources\bin
             else if cmd_to_check.to_lowercase().contains("\\resources\\bin\\")
                 || cmd_to_check.contains("/resources/bin/")
             {
@@ -507,7 +507,7 @@ fn is_command_allowed_with_allowlist(
                 }
             }
 
-            // Only check current directory for non-Goose paths
+            // Only check current directory for non-goose paths
             if !is_goose_path {
                 // Check that the command exists as a peer command to current executable directory
                 // Only apply this check if the command includes a path separator
@@ -524,7 +524,7 @@ fn is_command_allowed_with_allowlist(
 
                 if (first_part.contains('/') || first_part.contains('\\'))
                     && normalized_cmd_path != expected_path
-                    && !cmd_to_check.contains("Goose.app/Contents/Resources/bin/")
+                    && !cmd_to_check.contains("goose.app/Contents/Resources/bin/")
                 {
                     println!("Command not in expected directory: {}", cmd);
                     return false;
@@ -631,25 +631,19 @@ mod tests {
     #[test]
     fn test_make_full() {
         assert_eq!(
-            make_full_cmd("uvx", &vec!["mcp_slack".to_string()]),
+            make_full_cmd("uvx", &["mcp_slack".to_string()]),
             "uvx mcp_slack"
         );
         assert_eq!(
-            make_full_cmd("uvx", &vec!["mcp_slack ".to_string()]),
+            make_full_cmd("uvx", &["mcp_slack ".to_string()]),
             "uvx mcp_slack"
         );
         assert_eq!(
-            make_full_cmd(
-                "uvx",
-                &vec!["mcp_slack".to_string(), "--verbose".to_string()]
-            ),
+            make_full_cmd("uvx", &["mcp_slack".to_string(), "--verbose".to_string()]),
             "uvx mcp_slack --verbose"
         );
         assert_eq!(
-            make_full_cmd(
-                "uvx",
-                &vec!["mcp_slack".to_string(), " --verbose".to_string()]
-            ),
+            make_full_cmd("uvx", &["mcp_slack".to_string(), " --verbose".to_string()]),
             "uvx mcp_slack --verbose"
         );
     }
@@ -807,15 +801,15 @@ mod tests {
             &allowlist
         ));
 
-        // Test with shim path - 'Goose.app/Contents/Resources/bin/' and before can be stripped to get the command to match
+        // Test with shim path - 'goose.app/Contents/Resources/bin/' and before can be stripped to get the command to match
         assert!(is_command_allowed_with_allowlist(
-            "/private/var/folders/fq/rd_cb6/T/AppTranslocation/EA0195/d/Goose.app/Contents/Resources/bin/uvx something",
+            "/private/var/folders/fq/rd_cb6/T/AppTranslocation/EA0195/d/goose.app/Contents/Resources/bin/uvx something",
             &allowlist
         ));
 
         // Test with shim path & latest version
         assert!(is_command_allowed_with_allowlist(
-            "/private/var/folders/fq/rd_cb6/T/AppTranslocation/EA0195/d/Goose.app/Contents/Resources/bin/uvx something@latest",
+            "/private/var/folders/fq/rd_cb6/T/AppTranslocation/EA0195/d/goose.app/Contents/Resources/bin/uvx something@latest",
             &allowlist
         ));
 
@@ -839,7 +833,7 @@ mod tests {
 
         // Test with shim path & latest version
         assert!(is_command_allowed_with_allowlist(
-            "/private/var/folders/fq/rd_cb6/T/AppTranslocation/EA0195/d/Goose.app/Contents/Resources/bin/npx -y mcp_hammer@latest start",
+            "/private/var/folders/fq/rd_cb6/T/AppTranslocation/EA0195/d/goose.app/Contents/Resources/bin/npx -y mcp_hammer@latest start",
             &allowlist
         ));
     }
@@ -947,15 +941,15 @@ mod tests {
         // Test various Windows path formats
         let test_paths = vec![
             // Standard Windows path
-            r"C:\Users\MaxNovich\Downloads\Goose-1.0.17\resources\bin\uvx.exe",
+            r"C:\Users\MaxNovich\Downloads\goose-1.0.17\resources\bin\uvx.exe",
             // Path with different casing
-            r"C:\Users\MaxNovich\Downloads\Goose-1.0.17\Resources\Bin\uvx.exe",
+            r"C:\Users\MaxNovich\Downloads\goose-1.0.17\Resources\Bin\uvx.exe",
             // Path with forward slashes
-            r"C:/Users/MaxNovich/Downloads/Goose-1.0.17/resources/bin/uvx.exe",
+            r"C:/Users/MaxNovich/Downloads/goose-1.0.17/resources/bin/uvx.exe",
             // Path with spaces
-            r"C:\Program Files\Goose 1.0.17\resources\bin\uvx.exe",
+            r"C:\Program Files\goose 1.0.17\resources\bin\uvx.exe",
             // Path with version numbers
-            r"C:\Users\MaxNovich\Downloads\Goose-1.0.17-block.202504072238-76ffe-win32-x64\Goose-1.0.17-block.202504072238-76ffe-win32-x64\resources\bin\uvx.exe",
+            r"C:\Users\MaxNovich\Downloads\goose-1.0.17-block.202504072238-76ffe-win32-x64\goose-1.0.17-block.202504072238-76ffe-win32-x64\resources\bin\uvx.exe",
         ];
 
         for path in test_paths {
@@ -981,9 +975,9 @@ mod tests {
             // Path without resources\bin
             r"C:\Users\MaxNovich\Downloads\uvx.exe",
             // Path with modified resources\bin
-            r"C:\Users\MaxNovich\Downloads\Goose-1.0.17\resources_modified\bin\uvx.exe",
+            r"C:\Users\MaxNovich\Downloads\goose-1.0.17\resources_modified\bin\uvx.exe",
             // Path with extra components
-            r"C:\Users\MaxNovich\Downloads\Goose-1.0.17\resources\bin\extra\uvx.exe",
+            r"C:\Users\MaxNovich\Downloads\goose-1.0.17\resources\bin\extra\uvx.exe",
         ];
 
         for path in invalid_paths {
@@ -1001,14 +995,14 @@ mod tests {
         let allowlist = create_test_allowlist(&["uvx mcp_snowflake"]);
 
         // Test Windows-style path with uvx.exe
-        let windows_path = r"C:\Users\MaxNovich\Downloads\Goose-1.0.17-block.202504072238-76ffe-win32-x64\Goose-1.0.17-block.202504072238-76ffe-win32-x64\resources\bin\uvx.exe";
+        let windows_path = r"C:\Users\MaxNovich\Downloads\goose-1.0.17-block.202504072238-76ffe-win32-x64\goose-1.0.17-block.202504072238-76ffe-win32-x64\resources\bin\uvx.exe";
         let cmd = format!("{} mcp_snowflake@latest", windows_path);
 
-        // This should be allowed because it's a valid uvx command in the Goose resources/bin directory
+        // This should be allowed because it's a valid uvx command in the goose resources/bin directory
         assert!(is_command_allowed_with_allowlist(&cmd, &allowlist));
 
         // Test with different casing and backslashes
-        let windows_path_alt = r"c:\Users\MaxNovich\Downloads\Goose-1.0.17-block.202504072238-76ffe-win32-x64\Goose-1.0.17-block.202504072238-76ffe-win32-x64\Resources\Bin\uvx.exe";
+        let windows_path_alt = r"c:\Users\MaxNovich\Downloads\goose-1.0.17-block.202504072238-76ffe-win32-x64\goose-1.0.17-block.202504072238-76ffe-win32-x64\Resources\Bin\uvx.exe";
         let cmd_alt = format!("{} mcp_snowflake@latest", windows_path_alt);
         assert!(is_command_allowed_with_allowlist(&cmd_alt, &allowlist));
     }
@@ -1093,14 +1087,14 @@ mod tests {
         // With bypass enabled, any command should be allowed regardless of allowlist
         assert!(is_command_allowed(
             "uvx",
-            &vec!["unauthorized_command".to_string()]
+            &["unauthorized_command".to_string()]
         ));
 
         // Test case insensitivity
         env::set_var("GOOSE_ALLOWLIST_BYPASS", "TRUE");
         assert!(is_command_allowed(
             "uvx",
-            &vec!["unauthorized_command".to_string()]
+            &["unauthorized_command".to_string()]
         ));
 
         // Clean up
