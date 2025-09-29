@@ -3353,6 +3353,21 @@
           "user_prompt"
         ]
       },
+      "RecipeSetupState": {
+        "type": "object",
+        "required": [
+          "trust_granted",
+          "parameters_satisfied"
+        ],
+        "properties": {
+          "parameters_satisfied": {
+            "type": "boolean"
+          },
+          "trust_granted": {
+            "type": "boolean"
+          }
+        }
+      },
       "RedactedThinkingContent": {
         "type": "object",
         "required": [
@@ -3632,6 +3647,14 @@
             "allOf": [
               {
                 "$ref": "#/components/schemas/RecipeExecutionStatus"
+              }
+            ],
+            "nullable": true
+          },
+          "recipe_setup_state": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RecipeSetupState"
               }
             ],
             "nullable": true

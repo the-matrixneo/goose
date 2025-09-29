@@ -622,6 +622,11 @@ export type RecipeParameterInputType = 'string' | 'number' | 'boolean' | 'date' 
 
 export type RecipeParameterRequirement = 'required' | 'optional' | 'user_prompt';
 
+export type RecipeSetupState = {
+    parameters_satisfied: boolean;
+    trust_granted: boolean;
+};
+
 export type RedactedThinkingContent = {
     data: string;
 };
@@ -716,6 +721,7 @@ export type Session = {
     output_tokens?: number | null;
     recipe?: Recipe | null;
     recipe_execution_status?: RecipeExecutionStatus | null;
+    recipe_setup_state?: RecipeSetupState | null;
     schedule_id?: string | null;
     total_tokens?: number | null;
     updated_at: string;
