@@ -1,4 +1,5 @@
 use crate::state::AppState;
+use super::recipe_utils::find_recipe_file_path_by_id;
 use axum::{
     extract::{Query, State},
     http::StatusCode,
@@ -6,6 +7,9 @@ use axum::{
     Json, Router,
 };
 use goose::config::PermissionManager;
+use goose::recipe::recipe_hash::has_accepted_recipe_before;
+use goose::session::session_manager::RecipeExecutionStatus;
+use std::fs;
 
 use goose::model::ModelConfig;
 use goose::providers::create;
@@ -71,6 +75,7 @@ pub struct UpdateRouterToolSelectorRequest {
 pub struct StartAgentRequest {
     working_dir: String,
     recipe: Option<Recipe>,
+    recipe_id: Option<String>,
 }
 
 #[derive(Deserialize, utoipa::ToSchema)]
@@ -98,6 +103,8 @@ async fn start_agent(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<StartAgentRequest>,
 ) -> Result<Json<Session>, StatusCode> {
+    tracing::info!("============Starting agent with recipe: {:?}", payload.recipe_id);
+    tracing::info!("============Starting agent with recipe_id: {:?}", payload.recipe_id);
     let counter = state.session_counter.fetch_add(1, Ordering::SeqCst) + 1;
     let description = format!("New session {}", counter);
 
@@ -105,10 +112,31 @@ async fn start_agent(
         SessionManager::create_session(PathBuf::from(&payload.working_dir), description)
             .await
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let mut recipe_in_session = payload.recipe;
+    let mut recipe_execution_status = None;
+    if let Some(recipe_id) = payload.recipe_id {
+        let recipe_file_path = find_recipe_file_path_by_id(&recipe_id).map_err(|e| {
+            tracing::error!("Failed to find recipe file path: {}", e);
+            StatusCode::NOT_FOUND
+        })?;
+        let recipe_file_content = fs::read_to_string(&recipe_file_path).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        recipe_in_session = Some(Recipe::from_content(&recipe_file_content).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?);
+        if !has_accepted_recipe_before(&recipe_file_content).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)? {
+            recipe_execution_status = Some(RecipeExecutionStatus::PendingTrust);
+        }
+    }
 
-    if let Some(recipe) = payload.recipe {
+    if let Some(recipe) = recipe_in_session {
+        recipe_execution_status.get_or_insert(RecipeExecutionStatus::ReadyForExecution);
         SessionManager::update_session(&session.id)
             .recipe(Some(recipe))
+            .apply()
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+        // TODO: Lifei better to chain in the above call (it does not work now)
+        SessionManager::update_session(&session.id)
+            .recipe_execution_status(recipe_execution_status)
             .apply()
             .await
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -117,7 +145,6 @@ async fn start_agent(
             .await
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     }
-
     Ok(Json(session))
 }
 

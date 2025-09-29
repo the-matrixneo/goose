@@ -8,6 +8,7 @@ use goose::permission::permission_confirmation::PrincipalType;
 use goose::providers::base::{ConfigKey, ModelInfo, ProviderMetadata};
 
 use goose::session::{Session, SessionInsights};
+use goose::session::session_manager::RecipeExecutionStatus;
 use rmcp::model::{
     Annotations, Content, EmbeddedResource, ImageContent, RawEmbeddedResource, RawImageContent,
     RawResource, RawTextContent, ResourceContents, Role, TextContent, Tool, ToolAnnotations,
@@ -442,6 +443,7 @@ impl<'__s> ToSchema<'__s> for AnnotatedSchema {
         PrincipalType,
         ModelInfo,
         Session,
+        RecipeExecutionStatus,
         SessionInsights,
         Conversation,
         goose::session::extension_data::ExtensionData,

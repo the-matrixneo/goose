@@ -51,6 +51,7 @@ export const useRecipeManager = (chat: ChatType, recipeConfig?: Recipe | null) =
 
   useEffect(() => {
     const checkRecipeAcceptance = async () => {
+      console.log('============finalRecipeConfig', finalRecipeConfig);
       if (finalRecipeConfig) {
         try {
           const hasAccepted = await window.electron.hasAcceptedRecipeBefore(finalRecipeConfig);

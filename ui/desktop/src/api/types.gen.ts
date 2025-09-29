@@ -188,7 +188,7 @@ export type ExtendPromptResponse = {
 export type ExtensionConfig = {
     available_tools?: Array<string>;
     /**
-     * Whether this extension is bundled with Goose
+     * Whether this extension is bundled with goose
      */
     bundled?: boolean | null;
     description?: string | null;
@@ -205,7 +205,7 @@ export type ExtensionConfig = {
     args: Array<string>;
     available_tools?: Array<string>;
     /**
-     * Whether this extension is bundled with Goose
+     * Whether this extension is bundled with goose
      */
     bundled?: boolean | null;
     cmd: string;
@@ -221,7 +221,7 @@ export type ExtensionConfig = {
 } | {
     available_tools?: Array<string>;
     /**
-     * Whether this extension is bundled with Goose
+     * Whether this extension is bundled with goose
      */
     bundled?: boolean | null;
     description?: string | null;
@@ -235,7 +235,7 @@ export type ExtensionConfig = {
 } | {
     available_tools?: Array<string>;
     /**
-     * Whether this extension is bundled with Goose
+     * Whether this extension is bundled with goose
      */
     bundled?: boolean | null;
     description?: string | null;
@@ -254,7 +254,7 @@ export type ExtensionConfig = {
 } | {
     available_tools?: Array<string>;
     /**
-     * Whether this extension is bundled with Goose
+     * Whether this extension is bundled with goose
      */
     bundled?: boolean | null;
     /**
@@ -531,7 +531,7 @@ export type RawTextContent = {
 
 /**
  * A Recipe represents a personalized, user-generated agent configuration that defines
- * specific behaviors and capabilities within the Goose system.
+ * specific behaviors and capabilities within the goose system.
  *
  * # Fields
  *
@@ -598,6 +598,8 @@ export type Recipe = {
     title: string;
     version?: string;
 };
+
+export type RecipeExecutionStatus = 'PendingTrust' | 'ParametersRequired' | 'PendingConfirmExecution' | 'ReadyForExecution';
 
 export type RecipeManifestResponse = {
     id: string;
@@ -713,6 +715,7 @@ export type Session = {
     message_count: number;
     output_tokens?: number | null;
     recipe?: Recipe | null;
+    recipe_execution_status?: RecipeExecutionStatus | null;
     schedule_id?: string | null;
     total_tokens?: number | null;
     updated_at: string;
@@ -774,6 +777,7 @@ export type SetupResponse = {
 
 export type StartAgentRequest = {
     recipe?: Recipe | null;
+    recipe_id?: string | null;
     working_dir: string;
 };
 

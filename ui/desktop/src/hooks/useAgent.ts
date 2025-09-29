@@ -27,6 +27,7 @@ export enum AgentState {
 
 export interface InitializationContext {
   recipeConfig?: Recipe;
+  recipeId?: string | null;
   resumeSessionId?: string;
   setAgentWaitingMessage: (msg: string | null) => void;
   setIsExtensionsLoading?: (isLoading: boolean) => void;
@@ -52,6 +53,9 @@ export function useAgent(): UseAgentReturn {
   const [recipeFromAppConfig, setRecipeFromAppConfig] = useState<Recipe | null>(
     (window.appConfig.get('recipe') as Recipe) || null
   );
+  const [recipeIdFromAppConfig, setRecipeIdFromAppConfig] = useState<string | null>(
+    (window.appConfig.get('recipeId') as string | null) ?? null
+  );
 
   const { getExtensions, addExtension, read } = useConfig();
 
@@ -59,6 +63,7 @@ export function useAgent(): UseAgentReturn {
     setSessionId(null);
     setAgentState(AgentState.UNINITIALIZED);
     setRecipeFromAppConfig(null);
+    setRecipeIdFromAppConfig(null);
   }, []);
 
   const agentIsInitialized = agentState === AgentState.INITIALIZED;
@@ -74,6 +79,9 @@ export function useAgent(): UseAgentReturn {
 
         const agentSession = agentResponse.data;
         const messages = agentSession.conversation || [];
+        const recipeExecutionStatus =
+          (agentSession as unknown as { recipe_execution_status?: ChatType['recipeExecutionStatus'] })
+            .recipe_execution_status ?? null;
         return {
           sessionId: agentSession.id,
           title: agentSession.recipe?.title || agentSession.description,
@@ -82,6 +90,8 @@ export function useAgent(): UseAgentReturn {
             convertApiMessageToFrontendMessage(message)
           ),
           recipeConfig: agentSession.recipe,
+          recipeId: recipeIdFromAppConfig ?? initContext.recipeId ?? null,
+          recipeExecutionStatus,
         };
       }
 
@@ -115,10 +125,10 @@ export function useAgent(): UseAgentReturn {
                 body: {
                   working_dir: window.appConfig.get('GOOSE_WORKING_DIR') as string,
                   recipe: recipeFromAppConfig ?? initContext.recipeConfig,
+                  recipe_id: recipeIdFromAppConfig ?? initContext.recipeId ?? undefined,
                 },
                 throwOnError: true,
               });
-
           const agentSession = agentResponse.data;
           if (!agentSession) {
             throw Error('Failed to get session info');
@@ -152,6 +162,9 @@ export function useAgent(): UseAgentReturn {
           }
 
           const messages = agentSession.conversation || [];
+          const recipeExecutionStatus =
+            (agentSession as unknown as { recipe_execution_status?: ChatType['recipeExecutionStatus'] })
+              .recipe_execution_status ?? null;
           let initChat: ChatType = {
             sessionId: agentSession.id,
             title: agentSession.recipe?.title || agentSession.description,
@@ -160,6 +173,8 @@ export function useAgent(): UseAgentReturn {
               convertApiMessageToFrontendMessage(message)
             ),
             recipeConfig: agentSession.recipe,
+            recipeId: recipeIdFromAppConfig ?? initContext.recipeId ?? null,
+            recipeExecutionStatus,
           };
 
           setAgentState(AgentState.INITIALIZED);
