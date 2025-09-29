@@ -1940,7 +1940,11 @@ fn add_provider() -> Result<(), Box<dyn Error>> {
         })
         .interact()?;
 
-    let api_key: String = cliclack::password("API key:").mask('▪').interact()?;
+    let api_key_input = cliclack::input("API key (optional, leave empty if not required):")
+        .placeholder("Enter API key or leave empty")
+        .required(false)
+        .interact()?;
+    let api_key: String = api_key_input;
 
     let models_input: String = cliclack::input("Available models (seperate with commas):")
         .placeholder("model-a, model-b, model-c")
@@ -1963,11 +1967,17 @@ fn add_provider() -> Result<(), Box<dyn Error>> {
         .initial_value(true)
         .interact()?;
 
+    let api_key_option = if api_key.trim().is_empty() {
+        None
+    } else {
+        Some(api_key)
+    };
+
     CustomProviderConfig::create_and_save(
         provider_type,
         display_name.clone(),
         api_url,
-        api_key,
+        api_key_option,
         models,
         Some(supports_streaming),
     )?;

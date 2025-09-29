@@ -114,9 +114,11 @@ impl OpenAiProvider {
 
     pub fn from_custom_config(model: ModelConfig, config: CustomProviderConfig) -> Result<Self> {
         let global_config = crate::config::Config::global();
+
+        // Try to get API key, but don't fail if it's not found (for providers that don't need it)
         let api_key: String = global_config
             .get_secret(&config.api_key_env)
-            .map_err(|_e| anyhow::anyhow!("Missing API key: {}", config.api_key_env))?;
+            .unwrap_or_else(|_| String::new());
 
         let url = url::Url::parse(&config.base_url)
             .map_err(|e| anyhow::anyhow!("Invalid base URL '{}': {}", config.base_url, e))?;

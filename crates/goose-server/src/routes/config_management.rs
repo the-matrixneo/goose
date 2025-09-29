@@ -81,7 +81,7 @@ pub struct CreateCustomProviderRequest {
     pub provider_type: String,
     pub display_name: String,
     pub api_url: String,
-    pub api_key: String,
+    pub api_key: Option<String>,
     pub models: Vec<String>,
     pub supports_streaming: Option<bool>,
 }

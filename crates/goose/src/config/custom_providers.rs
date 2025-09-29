@@ -64,7 +64,7 @@ impl CustomProviderConfig {
         provider_type: &str,
         display_name: String,
         api_url: String,
-        api_key: String,
+        api_key: Option<String>,
         models: Vec<String>,
         supports_streaming: Option<bool>,
     ) -> Result<Self> {
@@ -72,7 +72,13 @@ impl CustomProviderConfig {
         let api_key_name = Self::generate_api_key_name(&id);
 
         let config = Config::global();
-        config.set_secret(&api_key_name, serde_json::Value::String(api_key))?;
+
+        // Only store API key if provided
+        if let Some(key) = &api_key {
+            if !key.trim().is_empty() {
+                config.set_secret(&api_key_name, serde_json::Value::String(key.clone()))?;
+            }
+        }
 
         let model_infos: Vec<ModelInfo> = models
             .into_iter()

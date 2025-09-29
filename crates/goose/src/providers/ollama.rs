@@ -116,7 +116,13 @@ impl OllamaProvider {
                 .map_err(|_| anyhow::anyhow!("Failed to set default port"))?;
         }
 
-        // No authentication for Ollama
+        // Check if API key is provided for custom config, but don't require it for Ollama
+        let global_config = crate::config::Config::global();
+        let _api_key: String = global_config
+            .get_secret(&config.api_key_env)
+            .unwrap_or_else(|_| String::new()); // Ollama typically doesn't need API keys
+
+        // No authentication for Ollama (even for custom configs)
         let auth = AuthMethod::Custom(Box::new(NoAuth));
         let api_client = ApiClient::with_timeout(base_url.to_string(), auth, timeout)?;
 
