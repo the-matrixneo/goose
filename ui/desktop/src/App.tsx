@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useState } from 'react';
 import { IpcRendererEvent } from 'electron';
 import {
   HashRouter,
@@ -78,7 +78,7 @@ const PairRouteWrapper = ({
   loadCurrentChat,
 }: {
   chat: ChatType;
-  setChat: (chat: ChatType) => void;
+  setChat: Dispatch<SetStateAction<ChatType>>;
   setIsGoosehintsModalOpen: (isOpen: boolean) => void;
   setAgentWaitingMessage: (msg: string | null) => void;
   setFatalError: (value: ((prevState: string | null) => string | null) | string | null) => void;

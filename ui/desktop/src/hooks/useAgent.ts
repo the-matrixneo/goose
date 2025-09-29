@@ -67,6 +67,24 @@ export function useAgent(): UseAgentReturn {
   }, []);
 
   const agentIsInitialized = agentState === AgentState.INITIALIZED;
+  const getRecipeSetupState = useCallback(
+    (agentSession: unknown): ChatType['recipeSetupState'] => {
+      const rawRecipeSetupState =
+        (agentSession as unknown as {
+          recipe_setup_state?: { trust_granted?: boolean; parameters_satisfied?: boolean } | null;
+        })?.recipe_setup_state ?? null;
+
+      if (!rawRecipeSetupState) {
+        return null;
+      }
+
+      return {
+        trustGranted: Boolean(rawRecipeSetupState.trust_granted),
+        parametersSatisfied: Boolean(rawRecipeSetupState.parameters_satisfied),
+      };
+    },
+    []
+  );
   const currentChat = useCallback(
     async (initContext: InitializationContext): Promise<ChatType> => {
       if (agentIsInitialized && sessionId) {
@@ -81,6 +99,7 @@ export function useAgent(): UseAgentReturn {
         const recipeExecutionStatus =
           (agentSession as unknown as { recipe_execution_status?: ChatType['recipeExecutionStatus'] })
             .recipe_execution_status ?? null;
+        const recipeSetupState = getRecipeSetupState(agentSession);
         return {
           sessionId: agentSession.id,
           title: agentSession.recipe?.title || agentSession.description,
@@ -91,6 +110,7 @@ export function useAgent(): UseAgentReturn {
           recipeConfig: agentSession.recipe,
           recipeId: recipeIdFromAppConfig ?? initContext.recipeId ?? null,
           recipeExecutionStatus,
+          recipeSetupState,
         };
       }
 
@@ -164,6 +184,7 @@ export function useAgent(): UseAgentReturn {
           const recipeExecutionStatus =
             (agentSession as unknown as { recipe_execution_status?: ChatType['recipeExecutionStatus'] })
               .recipe_execution_status ?? null;
+          const recipeSetupState = getRecipeSetupState(agentSession);
           let initChat: ChatType = {
             sessionId: agentSession.id,
             title: agentSession.recipe?.title || agentSession.description,
@@ -174,6 +195,7 @@ export function useAgent(): UseAgentReturn {
             recipeConfig: agentSession.recipe,
             recipeId: recipeIdFromAppConfig ?? initContext.recipeId ?? null,
             recipeExecutionStatus,
+            recipeSetupState,
           };
 
           setAgentState(AgentState.INITIALIZED);
@@ -195,7 +217,16 @@ export function useAgent(): UseAgentReturn {
       initPromiseRef.current = initPromise;
       return initPromise;
     },
-    [agentIsInitialized, sessionId, read, recipeFromAppConfig, getExtensions, addExtension]
+    [
+      agentIsInitialized,
+      sessionId,
+      read,
+      recipeFromAppConfig,
+      getExtensions,
+      addExtension,
+      getRecipeSetupState,
+      recipeIdFromAppConfig,
+    ]
   );
 
   return {

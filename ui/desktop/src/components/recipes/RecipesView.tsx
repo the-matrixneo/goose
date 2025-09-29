@@ -6,7 +6,7 @@ import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Skeleton } from '../ui/skeleton';
 import { MainPanelLayout } from '../Layout/MainPanelLayout';
-import { Recipe, generateDeepLink } from '../../recipe';
+import { generateDeepLink } from '../../recipe';
 import { toastSuccess, toastError } from '../../toasts';
 import { useEscapeKey } from '../../hooks/useEscapeKey';
 import { deleteRecipe, RecipeManifestResponse } from '../../api';

@@ -8,7 +8,7 @@ export const DEFAULT_CHAT_TITLE = 'New Chat';
 
 interface ChatContextType {
   chat: ChatType;
-  setChat: (chat: ChatType) => void;
+  setChat: React.Dispatch<React.SetStateAction<ChatType>>;
   resetChat: () => void;
   hasActiveSession: boolean;
   setRecipeConfig: (recipe: Recipe | null) => void;
@@ -27,7 +27,7 @@ const ChatContext = createContext<ChatContextType | undefined>(undefined);
 interface ChatProviderProps {
   children: ReactNode;
   chat: ChatType;
-  setChat: (chat: ChatType) => void;
+  setChat: React.Dispatch<React.SetStateAction<ChatType>>;
   contextKey?: string; // Optional context key, defaults to 'hub'
   agentWaitingMessage: string | null;
 }
@@ -62,6 +62,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       recipeParameters: null,
       recipeId: null,
       recipeExecutionStatus: null,
+      recipeSetupState: null,
     });
     clearDraft();
   };

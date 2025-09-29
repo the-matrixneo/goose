@@ -31,6 +31,8 @@ export const useRecipeManager = (chat: ChatType, recipeConfig?: Recipe | null) =
   }, [messages]);
 
   const finalRecipeConfig = chat.recipeConfig;
+  const recipeSetupState = chat.recipeSetupState;
+  const trustGranted = recipeSetupState?.trustGranted;
 
   useEffect(() => {
     if (!chatContext) return;
@@ -51,34 +53,41 @@ export const useRecipeManager = (chat: ChatType, recipeConfig?: Recipe | null) =
 
   useEffect(() => {
     const checkRecipeAcceptance = async () => {
-      if (finalRecipeConfig) {
-        if (chat.recipeExecutionStatus === 'PendingTrust') {
-          setRecipeAccepted(false);
-          setHasSecurityWarnings(false);
-          setIsRecipeWarningModalOpen(false);
-          return;
-        }
+      if (!finalRecipeConfig) {
+        return;
+      }
 
-        try {
-          const hasAccepted = await window.electron.hasAcceptedRecipeBefore(finalRecipeConfig);
+      if (trustGranted === false) {
+        setRecipeAccepted(false);
+        setHasSecurityWarnings(false);
+        setIsRecipeWarningModalOpen(false);
+        return;
+      }
 
-          if (!hasAccepted) {
-            const securityScanResult = await scanRecipe(finalRecipeConfig);
-            setHasSecurityWarnings(securityScanResult.has_security_warnings);
+      if (trustGranted === true) {
+        setRecipeAccepted(true);
+        return;
+      }
 
-            setIsRecipeWarningModalOpen(true);
-          } else {
-            setRecipeAccepted(true);
-          }
-        } catch {
-          setHasSecurityWarnings(false);
+      try {
+        const hasAccepted = await window.electron.hasAcceptedRecipeBefore(finalRecipeConfig);
+
+        if (!hasAccepted) {
+          const securityScanResult = await scanRecipe(finalRecipeConfig);
+          setHasSecurityWarnings(securityScanResult.has_security_warnings);
+
           setIsRecipeWarningModalOpen(true);
+        } else {
+          setRecipeAccepted(true);
         }
+      } catch {
+        setHasSecurityWarnings(false);
+        setIsRecipeWarningModalOpen(true);
       }
     };
 
     checkRecipeAcceptance();
-  }, [chat.recipeExecutionStatus, finalRecipeConfig]);
+  }, [chat.recipeExecutionStatus, finalRecipeConfig, trustGranted]);
 
   // Filter parameters to only show valid ones that are actually used in the recipe
   const filteredParameters = useMemo(() => {
@@ -96,14 +105,28 @@ export const useRecipeManager = (chat: ChatType, recipeConfig?: Recipe | null) =
     return filteredParameters.length > 0;
   }, [filteredParameters]);
   const hasParameters = !!recipeParameters;
+  const inlineRecipeSetupActive = Boolean(
+    recipeSetupState && (!recipeSetupState.trustGranted || !recipeSetupState.parametersSatisfied)
+  );
   const hasMessages = messages.length > 0;
   useEffect(() => {
+    if (inlineRecipeSetupActive) {
+      setIsParameterModalOpen(false);
+      return;
+    }
+
     if (requiresParameters && recipeAccepted) {
       if (!hasParameters && !hasMessages) {
         setIsParameterModalOpen(true);
       }
     }
-  }, [requiresParameters, hasParameters, recipeAccepted, hasMessages]);
+  }, [
+    inlineRecipeSetupActive,
+    requiresParameters,
+    hasParameters,
+    recipeAccepted,
+    hasMessages,
+  ]);
 
   useEffect(() => {
     setReadyForAutoUserPrompt(true);
@@ -125,6 +148,22 @@ export const useRecipeManager = (chat: ChatType, recipeConfig?: Recipe | null) =
     setRecipeParameters(inputValues);
     setIsParameterModalOpen(false);
 
+    if (chatContext) {
+      chatContext.setChat((prevChat) => {
+        if (!prevChat.recipeSetupState) {
+          return prevChat;
+        }
+
+        return {
+          ...prevChat,
+          recipeSetupState: {
+            ...prevChat.recipeSetupState,
+            parametersSatisfied: true,
+          },
+        };
+      });
+    }
+
     try {
       await updateSystemPromptWithParameters(
         chat.sessionId,
@@ -142,6 +181,21 @@ export const useRecipeManager = (chat: ChatType, recipeConfig?: Recipe | null) =
         await window.electron.recordRecipeHash(finalRecipeConfig);
         setRecipeAccepted(true);
         setIsRecipeWarningModalOpen(false);
+        if (chatContext) {
+          chatContext.setChat((prevChat) => {
+            if (!prevChat.recipeSetupState) {
+              return prevChat;
+            }
+
+            return {
+              ...prevChat,
+              recipeSetupState: {
+                ...prevChat.recipeSetupState,
+                trustGranted: true,
+              },
+            };
+          });
+        }
       }
     } catch (error) {
       console.error('Error recording recipe hash:', error);
