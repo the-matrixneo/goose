@@ -58,7 +58,7 @@ pub enum ModelError {
     UnsupportedLocation(String),
 }
 
-/// Represents available GCP Vertex AI models for goose.
+/// Represents available GCP Vertex AI models for Goose.
 ///
 /// This enum encompasses different model families and their versions
 /// that are supported in the GCP Vertex AI platform.
@@ -70,7 +70,7 @@ pub enum GcpVertexAIModel {
     Gemini(GeminiVersion),
 }
 
-/// Represents available versions of the Claude model for goose.
+/// Represents available versions of the Claude model for Goose.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ClaudeVersion {
     /// Claude 3.7 Sonnet
@@ -83,7 +83,7 @@ pub enum ClaudeVersion {
     Generic(String),
 }
 
-/// Represents available versions of the Gemini model for goose.
+/// Represents available versions of the Gemini model for Goose.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum GeminiVersion {
     /// Gemini 1.5 Pro version

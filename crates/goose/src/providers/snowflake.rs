@@ -87,7 +87,7 @@ impl SnowflakeProvider {
         };
 
         let auth = AuthMethod::BearerToken(token?);
-        let api_client = ApiClient::new(base_url, auth)?.with_header("User-Agent", "goose")?;
+        let api_client = ApiClient::new(base_url, auth)?.with_header("User-Agent", "Goose")?;
 
         Ok(Self {
             api_client,

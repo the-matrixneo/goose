@@ -378,7 +378,7 @@ const config: Config = {
           title: "Quick Links",
           items: [
             {
-              label: "Install goose",
+              label: "Install Goose",
               to: "docs/getting-started/installation",
             },
             {
@@ -460,7 +460,7 @@ const config: Config = {
             },
           },
         ],
-        quickQuestions: ["What is goose?"],
+        quickQuestions: ["What is Goose?"],
       },
     },
     announcementBar: {

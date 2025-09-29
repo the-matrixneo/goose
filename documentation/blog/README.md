@@ -1,13 +1,13 @@
 ---
 unlisted: true
 ---
-# Writing Blog Posts for goose
+# Writing Blog Posts for Goose
 
-This guide explains how to write and structure blog posts for the goose documentation site.
+This guide explains how to write and structure blog posts for the Goose documentation site.
 
 ## Getting Started
 
-1. Clone the goose repository:
+1. Clone the Goose repository:
 ```bash
 git clone https://github.com/block/goose.git
 cd goose

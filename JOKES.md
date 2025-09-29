@@ -1,6 +1,6 @@
-# goose Jokes 🦢
+# Goose Jokes 🦢
 
-## Why did the goose become a developer?
+## Why did the Goose become a developer?
 
 Because it wanted to help debug all those "fowl" errors in the code!
 

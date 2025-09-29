@@ -1,6 +1,6 @@
 # AGENTS Instructions
 
-goose is an AI agent framework in Rust with CLI and Electron desktop interfaces.
+Goose is an AI agent framework in Rust with CLI and Electron desktop interfaces.
 
 ## Setup
 ```bash
