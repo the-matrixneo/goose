@@ -59,7 +59,7 @@ struct StreamingChunk {
 ///   even though the message structure is otherwise following openai, the enum switches this
 pub fn format_messages(messages: &[Message], image_format: &ImageFormat) -> Vec<Value> {
     let mut messages_spec = Vec::new();
-    for message in messages {
+    for message in messages.iter().filter(|m| m.is_agent_visible()) {
         let mut converted = json!({
             "role": message.role
         });
