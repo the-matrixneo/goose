@@ -65,6 +65,7 @@ import { Message } from '../types/message';
 import { ChatState } from '../types/chatState';
 import { ChatType } from '../types/chat';
 import { useToolCount } from './alerts/useToolCount';
+import { SamplingIndicator } from './SamplingIndicator';
 
 // Context for sharing current model info
 const CurrentModelContext = createContext<{ model: string; mode: string } | null>(null);
@@ -183,6 +184,7 @@ function BaseChatContent({
     isUserMessage,
     clearError,
     onMessageUpdate,
+    samplingInfo,
   } = useChatEngine({
     chat,
     setChat,
@@ -406,6 +408,7 @@ function BaseChatContent({
                       isStreamingMessage={chatState !== ChatState.Idle}
                       onMessageUpdate={onMessageUpdate}
                       onRenderingComplete={handleRenderingComplete}
+                      samplingExchanges={samplingInfo.exchanges}
                     />
                   ) : (
                     // Render messages with SearchView wrapper when search is enabled
@@ -423,6 +426,7 @@ function BaseChatContent({
                         isStreamingMessage={chatState !== ChatState.Idle}
                         onMessageUpdate={onMessageUpdate}
                         onRenderingComplete={handleRenderingComplete}
+                        samplingExchanges={samplingInfo.exchanges}
                       />
                     </SearchView>
                   )}
@@ -477,6 +481,16 @@ function BaseChatContent({
             {/* Custom content after messages */}
             {renderAfterMessages && renderAfterMessages()}
           </ScrollArea>
+
+          {/* MCP Sampling indicator at top right of chat container */}
+          {samplingInfo.isActive && (
+            <div className="absolute top-4 right-4 z-20">
+              <SamplingIndicator
+                isActive={samplingInfo.isActive}
+                extensionName={samplingInfo.extensionName}
+              />
+            </div>
+          )}
 
           {/* Fixed loading indicator at bottom left of chat container */}
           {(chatState !== ChatState.Idle || loadingChat || isCompacting) && (

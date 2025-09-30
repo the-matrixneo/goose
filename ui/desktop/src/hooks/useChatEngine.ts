@@ -87,6 +87,7 @@ export const useChatEngine = ({
     notifications,
     session,
     setError,
+    samplingInfo,
   } = useMessageStream({
     api: getApiUrl('/reply'),
     id: chat.sessionId,
@@ -486,5 +487,8 @@ export const useChatEngine = ({
 
     // New functions for message editing
     onMessageUpdate,
+
+    // MCP sampling info
+    samplingInfo,
   };
 };
