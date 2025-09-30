@@ -96,33 +96,6 @@ export interface UseMessageStreamOptions {
   maxSteps?: number;
 }
 
-export interface SamplingInfo {
-  isActive: boolean;
-  extensionName?: string;
-  exchanges?: SamplingExchange[];
-}
-
-export interface SamplingExchange {
-  extensionName: string;
-  request: {
-    messages: Array<{
-      role: string;
-      content: string | any[];
-    }>;
-    systemPrompt?: string;
-    maxTokens?: number;
-    temperature?: number;
-    model?: string;
-  };
-  response?: {
-    content: string | any[];
-    model?: string;
-    stopReason?: string;
-  };
-  error?: string;
-  timestamp: number;
-}
-
 export interface UseMessageStreamHelpers {
   /** Current messages in the chat */
   messages: Message[];
@@ -184,9 +157,6 @@ export interface UseMessageStreamHelpers {
 
   /** Clear error state */
   setError: (error: Error | undefined) => void;
-
-  /** Information about active MCP sampling */
-  samplingInfo: SamplingInfo;
 }
 
 /**
@@ -219,7 +189,6 @@ export function useMessageStream({
     null
   );
   const [session, setSession] = useState<Session | null>(null);
-  const [samplingInfo, setSamplingInfo] = useState<SamplingInfo>({ isActive: false });
 
   // expose a way to update the body so we can update the session id when CLE occurs
   const updateMessageStreamBody = useCallback((newBody: object) => {
@@ -344,46 +313,6 @@ export function useMessageStream({
                       ...parsedEvent,
                     };
                     setNotifications((prev) => [...prev, newNotification]);
-
-                    // Check if this is a sampling notification
-                    if (parsedEvent.message.method === 'sampling/start') {
-                      const params = parsedEvent.message.params as { 
-                        extension?: string;
-                        request?: any;
-                      };
-                      setSamplingInfo(prev => ({
-                        isActive: true,
-                        extensionName: params.extension,
-                        exchanges: [
-                          ...(prev.exchanges || []),
-                          {
-                            extensionName: params.extension || 'unknown',
-                            request: params.request || { messages: [] },
-                            timestamp: Date.now(),
-                          }
-                        ]
-                      }));
-                    } else if (parsedEvent.message.method === 'sampling/end') {
-                      const params = parsedEvent.message.params as { 
-                        extension?: string;
-                        response?: any;
-                        error?: string;
-                      };
-                      setSamplingInfo(prev => {
-                        const exchanges = prev.exchanges || [];
-                        if (exchanges.length > 0) {
-                          const lastExchange = exchanges[exchanges.length - 1];
-                          if (!lastExchange.response) {
-                            lastExchange.response = params.response;
-                            lastExchange.error = params.error;
-                          }
-                        }
-                        return {
-                          ...prev,
-                          isActive: false,
-                        };
-                      });
-                    }
                     break;
                   }
 
@@ -557,9 +486,6 @@ export function useMessageStream({
         mutateChatState(ChatState.Thinking);
       }
 
-      // Clear sampling exchanges when starting a new message
-      setSamplingInfo({ isActive: false, exchanges: [] });
-
       const currentMessages = [...messagesRef.current, messageToAppend];
       mutate(currentMessages, false);
       await sendRequest(currentMessages);
@@ -702,6 +628,5 @@ export function useMessageStream({
     currentModelInfo,
     session: session,
     setError,
-    samplingInfo,
   };
 }

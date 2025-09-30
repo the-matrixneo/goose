@@ -20,8 +20,7 @@ import GooseMessage from './GooseMessage';
 import UserMessage from './UserMessage';
 import { CompactionMarker } from './context_management/CompactionMarker';
 import { useContextManager } from './context_management/ContextManager';
-import { NotificationEvent, SamplingExchange as SamplingExchangeType } from '../hooks/useMessageStream';
-import SamplingExchange from './SamplingExchange';
+import { NotificationEvent } from '../hooks/useMessageStream';
 import LoadingGoose from './LoadingGoose';
 import { ChatType } from '../types/chat';
 
@@ -40,7 +39,6 @@ interface ProgressiveMessageListProps {
   isStreamingMessage?: boolean; // Whether messages are currently being streamed
   onMessageUpdate?: (messageId: string, newContent: string) => void;
   onRenderingComplete?: () => void; // Callback when all messages are rendered
-  samplingExchanges?: SamplingExchangeType[]; // Add sampling exchanges
 }
 
 export default function ProgressiveMessageList({
@@ -57,7 +55,6 @@ export default function ProgressiveMessageList({
   isStreamingMessage = false, // Whether messages are currently being streamed
   onMessageUpdate,
   onRenderingComplete,
-  samplingExchanges = [],
 }: ProgressiveMessageListProps) {
   const [renderedCount, setRenderedCount] = useState(() => {
     // Initialize with either all messages (if small) or first batch (if large)
@@ -250,20 +247,6 @@ export default function ProgressiveMessageList({
   return (
     <>
       {renderMessages()}
-
-      {/* Render sampling exchanges inline */}
-      {samplingExchanges.length > 0 && (
-        <div className="mt-4">
-          {samplingExchanges.map((exchange, index) => (
-            <div key={`sampling-${exchange.timestamp}-${index}`} className="mb-3">
-              <SamplingExchange 
-                exchange={exchange} 
-                isStreamingMessage={isStreamingMessage && index === samplingExchanges.length - 1}
-              />
-            </div>
-          ))}
-        </div>
-      )}
 
       {/* Loading indicator when progressively rendering */}
       {isLoading && (
