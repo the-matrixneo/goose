@@ -98,9 +98,6 @@ fn parse_key_val(s: &str) -> Result<(String, String), String> {
 enum SessionCommand {
     #[command(about = "List all available sessions")]
     List {
-        #[arg(short, long, help = "List all available sessions")]
-        verbose: bool,
-
         #[arg(
             short,
             long,
@@ -115,6 +112,16 @@ enum SessionCommand {
             long_help = "Sort sessions by date in ascending order (oldest first). Default is descending order (newest first)."
         )]
         ascending: bool,
+
+        #[arg(
+            short = 'p',
+            long = "working_dir",
+            help = "Filter sessions by working directory"
+        )]
+        working_dir: Option<PathBuf>,
+
+        #[arg(short = 'l', long = "limit", help = "Limit the number of results")]
+        limit: Option<usize>,
     },
     #[command(about = "Remove sessions. Runs interactively if no ID or regex is provided.")]
     Remove {
@@ -182,11 +189,9 @@ enum SchedulerCommand {
         /// ID of the schedule
         #[arg(long, help = "ID of the schedule")] // Explicitly make it --id
         id: String,
-        /// Maximum number of sessions to return
         #[arg(long, help = "Maximum number of sessions to return")]
-        limit: Option<u32>,
+        limit: Option<usize>,
     },
-    /// Run a scheduled job immediately
     #[command(about = "Run a scheduled job immediately")]
     RunNow {
         /// ID of the schedule to run
@@ -302,12 +307,12 @@ enum RecipeCommand {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Configure Goose settings
-    #[command(about = "Configure Goose settings")]
+    /// Configure goose settings
+    #[command(about = "Configure goose settings")]
     Configure {},
 
-    /// Display Goose configuration information
-    #[command(about = "Display Goose information")]
+    /// Display goose configuration information
+    #[command(about = "Display goose information")]
     Info {
         /// Show verbose information including current configuration
         #[arg(short, long, help = "Show verbose information including config.yaml")]
@@ -318,8 +323,8 @@ enum Command {
     #[command(about = "Run one of the mcp servers bundled with goose")]
     Mcp { name: String },
 
-    /// Run Goose as an ACP (Agent Client Protocol) agent
-    #[command(about = "Run Goose as an ACP agent server on stdio")]
+    /// Run goose as an ACP (Agent Client Protocol) agent
+    #[command(about = "Run goose as an ACP agent server on stdio")]
     Acp {},
 
     /// Start or resume interactive chat sessions
@@ -445,8 +450,8 @@ enum Command {
             short = 't',
             long = "text",
             value_name = "TEXT",
-            help = "Input text to provide to Goose directly",
-            long_help = "Input text containing commands for Goose. Use this in lieu of the instructions argument.",
+            help = "Input text to provide to goose directly",
+            long_help = "Input text containing commands for goose. Use this in lieu of the instructions argument.",
             conflicts_with = "instructions",
             conflicts_with = "recipe"
         )]
@@ -656,7 +661,7 @@ enum Command {
         command: SchedulerCommand,
     },
 
-    /// Update the Goose CLI version
+    /// Update the goose CLI version
     #[command(about = "Update the goose CLI version")]
     Update {
         /// Update to canary version
@@ -668,7 +673,7 @@ enum Command {
         )]
         canary: bool,
 
-        /// Enforce to re-configure Goose during update
+        /// Enforce to re-configure goose during update
         #[arg(short, long, help = "Enforce to re-configure goose during update")]
         reconfigure: bool,
     },
@@ -703,6 +708,10 @@ enum Command {
         /// Open browser automatically
         #[arg(long, help = "Open browser automatically when server starts")]
         open: bool,
+
+        /// Authentication token for both Basic Auth (password) and Bearer token
+        #[arg(long, help = "Authentication token to secure the web interface")]
+        auth_token: Option<String>,
     },
 }
 
@@ -791,11 +800,12 @@ pub async fn cli() -> Result<()> {
         }) => {
             return match command {
                 Some(SessionCommand::List {
-                    verbose,
                     format,
                     ascending,
+                    working_dir,
+                    limit,
                 }) => {
-                    handle_session_list(verbose, format, ascending).await?;
+                    handle_session_list(format, ascending, working_dir, limit).await?;
                     Ok(())
                 }
                 Some(SessionCommand::Remove { id, regex }) => {
@@ -1211,8 +1221,13 @@ pub async fn cli() -> Result<()> {
             }
             return Ok(());
         }
-        Some(Command::Web { port, host, open }) => {
-            crate::commands::web::handle_web(port, host, open).await?;
+        Some(Command::Web {
+            port,
+            host,
+            open,
+            auth_token,
+        }) => {
+            crate::commands::web::handle_web(port, host, open, auth_token).await?;
             return Ok(());
         }
         None => {
@@ -1247,6 +1262,7 @@ pub async fn cli() -> Result<()> {
                 .await;
                 if let Err(e) = session.interactive(None).await {
                     eprintln!("Session ended with error: {}", e);
+                    std::process::exit(1);
                 }
                 Ok(())
             };

@@ -8,8 +8,9 @@ use goose::permission::permission_confirmation::PrincipalType;
 use goose::providers::base::{ConfigKey, ModelInfo, ProviderMetadata};
 use goose::session::{Session, SessionInsights};
 use rmcp::model::{
-    Annotations, Content, EmbeddedResource, ImageContent, RawEmbeddedResource, RawImageContent,
-    RawResource, RawTextContent, ResourceContents, Role, TextContent, Tool, ToolAnnotations,
+    Annotations, Content, EmbeddedResource, ImageContent, JsonObject, RawEmbeddedResource,
+    RawImageContent, RawResource, RawTextContent, ResourceContents, Role, TextContent, Tool,
+    ToolAnnotations,
 };
 use utoipa::{OpenApi, ToSchema};
 
@@ -311,6 +312,7 @@ derive_utoipa!(Tool as ToolSchema);
 derive_utoipa!(ToolAnnotations as ToolAnnotationsSchema);
 derive_utoipa!(Annotations as AnnotationsSchema);
 derive_utoipa!(ResourceContents as ResourceContentsSchema);
+derive_utoipa!(JsonObject as JsonObjectSchema);
 
 // Create a manual schema for the generic Annotated type
 // We manually define this to avoid circular references from RawContent::Audio(AudioContent)
@@ -430,6 +432,7 @@ impl<'__s> ToSchema<'__s> for AnnotatedSchema {
         ResourceContentsSchema,
         ContextLengthExceeded,
         SummarizationRequested,
+        JsonObjectSchema,
         RoleSchema,
         ProviderMetadata,
         ExtensionEntry,
