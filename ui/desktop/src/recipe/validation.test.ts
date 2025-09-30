@@ -184,9 +184,9 @@ describe('Recipe Validation', () => {
           ...validRecipe,
           extensions: [
             {
-              // Only required fields for builtin extension
               type: 'builtin',
               name: 'developer',
+              description: 'description',
             },
           ],
         };
@@ -554,10 +554,12 @@ describe('Recipe Validation', () => {
           {
             type: 'builtin',
             name: 'developer',
+            description: 'developer',
           },
           {
             type: 'builtin',
             name: 'computercontroller',
+            description: 'computercontroller',
           },
         ],
       };

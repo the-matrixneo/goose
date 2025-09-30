@@ -186,17 +186,6 @@ export function combineCmdAndArgs(cmd: string, args: string[]): string {
   return [cmd, ...args].join(' ');
 }
 
-/**
- * Extracts the ExtensionConfig from a FixedExtensionEntry object
- * @param fixedEntry - The FixedExtensionEntry object
- * @returns The ExtensionConfig portion of the object
- */
-export function extractExtensionConfig(fixedEntry: FixedExtensionEntry): ExtensionConfig {
-  // todo: enabled not used?
-  const { ...extensionConfig } = fixedEntry;
-  return extensionConfig;
-}
-
 export async function replaceWithShims(cmd: string) {
   const binaryPathMap: Record<string, string> = {
     goosed: await window.electron.getBinaryPath('goosed'),

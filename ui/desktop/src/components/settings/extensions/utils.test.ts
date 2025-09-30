@@ -6,7 +6,6 @@ import {
   createExtensionConfig,
   splitCmdAndArgs,
   combineCmdAndArgs,
-  extractExtensionConfig,
   replaceWithShims,
   removeShims,
   extractCommand,
@@ -185,7 +184,7 @@ describe('Extension Utils', () => {
 
       expect(formData).toEqual({
         name: 'developer',
-        description: '',
+        description: 'developer',
         type: 'builtin',
         cmd: undefined,
         endpoint: undefined,
@@ -286,7 +285,7 @@ describe('Extension Utils', () => {
     it('should create builtin extension config', () => {
       const formData = {
         name: 'developer',
-        description: '',
+        description: 'developer',
         type: 'builtin' as const,
         cmd: '',
         endpoint: '',
@@ -301,6 +300,7 @@ describe('Extension Utils', () => {
       expect(config).toEqual({
         type: 'builtin',
         name: 'developer',
+        description: 'developer',
         timeout: 300,
       });
     });
@@ -339,31 +339,6 @@ describe('Extension Utils', () => {
       expect(combineCmdAndArgs('node', [])).toBe('node');
 
       expect(combineCmdAndArgs('', ['arg1', 'arg2'])).toBe(' arg1 arg2');
-    });
-  });
-
-  describe('extractExtensionConfig', () => {
-    it('should extract extension config from fixed entry', () => {
-      const fixedEntry: FixedExtensionEntry = {
-        type: 'stdio',
-        name: 'test-extension',
-        description: 'test-extension',
-        cmd: 'python',
-        args: ['script.py'],
-        enabled: true,
-        timeout: 300,
-      };
-
-      const config = extractExtensionConfig(fixedEntry);
-
-      expect(config).toEqual({
-        type: 'stdio',
-        name: 'test-extension',
-        cmd: 'python',
-        args: ['script.py'],
-        enabled: true,
-        timeout: 300,
-      });
     });
   });
 
