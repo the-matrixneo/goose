@@ -1,11 +1,11 @@
-import { spawn, ChildProcess, execSync } from 'child_process';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as https from 'https';
-import * as os from 'os';
+import { spawn, ChildProcess, execSync } from 'node:child_process';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import * as https from 'node:https';
+import * as os from 'node:os';
+import { EventEmitter } from 'node:events';
+import { Buffer } from 'node:buffer';
 import log from './logger';
-import { EventEmitter } from 'events';
-import { Buffer } from 'buffer';
 
 const RELEASE_BASE = 'https://github.com/cloudflare/cloudflared/releases/';
 

@@ -74,9 +74,9 @@ export default function TunnelSection() {
         },
       });
       setShowQRModal(true);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Failed to start tunnel:', error);
-      setError(error.message || 'Failed to start tunnel');
+      setError(error instanceof Error ? error.message : 'Failed to start tunnel');
     } finally {
       setIsStarting(false);
     }
@@ -89,9 +89,9 @@ export default function TunnelSection() {
       await window.electron.tunnelStop();
       setTunnelInfo(null);
       setTunnelStatus({ isRunning: false, config: null });
-    } catch (error: any) {
+    } catch (error) {
       console.error('Failed to stop tunnel:', error);
-      setError(error.message || 'Failed to stop tunnel');
+      setError(error instanceof Error ? error.message : 'Failed to stop tunnel');
     } finally {
       setIsStopping(false);
     }

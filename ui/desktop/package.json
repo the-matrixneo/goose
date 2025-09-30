@@ -152,7 +152,7 @@
   "lint-staged": {
     "src/**/*.{ts,tsx}": [
       "bash -c 'npm run typecheck'",
-      "eslint --fix --max-warnings 10",
+      "eslint --fix --max-warnings 0 --no-warn-ignored",
       "prettier --write"
     ],
     "src/**/*.{css,json}": [

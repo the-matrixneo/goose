@@ -1,11 +1,11 @@
 import { CloudflareTunnel } from './cloudflare-tunnel';
 import * as QRCode from 'qrcode';
-import * as crypto from 'crypto';
+import * as crypto from 'node:crypto';
 import { Buffer } from 'node:buffer';
-import log from './logger';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import os from 'node:os';
+import log from './logger';
 
 export interface TunnelConfig {
   port: number;

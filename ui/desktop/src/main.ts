@@ -1927,48 +1927,6 @@ async function appMain() {
     );
   }
 
-  // Add Tunnel menu
-  const tunnelMenu = new MenuItem({
-    label: 'Tunnel',
-    submenu: Menu.buildFromTemplate([
-      {
-        label: 'Start Tunnel',
-        click: async () => {
-          const focusedWindow = BrowserWindow.getFocusedWindow();
-          if (focusedWindow) {
-            focusedWindow.webContents.send('tunnel-start');
-          }
-        },
-      },
-      {
-        label: 'Stop Tunnel',
-        click: () => {
-          const focusedWindow = BrowserWindow.getFocusedWindow();
-          if (focusedWindow) {
-            focusedWindow.webContents.send('tunnel-stop');
-          }
-        },
-      },
-      {
-        label: 'Show QR Code',
-        click: () => {
-          const focusedWindow = BrowserWindow.getFocusedWindow();
-          if (focusedWindow) {
-            focusedWindow.webContents.send('tunnel-show-qr');
-          }
-        },
-      },
-    ]),
-  });
-
-  // Insert Tunnel menu before Help menu
-  const helpMenuIndex = menu?.items.findIndex((item) => item.label === 'Help') ?? -1;
-  if (helpMenuIndex > 0) {
-    menu?.insert(helpMenuIndex, tunnelMenu);
-  } else {
-    menu?.append(tunnelMenu);
-  }
-
   // on macOS, the topbar is hidden
   if (menu && process.platform !== 'darwin') {
     let helpMenu = menu.items.find((item) => item.label === 'Help');

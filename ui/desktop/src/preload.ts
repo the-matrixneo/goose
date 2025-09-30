@@ -115,9 +115,24 @@ type ElectronAPI = {
   recordRecipeHash: (recipeConfig: Recipe) => Promise<boolean>;
   openDirectoryInExplorer: (directoryPath: string) => Promise<boolean>;
   // Tunnel functions
-  tunnelStart: () => Promise<any>;
+  tunnelStart: () => Promise<{
+    url: string;
+    secret: string;
+    appUrl: string;
+    qrCodeDataUrl: string;
+    qrCodePath: string;
+  }>;
   tunnelStop: () => Promise<boolean>;
-  tunnelStatus: () => Promise<any>;
+  tunnelStatus: () => Promise<{
+    isRunning: boolean;
+    config: {
+      port: number;
+      secret: string;
+      url?: string;
+      qrCodePath?: string;
+      qrCodeDataUrl?: string;
+    } | null;
+  }>;
   tunnelShowQr: () => Promise<boolean>;
 };
 
