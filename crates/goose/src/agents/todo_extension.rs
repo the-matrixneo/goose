@@ -40,7 +40,25 @@ impl TodoClient {
                 version: "1.0.0".to_string(),
             },
             instructions: Some(
-                "Manage TODO lists - read and write task planning content.".to_string(),
+                r#"Use todo_read and todo_write for tasks with 2+ steps, multiple files/components, or uncertain scope.
+
+Workflow:
+- Start: read → write checklist
+- During: read → update progress
+- End: verify all complete
+
+Warning: todo_write overwrites entirely; always todo_read first (skipping is an error)
+
+Keep items short, specific, action-oriented. Not using the todo tools for complex tasks is an error.
+
+Template:
+- [ ] Implement feature X
+  - [ ] Update API
+  - [ ] Write tests
+  - [ ] Run tests (subagent in parallel)
+  - [ ] Run lint (subagent in parallel)
+- [ ] Blocked: waiting on credentials"#
+                    .to_string(),
             ),
         };
 
