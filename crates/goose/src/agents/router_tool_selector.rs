@@ -178,3 +178,65 @@ pub async fn create_tool_selector(
     let selector = LLMToolSelector::new(provider).await?;
     Ok(Box::new(selector))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use async_trait::async_trait;
+    use std::sync::Arc;
+
+    use crate::model::ModelConfig;
+    use crate::providers::base::{Provider, ProviderMetadata};
+    use crate::providers::errors::ProviderError;
+
+    #[derive(Clone)]
+    struct DummyProvider;
+
+    #[async_trait]
+    impl Provider for DummyProvider {
+        fn metadata() -> ProviderMetadata {
+            ProviderMetadata::new(
+                "dummy",
+                "Dummy Provider",
+                "A dummy provider for testing",
+                "dummy-model",
+                vec!["dummy-model"],
+                "",
+                vec![],
+            )
+        }
+
+        async fn complete_with_model(
+            &self,
+            _model_config: &ModelConfig,
+            _system: &str,
+            _messages: &[Message],
+            _tools: &[Tool],
+        ) -> Result<(Message, crate::providers::base::ProviderUsage), ProviderError> {
+            Err(ProviderError::NotImplemented("not used in this test".to_string()))
+        }
+
+        fn get_model_config(&self) -> ModelConfig {
+            ModelConfig::new_or_fail("dummy-model")
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_recent_tool_calls_orders_and_limits() {
+        let provider = Arc::new(DummyProvider);
+        let selector = LLMToolSelector::new(provider).await.expect("selector");
+
+        // Record three tool calls
+        selector.record_tool_call("ext__tool_a").await.unwrap();
+        selector.record_tool_call("ext__tool_b").await.unwrap();
+        selector.record_tool_call("ext__tool_c").await.unwrap();
+
+        // Request the last two calls; should be in reverse chronological order
+        let recent = selector.get_recent_tool_calls(2).await.unwrap();
+        assert_eq!(recent, vec!["ext__tool_c", "ext__tool_b"]);
+
+        // Also verify that asking for more than recorded returns all available in correct order
+        let recent_all = selector.get_recent_tool_calls(10).await.unwrap();
+        assert_eq!(recent_all, vec!["ext__tool_c", "ext__tool_b", "ext__tool_a"]);
+    }
+}
