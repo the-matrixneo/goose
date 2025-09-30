@@ -8,8 +8,8 @@ use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;
 
 use crate::config::permission::PermissionLevel;
+use crate::mcp_utils::ToolResult;
 use crate::permission::Permission;
-use mcp_core::ToolResult;
 use rmcp::model::{Content, ServerNotification};
 
 // ToolCallResult combines the result of a tool call with an optional notification stream that
@@ -70,8 +70,8 @@ impl Agent {
 
                     let confirmation = Message::user().with_tool_confirmation_request(
                         request.id.clone(),
-                        tool_call.name.clone(),
-                        tool_call.arguments.clone(),
+                        tool_call.name.to_string().clone(),
+                        tool_call.arguments.clone().unwrap_or_default(),
                         security_message,
                     );
                     yield confirmation;

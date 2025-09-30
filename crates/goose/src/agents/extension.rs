@@ -1,14 +1,15 @@
 use crate::agents::todo_extension;
+use std::collections::HashMap;
+
+use crate::agents::mcp_client::McpClientTrait;
 use crate::config;
 use crate::config::extensions::name_to_key;
 use crate::config::permission::PermissionLevel;
-use mcp_client::client::Error as ClientError;
-use mcp_client::McpClientTrait;
 use once_cell::sync::Lazy;
 use rmcp::model::Tool;
 use rmcp::service::ClientInitializeError;
+use rmcp::ServiceError as ClientError;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use thiserror::Error;
 use tracing::warn;
 use utoipa::ToSchema;

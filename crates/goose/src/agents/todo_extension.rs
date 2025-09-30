@@ -1,13 +1,13 @@
 use crate::agents::extension::PlatformExtensionContext;
+use crate::agents::mcp_client::{Error, McpClientTrait};
 use crate::session::extension_data::ExtensionState;
 use crate::session::{extension_data, SessionManager};
 use anyhow::Result;
 use async_trait::async_trait;
-use mcp_client::client::{Error, McpClientTrait};
 use rmcp::model::{
-    CallToolResult, Content, GetPromptResult, Implementation, InitializeResult, ListPromptsResult,
-    ListResourcesResult, ListToolsResult, ProtocolVersion, ReadResourceResult, ServerCapabilities,
-    ServerNotification, Tool, ToolsCapability,
+    CallToolResult, Content, GetPromptResult, Implementation, InitializeResult, JsonObject,
+    ListPromptsResult, ListResourcesResult, ListToolsResult, ProtocolVersion, ReadResourceResult,
+    ServerCapabilities, ServerNotification, Tool, ToolsCapability,
 };
 use serde_json::{json, Map, Value};
 use std::sync::Arc;
@@ -36,7 +36,7 @@ impl TodoClient {
                 logging: None,
             },
             server_info: Implementation {
-                name: "todo".to_string(),
+                name: EXTENSION_NAME.to_string(),
                 version: "1.0.0".to_string(),
             },
             instructions: Some(
@@ -60,8 +60,13 @@ impl TodoClient {
         }
     }
 
-    async fn handle_write_todo(&self, arguments: Value) -> Result<Vec<Content>, String> {
+    async fn handle_write_todo(
+        &self,
+        arguments: Option<JsonObject>,
+    ) -> Result<Vec<Content>, String> {
         let content = arguments
+            .as_ref()
+            .ok_or("Missing arguments")?
             .get("content")
             .and_then(|v| v.as_str())
             .ok_or("Missing required parameter: content")?
@@ -175,7 +180,7 @@ impl McpClientTrait for TodoClient {
     async fn call_tool(
         &self,
         name: &str,
-        arguments: Value,
+        arguments: Option<JsonObject>,
         _cancellation_token: CancellationToken,
     ) -> Result<CallToolResult, Error> {
         let content = match name {
