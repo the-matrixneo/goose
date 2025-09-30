@@ -32,7 +32,7 @@ async fn add_extension(
 
     // If this is a Stdio extension that uses npx, check for Node.js installation
     #[cfg(target_os = "windows")]
-    if let ExtensionConfigRequest::Stdio { cmd, .. } = &extension_request {
+    if let ExtensionConfig::Stdio { cmd, .. } = &request.config {
         if cmd.ends_with("npx.cmd") || cmd.ends_with("npx") {
             // Check if Node.js is installed in standard locations
             let node_exists = std::path::Path::new(r"C:\Program Files\nodejs\node.exe").exists()

@@ -229,7 +229,7 @@ pub enum ExtensionConfig {
         #[serde(default)]
         available_tools: Vec<String>,
     },
-    /// Platform extensions that have direct access to the agent etc and are part of the  the goose binary
+    /// Platform extensions that have direct access to the agent etc and run in the agent process
     #[serde(rename = "platform")]
     Platform {
         /// The name used to identify this extension

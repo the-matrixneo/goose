@@ -4,6 +4,7 @@ use crate::session::extension_data::ExtensionState;
 use crate::session::{extension_data, SessionManager};
 use anyhow::Result;
 use async_trait::async_trait;
+use indoc::indoc;
 use rmcp::model::{
     CallToolResult, Content, GetPromptResult, Implementation, InitializeResult, JsonObject,
     ListPromptsResult, ListResourcesResult, ListToolsResult, ProtocolVersion, ReadResourceResult,
@@ -39,27 +40,28 @@ impl TodoClient {
                 name: EXTENSION_NAME.to_string(),
                 version: "1.0.0".to_string(),
             },
-            instructions: Some(
-                r#"Use todo_read and todo_write for tasks with 2+ steps, multiple files/components, or uncertain scope.
+            instructions: Some(indoc! {r#"
+                Task Management
+            
+                Use todo_read and todo_write for tasks with 2+ steps, multiple files/components, or uncertain scope.
 
-Workflow:
-- Start: read → write checklist
-- During: read → update progress
-- End: verify all complete
+                Workflow:
+                - Start: read → write checklist
+                - During: read → update progress
+                - End: verify all complete
 
-Warning: todo_write overwrites entirely; always todo_read first (skipping is an error)
+                Warning: todo_write overwrites entirely; always todo_read first (skipping is an error)
 
-Keep items short, specific, action-oriented. Not using the todo tools for complex tasks is an error.
+                Keep items short, specific, action-oriented. Not using the todo tools for complex tasks is an error.
 
-Template:
-- [ ] Implement feature X
-  - [ ] Update API
-  - [ ] Write tests
-  - [ ] Run tests (subagent in parallel)
-  - [ ] Run lint (subagent in parallel)
-- [ ] Blocked: waiting on credentials"#
-                    .to_string(),
-            ),
+                Template:
+                - [ ] Implement feature X
+                  - [ ] Update API
+                  - [ ] Write tests
+                  - [ ] Run tests (subagent in parallel)
+                  - [ ] Run lint (subagent in parallel)
+                - [ ] Blocked: waiting on credentials
+            "#}.to_string()),
         };
 
         Ok(Self { info, context })
@@ -137,28 +139,46 @@ Template:
         vec![
             Tool {
                 name: "todo_read".into(),
-                description: Some("Read the current TODO list content".into()),
+                description: Some(indoc! {r#"
+                Read the entire TODO file content.
+
+                This tool reads the complete TODO file and returns its content as a string.
+                Use this to view current tasks, notes, and any other information stored in the TODO file.
+
+                The tool will return an error if the TODO file doesn't exist or cannot be read.
+            "#}.into()),
                 input_schema: create_schema(json!({
-                    "type": "object",
-                    "properties": {},
-                    "required": []
-                })),
+                "type": "object",
+                "properties": {},
+                "required": []
+            })),
                 annotations: None,
                 output_schema: None,
             },
             Tool {
                 name: "todo_write".into(),
-                description: Some("Write/update the TODO list content".into()),
+                description: Some(indoc! {r#"
+                Write or overwrite the entire TODO file content.
+
+                This tool replaces the complete TODO file content with the provided string.
+                Use this to update tasks, add new items, or reorganize the TODO file.
+
+                WARNING: This operation completely replaces the file content. Make sure to include
+                all content you want to keep, not just the changes.
+
+                The tool will create the TODO file if it doesn't exist, or overwrite it if it does.
+                Returns an error if the file cannot be written due to permissions or other I/O issues.
+            "#}.into()),
                 input_schema: create_schema(json!({
-                    "type": "object",
-                    "properties": {
-                        "content": {
-                            "type": "string",
-                            "description": "The TODO list content to save"
-                        }
-                    },
-                    "required": ["content"]
-                })),
+                "type": "object",
+                "properties": {
+                    "content": {
+                        "type": "string",
+                        "description": "The TODO list content to save"
+                    }
+                },
+                "required": ["content"]
+            })),
                 annotations: None,
                 output_schema: None,
             },
