@@ -1,241 +1,35 @@
-import { useCallback, useRef, useState } from 'react';
-import { useConfig } from '../components/ConfigContext';
+import { useCallback } from 'react';
 import { ChatType } from '../types/chat';
-import { initializeSystem } from '../utils/providerUtils';
-import { initializeCostDatabase } from '../utils/costDatabase';
+import { useAgentInitialization } from './useAgentInitialization';
 import {
-  backupConfig,
-  initConfig,
-  Message as ApiMessage,
-  readAllConfig,
-  Recipe,
-  recoverConfig,
-  resumeAgent,
-  startAgent,
-  validateConfig,
-} from '../api';
-import { COST_TRACKING_ENABLED } from '../updates';
-import { convertApiMessageToFrontendMessage } from '../components/context_management';
+  AgentState,
+  InitializationContext,
+  UseAgentReturn,
+  NoProviderOrModelError,
+  AgentInitializationError,
+  ConfigurationError,
+} from '../types/agent';
 
-export enum AgentState {
-  UNINITIALIZED = 'uninitialized',
-  INITIALIZING = 'initializing',
-  NO_PROVIDER = 'no_provider',
-  INITIALIZED = 'initialized',
-  ERROR = 'error',
-}
-
-export interface InitializationContext {
-  recipeConfig?: Recipe;
-  resumeSessionId?: string;
-  setAgentWaitingMessage: (msg: string | null) => void;
-  setIsExtensionsLoading?: (isLoading: boolean) => void;
-  forceReset?: boolean;
-}
-
-interface UseAgentReturn {
-  agentState: AgentState;
-  resetChat: () => void;
-  loadCurrentChat: (context: InitializationContext) => Promise<ChatType>;
-}
-
-export class NoProviderOrModelError extends Error {
-  constructor() {
-    super('No provider or model configured');
-    this.name = this.constructor.name;
-  }
-}
+export { AgentState, NoProviderOrModelError, AgentInitializationError, ConfigurationError };
+export type { InitializationContext };
 
 export function useAgent(): UseAgentReturn {
-  const [agentState, setAgentState] = useState<AgentState>(AgentState.UNINITIALIZED);
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const initPromiseRef = useRef<Promise<ChatType> | null>(null);
-  const [recipeFromAppConfig, setRecipeFromAppConfig] = useState<Recipe | null>(
-    (window.appConfig.get('recipe') as Recipe) || null
-  );
-
-  const { getExtensions, addExtension, read } = useConfig();
+  const { agentState, resetInitialization, initializeAgent } = useAgentInitialization();
 
   const resetChat = useCallback(() => {
-    setSessionId(null);
-    setAgentState(AgentState.UNINITIALIZED);
-    setRecipeFromAppConfig(null);
-    initPromiseRef.current = null; // Clear any pending initialization
-  }, []);
+    resetInitialization();
+  }, [resetInitialization]);
 
-  const agentIsInitialized = agentState === AgentState.INITIALIZED;
-  const currentChat = useCallback(
-    async (initContext: InitializationContext): Promise<ChatType> => {
-      // If forceReset is true, always reinitialize
-      if (initContext.forceReset) {
-        setSessionId(null);
-        setAgentState(AgentState.UNINITIALIZED);
-        initPromiseRef.current = null;
-        // Don't return early, continue to initialization
-      } else if (agentIsInitialized && sessionId) {
-        const agentResponse = await resumeAgent({
-          body: {
-            session_id: sessionId,
-          },
-          throwOnError: true,
-        });
-
-        const agentSession = agentResponse.data;
-        const messages = agentSession.conversation || [];
-        return {
-          sessionId: agentSession.id,
-          title: agentSession.recipe?.title || agentSession.description,
-          messageHistoryIndex: 0,
-          messages: messages?.map((message: ApiMessage) =>
-            convertApiMessageToFrontendMessage(message)
-          ),
-          recipeConfig: agentSession.recipe,
-          recipeParameters: agentSession.recipe_parameters || null,
-        };
-      }
-
-      if (initPromiseRef.current) {
-        return initPromiseRef.current;
-      }
-
-      const initPromise = (async () => {
-        setAgentState(AgentState.INITIALIZING);
-        const agentWaitingMessage = initContext.setAgentWaitingMessage;
-        agentWaitingMessage('Agent is initializing');
-
-        try {
-          const config = window.electron.getConfig();
-          const provider = (await read('GOOSE_PROVIDER', false)) ?? config.GOOSE_DEFAULT_PROVIDER;
-          const model = (await read('GOOSE_MODEL', false)) ?? config.GOOSE_DEFAULT_MODEL;
-
-          if (!provider || !model) {
-            setAgentState(AgentState.NO_PROVIDER);
-            throw new NoProviderOrModelError();
-          }
-
-          const agentResponse = initContext.resumeSessionId
-            ? await resumeAgent({
-                body: {
-                  session_id: initContext.resumeSessionId,
-                },
-                throwOnError: true,
-              })
-            : await startAgent({
-                body: {
-                  working_dir: window.appConfig.get('GOOSE_WORKING_DIR') as string,
-                  recipe: recipeFromAppConfig ?? initContext.recipeConfig,
-                },
-                throwOnError: true,
-              });
-
-          const agentSession = agentResponse.data;
-          if (!agentSession) {
-            throw Error('Failed to get session info');
-          }
-          setSessionId(agentSession.id);
-
-          agentWaitingMessage('Agent is loading config');
-
-          await initConfig();
-
-          try {
-            await readAllConfig({ throwOnError: true });
-          } catch (error) {
-            console.warn('Initial config read failed, attempting recovery:', error);
-            await handleConfigRecovery();
-          }
-
-          agentWaitingMessage('Extensions are loading');
-
-          const recipeConfigForInit = initContext.recipeConfig || agentSession.recipe || undefined;
-          await initializeSystem(agentSession.id, provider as string, model as string, {
-            getExtensions,
-            addExtension,
-            setIsExtensionsLoading: initContext.setIsExtensionsLoading,
-            recipeParameters: agentSession.recipe_parameters,
-            recipeConfig: recipeConfigForInit,
-          });
-
-          if (COST_TRACKING_ENABLED) {
-            try {
-              await initializeCostDatabase();
-            } catch (error) {
-              console.error('Failed to initialize cost database:', error);
-            }
-          }
-
-          const recipeConfig = initContext.recipeConfig || agentSession.recipe;
-          const conversation = agentSession.conversation || [];
-          // If we're loading a recipe from initContext (new recipe load), start with empty messages
-          // Otherwise, use the messages from the session
-          const messages =
-            initContext.recipeConfig && !initContext.resumeSessionId
-              ? []
-              : conversation.map((message: ApiMessage) =>
-                  convertApiMessageToFrontendMessage(message)
-                );
-
-          let initChat: ChatType = {
-            sessionId: agentSession.id,
-            title: agentSession.recipe?.title || agentSession.description,
-            messageHistoryIndex: 0,
-            messages: messages,
-            recipeConfig: recipeConfig,
-            recipeParameters: agentSession.recipe_parameters || null,
-          };
-
-          setAgentState(AgentState.INITIALIZED);
-
-          return initChat;
-        } catch (error) {
-          if ((error + '').includes('Failed to create provider')) {
-            setAgentState(AgentState.NO_PROVIDER);
-          } else {
-            setAgentState(AgentState.ERROR);
-          }
-          throw error;
-        } finally {
-          agentWaitingMessage(null);
-          initPromiseRef.current = null;
-        }
-      })();
-
-      initPromiseRef.current = initPromise;
-      return initPromise;
+  const loadCurrentChat = useCallback(
+    async (context: InitializationContext): Promise<ChatType> => {
+      return initializeAgent(context);
     },
-    [agentIsInitialized, sessionId, read, recipeFromAppConfig, getExtensions, addExtension]
+    [initializeAgent]
   );
 
   return {
     agentState,
     resetChat,
-    loadCurrentChat: currentChat,
+    loadCurrentChat,
   };
 }
-
-const handleConfigRecovery = async () => {
-  const configVersion = localStorage.getItem('configVersion');
-  const shouldMigrateExtensions = !configVersion || parseInt(configVersion, 10) < 3;
-
-  if (shouldMigrateExtensions) {
-    try {
-      await backupConfig({ throwOnError: true });
-      await initConfig();
-    } catch (migrationError) {
-      console.error('Migration failed:', migrationError);
-    }
-  }
-
-  try {
-    await validateConfig({ throwOnError: true });
-    await readAllConfig({ throwOnError: true });
-  } catch {
-    try {
-      await recoverConfig({ throwOnError: true });
-      await readAllConfig({ throwOnError: true });
-    } catch {
-      console.warn('Config recovery failed, reinitializing...');
-      await initConfig();
-    }
-  }
-};

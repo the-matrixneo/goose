@@ -59,6 +59,7 @@ import ParameterInputModal from './ParameterInputModal';
 import CreateRecipeFromSessionModal from './recipes/CreateRecipeFromSessionModal';
 import { useChatEngine } from '../hooks/useChatEngine';
 import { useRecipeManager } from '../hooks/useRecipeManager';
+import { useRecipeCreationModal } from '../hooks/useRecipeCreationModal';
 import { useFileDrop } from '../hooks/useFileDrop';
 import { useCostTracking } from '../hooks/useCostTracking';
 import { Message } from '../types/message';
@@ -217,11 +218,14 @@ function BaseChatContent({
     handleRecipeAccept,
     handleRecipeCancel,
     hasSecurityWarnings,
-    isCreateRecipeModalOpen,
-    setIsCreateRecipeModalOpen,
     handleRecipeCreated,
     handleStartRecipe,
   } = useRecipeManager(chat, location.state?.recipeConfig);
+
+  // Use recipe creation modal hook for UI-specific functionality
+  const { isCreateRecipeModalOpen, setIsCreateRecipeModalOpen } = useRecipeCreationModal(
+    chat.sessionId
+  );
 
   // Reset recipe usage tracking when recipe changes
   useEffect(() => {
@@ -519,7 +523,7 @@ function BaseChatContent({
       <RecipeWarningModal
         isOpen={isRecipeWarningModalOpen}
         onConfirm={handleRecipeAccept}
-        onCancel={handleRecipeCancel}
+        onCancel={() => handleRecipeCancel()}
         recipeDetails={{
           title: recipeConfig?.title,
           description: recipeConfig?.description,
@@ -542,7 +546,17 @@ function BaseChatContent({
         isOpen={isCreateRecipeModalOpen}
         onClose={() => setIsCreateRecipeModalOpen(false)}
         sessionId={chat.sessionId}
-        onRecipeCreated={handleRecipeCreated}
+        onRecipeCreated={(recipe) =>
+          handleRecipeCreated(recipe, (recipe) => {
+            // Handle toast notification at the component level
+            import('../toasts').then(({ toastSuccess }) => {
+              toastSuccess({
+                title: 'Recipe created successfully!',
+                msg: `"${recipe.title}" has been saved and is ready to use.`,
+              });
+            });
+          })
+        }
         onStartRecipe={handleStartRecipe}
       />
     </div>
