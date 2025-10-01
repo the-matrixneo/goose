@@ -162,6 +162,11 @@ pub fn set_thinking_message(s: &String) {
 }
 
 pub fn render_message(message: &Message, debug: bool) {
+    // Skip messages that aren't visible to the user
+    if !message.is_user_visible() {
+        return;
+    }
+
     let theme = get_theme();
 
     for content in &message.content {

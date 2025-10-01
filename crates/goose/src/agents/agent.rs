@@ -242,22 +242,28 @@ impl Agent {
 
     async fn prepare_reply_context(
         &self,
-        unfixed_conversation: Conversation,
+        conversation: Conversation,
         session: &Option<SessionConfig>,
     ) -> Result<ReplyContext> {
-        let unfixed_messages = unfixed_conversation.messages().clone();
-        let (conversation, issues) = fix_conversation(unfixed_conversation.clone());
+        // Filter to agent-visible messages before fixing to avoid visibility boundary issues.
+        // This prevents orphaned tool_use blocks when summarization marks messages as agent_visible=false
+        // while their corresponding tool_result remains in the conversation.
+        // We only fix messages that will actually be sent to the LLM.
+        let unfixed_agent_messages = conversation.agent_visible_messages();
+        let agent_conversation = Conversation::new_unvalidated(unfixed_agent_messages.clone());
+
+        let (fixed_conversation, issues) = fix_conversation(agent_conversation);
         if !issues.is_empty() {
             debug!(
                 "Conversation issue fixed: {}",
                 debug_conversation_fix(
-                    unfixed_messages.as_slice(),
-                    conversation.messages(),
+                    unfixed_agent_messages.as_slice(),
+                    fixed_conversation.messages(),
                     &issues
                 )
             );
         }
-        let initial_messages = conversation.messages().clone();
+        let initial_messages = fixed_conversation.messages().clone();
         let config = Config::global();
 
         let (tools, toolshim_tools, system_prompt) = self.prepare_tools_and_prompt().await?;
@@ -269,7 +275,7 @@ impl Agent {
             .await;
 
         Ok(ReplyContext {
-            conversation,
+            conversation: fixed_conversation,
             tools,
             toolshim_tools,
             system_prompt,

@@ -397,7 +397,7 @@ pub fn debug_conversation_fix(
 
 #[cfg(test)]
 mod tests {
-    use crate::conversation::message::Message;
+    use crate::conversation::message::{Message, MessageContent, MessageMetadata};
     use crate::conversation::{debug_conversation_fix, fix_conversation, Conversation};
     use rmcp::model::{CallToolRequestParam, Role};
     use rmcp::object;
@@ -593,5 +593,84 @@ mod tests {
 
         let (_fixed, issues) = run_verify(messages);
         assert_eq!(issues.len(), 0);
+    }
+
+    #[test]
+    fn test_fix_conversation_with_mixed_visibility() {
+        // Simulates the scenario after summarization where old messages are marked agent_visible=false
+        // but a new tool_use is added that's agent_visible=true
+        let messages = vec![
+            // Old messages from before summarization (agent_visible=false, user_visible=true)
+            Message::user()
+                .with_text("Previous conversation")
+                .with_metadata(MessageMetadata::user_only()),
+            Message::assistant()
+                .with_text("I'll help")
+                .with_tool_request(
+                    "old_tool",
+                    Ok(CallToolRequestParam {
+                        name: "old_search".into(),
+                        arguments: Some(object!({})),
+                    }),
+                )
+                .with_metadata(MessageMetadata::user_only()),
+            Message::user()
+                .with_tool_response("old_tool", Ok(vec![]))
+                .with_metadata(MessageMetadata::user_only()),
+            // Summary message (agent_visible=true, user_visible=false)
+            Message::user()
+                .with_text("Summary of conversation")
+                .with_metadata(MessageMetadata::agent_only()),
+            // New messages after summarization (agent_visible=true, user_visible=true)
+            Message::user().with_text("New question"),
+            Message::assistant()
+                .with_text("Let me search")
+                .with_tool_request(
+                    "new_tool",
+                    Ok(CallToolRequestParam {
+                        name: "new_search".into(),
+                        arguments: Some(object!({})),
+                    }),
+                ),
+        ];
+
+        // When we filter to agent_visible messages and fix, we should only see:
+        // - Summary message
+        // - New question
+        // - Assistant with new_tool request (orphaned, so should be removed)
+        let conversation = Conversation::new_unvalidated(messages);
+        let agent_visible_messages = conversation.agent_visible_messages();
+        let agent_conversation = Conversation::new_unvalidated(agent_visible_messages);
+
+        let (fixed, issues) = fix_conversation(agent_conversation);
+
+        // Should have removed the orphaned new_tool request
+        assert!(
+            issues.iter().any(|i| i.contains("Removed orphaned tool request 'new_tool'")),
+            "Expected orphaned tool request to be removed. Issues: {:?}",
+            issues
+        );
+
+        // Should have at least 1 message (after merging and cleanup)
+        assert!(
+            !fixed.is_empty(),
+            "Fixed conversation should not be empty. Got {} messages",
+            fixed.len()
+        );
+
+        // Verify no tool requests remain in the fixed conversation
+        for msg in fixed.messages() {
+            for content in &msg.content {
+                assert!(
+                    !matches!(content, MessageContent::ToolRequest(_)),
+                    "Should not have any tool requests in fixed conversation"
+                );
+            }
+        }
+
+        // The key assertion: verify that when filtering by agent_visible and then fixing,
+        // we don't send orphaned tool_use blocks to the provider
+        println!("Fixed conversation has {} messages", fixed.len());
+        println!("Issues found: {:?}", issues);
     }
 }
