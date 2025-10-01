@@ -240,7 +240,7 @@ async fn scan_recipe(
 async fn list_recipes(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<ListRecipeResponse>, StatusCode> {
-    let recipe_manifest_with_paths = get_all_recipes_manifests().unwrap();
+    let recipe_manifest_with_paths = get_all_recipes_manifests().unwrap_or_default();
     let mut recipe_file_hash_map = HashMap::new();
     let recipe_manifest_responses = recipe_manifest_with_paths
         .iter()
