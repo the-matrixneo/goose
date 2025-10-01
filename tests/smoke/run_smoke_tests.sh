@@ -143,12 +143,12 @@ run_test() {
     fi
     
     if [ -n "${timeout_cmd}" ]; then
-        eval "${timeout_cmd} bash -c \"${cmd}\"" > "${output_file}" 2>&1
-        local exit_code=$?
+        eval "${timeout_cmd} bash -c \"${cmd}\"" > "${output_file}" 2>&1 || local exit_code=$?
+        [ -z "${exit_code:-}" ] && local exit_code=0
     else
         # No timeout available, run without it
-        bash -c "${cmd}" > "${output_file}" 2>&1
-        local exit_code=$?
+        bash -c "${cmd}" > "${output_file}" 2>&1 || local exit_code=$?
+        [ -z "${exit_code:-}" ] && local exit_code=0
     fi
     
     if [ ${exit_code} -eq 0 ]; then
