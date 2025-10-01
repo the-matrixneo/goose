@@ -11,7 +11,7 @@ use rmcp::model::{
     ServerCapabilities, ServerNotification, Tool, ToolAnnotations, ToolsCapability,
 };
 use rmcp::object;
-use serde_json::{Map, Value};
+use serde_json::Value;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
