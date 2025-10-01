@@ -213,6 +213,13 @@ impl SessionManager {
             .await
     }
 
+    pub async fn hide_previous_moim_responses(id: &str) -> Result<()> {
+        Self::instance()
+            .await?
+            .hide_previous_moim_responses(id)
+            .await
+    }
+
     pub async fn list_sessions() -> Result<Vec<Session>> {
         Self::instance().await?.list_sessions().await
     }
@@ -854,5 +861,53 @@ impl SessionStorage {
             total_sessions: row.0 as usize,
             total_tokens: row.1.unwrap_or(0),
         })
+    }
+
+    async fn hide_previous_moim_responses(&self, session_id: &str) -> Result<()> {
+        use crate::conversation::message::MessageContent;
+
+        let conversation = self.get_conversation(session_id).await?;
+        let mut messages = conversation.messages().clone();
+        let mut modified = false;
+
+        const MOIM_TOOL_NAME: &str = "moim__read";
+
+        for i in 0..messages.len() {
+            if messages[i].role == Role::User {
+                let mut is_moim_response = false;
+                for content in &messages[i].content {
+                    if let MessageContent::ToolResponse(resp) = content {
+                        if i > 0 && messages[i - 1].role == Role::Assistant {
+                            for prev_content in &messages[i - 1].content {
+                                if let MessageContent::ToolRequest(req) = prev_content {
+                                    if req.id == resp.id {
+                                        if let Ok(tool_call) = &req.tool_call {
+                                            if tool_call.name == MOIM_TOOL_NAME {
+                                                is_moim_response = true;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if is_moim_response {
+                        break;
+                    }
+                }
+                if is_moim_response {
+                    messages[i].metadata.agent_visible = false;
+                    modified = true;
+                }
+            }
+        }
+
+        if modified {
+            let updated = Conversation::new_unvalidated(messages);
+            self.replace_conversation(session_id, &updated).await?;
+        }
+
+        Ok(())
     }
 }

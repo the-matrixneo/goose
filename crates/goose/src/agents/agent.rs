@@ -61,7 +61,9 @@ use super::platform_tools;
 use super::tool_execution::{ToolCallResult, CHAT_MODE_TOOL_SKIPPED_RESPONSE, DECLINED_RESPONSE};
 use crate::agents::subagent_task_config::TaskConfig;
 use crate::agents::todo_tools::{todo_write_tool, TODO_WRITE_TOOL_NAME};
-use crate::conversation::message::{Message, ToolRequest};
+use crate::conversation::message::{Message, MessageContent, ToolRequest};
+use mcp_core::tool::ToolCall;
+use serde_json::json;
 use crate::session::extension_data::ExtensionState;
 use crate::session::{extension_data, SessionManager};
 
@@ -967,6 +969,119 @@ impl Agent {
             .await
     }
 
+    const MOIM_TOOL_NAME: &'static str = "moim__read";
+
+    async fn maybe_inject_moim(
+        &self,
+        conversation: &mut Conversation,
+        session: &Option<SessionConfig>,
+    ) -> Result<bool> {
+        if !self.should_inject_moim(conversation, session).await? {
+            return Ok(false);
+        }
+
+        let Some(session_config) = session else {
+            return Ok(false);
+        };
+
+        // Create tool request
+        let request_id = format!("moim_{}", Uuid::new_v4());
+        let moim_request = Message::assistant().with_tool_request(
+            &request_id,
+            Ok(ToolCall::new(Self::MOIM_TOOL_NAME, json!({}))),
+        );
+
+        // Add to session and conversation
+        SessionManager::add_message(&session_config.id, &moim_request).await?;
+        conversation.push(moim_request.clone());
+
+        // Build MOIM content
+        let moim_content = self.build_moim_content(session).await?;
+
+        // Create tool response
+        let moim_response =
+            Message::user().with_tool_response(&request_id, Ok(vec![Content::text(moim_content)]));
+
+        // Hide previous MOIM responses
+        SessionManager::hide_previous_moim_responses(&session_config.id).await?;
+
+        // Add response
+        SessionManager::add_message(&session_config.id, &moim_response).await?;
+        conversation.push(moim_response);
+
+        Ok(true)
+    }
+
+    async fn should_inject_moim(
+        &self,
+        conversation: &Conversation,
+        _session: &Option<SessionConfig>,
+    ) -> Result<bool> {
+        let config = Config::global();
+
+        if !config
+            .get_param::<bool>("GOOSE_MOIM_ENABLED")
+            .unwrap_or(true)
+        {
+            return Ok(false);
+        }
+
+        let interval = config
+            .get_param::<usize>("GOOSE_MOIM_MESSAGE_INTERVAL")
+            .unwrap_or(10);
+
+        let messages_since = self.count_messages_since_last_moim(conversation);
+        Ok(messages_since >= interval)
+    }
+
+    fn count_messages_since_last_moim(&self, conversation: &Conversation) -> usize {
+        for (i, message) in conversation.messages().iter().enumerate().rev() {
+            if message.content.iter().any(|c| {
+                if let MessageContent::ToolRequest(req) = c {
+                    req.tool_call
+                        .as_ref()
+                        .map_or(false, |tc| tc.name == Self::MOIM_TOOL_NAME)
+                } else {
+                    false
+                }
+            }) {
+                return conversation.len() - i - 1;
+            }
+        }
+        conversation.len()
+    }
+
+    async fn build_moim_content(&self, session: &Option<SessionConfig>) -> Result<String> {
+        use crate::session::extension_data::TodoState;
+        use chrono::Local;
+
+        let mut content = String::new();
+
+        // Add header
+        content.push_str("=== System Context Update ===\n");
+
+        // Add timestamp
+        content.push_str(&format!(
+            "Current date and time: {}\n",
+            Local::now().format("%Y-%m-%d %H:%M:%S")
+        ));
+
+        // Add TODO content if available
+        if let Some(session_config) = session {
+            if let Ok(session_data) = SessionManager::get_session(&session_config.id, false).await {
+                if let Some(todo) = TodoState::from_extension_data(&session_data.extension_data) {
+                    if !todo.content.trim().is_empty() {
+                        content.push_str("\nCurrent TODO list:\n");
+                        content.push_str(&todo.content);
+                        content.push('\n');
+                    }
+                }
+            }
+        }
+
+        Ok(content)
+    }
+
     /// Main reply method that handles the actual agent processing
     async fn reply_internal(
         &self,
@@ -1048,6 +1163,25 @@ impl Agent {
             loop {
                 if is_token_cancelled(&cancel_token) {
                     break;
+                }
+
+                // Check and inject MOIM if needed
+                if self.maybe_inject_moim(&mut conversation, &session).await? {
+                    // MOIM was injected, yield the messages
+                    if let Some(moim_request) = conversation
+                        .messages()
+                        .iter()
+                        .rev()
+                        .nth(1)
+                    {
+                        yield AgentEvent::Message(moim_request.clone());
+                    }
+
+                    if let Some(moim_response) = conversation.last() {
+                        yield AgentEvent::Message(moim_response.clone());
+                    }
+
+                    continue;
                 }
 
                 if let Some(final_output_tool) = self.final_output_tool.lock().await.as_ref() {
