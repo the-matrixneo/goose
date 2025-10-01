@@ -12,7 +12,6 @@ use rmcp::model::{
 };
 use rmcp::object;
 use serde_json::{Map, Value};
-use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
