@@ -13,7 +13,7 @@ use goose::conversation::Conversation;
 use goose::execution::SessionExecutionMode;
 use goose::mcp_utils::ToolResult;
 use goose::permission::{Permission, PermissionConfirmation};
-use goose::session::SessionManager;
+use goose::session::{Session, SessionManager};
 use goose::{
     agents::{AgentEvent, SessionConfig},
     permission::permission_confirmation::PrincipalType,
@@ -144,6 +144,10 @@ enum MessageEvent {
         request_id: String,
         message: ServerNotification,
     },
+    /// Full state synchronization - sends the complete Session
+    SessionState {
+        session: Session,
+    },
     Ping,
 }
 
@@ -251,6 +255,31 @@ async fn reply_handler(
             retry_config: None,
         };
 
+        // Send initial state sync "keyframe" if this is an existing session being loaded
+        // Detect session load by checking if we have existing messages in the database
+        let is_session_load = if let Ok(stored_session) = SessionManager::get_session(&session_id, true).await {
+            let has_stored_messages = stored_session.conversation
+                .map(|c| !c.messages().is_empty())
+                .unwrap_or(false);
+            
+            // It's a session load if we have stored messages but received empty/minimal messages from client
+            has_stored_messages && messages.len() <= 1
+        } else {
+            false
+        };
+
+        // Send state sync on session load - just send the full Session
+        if is_session_load {
+            if let Ok(full_session) = SessionManager::get_session(&session_id, true).await {
+                tracing::info!("Sending SessionState keyframe for session load: {}", session_id);
+                stream_event(
+                    MessageEvent::SessionState { session: full_session },
+                    &task_tx,
+                    &task_cancel,
+                ).await;
+            }
+        }
+
         let mut stream = match agent
             .reply(
                 messages.clone(),
@@ -275,6 +304,7 @@ async fn reply_handler(
         };
 
         let mut all_messages = messages.clone();
+        let mut _message_count_at_last_keyframe = all_messages.len();
 
         let mut heartbeat_interval = tokio::time::interval(Duration::from_millis(500));
         loop {
@@ -302,9 +332,18 @@ async fn reply_handler(
                         }
                         Ok(Some(Ok(AgentEvent::HistoryReplaced(new_messages)))) => {
                             // Replace the message history with the compacted messages
-                            all_messages = Conversation::new_unvalidated(new_messages);
-                            // Note: We don't send this as a stream event since it's an internal operation
-                            // The client will see the compaction notification message that was sent before this event
+                            all_messages = Conversation::new_unvalidated(new_messages.clone());
+                            
+                            // Send a SessionState keyframe after compaction with the full session
+                            if let Ok(full_session) = SessionManager::get_session(&session_id, true).await {
+                                tracing::info!("Sending SessionState keyframe after compaction");
+                                stream_event(
+                                    MessageEvent::SessionState { session: full_session },
+                                    &tx,
+                                    &cancel_token,
+                                ).await;
+                                _message_count_at_last_keyframe = all_messages.len();
+                            }
                         }
                         Ok(Some(Ok(AgentEvent::ModelChange { model, mode }))) => {
                             stream_event(MessageEvent::ModelChange { model, mode }, &tx, &cancel_token).await;

@@ -32,6 +32,7 @@ type MessageEvent =
   | { type: 'Error'; error: string }
   | { type: 'Finish'; reason: string }
   | { type: 'ModelChange'; model: string; mode: string }
+  | { type: 'SessionState'; session: Session }
   | NotificationEvent;
 
 export interface UseMessageStreamOptions {
@@ -323,6 +324,36 @@ export function useMessageStream({
                       mode: parsedEvent.mode,
                     };
                     setCurrentModelInfo(modelInfo);
+                    break;
+                  }
+
+                  case 'SessionState': {
+                    // Full session state synchronization - replace everything with the Session
+                    console.log('Received SessionState keyframe:', parsedEvent.session);
+                    
+                    // Replace messages with the server's authoritative state if present
+                    if (parsedEvent.session.conversation) {
+                      currentMessages = parsedEvent.session.conversation;
+                      mutate(currentMessages, false);
+                    }
+                    
+                    // Update session metadata
+                    setSession(parsedEvent.session);
+                    
+                    // Update chat state based on last message
+                    if (currentMessages.length > 0) {
+                      const lastMessage = currentMessages[currentMessages.length - 1];
+                      const hasPendingToolConfirmation = lastMessage?.content.some(
+                        (content) => content.type === 'toolConfirmationRequest'
+                      );
+                      
+                      if (hasPendingToolConfirmation) {
+                        mutateChatState(ChatState.WaitingForUserInput);
+                      } else {
+                        mutateChatState(ChatState.Idle);
+                      }
+                    }
+                    
                     break;
                   }
 
