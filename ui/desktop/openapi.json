@@ -3650,7 +3650,8 @@
             "nullable": true
           },
           "created_at": {
-            "type": "string"
+            "type": "string",
+            "format": "date-time"
           },
           "description": {
             "type": "string"
@@ -3693,7 +3694,8 @@
             "nullable": true
           },
           "updated_at": {
-            "type": "string"
+            "type": "string",
+            "format": "date-time"
           },
           "working_dir": {
             "type": "string"
