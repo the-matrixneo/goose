@@ -76,6 +76,9 @@ setup_test_env() {
     export HOME="${TEST_TEMP_DIR}"
     export GOOSE_DISABLE_KEYRING=1
     
+    # Create config directory (config will be swapped per test)
+    mkdir -p "${HOME}/.config/goose"
+    
     log_verbose "Test environment configured"
 }
 
@@ -115,20 +118,18 @@ check_prerequisites() {
 run_test() {
     local test_name="$1"
     local provider="$2"
-    local model="$3"
-    local prompt="$4"
-    local expected_pattern="$5"
-    local use_developer="${6:-no}"
+    local prompt="$3"
+    local expected_pattern="$4"
+    local use_developer="${5:-no}"
     
     TESTS_RUN=$((TESTS_RUN + 1))
     
     log_info "Running test: ${test_name}"
     log_verbose "  Provider: ${provider}"
-    log_verbose "  Model: ${model}"
     log_verbose "  Prompt: ${prompt}"
     
-    # Build command
-    local cmd="${GOOSE_BINARY} run --text \"${prompt}\" --no-session --provider ${provider} --model ${model}"
+    # Build command (model comes from config file)
+    local cmd="${GOOSE_BINARY} run --text \"${prompt}\" --no-session --provider ${provider}"
     
     # Add developer extension if requested
     if [ "${use_developer}" = "yes" ]; then
@@ -193,7 +194,16 @@ run_test() {
 # Smoke test: Developer extension with file listing
 test_developer_extension() {
     local provider="$1"
-    local model="$2"
+    
+    # Swap in the provider-specific config
+    local config_file="${SCRIPT_DIR}/config.${provider}.yaml"
+    if [ -f "${config_file}" ]; then
+        cp "${config_file}" "${HOME}/.config/goose/config.yaml"
+        log_verbose "Swapped in config for ${provider}"
+    else
+        log_error "Config file not found: ${config_file}"
+        return 1
+    fi
     
     # Create hello.txt in temp directory
     echo "hello" > "${TEST_TEMP_DIR}/hello.txt"
@@ -204,7 +214,6 @@ test_developer_extension() {
     run_test \
         "Developer extension smoke test (${provider})" \
         "${provider}" \
-        "${model}" \
         "list files" \
         "hello.txt" \
         "yes"
@@ -215,13 +224,12 @@ test_developer_extension() {
 # Run all tests for a provider
 run_provider_tests() {
     local provider="$1"
-    local model="$2"
     
     log_info "========================================="
-    log_info "Testing provider: ${provider} (${model})"
+    log_info "Testing provider: ${provider}"
     log_info "========================================="
     
-    test_developer_extension "${provider}" "${model}"
+    test_developer_extension "${provider}"
     
     echo ""
 }
@@ -236,11 +244,11 @@ main() {
     
     # Run tests for each provider
     if echo "${PROVIDERS}" | grep -q "anthropic"; then
-        run_provider_tests "anthropic" "claude-sonnet-4-20250514"
+        run_provider_tests "anthropic"
     fi
     
     if echo "${PROVIDERS}" | grep -q "openai"; then
-        run_provider_tests "openai" "gpt-4o"
+        run_provider_tests "openai"
     fi
     
     # Print summary

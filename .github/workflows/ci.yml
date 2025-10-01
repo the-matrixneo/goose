@@ -134,11 +134,20 @@ jobs:
       - name: Make Binary Executable
         run: chmod +x target/release/goose
 
+      - name: Debug - Check binary and environment
+        run: |
+          ls -la target/release/goose
+          ./target/release/goose --version
+          echo "Provider: ${{ matrix.provider }}"
+          echo "ANTHROPIC_API_KEY set: ${{ secrets.ANTHROPIC_API_KEY != '' }}"
+          echo "OPENAI_API_KEY set: ${{ secrets.OPENAI_API_KEY != '' }}"
+
       - name: Run Smoke Test
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           PROVIDERS: ${{ matrix.provider }}
+          VERBOSE: 1
         run: ./tests/smoke/run_smoke_tests.sh
 
   desktop-lint:
