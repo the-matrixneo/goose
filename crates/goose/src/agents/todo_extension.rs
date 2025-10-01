@@ -8,9 +8,10 @@ use indoc::indoc;
 use rmcp::model::{
     CallToolResult, Content, GetPromptResult, Implementation, InitializeResult, JsonObject,
     ListPromptsResult, ListResourcesResult, ListToolsResult, ProtocolVersion, ReadResourceResult,
-    ServerCapabilities, ServerNotification, Tool, ToolsCapability,
+    ServerCapabilities, ServerNotification, Tool, ToolAnnotations, ToolsCapability,
 };
-use serde_json::{json, Map, Value};
+use rmcp::object;
+use serde_json::{Map, Value};
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
@@ -38,7 +39,10 @@ impl TodoClient {
             },
             server_info: Implementation {
                 name: EXTENSION_NAME.to_string(),
+                title: Some("Todo".to_string()),
                 version: "1.0.0".to_string(),
+                icons: None,
+                website_url: None,
             },
             instructions: Some(indoc! {r#"
                 Task Management
@@ -132,56 +136,60 @@ impl TodoClient {
     }
 
     fn get_tools() -> Vec<Tool> {
-        fn create_schema(json_value: Value) -> Arc<Map<String, Value>> {
-            Arc::new(json_value.as_object().unwrap().clone())
-        }
-
         vec![
-            Tool {
-                name: "todo_read".into(),
-                description: Some(indoc! {r#"
-                Read the entire TODO file content.
+            Tool::new(
+                "todo_read".to_string(),
+                indoc! {r#"
+                        Read the entire TODO file content.
 
-                This tool reads the complete TODO file and returns its content as a string.
-                Use this to view current tasks, notes, and any other information stored in the TODO file.
+                        This tool reads the complete TODO file and returns its content as a string.
+                        Use this to view current tasks, notes, and any other information stored in the TODO file.
 
-                The tool will return an error if the TODO file doesn't exist or cannot be read.
-            "#}.into()),
-                input_schema: create_schema(json!({
-                "type": "object",
-                "properties": {},
-                "required": []
-            })),
-                annotations: None,
-                output_schema: None,
-            },
-            Tool {
-                name: "todo_write".into(),
-                description: Some(indoc! {r#"
-                Write or overwrite the entire TODO file content.
+                        The tool will return an error if the TODO file doesn't exist or cannot be read.
+                    "#}.to_string(),
+                object!({
+                        "type": "object",
+                        "properties": {},
+                        "required": []
+                    }),
+            ).annotate(ToolAnnotations {
+                title: Some("Read TODO file".to_string()),
+                read_only_hint: Some(true),
+                destructive_hint: Some(false),
+                idempotent_hint: Some(true),
+                open_world_hint: Some(false),
+            }),
+            Tool::new(
+                "todo_write".to_string(),
+                indoc! {r#"
+                    Write or overwrite the entire TODO file content.
 
-                This tool replaces the complete TODO file content with the provided string.
-                Use this to update tasks, add new items, or reorganize the TODO file.
+                    This tool replaces the complete TODO file content with the provided string.
+                    Use this to update tasks, add new items, or reorganize the TODO file.
 
-                WARNING: This operation completely replaces the file content. Make sure to include
-                all content you want to keep, not just the changes.
+                    WARNING: This operation completely replaces the file content. Make sure to include
+                    all content you want to keep, not just the changes.
 
-                The tool will create the TODO file if it doesn't exist, or overwrite it if it does.
-                Returns an error if the file cannot be written due to permissions or other I/O issues.
-            "#}.into()),
-                input_schema: create_schema(json!({
-                "type": "object",
-                "properties": {
-                    "content": {
-                        "type": "string",
-                        "description": "The TODO list content to save"
-                    }
-                },
-                "required": ["content"]
-            })),
-                annotations: None,
-                output_schema: None,
-            },
+                    The tool will create the TODO file if it doesn't exist, or overwrite it if it does.
+                    Returns an error if the file cannot be written due to permissions or other I/O issues.
+                "#}.to_string(),
+                            object!({
+                    "type": "object",
+                    "properties": {
+                        "content": {
+                            "type": "string",
+                            "description": "The TODO list content to save"
+                        }
+                    },
+                    "required": ["content"]
+                }),
+            ).annotate(ToolAnnotations {
+                title: Some("Write TODO file".to_string()),
+                read_only_hint: Some(false),
+                destructive_hint: Some(true),
+                idempotent_hint: Some(false),
+                open_world_hint: Some(false),
+            })
         ]
     }
 }
