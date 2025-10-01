@@ -21,7 +21,14 @@ PROVIDERS=${PROVIDERS:-"anthropic openai"}
 # Get script directory and repo root
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-GOOSE_BINARY="${REPO_ROOT}/target/release/goose"
+# Look for binary in multiple locations (for CI sparse checkout)
+if [ -f "${REPO_ROOT}/target/release/goose" ]; then
+    GOOSE_BINARY="${REPO_ROOT}/target/release/goose"
+elif [ -f "target/release/goose" ]; then
+    GOOSE_BINARY="$(pwd)/target/release/goose"
+else
+    GOOSE_BINARY="${REPO_ROOT}/target/release/goose"
+fi
 
 # Temporary directory for test artifacts
 TEST_TEMP_DIR=""
