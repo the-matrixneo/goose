@@ -121,6 +121,7 @@ type ElectronAPI = {
     appUrl: string;
     qrCodeDataUrl: string;
     qrCodePath: string;
+    ntfyUrl: string;
   }>;
   tunnelStop: () => Promise<boolean>;
   tunnelStatus: () => Promise<{
