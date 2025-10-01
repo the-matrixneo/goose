@@ -148,6 +148,7 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           PROVIDERS: ${{ matrix.provider }}
           VERBOSE: 1
+          GOOSE_DISABLE_KEYRING: 1
         run: ./tests/smoke/run_smoke_tests.sh
 
   desktop-lint:
