@@ -66,28 +66,28 @@ log_verbose() {
 setup_test_env() {
     TEST_TEMP_DIR=$(mktemp -d -t goose-smoke-test.XXXXXX)
     log_verbose "Created temp directory: ${TEST_TEMP_DIR}"
-    
+
     export HOME="${TEST_TEMP_DIR}"
     export GOOSE_DISABLE_KEYRING=1
-    
+
     # Create goose directory structure
     mkdir -p "${HOME}/.local/share/goose/sessions"
     mkdir -p "${HOME}/.config/goose"
-    
+
     log_verbose "Test environment configured"
 }
 
 # Verify prerequisites
 check_prerequisites() {
     log_info "Checking prerequisites..."
-    
+
     if [ ! -f "${GOOSE_BINARY}" ]; then
         log_error "Goose binary not found at: ${GOOSE_BINARY}"
         log_error "Please build it first: cargo build --release"
         exit 1
     fi
     log_verbose "✓ Binary found: ${GOOSE_BINARY}"
-    
+
     if echo "${PROVIDERS}" | grep -q "anthropic"; then
         if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
             log_error "ANTHROPIC_API_KEY environment variable not set"
@@ -95,7 +95,7 @@ check_prerequisites() {
         fi
         log_verbose "✓ ANTHROPIC_API_KEY is set"
     fi
-    
+
     if echo "${PROVIDERS}" | grep -q "openai"; then
         if [ -z "${OPENAI_API_KEY:-}" ]; then
             log_error "OPENAI_API_KEY environment variable not set"
@@ -103,7 +103,7 @@ check_prerequisites() {
         fi
         log_verbose "✓ OPENAI_API_KEY is set"
     fi
-    
+
     log_info "All prerequisites met"
 }
 
@@ -114,23 +114,23 @@ run_test() {
     local model="$3"
     local prompt="$4"
     local expected_pattern="$5"
-    
+
     TESTS_RUN=$((TESTS_RUN + 1))
-    
+
     log_info "Running test: ${test_name}"
     log_verbose "  Provider: ${provider}"
     log_verbose "  Model: ${model}"
     log_verbose "  Prompt: ${prompt}"
-    
+
     # Set provider env vars
     export GOOSE_PROVIDER="${provider}"
     export GOOSE_MODEL="${model}"
-    
-    local cmd="${GOOSE_BINARY} run --text \"${prompt}\" --no-session --with-builtin developer"
+
+    local cmd="${GOOSE_BINARY} run --text \"${prompt}\" --with-builtin developer"
     local output_file="${TEST_TEMP_DIR}/test_${TESTS_RUN}.out"
-    
+
     log_verbose "  Running command: ${cmd}"
-    
+
     # Run with timeout if available
     local timeout_cmd=""
     if command -v timeout >/dev/null 2>&1; then
@@ -138,7 +138,7 @@ run_test() {
     elif command -v gtimeout >/dev/null 2>&1; then
         timeout_cmd="gtimeout ${TIMEOUT}"
     fi
-    
+
     if [ -n "${timeout_cmd}" ]; then
         eval "${timeout_cmd} bash -c \"${cmd}\"" > "${output_file}" 2>&1 || local exit_code=$?
         [ -z "${exit_code:-}" ] && local exit_code=0
@@ -146,14 +146,14 @@ run_test() {
         bash -c "${cmd}" > "${output_file}" 2>&1 || local exit_code=$?
         [ -z "${exit_code:-}" ] && local exit_code=0
     fi
-    
+
     if [ ${exit_code} -eq 0 ]; then
         log_verbose "  Command completed successfully"
-        
+
         if grep -q "${expected_pattern}" "${output_file}"; then
             log_info "✓ Test passed: ${test_name}"
             TESTS_PASSED=$((TESTS_PASSED + 1))
-            
+
             if [ "${VERBOSE}" = "1" ]; then
                 log_verbose "Output:"
                 cat "${output_file}"
@@ -181,19 +181,19 @@ run_test() {
 test_developer_extension() {
     local provider="$1"
     local model="$2"
-    
+
     # Create hello.txt in temp directory
     echo "hello" > "${TEST_TEMP_DIR}/hello.txt"
-    
+
     cd "${TEST_TEMP_DIR}"
-    
+
     run_test \
         "Developer extension smoke test (${provider})" \
         "${provider}" \
         "${model}" \
-        "list files" \
+        "please list files in dir ${TEST_TEMP_DIR}" \
         "hello.txt"
-    
+
     cd "${REPO_ROOT}"
 }
 
@@ -201,13 +201,13 @@ test_developer_extension() {
 run_provider_tests() {
     local provider="$1"
     local model="$2"
-    
+
     log_info "========================================="
     log_info "Testing provider: ${provider} (${model})"
     log_info "========================================="
-    
+
     test_developer_extension "${provider}" "${model}"
-    
+
     echo ""
 }
 
@@ -215,19 +215,19 @@ run_provider_tests() {
 main() {
     log_info "Starting Goose smoke tests"
     log_info "========================================="
-    
+
     check_prerequisites
     setup_test_env
-    
+
     # Run tests for each provider
     if echo "${PROVIDERS}" | grep -q "anthropic"; then
         run_provider_tests "anthropic" "claude-sonnet-4-5-20250929"
     fi
-    
+
     if echo "${PROVIDERS}" | grep -q "openai"; then
         run_provider_tests "openai" "gpt-5"
     fi
-    
+
     # Print summary
     echo ""
     log_info "========================================="
@@ -236,7 +236,7 @@ main() {
     log_info "Total tests run: ${TESTS_RUN}"
     log_info "Tests passed: ${TESTS_PASSED}"
     log_info "Tests failed: ${TESTS_FAILED}"
-    
+
     if [ "${TESTS_FAILED}" -eq 0 ]; then
         log_info "✓ All tests passed!"
         exit 0
