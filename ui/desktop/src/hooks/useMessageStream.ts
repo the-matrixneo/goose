@@ -330,30 +330,41 @@ export function useMessageStream({
                   case 'SessionState': {
                     // Full session state synchronization - replace everything with the Session
                     console.log('Received SessionState keyframe:', parsedEvent.session);
-                    
+
                     // Replace messages with the server's authoritative state if present
                     if (parsedEvent.session.conversation) {
-                      currentMessages = parsedEvent.session.conversation;
+                      // Convert API Message type to our local Message type
+                      // The API Message type from types.gen.ts matches our local Message type structure
+                      // but we need to ensure proper typing
+                      const convertedMessages = parsedEvent.session.conversation.map((msg) => ({
+                        ...msg,
+                        id: msg.id === null ? undefined : msg.id, // Convert null to undefined
+                        role: msg.role as Role,
+                        created: msg.created || Date.now(),
+                        content: msg.content || [],
+                      })) as Message[];
+
+                      currentMessages = convertedMessages;
                       mutate(currentMessages, false);
                     }
-                    
+
                     // Update session metadata
                     setSession(parsedEvent.session);
-                    
+
                     // Update chat state based on last message
                     if (currentMessages.length > 0) {
                       const lastMessage = currentMessages[currentMessages.length - 1];
                       const hasPendingToolConfirmation = lastMessage?.content.some(
                         (content) => content.type === 'toolConfirmationRequest'
                       );
-                      
+
                       if (hasPendingToolConfirmation) {
                         mutateChatState(ChatState.WaitingForUserInput);
                       } else {
                         mutateChatState(ChatState.Idle);
                       }
                     }
-                    
+
                     break;
                   }
 
