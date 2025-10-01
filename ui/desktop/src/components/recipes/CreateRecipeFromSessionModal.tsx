@@ -78,6 +78,7 @@ export default function CreateRecipeFromSessionModal({
       // Call the backend to analyze messages and create a recipe
       createRecipe({
         body: { session_id: sessionId },
+        throwOnError: true,
       })
         .then((response) => {
           clearInterval(stageInterval);
