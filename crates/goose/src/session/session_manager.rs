@@ -238,7 +238,15 @@ impl SessionManager {
             .count();
 
         if user_message_count <= MSG_COUNT_FOR_SESSION_NAME_GENERATION {
-            let description = provider.generate_session_name(&conversation).await?;
+            let description = if std::env::var("DISABLE_GENERATED_SESSION_NAMING")
+                .unwrap_or_default()
+                .to_lowercase()
+                == "true"
+            {
+                "no session name".to_string()
+            } else {
+                provider.generate_session_name(&conversation).await?
+            };
             Self::update_session(id)
                 .description(description)
                 .apply()
