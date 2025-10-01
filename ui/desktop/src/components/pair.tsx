@@ -15,7 +15,7 @@ import { useSearchParams } from 'react-router-dom';
 export interface PairRouteState {
   resumeSessionId?: string;
   initialMessage?: string;
-  recipeConfig?: Recipe;
+  recipe?: Recipe;
 }
 
 interface PairProps {
@@ -40,7 +40,7 @@ export default function Pair({
   loadCurrentChat,
   resumeSessionId,
   initialMessage,
-  recipeConfig,
+  recipe,
 }: PairProps & PairRouteState) {
   const isMobile = useIsMobile();
   const { state: sidebarState } = useSidebar();
@@ -53,7 +53,7 @@ export default function Pair({
 
   // Use refs to track current chat state to avoid dependency issues
   const chatRef = useRef(chat);
-  const prevRecipeConfigRef = useRef<Recipe | null>(null);
+  const prevRecipeRef = useRef<Recipe | null>(null);
   chatRef.current = chat;
 
   useEffect(() => {
@@ -61,31 +61,30 @@ export default function Pair({
       setLoadingChat(true);
 
       const currentChat = chatRef.current;
-      const prevRecipeConfig = prevRecipeConfigRef.current;
+      const prevRecipe = prevRecipeRef.current;
 
-      // If we have a recipe config from navigation, always create a new chat with the recipe
+      // If we have a recipe from navigation, always create a new chat with the recipe
       // This ensures we start fresh when loading a recipe from the recipes view
       // Compare using JSON.stringify to detect any changes in the recipe object
       const recipeChanged =
-        recipeConfig &&
-        (!prevRecipeConfig || JSON.stringify(prevRecipeConfig) !== JSON.stringify(recipeConfig));
+        recipe && (!prevRecipe || JSON.stringify(prevRecipe) !== JSON.stringify(recipe));
 
-      if (recipeConfig && recipeChanged) {
-        prevRecipeConfigRef.current = recipeConfig;
+      if (recipe && recipeChanged) {
+        prevRecipeRef.current = recipe;
 
         try {
           // Load a fresh chat session with forced reset
           const newChat = await loadCurrentChat({
             resumeSessionId: undefined,
-            recipeConfig: recipeConfig,
+            recipeConfig: recipe,
             setAgentWaitingMessage,
             forceReset: true,
           });
 
-          // Set the chat with the recipe config and ensure messages are cleared
+          // Set the chat with the recipe and ensure messages are cleared
           const chatWithRecipe = {
             ...newChat,
-            recipeConfig: recipeConfig,
+            recipeConfig: recipe,
             recipeParameters: null,
             messages: [],
           };
@@ -105,9 +104,9 @@ export default function Pair({
         return;
       }
 
-      // If we don't have a recipe config from navigation but had one before, clear it
-      if (!recipeConfig && prevRecipeConfig) {
-        prevRecipeConfigRef.current = null;
+      // If we don't have a recipe from navigation but had one before, clear it
+      if (!recipe && prevRecipe) {
+        prevRecipeRef.current = null;
       }
 
       try {
@@ -151,7 +150,7 @@ export default function Pair({
     loadCurrentChat,
     resumeSessionId,
     setSearchParams,
-    recipeConfig,
+    recipe,
   ]);
 
   // Followed by sending the initialMessage if we have one. This will happen
@@ -175,7 +174,7 @@ export default function Pair({
 
   const { initialPrompt: recipeInitialPrompt } = useRecipeManager(
     chat,
-    recipeConfig || chat.recipeConfig || null
+    recipe || chat.recipeConfig || null
   );
 
   const handleMessageSubmit = () => {

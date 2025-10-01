@@ -106,7 +106,7 @@ const PairRouteWrapper = ({
       setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
       resumeSessionId={resumeSessionId}
       initialMessage={initialMessage}
-      recipeConfig={routeState.recipeConfig}
+      recipe={routeState.recipe}
     />
   );
 };
