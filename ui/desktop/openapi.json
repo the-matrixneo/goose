@@ -2326,7 +2326,7 @@
           },
           {
             "type": "object",
-            "description": "Platform extensions that have direct access to the agent etc and are part of the  the goose binary",
+            "description": "Platform extensions that have direct access to the agent etc and run in the agent process",
             "required": [
               "name",
               "description",
