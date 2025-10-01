@@ -113,12 +113,8 @@ async fn create_recipe(
     let session = match SessionManager::get_session(&request.session_id, true).await {
         Ok(session) => session,
         Err(e) => {
-            let error_message = format!("Failed to get session: {}", e);
-            let error_response = CreateRecipeResponse {
-                recipe: None,
-                error: Some(error_message),
-            };
-            return Ok(Json(error_response));
+            tracing::error!("Failed to get session: {}", e);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
         }
     };
 
