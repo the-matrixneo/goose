@@ -5,8 +5,8 @@ import {
   updateSystemPromptWithParameters,
   substituteParameters,
   filterValidUsedParameters,
-  updateSessionMetadataWithParameters,
 } from '../utils/providerUtils';
+import { updateSessionRecipeParameters } from '../api';
 import { useChatContext } from '../contexts/ChatContext';
 import { ChatType } from '../types/chat';
 import { toastSuccess } from '../toasts';
@@ -206,7 +206,15 @@ export const useRecipeManager = (chat: ChatType, recipeConfig?: Recipe | null) =
       );
 
       // Save recipe parameters to session metadata
-      await updateSessionMetadataWithParameters(chat.sessionId, inputValues);
+      await updateSessionRecipeParameters({
+        path: {
+          session_id: chat.sessionId,
+        },
+        body: {
+          recipeParameters: inputValues,
+        },
+        throwOnError: true,
+      });
     } catch (error) {
       console.error('Failed to update system prompt with parameters:', error);
     }

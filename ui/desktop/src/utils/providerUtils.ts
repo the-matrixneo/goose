@@ -331,28 +331,3 @@ export const initializeSystem = async (
     throw error;
   }
 };
-
-/**
- * Updates session metadata with recipe parameters
- * This ensures parameters are persisted across session resumption
- */
-export const updateSessionMetadataWithParameters = async (
-  sessionId: string,
-  recipeParameters: Record<string, string>
-): Promise<void> => {
-  try {
-    const { updateSessionRecipeParameters } = await import('../api');
-
-    await updateSessionRecipeParameters({
-      path: {
-        session_id: sessionId,
-      },
-      body: {
-        recipeParameters,
-      },
-      throwOnError: true,
-    });
-  } catch (error) {
-    console.error('Failed to save recipe parameters to session metadata:', error);
-  }
-};
