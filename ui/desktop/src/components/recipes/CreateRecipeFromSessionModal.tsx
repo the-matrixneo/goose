@@ -111,11 +111,11 @@ export default function CreateRecipeFromSessionModal({
         })
         .catch((error) => {
           console.error('Failed to analyze messages:', error);
-          clearInterval(stageInterval);
           setAnalysisStage('Analysis failed');
-          setHasAnalyzed(true);
         })
         .finally(() => {
+          clearInterval(stageInterval);
+          setHasAnalyzed(true);
           setTimeout(() => {
             setIsAnalyzing(false);
             setAnalysisStage('');
