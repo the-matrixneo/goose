@@ -266,6 +266,8 @@ export default function ApiKeyTester({ onSuccess }: ApiKeyTesterProps) {
     }
   };
 
+  const hasInput = apiKey.trim().length > 0;
+
   return (
     <div className="relative w-full mb-6">
       {/* Recommended pill */}
@@ -299,15 +301,15 @@ export default function ApiKeyTester({ onSuccess }: ApiKeyTesterProps) {
               className="flex-1 px-3 py-2 border border-background-hover rounded-lg bg-background-default text-text-standard placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               disabled={isLoading}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && !isLoading && apiKey.trim()) {
+                if (e.key === 'Enter' && !isLoading && hasInput) {
                   testApiKey();
                 }
               }}
             />
             <Button
               onClick={testApiKey}
-              disabled={isLoading || !apiKey.trim()}
-              variant="default"
+              disabled={isLoading || !hasInput}
+              variant={hasInput && !isLoading ? "default" : "secondary"}
               className="h-auto py-2 px-4"
             >
               {isLoading ? (
