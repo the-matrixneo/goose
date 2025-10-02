@@ -189,23 +189,30 @@ jobs:
           GOOSE_MODEL: ${{ matrix.model }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          HOME: /tmp/goose-home
+          HOME: /tmp/goose-home-${{ matrix.provider }}
           GOOSE_DISABLE_KEYRING: 1
         run: |
           # Ensure the HOME directory structure exists
           mkdir -p $HOME/.local/share/goose/sessions
           mkdir -p $HOME/.config/goose
 
-          # Create test file in current directory
+          # Create a unique test directory for this matrix job
+          # Each matrix combination has unique provider+model, ensuring no collisions
+          TEST_DIR="/tmp/goose-test-${GOOSE_PROVIDER}-${GOOSE_MODEL}"
+          mkdir -p "$TEST_DIR"
+          cd "$TEST_DIR"
+
+          # Create test file in the test directory
           echo "hello" > hello.txt
 
           echo "=== Goose Smoke Test ==="
           echo "Provider: ${GOOSE_PROVIDER}"
           echo "Model: ${GOOSE_MODEL}"
+          echo "Test Directory: $TEST_DIR"
           echo ""
 
-          # Run goose and capture output
-          OUTPUT=$(./target/release/goose run --text "please list files in the current directory" --with-builtin developer 2>&1)
+          # Run goose from the test directory and capture output
+          OUTPUT=$("$GITHUB_WORKSPACE/target/release/goose" run --text "please list files in the current directory" --with-builtin developer 2>&1)
           
           echo "Output:"
           echo "$OUTPUT"
