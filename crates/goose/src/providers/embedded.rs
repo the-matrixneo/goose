@@ -31,6 +31,10 @@ const DEFAULT_MODEL_URL: &str =
     "https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF/resolve/main/qwen2.5-7b-instruct-q3_k_m.gguf";
 const DEFAULT_MODEL_SIZE_MB: u64 = 3631;
 
+// Tool output truncation settings
+const MAX_TOOL_OUTPUT_SIZE: usize = 1000; // Maximum characters for tool output in session
+const TRUNCATION_INDICATOR: &str = "\n... [Output truncated - showing first 1000 characters]";
+
 pub struct EmbeddedProvider {
     session: Arc<Mutex<LlamaSession>>,
     model: ModelConfig,
@@ -123,7 +127,7 @@ impl ToolExecutor {
         None
     }
 
-    /// Execute a single tool call
+    /// Execute a single tool call with output truncation for session storage
     async fn execute_tool_call(json: &serde_json::Value) -> Option<String> {
         let tool_name = json.get("tool")?.as_str()?;
         let args = json.get("args")?;
@@ -136,21 +140,37 @@ impl ToolExecutor {
                             let stdout = String::from_utf8_lossy(&output.stdout);
                             let stderr = String::from_utf8_lossy(&output.stderr);
 
+                            // Helper function to truncate output if needed
+                            let truncate_if_large = |s: &str| -> String {
+                                if s.len() > MAX_TOOL_OUTPUT_SIZE {
+                                    format!(
+                                        "{}{}",
+                                        &s[..MAX_TOOL_OUTPUT_SIZE],
+                                        TRUNCATION_INDICATOR
+                                    )
+                                } else {
+                                    s.to_string()
+                                }
+                            };
+
                             if output.status.success() {
                                 if !stdout.is_empty() {
-                                    Some(format!("✓ Command executed successfully:\n{}", stdout))
+                                    let truncated_stdout = truncate_if_large(&stdout);
+                                    Some(format!(
+                                        "✓ Command executed successfully:\n{}",
+                                        truncated_stdout
+                                    ))
                                 } else {
                                     Some("✓ Command executed successfully".to_string())
                                 }
                             } else {
-                                Some(format!(
-                                    "✗ Command failed:\n{}",
-                                    if !stderr.is_empty() {
-                                        stderr.to_string()
-                                    } else {
-                                        stdout.to_string()
-                                    }
-                                ))
+                                let error_output = if !stderr.is_empty() {
+                                    stderr.to_string()
+                                } else {
+                                    stdout.to_string()
+                                };
+                                let truncated_error = truncate_if_large(&error_output);
+                                Some(format!("✗ Command failed:\n{}", truncated_error))
                             }
                         }
                         Err(e) => Some(format!("✗ Failed to execute command: {}", e)),
@@ -493,6 +513,42 @@ impl EmbeddedProvider {
 
         Ok(result)
     }
+
+    /// Apply "middle out" compression to messages when session gets large
+    fn compress_messages_if_needed(messages: &[Message]) -> Vec<Message> {
+        const MESSAGE_THRESHOLD: usize = 10;
+        const MESSAGES_TO_KEEP_EACH_END: usize = 3;
+
+        // If we have more than threshold messages, compress by keeping first and last few
+        if messages.len() > MESSAGE_THRESHOLD {
+            let mut compressed = Vec::new();
+
+            // Keep first N messages (including system prompt context)
+            compressed.extend_from_slice(&messages[..MESSAGES_TO_KEEP_EACH_END]);
+
+            // Add a compression indicator message
+            let messages_removed = messages.len() - (MESSAGES_TO_KEEP_EACH_END * 2);
+            compressed.push(Message::user().with_text(
+                format!(
+                    "[Note: {} middle messages have been removed to reduce context size. Conversation continues from recent messages.]",
+                    messages_removed
+                )
+            ));
+
+            // Keep last N messages
+            compressed.extend_from_slice(&messages[messages.len() - MESSAGES_TO_KEEP_EACH_END..]);
+
+            info!(
+                "Applied middle-out compression: {} messages -> {} messages",
+                messages.len(),
+                compressed.len()
+            );
+
+            compressed
+        } else {
+            messages.to_vec()
+        }
+    }
 }
 
 #[async_trait]
@@ -567,8 +623,11 @@ The tool will execute immediately and you'll receive the result (success or erro
         // Add the system prompt as the first user message (works better for embedded models)
         full_messages.push(Message::user().with_text(g3_system_prompt));
 
-        // Add conversation messages directly
-        full_messages.extend_from_slice(messages);
+        // Apply middle-out compression if needed before adding to full messages
+        let compressed_messages = Self::compress_messages_if_needed(messages);
+
+        // Add conversation messages (possibly compressed)
+        full_messages.extend(compressed_messages);
 
         // Format for the model
         let prompt = self.format_messages(&full_messages);
