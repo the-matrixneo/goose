@@ -1,4 +1,5 @@
 import { NavigateFunction } from 'react-router-dom';
+import { Recipe } from '../api/types.gen';
 
 export type View =
   | 'welcome'
@@ -26,7 +27,7 @@ export type ViewOptions = {
   sessionDetails?: unknown;
   error?: string;
   baseUrl?: string;
-  recipeConfig?: unknown;
+  recipe?: Recipe;
   parentView?: View;
   parentViewOptions?: ViewOptions;
   disableAnimation?: boolean;

@@ -72,10 +72,10 @@ export default function RecipesView({ setView }: RecipesViewProps) {
 
   const handleLoadRecipe = async (recipeManifest: RecipeManifestResponse) => {
     try {
-      // Navigate to pair view with recipe config and force a new session
+      // Navigate to pair view with recipe and force a new session
       setView('pair', {
         disableAnimation: true,
-        recipeConfig: recipeManifest.recipe,
+        recipe: recipeManifest.recipe,
         resumeSessionId: undefined, // Force new session to clear current chat
       });
     } catch (err) {

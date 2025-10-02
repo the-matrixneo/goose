@@ -82,7 +82,7 @@ export const filterValidUsedParameters = (
   parameters: RecipeParameter[] | undefined,
   recipeContent: { prompt?: string; instructions?: string; activities?: string[] }
 ): RecipeParameter[] => {
-  if (!parameters || !Array.isArray(parameters)) {
+  if (!parameters) {
     return [];
   }
 
@@ -94,14 +94,8 @@ export const filterValidUsedParameters = (
     ? extractTemplateVariables(recipeContent.instructions)
     : [];
 
-  // Extract variables from activities
-  const activityVariables: string[] = [];
-  if (recipeContent.activities && Array.isArray(recipeContent.activities)) {
-    recipeContent.activities.forEach((activity) => {
-      const vars = extractTemplateVariables(activity);
-      activityVariables.push(...vars);
-    });
-  }
+  // Extract variables from activities using flatMap
+  const activityVariables = recipeContent.activities?.flatMap(extractTemplateVariables) ?? [];
 
   const allUsedVariables = [
     ...new Set([...promptVariables, ...instructionVariables, ...activityVariables]),
@@ -335,30 +329,5 @@ export const initializeSystem = async (
     console.error('Failed to initialize agent:', error);
     options?.setIsExtensionsLoading?.(false);
     throw error;
-  }
-};
-
-/**
- * Updates session metadata with recipe parameters
- * This ensures parameters are persisted across session resumption
- */
-export const updateSessionMetadataWithParameters = async (
-  sessionId: string,
-  recipeParameters: Record<string, string>
-): Promise<void> => {
-  try {
-    const { updateSessionRecipeParameters } = await import('../api');
-
-    await updateSessionRecipeParameters({
-      path: {
-        session_id: sessionId,
-      },
-      body: {
-        recipeParameters,
-      },
-      throwOnError: true,
-    });
-  } catch (error) {
-    console.error('Failed to save recipe parameters to session metadata:', error);
   }
 };

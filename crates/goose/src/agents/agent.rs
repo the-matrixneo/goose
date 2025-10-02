@@ -1696,7 +1696,6 @@ impl Agent {
             extension_configs.len()
         );
 
-        // Extract title and description from the JSON response if available
         let (title, description) =
             if let Ok(json_content) = serde_json::from_str::<Value>(&clean_content) {
                 let title = json_content

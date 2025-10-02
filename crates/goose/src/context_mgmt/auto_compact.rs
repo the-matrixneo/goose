@@ -317,8 +317,8 @@ mod tests {
             id: "test_session".to_string(),
             working_dir: PathBuf::from(working_dir),
             description: "Test session".to_string(),
-            created_at: "2024-01-01T00:00:00Z".to_string(),
-            updated_at: "2024-01-01T00:00:00Z".to_string(),
+            created_at: Default::default(),
+            updated_at: Default::default(),
             schedule_id: Some("test_job".to_string()),
             recipe: None,
             total_tokens: Some(100),
@@ -330,7 +330,7 @@ mod tests {
             extension_data: extension_data::ExtensionData::new(),
             conversation: Some(conversation),
             message_count,
-            recipe_parameters: None,
+            user_recipe_values: None,
         }
     }
 

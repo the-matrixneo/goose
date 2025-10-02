@@ -53,34 +53,28 @@ describe('RecipeFormFields', () => {
   describe('Basic Rendering', () => {
     it('renders the component without crashing', () => {
       render(<TestWrapper {...defaultProps} />);
-      expect(screen.getByText('Title')).toBeInTheDocument();
+      expect(screen.getByLabelText(/title/i)).toBeInTheDocument();
     });
 
     it('renders required form fields', () => {
       render(<TestWrapper {...defaultProps} />);
 
-      expect(screen.getByText('Title')).toBeInTheDocument();
-      expect(screen.getByText('Description')).toBeInTheDocument();
-      expect(screen.getByText('Instructions')).toBeInTheDocument();
-      expect(screen.getByText('Initial Prompt')).toBeInTheDocument();
-      expect(screen.getByText('Activities')).toBeInTheDocument();
-      expect(screen.getByText('Parameters')).toBeInTheDocument();
-      expect(screen.getByText('Response JSON Schema')).toBeInTheDocument();
+      expect(screen.getByLabelText(/title/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/description/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/instructions/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/prompt/i)).toBeInTheDocument();
+      expect(screen.getAllByText(/activities/i)[0]).toBeInTheDocument();
+      expect(screen.getAllByText(/parameters/i)[0]).toBeInTheDocument();
+      expect(screen.getByText(/response json schema/i)).toBeInTheDocument();
     });
 
-    it('shows placeholders for input fields', () => {
+    it('shows form inputs with proper accessibility', () => {
       render(<TestWrapper {...defaultProps} />);
 
-      expect(screen.getByPlaceholderText('Recipe title')).toBeInTheDocument();
-      expect(
-        screen.getByPlaceholderText('Brief description of what this recipe does')
-      ).toBeInTheDocument();
-      expect(
-        screen.getByPlaceholderText('Detailed instructions for the AI, hidden from the user...')
-      ).toBeInTheDocument();
-      expect(
-        screen.getByPlaceholderText('Pre-filled prompt when the recipe starts...')
-      ).toBeInTheDocument();
+      expect(screen.getByRole('textbox', { name: /title/i })).toBeInTheDocument();
+      expect(screen.getByRole('textbox', { name: /description/i })).toBeInTheDocument();
+      expect(screen.getByRole('textbox', { name: /instructions/i })).toBeInTheDocument();
+      expect(screen.getByRole('textbox', { name: /prompt/i })).toBeInTheDocument();
     });
   });
 
@@ -89,13 +83,11 @@ describe('RecipeFormFields', () => {
       const user = userEvent.setup();
       render(<TestWrapper {...defaultProps} />);
 
-      const titleInput = screen.getByPlaceholderText('Recipe title');
+      const titleInput = screen.getByRole('textbox', { name: /title/i });
       await user.type(titleInput, 'Test Recipe');
       expect(titleInput).toHaveValue('Test Recipe');
 
-      const descriptionInput = screen.getByPlaceholderText(
-        'Brief description of what this recipe does'
-      );
+      const descriptionInput = screen.getByRole('textbox', { name: /description/i });
       await user.type(descriptionInput, 'A test recipe');
       expect(descriptionInput).toHaveValue('A test recipe');
     });
@@ -104,15 +96,11 @@ describe('RecipeFormFields', () => {
       const user = userEvent.setup();
       render(<TestWrapper {...defaultProps} />);
 
-      const instructionsInput = screen.getByPlaceholderText(
-        'Detailed instructions for the AI, hidden from the user...'
-      );
+      const instructionsInput = screen.getByRole('textbox', { name: /instructions/i });
       await user.type(instructionsInput, 'Do something');
       expect(instructionsInput).toHaveValue('Do something');
 
-      const promptInput = screen.getByPlaceholderText(
-        'Pre-filled prompt when the recipe starts...'
-      );
+      const promptInput = screen.getByRole('textbox', { name: /prompt/i });
       await user.type(promptInput, 'Hello world');
       expect(promptInput).toHaveValue('Hello world');
     });
@@ -123,7 +111,7 @@ describe('RecipeFormFields', () => {
       render(<TestWrapper {...defaultProps} />);
 
       expect(screen.getByPlaceholderText('Enter parameter name...')).toBeInTheDocument();
-      expect(screen.getByText('Add parameter')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /add parameter/i })).toBeInTheDocument();
     });
 
     it('allows adding parameters manually', async () => {
@@ -131,7 +119,7 @@ describe('RecipeFormFields', () => {
       render(<TestWrapper {...defaultProps} />);
 
       const parameterInput = screen.getByPlaceholderText('Enter parameter name...');
-      const addButton = screen.getByText('Add parameter');
+      const addButton = screen.getByRole('button', { name: /add parameter/i });
 
       expect(addButton).toBeDisabled();
 

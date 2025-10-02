@@ -1663,12 +1663,12 @@
         ]
       }
     },
-    "/sessions/{session_id}/recipe_parameters": {
+    "/sessions/{session_id}/user_recipe_values": {
       "put": {
         "tags": [
           "Session Management"
         ],
-        "operationId": "update_session_recipe_parameters",
+        "operationId": "update_session_user_recipe_values",
         "parameters": [
           {
             "name": "session_id",
@@ -1684,7 +1684,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdateSessionRecipeParametersRequest"
+                "$ref": "#/components/schemas/UpdateSessionUserRecipeValuesRequest"
               }
             }
           },
@@ -1692,7 +1692,7 @@
         },
         "responses": {
           "200": {
-            "description": "Session recipe parameters updated successfully"
+            "description": "Session user recipe values updated successfully"
           },
           "401": {
             "description": "Unauthorized - Invalid or missing API key"
@@ -1762,19 +1762,6 @@
             "type": "boolean"
           }
         }
-      },
-      "Annotated": {
-        "oneOf": [
-          {
-            "$ref": "#/components/schemas/RawTextContent"
-          },
-          {
-            "$ref": "#/components/schemas/RawImageContent"
-          },
-          {
-            "$ref": "#/components/schemas/RawEmbeddedResource"
-          }
-        ]
       },
       "Annotations": {
         "type": "object",
@@ -1906,7 +1893,7 @@
           {
             "allOf": [
               {
-                "$ref": "#/components/schemas/Annotated"
+                "$ref": "#/components/schemas/RawAudioContent"
               }
             ]
           },
@@ -2613,6 +2600,23 @@
           }
         }
       },
+      "Icon": {
+        "type": "object",
+        "required": [
+          "src"
+        ],
+        "properties": {
+          "mimeType": {
+            "type": "string"
+          },
+          "sizes": {
+            "type": "string"
+          },
+          "src": {
+            "type": "string"
+          }
+        }
+      },
       "ImageContent": {
         "type": "object",
         "required": [
@@ -3126,6 +3130,21 @@
           }
         }
       },
+      "RawAudioContent": {
+        "type": "object",
+        "required": [
+          "data",
+          "mimeType"
+        ],
+        "properties": {
+          "data": {
+            "type": "string"
+          },
+          "mimeType": {
+            "type": "string"
+          }
+        }
+      },
       "RawEmbeddedResource": {
         "type": "object",
         "required": [
@@ -3170,6 +3189,12 @@
           "description": {
             "type": "string"
           },
+          "icons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Icon"
+            }
+          },
           "mimeType": {
             "type": "string"
           },
@@ -3179,6 +3204,9 @@
           "size": {
             "type": "integer",
             "minimum": 0
+          },
+          "title": {
+            "type": "string"
           },
           "uri": {
             "type": "string"
@@ -3616,7 +3644,8 @@
             "nullable": true
           },
           "created_at": {
-            "type": "string"
+            "type": "string",
+            "format": "date-time"
           },
           "description": {
             "type": "string"
@@ -3649,13 +3678,6 @@
             ],
             "nullable": true
           },
-          "recipe_parameters": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "string"
-            },
-            "nullable": true
-          },
           "schedule_id": {
             "type": "string",
             "nullable": true
@@ -3666,7 +3688,15 @@
             "nullable": true
           },
           "updated_at": {
-            "type": "string"
+            "type": "string",
+            "format": "date-time"
+          },
+          "user_recipe_values": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "nullable": true
           },
           "working_dir": {
             "type": "string"
@@ -3978,6 +4008,12 @@
           "description": {
             "type": "string"
           },
+          "icons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Icon"
+            }
+          },
           "inputSchema": {
             "type": "object",
             "additionalProperties": true
@@ -3988,6 +4024,9 @@
           "outputSchema": {
             "type": "object",
             "additionalProperties": true
+          },
+          "title": {
+            "type": "string"
           }
         }
       },
@@ -4163,13 +4202,13 @@
           }
         }
       },
-      "UpdateSessionRecipeParametersRequest": {
+      "UpdateSessionUserRecipeValuesRequest": {
         "type": "object",
         "required": [
-          "recipeParameters"
+          "userRecipeValues"
         ],
         "properties": {
-          "recipeParameters": {
+          "userRecipeValues": {
             "type": "object",
             "description": "Recipe parameter values entered by the user",
             "additionalProperties": {

@@ -70,7 +70,6 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
           </div>
         </div>
 
-        {/* Delete button - always visible */}
         {onDelete && (
           <button
             type="button"

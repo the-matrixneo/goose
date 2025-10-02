@@ -3,11 +3,8 @@ import { Message, createUserMessage } from '../types/message';
 import { Recipe } from '../recipe';
 import { ChatType } from '../types/chat';
 import { useChatContext } from '../contexts/ChatContext';
-import {
-  updateSystemPromptWithParameters,
-  updateSessionMetadataWithParameters,
-  substituteParameters,
-} from '../utils/providerUtils';
+import { updateSystemPromptWithParameters, substituteParameters } from '../utils/providerUtils';
+import { updateSessionUserRecipeValues } from '../api';
 
 /**
  * Hook for managing recipe-related UI state and interactions
@@ -86,7 +83,10 @@ export function useRecipeUI(
       );
 
       // Save recipe parameters to session metadata
-      await updateSessionMetadataWithParameters(chat.sessionId, inputValues);
+      await updateSessionUserRecipeValues({
+        path: { session_id: chat.sessionId },
+        body: { userRecipeValues: inputValues },
+      });
     } catch (error) {
       console.error('Failed to update system prompt with parameters:', error);
     }

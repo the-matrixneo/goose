@@ -9,8 +9,6 @@ export type AddSubRecipesResponse = {
     success: boolean;
 };
 
-export type Annotated = RawTextContent | RawImageContent | RawEmbeddedResource;
-
 export type Annotations = {
     audience?: Array<Role>;
     lastModified?: string;
@@ -65,7 +63,7 @@ export type ConfigResponse = {
     };
 };
 
-export type Content = RawTextContent | RawImageContent | RawEmbeddedResource | Annotated | RawResource;
+export type Content = RawTextContent | RawImageContent | RawEmbeddedResource | RawAudioContent | RawResource;
 
 export type ContextLengthExceeded = {
     msg: string;
@@ -327,6 +325,12 @@ export type GetToolsQuery = {
     session_id: string;
 };
 
+export type Icon = {
+    mimeType?: string;
+    sizes?: string;
+    src: string;
+};
+
 export type ImageContent = {
     _meta?: {
         [key: string]: unknown;
@@ -499,6 +503,11 @@ export type ProvidersResponse = {
     providers: Array<ProviderDetails>;
 };
 
+export type RawAudioContent = {
+    data: string;
+    mimeType: string;
+};
+
 export type RawEmbeddedResource = {
     _meta?: {
         [key: string]: unknown;
@@ -516,9 +525,11 @@ export type RawImageContent = {
 
 export type RawResource = {
     description?: string;
+    icons?: Array<Icon>;
     mimeType?: string;
     name: string;
     size?: number;
+    title?: string;
     uri: string;
 };
 
@@ -713,12 +724,12 @@ export type Session = {
     message_count: number;
     output_tokens?: number | null;
     recipe?: Recipe | null;
-    recipe_parameters?: {
-        [key: string]: string;
-    } | null;
     schedule_id?: string | null;
     total_tokens?: number | null;
     updated_at: string;
+    user_recipe_values?: {
+        [key: string]: string;
+    } | null;
     working_dir: string;
 };
 
@@ -825,6 +836,7 @@ export type Tool = {
         [key: string]: unknown;
     };
     description?: string;
+    icons?: Array<Icon>;
     inputSchema: {
         [key: string]: unknown;
     };
@@ -832,6 +844,7 @@ export type Tool = {
     outputSchema?: {
         [key: string]: unknown;
     };
+    title?: string;
 };
 
 export type ToolAnnotations = {
@@ -899,11 +912,11 @@ export type UpdateSessionDescriptionRequest = {
     description: string;
 };
 
-export type UpdateSessionRecipeParametersRequest = {
+export type UpdateSessionUserRecipeValuesRequest = {
     /**
      * Recipe parameter values entered by the user
      */
-    recipeParameters: {
+    userRecipeValues: {
         [key: string]: string;
     };
 };
@@ -2257,8 +2270,8 @@ export type UpdateSessionDescriptionResponses = {
     200: unknown;
 };
 
-export type UpdateSessionRecipeParametersData = {
-    body: UpdateSessionRecipeParametersRequest;
+export type UpdateSessionUserRecipeValuesData = {
+    body: UpdateSessionUserRecipeValuesRequest;
     path: {
         /**
          * Unique identifier for the session
@@ -2266,10 +2279,10 @@ export type UpdateSessionRecipeParametersData = {
         session_id: string;
     };
     query?: never;
-    url: '/sessions/{session_id}/recipe_parameters';
+    url: '/sessions/{session_id}/user_recipe_values';
 };
 
-export type UpdateSessionRecipeParametersErrors = {
+export type UpdateSessionUserRecipeValuesErrors = {
     /**
      * Unauthorized - Invalid or missing API key
      */
@@ -2284,9 +2297,9 @@ export type UpdateSessionRecipeParametersErrors = {
     500: unknown;
 };
 
-export type UpdateSessionRecipeParametersResponses = {
+export type UpdateSessionUserRecipeValuesResponses = {
     /**
-     * Session recipe parameters updated successfully
+     * Session user recipe values updated successfully
      */
     200: unknown;
 };

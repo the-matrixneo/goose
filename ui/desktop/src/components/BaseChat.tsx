@@ -59,11 +59,8 @@ import ParameterInputModal from './ParameterInputModal';
 import CreateRecipeFromSessionModal from './recipes/CreateRecipeFromSessionModal';
 import { useChatEngine } from '../hooks/useChatEngine';
 import { useRecipeState } from '../hooks/useRecipeState';
-import {
-  updateSystemPromptWithParameters,
-  updateSessionMetadataWithParameters,
-  substituteParameters,
-} from '../utils/providerUtils';
+import { updateSystemPromptWithParameters, substituteParameters } from '../utils/providerUtils';
+import { updateSessionUserRecipeValues } from '../api';
 import { createUserMessage } from '../types/message';
 import { Recipe } from '../recipe';
 import { useRecipeCreationModal } from '../hooks/useRecipeCreationModal';
@@ -125,50 +122,6 @@ function BaseChatContent({
   const [currentRecipeTitle, setCurrentRecipeTitle] = React.useState<string | null>(null);
   const { isCompacting, handleManualCompaction } = useContextManager();
 
-  // Timeout ref for debouncing auto-scroll
-  const autoScrollTimeoutRef = useRef<number | null>(null);
-  // Track if user was following when agent started responding
-  const wasFollowingRef = useRef<boolean>(true);
-
-  const isNearBottom = React.useCallback(() => {
-    if (!scrollRef.current) return false;
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const viewport = scrollRef.current as any;
-    if (!viewport.viewportRef?.current) return false;
-
-    const viewportElement = viewport.viewportRef.current;
-    const { scrollHeight, scrollTop, clientHeight } = viewportElement;
-    const scrollBottom = scrollTop + clientHeight;
-    const distanceFromBottom = scrollHeight - scrollBottom;
-
-    return distanceFromBottom <= 100;
-  }, []);
-
-  // Function to auto-scroll if user was following when agent started
-  const conditionalAutoScroll = React.useCallback(() => {
-    // Clear any existing timeout
-    if (autoScrollTimeoutRef.current) {
-      clearTimeout(autoScrollTimeoutRef.current);
-    }
-
-    // Debounce the auto-scroll to prevent jumpy behavior and prevent multiple rapid scrolls
-    autoScrollTimeoutRef.current = window.setTimeout(() => {
-      // Only auto-scroll if user was following when the agent started responding
-      if (wasFollowingRef.current && scrollRef.current) {
-        scrollRef.current.scrollToBottom();
-      }
-    }, 150);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (autoScrollTimeoutRef.current) {
-        clearTimeout(autoScrollTimeoutRef.current);
-      }
-    };
-  }, []);
-
   // Use shared chat engine
   const {
     messages,
@@ -195,14 +148,10 @@ function BaseChatContent({
     chat,
     setChat,
     onMessageStreamFinish: () => {
-      conditionalAutoScroll();
-
       // Call the original callback if provided
       onMessageStreamFinish?.();
     },
     onMessageSent: () => {
-      wasFollowingRef.current = isNearBottom();
-
       // Mark that user has started using the recipe
       if (recipeConfig) {
         setHasStartedUsingRecipe(true);
@@ -285,7 +234,11 @@ function BaseChatContent({
         inputValues,
         recipeConfig || undefined
       );
-      await updateSessionMetadataWithParameters(chat.sessionId, inputValues);
+      // Update session user recipe values via API
+      await updateSessionUserRecipeValues({
+        path: { session_id: chat.sessionId },
+        body: { userRecipeValues: inputValues },
+      });
     } catch (error) {
       console.error('Failed to update system prompt with parameters:', error);
     }
@@ -390,12 +343,30 @@ function BaseChatContent({
     session: sessionMetadata,
   });
 
+  useEffect(() => {
+    window.electron.logInfo(
+      'Initial messages when resuming session: ' + JSON.stringify(chat.messages, null, 2)
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Track if this is the initial render for session resuming
+  const initialRenderRef = useRef(true);
+
   // Auto-scroll when messages are loaded (for session resuming)
   const handleRenderingComplete = React.useCallback(() => {
-    if (scrollRef.current?.scrollToBottom) {
-      scrollRef.current.scrollToBottom();
+    // Only force scroll on the very first render
+    if (initialRenderRef.current && messages.length > 0) {
+      initialRenderRef.current = false;
+      if (scrollRef.current?.scrollToBottom) {
+        scrollRef.current.scrollToBottom();
+      }
+    } else if (scrollRef.current?.isFollowing) {
+      if (scrollRef.current?.scrollToBottom) {
+        scrollRef.current.scrollToBottom();
+      }
     }
-  }, []);
+  }, [messages.length]);
 
   // Handle submit
   const handleSubmit = (e: React.FormEvent) => {
@@ -552,7 +523,12 @@ function BaseChatContent({
                             onClick={async () => {
                               clearError();
 
-                              await handleManualCompaction(messages, setMessages, append);
+                              await handleManualCompaction(
+                                messages,
+                                setMessages,
+                                append,
+                                chat.sessionId
+                              );
                             }}
                           >
                             Summarize Conversation

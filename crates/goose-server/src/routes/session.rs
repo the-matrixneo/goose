@@ -28,9 +28,9 @@ pub struct UpdateSessionDescriptionRequest {
 
 #[derive(Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct UpdateSessionRecipeParametersRequest {
+pub struct UpdateSessionUserRecipeValuesRequest {
     /// Recipe parameter values entered by the user
-    recipe_parameters: HashMap<String, String>,
+    user_recipe_values: HashMap<String, String>,
 }
 
 const MAX_DESCRIPTION_LENGTH: usize = 200;
@@ -138,13 +138,13 @@ async fn update_session_description(
 
 #[utoipa::path(
     put,
-    path = "/sessions/{session_id}/recipe_parameters",
-    request_body = UpdateSessionRecipeParametersRequest,
+    path = "/sessions/{session_id}/user_recipe_values",
+    request_body = UpdateSessionUserRecipeValuesRequest,
     params(
         ("session_id" = String, Path, description = "Unique identifier for the session")
     ),
     responses(
-        (status = 200, description = "Session recipe parameters updated successfully"),
+        (status = 200, description = "Session user recipe values updated successfully"),
         (status = 401, description = "Unauthorized - Invalid or missing API key"),
         (status = 404, description = "Session not found"),
         (status = 500, description = "Internal server error")
@@ -154,13 +154,13 @@ async fn update_session_description(
     ),
     tag = "Session Management"
 )]
-// Update session recipe parameters
-async fn update_session_recipe_parameters(
+// Update session user recipe parameter values
+async fn update_session_user_recipe_values(
     Path(session_id): Path<String>,
-    Json(request): Json<UpdateSessionRecipeParametersRequest>,
+    Json(request): Json<UpdateSessionUserRecipeValuesRequest>,
 ) -> Result<StatusCode, StatusCode> {
     SessionManager::update_session(&session_id)
-        .recipe_parameters(Some(request.recipe_parameters))
+        .user_recipe_values(Some(request.user_recipe_values))
         .apply()
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -210,8 +210,8 @@ pub fn routes(state: Arc<AppState>) -> Router {
             put(update_session_description),
         )
         .route(
-            "/sessions/{session_id}/recipe_parameters",
-            put(update_session_recipe_parameters),
+            "/sessions/{session_id}/user_recipe_values",
+            put(update_session_user_recipe_values),
         )
         .with_state(state)
 }

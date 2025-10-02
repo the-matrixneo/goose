@@ -121,7 +121,7 @@ export function useAgentInitialization(): UseAgentInitializationReturn {
             getExtensions,
             addExtension,
             setIsExtensionsLoading: initContext.setIsExtensionsLoading,
-            recipeParameters: agentSession.recipe_parameters,
+            recipeParameters: agentSession.user_recipe_values,
             recipeConfig: recipeConfigForInit,
           });
         } catch (error) {
@@ -152,7 +152,7 @@ export function useAgentInitialization(): UseAgentInitializationReturn {
           messageHistoryIndex: 0,
           messages: messages,
           recipeConfig: agentSession.recipe, // Always trust what the agent returns
-          recipeParameters: agentSession.recipe_parameters || null,
+          recipeParameters: agentSession.user_recipe_values || null,
         };
 
         setAgentState(AgentState.INITIALIZED);
@@ -202,7 +202,7 @@ export function useAgentInitialization(): UseAgentInitializationReturn {
           messageHistoryIndex: 0,
           messages: messages?.map(convertApiMessageToFrontendMessage),
           recipeConfig: agentSession.recipe,
-          recipeParameters: agentSession.recipe_parameters || null,
+          recipeParameters: agentSession.user_recipe_values || null,
         };
       }
 

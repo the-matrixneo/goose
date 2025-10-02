@@ -78,6 +78,7 @@ export default function CreateRecipeFromSessionModal({
       // Call the backend to analyze messages and create a recipe
       createRecipe({
         body: { session_id: sessionId },
+        throwOnError: true,
       })
         .then((response) => {
           clearInterval(stageInterval);
@@ -110,11 +111,11 @@ export default function CreateRecipeFromSessionModal({
         })
         .catch((error) => {
           console.error('Failed to analyze messages:', error);
-          clearInterval(stageInterval);
           setAnalysisStage('Analysis failed');
-          setHasAnalyzed(true);
         })
         .finally(() => {
+          clearInterval(stageInterval);
+          setHasAnalyzed(true);
           setTimeout(() => {
             setIsAnalyzing(false);
             setAnalysisStage('');
