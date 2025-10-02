@@ -22,14 +22,38 @@ use crate::model::ModelConfig;
 pub const EMBEDDED_DEFAULT_MODEL: &str = "qwen2.5-7b-instruct";
 pub const EMBEDDED_KNOWN_MODELS: &[&str] = &[
     "qwen2.5-7b-instruct",
+    "gemma-3n-e4b-it",
     "llama-7b",
     "codellama-7b",
     "mistral-7b",
 ];
 
-const DEFAULT_MODEL_URL: &str =
-    "https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF/resolve/main/qwen2.5-7b-instruct-q3_k_m.gguf";
-const DEFAULT_MODEL_SIZE_MB: u64 = 3631;
+// Model registry with download information
+struct ModelInfo {
+    name: &'static str,
+    display_name: &'static str,
+    url: &'static str,
+    size_mb: u64,
+    #[allow(dead_code)] // Reserved for future use to determine model format
+    model_type: &'static str,
+}
+
+const KNOWN_MODELS_INFO: &[ModelInfo] = &[
+    ModelInfo {
+        name: "qwen2.5-7b-instruct",
+        display_name: "Qwen 2.5 7B Instruct (Q3_K_M, ~3.5GB)",
+        url: "https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF/resolve/main/qwen2.5-7b-instruct-q3_k_m.gguf",
+        size_mb: 3631,
+        model_type: "qwen",
+    },
+    ModelInfo {
+        name: "gemma-3n-e4b-it",
+        display_name: "Gemma 3N E4B Instruct (Q6_K, ~6GB)",
+        url: "https://huggingface.co/unsloth/gemma-3n-E4B-it-GGUF/resolve/main/gemma-3n-E4B-it-Q6_K.gguf",
+        size_mb: 5981,
+        model_type: "gemma",
+    },
+];
 
 // Tool output truncation settings
 const MAX_TOOL_OUTPUT_SIZE: usize = 1000; // Maximum characters for tool output in session
@@ -206,18 +230,26 @@ impl EmbeddedProvider {
     pub fn from_env(model: ModelConfig) -> Result<Self> {
         let config = crate::config::Config::global();
 
+        // Look up model info from registry to get default path and type
+        let model_info = Self::get_model_info(&model.model_name);
+
+        // Generate default path based on model URL's filename
+        let default_filename = model_info
+            .and_then(|info| info.url.rsplit('/').next())
+            .unwrap_or("model.gguf");
+
         // Get configuration parameters
         let model_path: String = config.get_param("EMBEDDED_MODEL_PATH").unwrap_or_else(|_| {
             let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-            format!(
-                "{}/.cache/goose/models/qwen2.5-7b-instruct-q3_k_m.gguf",
-                home
-            )
+            format!("{}/.cache/goose/models/{}", home, default_filename)
         });
 
-        let model_type: String = config
-            .get_param("EMBEDDED_MODEL_TYPE")
-            .unwrap_or_else(|_| "qwen".to_string());
+        // Auto-detect model type from registry, or use config override
+        let model_type: String = config.get_param("EMBEDDED_MODEL_TYPE").unwrap_or_else(|_| {
+            model_info
+                .map(|info| info.model_type.to_string())
+                .unwrap_or_else(|| "qwen".to_string())
+        });
 
         let context_length: u32 = config.get_param("EMBEDDED_CONTEXT_LENGTH").unwrap_or(32768); // Match g3's default
 
@@ -256,15 +288,26 @@ impl EmbeddedProvider {
         let expanded_path = shellexpand::tilde(&config.model_path);
         let model_path_buf = PathBuf::from(expanded_path.as_ref());
 
-        // If model doesn't exist and it's the default Qwen model, offer to download it
+        // If model doesn't exist, check if we can auto-download from registry
         if !model_path_buf.exists() {
-            if config.model_path.contains("qwen2.5-7b-instruct") {
-                info!("Model file not found. Attempting to download Qwen 2.5 7B model...");
-                Self::download_default_model(&model_path_buf)?;
+            // Try to find model in registry by name from the model config
+            let model_name = &config.model.model_name;
+            if let Some(model_info) = Self::get_model_info(model_name) {
+                info!(
+                    "Model file not found. Attempting to download {}...",
+                    model_info.display_name
+                );
+                Self::download_model(
+                    &model_path_buf,
+                    model_info.url,
+                    model_info.size_mb,
+                    model_info.display_name,
+                )?;
             } else {
                 return Err(anyhow::anyhow!(
-                    "Model file not found: {}",
-                    model_path_buf.display()
+                    "Model file not found: {}\nIf this is a custom model, please download it manually or provide a valid model name from: {:?}",
+                    model_path_buf.display(),
+                    KNOWN_MODELS_INFO.iter().map(|m| m.name).collect::<Vec<_>>()
                 ));
             }
         }
@@ -320,8 +363,13 @@ impl EmbeddedProvider {
         })
     }
 
-    /// Download the default Qwen model if it doesn't exist
-    fn download_default_model(model_path: &Path) -> Result<()> {
+    /// Download a model from HuggingFace if it doesn't exist
+    fn download_model(
+        model_path: &Path,
+        url: &str,
+        expected_size_mb: u64,
+        display_name: &str,
+    ) -> Result<()> {
         use std::fs;
 
         // Create the parent directory if it doesn't exist
@@ -329,9 +377,28 @@ impl EmbeddedProvider {
             fs::create_dir_all(parent)?;
         }
 
-        info!("Downloading Qwen 2.5 7B model (Q3_K_M quantization, ~3.5GB)...");
+        info!("Downloading {}...", display_name);
         info!("This is a one-time download that may take several minutes.");
         info!("Downloading to: {}", model_path.display());
+
+        // Verify URL exists with HEAD request
+        info!("Verifying download URL...");
+        let verify_output = Command::new("curl")
+            .args([
+                "-I", // HEAD request
+                "-L", // Follow redirects
+                "-f", // Fail on HTTP errors
+                "-s", // Silent
+                url,
+            ])
+            .output()?;
+
+        if !verify_output.status.success() {
+            anyhow::bail!(
+                "Failed to verify model URL. Please check that the URL is accessible:\n{}",
+                url
+            );
+        }
 
         // Use curl with progress bar for download
         let output = Command::new("curl")
@@ -341,7 +408,7 @@ impl EmbeddedProvider {
                 "-f", // Fail on HTTP errors
                 "-o",
                 model_path.to_str().unwrap(),
-                DEFAULT_MODEL_URL,
+                url,
             ])
             .output()?;
 
@@ -352,7 +419,7 @@ impl EmbeddedProvider {
                 error!(
                     "curl is not installed. Please install curl or manually download the model."
                 );
-                error!("Manual download: {}", DEFAULT_MODEL_URL);
+                error!("Manual download: {}", url);
                 error!("Save to: {}", model_path.display());
                 anyhow::bail!(
                     "curl not found - please install curl or download the model manually"
@@ -366,17 +433,45 @@ impl EmbeddedProvider {
         let metadata = fs::metadata(model_path)?;
         let size_mb = metadata.len() / (1024 * 1024);
 
-        if size_mb < DEFAULT_MODEL_SIZE_MB - 100 {
+        // Allow 100MB variance for size check
+        if size_mb < expected_size_mb.saturating_sub(100) {
             fs::remove_file(model_path).ok();
             anyhow::bail!(
                 "Downloaded file appears incomplete ({}MB vs expected ~{}MB)",
                 size_mb,
-                DEFAULT_MODEL_SIZE_MB
+                expected_size_mb
             );
         }
 
-        info!("Successfully downloaded Qwen 2.5 7B model ({}MB)", size_mb);
+        info!("Successfully downloaded {} ({}MB)", display_name, size_mb);
         Ok(())
+    }
+
+    /// Download the default Qwen model if it doesn't exist
+    #[allow(dead_code)]
+    fn download_default_model(model_path: &Path) -> Result<()> {
+        let default_model = KNOWN_MODELS_INFO
+            .iter()
+            .find(|m| m.name == EMBEDDED_DEFAULT_MODEL)
+            .expect("Default model not found in registry");
+
+        Self::download_model(
+            model_path,
+            default_model.url,
+            default_model.size_mb,
+            default_model.display_name,
+        )
+    }
+
+    /// Normalize HuggingFace URL from blob format to resolve format
+    #[allow(dead_code)]
+    fn normalize_hf_url(url: &str) -> String {
+        url.replace("/blob/", "/resolve/")
+    }
+
+    /// Get model info by name from the registry
+    fn get_model_info(model_name: &str) -> Option<&'static ModelInfo> {
+        KNOWN_MODELS_INFO.iter().find(|m| m.name == model_name)
     }
 
     /// Format messages for the model based on model type
@@ -569,6 +664,15 @@ impl Provider for EmbeddedProvider {
         self.model.clone()
     }
 
+    async fn fetch_supported_models(&self) -> Result<Option<Vec<String>>, ProviderError> {
+        // Return the models from our registry
+        let models: Vec<String> = KNOWN_MODELS_INFO
+            .iter()
+            .map(|m| m.name.to_string())
+            .collect();
+        Ok(Some(models))
+    }
+
     #[tracing::instrument(
         skip(self, model_config, system, messages),
         fields(model_config, input, output, input_tokens, output_tokens, total_tokens)
@@ -685,5 +789,33 @@ mod tests {
 
         assert_eq!(config.model_name, EMBEDDED_DEFAULT_MODEL);
         assert!(config.context_limit() > 0);
+    }
+
+    #[test]
+    fn test_model_registry() {
+        // Test that we can find models in the registry
+        let qwen_info = EmbeddedProvider::get_model_info("qwen2.5-7b-instruct");
+        assert!(qwen_info.is_some());
+        assert_eq!(qwen_info.unwrap().model_type, "qwen");
+
+        let gemma_info = EmbeddedProvider::get_model_info("gemma-3n-e4b-it");
+        assert!(gemma_info.is_some());
+        assert_eq!(gemma_info.unwrap().model_type, "gemma");
+
+        // Test unknown model
+        let unknown = EmbeddedProvider::get_model_info("unknown-model");
+        assert!(unknown.is_none());
+    }
+
+    #[test]
+    fn test_filename_extraction() {
+        // Test that we correctly extract filenames from URLs
+        let qwen_info = EmbeddedProvider::get_model_info("qwen2.5-7b-instruct").unwrap();
+        let qwen_filename = qwen_info.url.rsplit('/').next().unwrap();
+        assert_eq!(qwen_filename, "qwen2.5-7b-instruct-q3_k_m.gguf");
+
+        let gemma_info = EmbeddedProvider::get_model_info("gemma-3n-e4b-it").unwrap();
+        let gemma_filename = gemma_info.url.rsplit('/').next().unwrap();
+        assert_eq!(gemma_filename, "gemma-3n-E4B-it-Q6_K.gguf");
     }
 }
