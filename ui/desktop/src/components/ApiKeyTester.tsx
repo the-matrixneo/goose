@@ -39,31 +39,65 @@ export default function ApiKeyTester({ onSuccess }: ApiKeyTesterProps) {
       const providersResponse = await providers();
       const availableProviders = providersResponse.data || [];
 
-      // Common provider patterns to test
+      // Provider configurations to test
       const providerTests = [
-        { name: 'openai', keyFormat: 'OPENAI_API_KEY' },
-        { name: 'anthropic', keyFormat: 'ANTHROPIC_API_KEY' },
-        { name: 'google', keyFormat: 'GOOGLE_API_KEY' },
-        { name: 'groq', keyFormat: 'GROQ_API_KEY' },
-        { name: 'cohere', keyFormat: 'COHERE_API_KEY' },
-        { name: 'mistral', keyFormat: 'MISTRAL_API_KEY' },
+        { 
+          name: 'openai', 
+          keyName: 'OPENAI_API_KEY',
+          displayName: 'OpenAI'
+        },
+        { 
+          name: 'anthropic', 
+          keyName: 'ANTHROPIC_API_KEY',
+          displayName: 'Anthropic'
+        },
+        { 
+          name: 'google', 
+          keyName: 'GOOGLE_API_KEY',
+          displayName: 'Google'
+        },
+        { 
+          name: 'groq', 
+          keyName: 'GROQ_API_KEY',
+          displayName: 'Groq'
+        },
+        { 
+          name: 'cohere', 
+          keyName: 'COHERE_API_KEY',
+          displayName: 'Cohere'
+        },
+        { 
+          name: 'mistral', 
+          keyName: 'MISTRAL_API_KEY',
+          displayName: 'Mistral'
+        },
       ];
 
       const results: TestResult[] = [];
+      let firstSuccessfulProvider: { name: string; model: string } | null = null;
 
       for (const test of providerTests) {
-        // Check if this provider is available
+        // Check if this provider is available in the system
         const provider = availableProviders.find((p: any) => 
           p.name.toLowerCase() === test.name.toLowerCase()
         );
 
         if (!provider) {
-          continue;
+          continue; // Skip providers that aren't available
         }
 
         try {
-          // Temporarily set the API key
-          await upsert(test.keyFormat, apiKey, true);
+          // Set the API key for this provider
+          await upsertConfig({
+            body: {
+              key: test.keyName,
+              value: apiKey,
+              is_secret: true
+            }
+          });
+
+          // Small delay to ensure config is set
+          await new Promise(resolve => setTimeout(resolve, 100));
 
           // Try to get models for this provider
           const modelsResponse = await getProviderModels({
@@ -73,46 +107,74 @@ export default function ApiKeyTester({ onSuccess }: ApiKeyTesterProps) {
           if (modelsResponse.data && modelsResponse.data.length > 0) {
             const firstModel = modelsResponse.data[0];
             results.push({
-              provider: test.name,
+              provider: test.displayName,
               success: true,
               model: firstModel,
             });
 
-            // If this is the first successful test, configure it
-            if (results.filter(r => r.success).length === 1) {
-              await upsert('GOOSE_PROVIDER', test.name, false);
-              await upsert('GOOSE_MODEL', firstModel, false);
-              
-              toastService.success({
-                title: 'Success!',
-                msg: `Configured ${test.name} with model ${firstModel}`,
-              });
-
-              onSuccess(test.name, firstModel);
+            // Store the first successful provider
+            if (!firstSuccessfulProvider) {
+              firstSuccessfulProvider = { name: test.name, model: firstModel };
             }
           } else {
             results.push({
-              provider: test.name,
+              provider: test.displayName,
               success: false,
               error: 'No models available',
             });
           }
-        } catch (error) {
+        } catch (error: any) {
+          let errorMessage = 'Authentication failed';
+          
+          // Try to extract more specific error information
+          if (error?.response?.data?.message) {
+            errorMessage = error.response.data.message;
+          } else if (error?.message) {
+            errorMessage = error.message;
+          }
+
           results.push({
-            provider: test.name,
+            provider: test.displayName,
             success: false,
-            error: error instanceof Error ? error.message : 'Authentication failed',
+            error: errorMessage,
           });
         }
       }
 
       setTestResults(results);
 
-      if (results.some(r => r.success)) {
-        toastService.success({
-          title: 'API Key Valid!',
-          msg: `Found ${results.filter(r => r.success).length} working provider(s)`,
-        });
+      // Configure the first successful provider
+      if (firstSuccessfulProvider) {
+        try {
+          await upsertConfig({
+            body: {
+              key: 'GOOSE_PROVIDER',
+              value: firstSuccessfulProvider.name,
+              is_secret: false
+            }
+          });
+
+          await upsertConfig({
+            body: {
+              key: 'GOOSE_MODEL',
+              value: firstSuccessfulProvider.model,
+              is_secret: false
+            }
+          });
+
+          toastService.success({
+            title: 'Success!',
+            msg: `Configured ${firstSuccessfulProvider.name} with model ${firstSuccessfulProvider.model}`,
+          });
+
+          onSuccess(firstSuccessfulProvider.name, firstSuccessfulProvider.model);
+        } catch (configError) {
+          console.error('Error configuring provider:', configError);
+          toastService.error({
+            title: 'Configuration Error',
+            msg: 'API key validated but failed to configure provider.',
+          });
+        }
       } else {
         toastService.error({
           title: 'No Valid Providers',
@@ -157,6 +219,11 @@ export default function ApiKeyTester({ onSuccess }: ApiKeyTesterProps) {
             placeholder="Enter your API key (OpenAI, Anthropic, Google, etc.)"
             className="flex-1 px-3 py-2 border border-background-hover rounded-lg bg-background-default text-text-standard placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             disabled={isLoading}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !isLoading && apiKey.trim()) {
+                testApiKey();
+              }
+            }}
           />
           <button
             onClick={testApiKey}
@@ -183,17 +250,17 @@ export default function ApiKeyTester({ onSuccess }: ApiKeyTesterProps) {
                   key={index}
                   className={`flex items-center gap-2 text-sm p-2 rounded ${
                     result.success
-                      ? 'bg-green-50 text-green-800 border border-green-200'
-                      : 'bg-red-50 text-red-800 border border-red-200'
+                      ? 'bg-green-50 text-green-800 border border-green-200 dark:bg-green-900/20 dark:text-green-200 dark:border-green-800'
+                      : 'bg-red-50 text-red-800 border border-red-200 dark:bg-red-900/20 dark:text-red-200 dark:border-red-800'
                   }`}
                 >
                   <span>{result.success ? '✅' : '❌'}</span>
-                  <span className="font-medium capitalize">{result.provider}</span>
+                  <span className="font-medium">{result.provider}</span>
                   {result.success && result.model && (
-                    <span className="text-green-600">- {result.model}</span>
+                    <span className="text-green-600 dark:text-green-400">- {result.model}</span>
                   )}
                   {!result.success && result.error && (
-                    <span className="text-red-600">- {result.error}</span>
+                    <span className="text-red-600 dark:text-red-400">- {result.error}</span>
                   )}
                 </div>
               ))}
