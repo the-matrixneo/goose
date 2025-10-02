@@ -6,7 +6,7 @@ import {
   substituteParameters,
   filterValidUsedParameters,
 } from '../utils/providerUtils';
-import { updateSessionRecipeParameters } from '../api';
+import { updateSessionUserRecipeValues } from '../api';
 import { useChatContext } from '../contexts/ChatContext';
 import { ChatType } from '../types/chat';
 import { toastSuccess } from '../toasts';
@@ -206,12 +206,12 @@ export const useRecipeManager = (chat: ChatType, recipeConfig?: Recipe | null) =
       );
 
       // Save recipe parameters to session metadata
-      await updateSessionRecipeParameters({
+      await updateSessionUserRecipeValues({
         path: {
           session_id: chat.sessionId,
         },
         body: {
-          recipeParameters: inputValues,
+          userRecipeValues: inputValues,
         },
         throwOnError: true,
       });

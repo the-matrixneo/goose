@@ -1663,12 +1663,12 @@
         ]
       }
     },
-    "/sessions/{session_id}/recipe_parameters": {
+    "/sessions/{session_id}/user_recipe_values": {
       "put": {
         "tags": [
           "Session Management"
         ],
-        "operationId": "update_session_recipe_parameters",
+        "operationId": "update_session_user_recipe_values",
         "parameters": [
           {
             "name": "session_id",
@@ -1684,7 +1684,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdateSessionRecipeParametersRequest"
+                "$ref": "#/components/schemas/UpdateSessionUserRecipeValuesRequest"
               }
             }
           },
@@ -1692,7 +1692,7 @@
         },
         "responses": {
           "200": {
-            "description": "Session recipe parameters updated successfully"
+            "description": "Session user recipe values updated successfully"
           },
           "401": {
             "description": "Unauthorized - Invalid or missing API key"
@@ -3678,13 +3678,6 @@
             ],
             "nullable": true
           },
-          "recipe_parameters": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "string"
-            },
-            "nullable": true
-          },
           "schedule_id": {
             "type": "string",
             "nullable": true
@@ -3697,6 +3690,13 @@
           "updated_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "user_recipe_values": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "nullable": true
           },
           "working_dir": {
             "type": "string"
@@ -4202,13 +4202,13 @@
           }
         }
       },
-      "UpdateSessionRecipeParametersRequest": {
+      "UpdateSessionUserRecipeValuesRequest": {
         "type": "object",
         "required": [
-          "recipeParameters"
+          "userRecipeValues"
         ],
         "properties": {
-          "recipeParameters": {
+          "userRecipeValues": {
             "type": "object",
             "description": "Recipe parameter values entered by the user",
             "additionalProperties": {

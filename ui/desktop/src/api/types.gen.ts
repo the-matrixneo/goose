@@ -724,12 +724,12 @@ export type Session = {
     message_count: number;
     output_tokens?: number | null;
     recipe?: Recipe | null;
-    recipe_parameters?: {
-        [key: string]: string;
-    } | null;
     schedule_id?: string | null;
     total_tokens?: number | null;
     updated_at: string;
+    user_recipe_values?: {
+        [key: string]: string;
+    } | null;
     working_dir: string;
 };
 
@@ -912,11 +912,11 @@ export type UpdateSessionDescriptionRequest = {
     description: string;
 };
 
-export type UpdateSessionRecipeParametersRequest = {
+export type UpdateSessionUserRecipeValuesRequest = {
     /**
      * Recipe parameter values entered by the user
      */
-    recipeParameters: {
+    userRecipeValues: {
         [key: string]: string;
     };
 };
@@ -2270,8 +2270,8 @@ export type UpdateSessionDescriptionResponses = {
     200: unknown;
 };
 
-export type UpdateSessionRecipeParametersData = {
-    body: UpdateSessionRecipeParametersRequest;
+export type UpdateSessionUserRecipeValuesData = {
+    body: UpdateSessionUserRecipeValuesRequest;
     path: {
         /**
          * Unique identifier for the session
@@ -2279,10 +2279,10 @@ export type UpdateSessionRecipeParametersData = {
         session_id: string;
     };
     query?: never;
-    url: '/sessions/{session_id}/recipe_parameters';
+    url: '/sessions/{session_id}/user_recipe_values';
 };
 
-export type UpdateSessionRecipeParametersErrors = {
+export type UpdateSessionUserRecipeValuesErrors = {
     /**
      * Unauthorized - Invalid or missing API key
      */
@@ -2297,9 +2297,9 @@ export type UpdateSessionRecipeParametersErrors = {
     500: unknown;
 };
 
-export type UpdateSessionRecipeParametersResponses = {
+export type UpdateSessionUserRecipeValuesResponses = {
     /**
-     * Session recipe parameters updated successfully
+     * Session user recipe values updated successfully
      */
     200: unknown;
 };

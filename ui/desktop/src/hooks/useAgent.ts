@@ -106,7 +106,7 @@ export function useAgent(): UseAgentReturn {
             convertApiMessageToFrontendMessage(message)
           ),
           recipeConfig: agentSession.recipe,
-          recipeParameters: agentSession.recipe_parameters || null,
+          recipeParameters: agentSession.user_recipe_values || null,
         };
       }
 
@@ -168,7 +168,7 @@ export function useAgent(): UseAgentReturn {
             getExtensions,
             addExtension,
             setIsExtensionsLoading: initContext.setIsExtensionsLoading,
-            recipeParameters: agentSession.recipe_parameters,
+            recipeParameters: agentSession.user_recipe_values,
             recipeConfig: recipeConfigForInit,
           });
 
@@ -197,7 +197,7 @@ export function useAgent(): UseAgentReturn {
             messageHistoryIndex: 0,
             messages: messages,
             recipeConfig: recipeConfig,
-            recipeParameters: agentSession.recipe_parameters || null,
+            recipeParameters: agentSession.user_recipe_values || null,
           };
 
           setAgentState(AgentState.INITIALIZED);
