@@ -301,14 +301,23 @@ export function AppInner() {
   });
 
   const { addExtension } = useConfig();
-  const { agentState, loadCurrentChat, resetChat } = useAgent();
-  const resetChatForNewConversation = useCallback(() => {
+  const { agentState, loadCurrentChat, resetForNewConversation } = useAgent();
+  const resetChatForNewConversation = useCallback(async () => {
     setSearchParams((prev) => {
       prev.delete('resumeSessionId');
       return prev;
     });
-    resetChat();
-  }, [setSearchParams, resetChat]);
+    try {
+      const newChat = await resetForNewConversation({
+        setAgentWaitingMessage,
+        setIsExtensionsLoading,
+      });
+      setChat(newChat);
+    } catch (error) {
+      console.error('Failed to reset for new conversation:', error);
+      throw error;
+    }
+  }, [setSearchParams, resetForNewConversation, setAgentWaitingMessage, setChat]);
 
   useEffect(() => {
     console.log('Sending reactReady signal to Electron');
@@ -343,7 +352,7 @@ export function AppInner() {
         }
       })();
     }
-  }, [resetChat, loadCurrentChat, setAgentWaitingMessage, navigate, loadingHub, setChat]);
+  }, [loadCurrentChat, setAgentWaitingMessage, navigate, loadingHub, setChat]);
 
   useEffect(() => {
     const handleOpenSharedSession = async (_event: IpcRendererEvent, ...args: unknown[]) => {

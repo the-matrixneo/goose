@@ -140,19 +140,33 @@ export function useAgentInitialization(): UseAgentInitializationReturn {
           }
         }
 
-        // Prepare chat data - trust what the agent returns
-        // For start_agent: agent returns the recipe we provided + empty conversation
-        // For resume_agent: agent returns existing recipe + existing conversation
+        // Prepare chat data - trust what the agent returns, but apply reset options
+        const resetOptions = initContext.resetOptions || {};
         const conversation = agentSession.conversation || [];
-        const messages = conversation.map(convertApiMessageToFrontendMessage);
+        let messages = conversation.map(convertApiMessageToFrontendMessage);
+
+        // Apply reset options
+        if (resetOptions.clearMessages) {
+          messages = [];
+        }
+
+        let recipeConfig = agentSession.recipe;
+        if (resetOptions.clearRecipe) {
+          recipeConfig = null;
+        }
+
+        let recipeParameters = agentSession.user_recipe_values || null;
+        if (resetOptions.clearRecipeParameters) {
+          recipeParameters = null;
+        }
 
         const initChat: ChatType = {
           sessionId: agentSession.id,
-          title: agentSession.recipe?.title || agentSession.description || 'New Session',
+          title: recipeConfig?.title || agentSession.description || 'New Session',
           messageHistoryIndex: 0,
           messages: messages,
-          recipeConfig: agentSession.recipe, // Always trust what the agent returns
-          recipeParameters: agentSession.user_recipe_values || null,
+          recipeConfig: recipeConfig,
+          recipeParameters: recipeParameters,
         };
 
         setAgentState(AgentState.INITIALIZED);
@@ -182,13 +196,15 @@ export function useAgentInitialization(): UseAgentInitializationReturn {
 
   const initializeAgent = useCallback(
     async (initContext: InitializationContext): Promise<ChatType> => {
-      // Handle force reset
-      if (initContext.forceReset) {
+      const resetOptions = initContext.resetOptions || {};
+      const shouldReset = resetOptions.resetSession;
+
+      if (shouldReset) {
         resetInitialization();
       }
 
-      // Return existing session if already initialized and not forcing reset
-      if (agentState === AgentState.INITIALIZED && sessionId && !initContext.forceReset) {
+      // Return existing session if already initialized and not resetting
+      if (agentState === AgentState.INITIALIZED && sessionId && !shouldReset) {
         const agentResponse = await resumeAgent({
           body: { session_id: sessionId },
           throwOnError: true,

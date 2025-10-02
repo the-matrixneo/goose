@@ -14,11 +14,7 @@ export { AgentState, NoProviderOrModelError, AgentInitializationError, Configura
 export type { InitializationContext };
 
 export function useAgent(): UseAgentReturn {
-  const { agentState, resetInitialization, initializeAgent } = useAgentInitialization();
-
-  const resetChat = useCallback(() => {
-    resetInitialization();
-  }, [resetInitialization]);
+  const { agentState, initializeAgent } = useAgentInitialization();
 
   const loadCurrentChat = useCallback(
     async (context: InitializationContext): Promise<ChatType> => {
@@ -27,9 +23,39 @@ export function useAgent(): UseAgentReturn {
     [initializeAgent]
   );
 
+  const resetForNewConversation = useCallback(
+    async (context: Omit<InitializationContext, 'resetOptions'>): Promise<ChatType> => {
+      return initializeAgent({
+        ...context,
+        resetOptions: {
+          resetSession: true,
+          clearMessages: true,
+          clearRecipeParameters: true,
+        },
+      });
+    },
+    [initializeAgent]
+  );
+
+  const resetForNewRecipe = useCallback(
+    async (context: Omit<InitializationContext, 'resetOptions'>): Promise<ChatType> => {
+      return initializeAgent({
+        ...context,
+        resetOptions: {
+          resetSession: true,
+          clearMessages: true,
+          clearRecipe: true,
+          clearRecipeParameters: true,
+        },
+      });
+    },
+    [initializeAgent]
+  );
+
   return {
     agentState,
-    resetChat,
     loadCurrentChat,
+    resetForNewConversation,
+    resetForNewRecipe,
   };
 }

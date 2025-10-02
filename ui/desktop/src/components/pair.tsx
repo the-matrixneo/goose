@@ -73,23 +73,20 @@ export default function Pair({
         prevRecipeRef.current = recipe;
 
         try {
-          // Load a fresh chat session with forced reset
+          // Load a fresh chat session with new recipe reset behavior
           const newChat = await loadCurrentChat({
             resumeSessionId: undefined,
             recipeConfig: recipe,
             setAgentWaitingMessage,
-            forceReset: true,
+            resetOptions: {
+              resetSession: true,
+              clearMessages: true,
+              clearRecipeParameters: true,
+              // Keep the new recipe from recipeConfig
+            },
           });
 
-          // Set the chat with the recipe and ensure messages are cleared
-          const chatWithRecipe = {
-            ...newChat,
-            recipeConfig: recipe,
-            recipeParameters: null,
-            messages: [],
-          };
-
-          setChat(chatWithRecipe);
+          setChat(newChat);
           setSearchParams((prev) => {
             prev.set('resumeSessionId', newChat.sessionId);
             return prev;

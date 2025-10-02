@@ -12,6 +12,20 @@ export enum AgentState {
 }
 
 /**
+ * Reset behavior options for chat initialization
+ */
+export interface ResetOptions {
+  /** Reset the agent session (creates new session ID) */
+  resetSession?: boolean;
+  /** Clear all messages from chat */
+  clearMessages?: boolean;
+  /** Clear recipe configuration */
+  clearRecipe?: boolean;
+  /** Clear recipe parameters */
+  clearRecipeParameters?: boolean;
+}
+
+/**
  * Context required for agent initialization
  */
 export interface InitializationContext {
@@ -23,8 +37,8 @@ export interface InitializationContext {
   setAgentWaitingMessage: (msg: string | null) => void;
   /** Callback to set extensions loading state */
   setIsExtensionsLoading?: (isLoading: boolean) => void;
-  /** Force reset of existing session */
-  forceReset?: boolean;
+  /** Reset behavior options */
+  resetOptions?: ResetOptions;
 }
 
 /**
@@ -47,10 +61,16 @@ export interface UseAgentInitializationReturn {
 export interface UseAgentReturn {
   /** Current agent state */
   agentState: AgentState;
-  /** Reset chat and agent state */
-  resetChat: () => void;
   /** Load current chat with initialization context */
   loadCurrentChat: (context: InitializationContext) => Promise<import('../types/chat').ChatType>;
+  /** Reset chat for new conversation (clears messages, keeps recipe) */
+  resetForNewConversation: (
+    context: Omit<InitializationContext, 'resetOptions'>
+  ) => Promise<import('../types/chat').ChatType>;
+  /** Reset chat for new recipe (clears everything, loads new recipe) */
+  resetForNewRecipe: (
+    context: Omit<InitializationContext, 'resetOptions'>
+  ) => Promise<import('../types/chat').ChatType>;
 }
 
 /**
