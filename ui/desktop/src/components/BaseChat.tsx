@@ -41,7 +41,7 @@
  * while remaining flexible enough to support different UI contexts (Hub vs Pair).
  */
 
-import React, { createContext, useContext, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { SearchView } from './conversation/SearchView';
 import { AgentHeader } from './AgentHeader';
@@ -58,7 +58,14 @@ import { RecipeWarningModal } from './ui/RecipeWarningModal';
 import ParameterInputModal from './ParameterInputModal';
 import CreateRecipeFromSessionModal from './recipes/CreateRecipeFromSessionModal';
 import { useChatEngine } from '../hooks/useChatEngine';
-import { useRecipeManager } from '../hooks/useRecipeManager';
+import { useRecipeState } from '../hooks/useRecipeState';
+import {
+  updateSystemPromptWithParameters,
+  updateSessionMetadataWithParameters,
+  substituteParameters,
+} from '../utils/providerUtils';
+import { createUserMessage } from '../types/message';
+import { Recipe } from '../recipe';
 import { useRecipeCreationModal } from '../hooks/useRecipeCreationModal';
 import { useFileDrop } from '../hooks/useFileDrop';
 import { useCostTracking } from '../hooks/useCostTracking';
@@ -203,29 +210,141 @@ function BaseChatContent({
     },
   });
 
-  // Use shared recipe manager
-  const {
-    recipeConfig,
-    recipeParameters,
-    filteredParameters,
-    initialPrompt,
-    isParameterModalOpen,
-    setIsParameterModalOpen,
-    handleParameterSubmit,
-    handleAutoExecution,
-    isRecipeWarningModalOpen,
-    recipeAccepted,
-    handleRecipeAccept,
-    handleRecipeCancel,
-    hasSecurityWarnings,
-    handleRecipeCreated,
-    handleStartRecipe,
-  } = useRecipeManager(chat, location.state?.recipeConfig);
+  // Use recipe state - no complex heuristics
+  const recipeState = useRecipeState(location.state?.recipeConfig || chat.recipeConfig);
+
+  // Local UI state for modals
+  const [isParameterModalOpen, setIsParameterModalOpen] = useState(false);
+  const [isRecipeWarningModalOpen, setIsRecipeWarningModalOpen] = useState(false);
+  const [readyForAutoUserPrompt, setReadyForAutoUserPrompt] = useState(false);
+
+  // Computed values using the simple approach
+  const recipeConfig = recipeState.recipe;
+  const recipeParameters = chat.recipeParameters;
+  const filteredParameters = recipeState.filteredParameters;
+  const hasAllRequiredParameters = recipeState.hasAllRequiredParameters(recipeParameters || null);
+  const initialPrompt = recipeState.getInitialPrompt(recipeParameters || null);
+  const recipeAccepted = recipeState.recipeAccepted;
+  const hasSecurityWarnings = recipeState.hasSecurityWarnings;
 
   // Use recipe creation modal hook for UI-specific functionality
   const { isCreateRecipeModalOpen, setIsCreateRecipeModalOpen } = useRecipeCreationModal(
     chat.sessionId
   );
+
+  // Handle parameter modal display logic
+  useEffect(() => {
+    // Only show parameter modal if:
+    // 1. Recipe requires parameters
+    // 2. Recipe has been accepted
+    // 3. Not all required parameters have been filled in yet
+    // 4. Parameter modal is not already open (prevent multiple opens)
+    // 5. No messages in chat yet (don't show after conversation has started)
+    if (
+      recipeState.requiresParameters &&
+      recipeAccepted &&
+      !hasAllRequiredParameters &&
+      !isParameterModalOpen &&
+      messages.length === 0
+    ) {
+      setIsParameterModalOpen(true);
+    }
+  }, [
+    recipeState.requiresParameters,
+    hasAllRequiredParameters,
+    recipeAccepted,
+    isParameterModalOpen,
+    messages.length,
+    chat.sessionId,
+    recipeConfig?.title,
+  ]);
+
+  // Handle recipe warning modal display
+  useEffect(() => {
+    if (recipeConfig && !recipeAccepted && hasSecurityWarnings) {
+      setIsRecipeWarningModalOpen(true);
+    }
+  }, [recipeConfig, recipeAccepted, hasSecurityWarnings]);
+
+  useEffect(() => {
+    setReadyForAutoUserPrompt(true);
+  }, []);
+
+  // UI interaction handlers
+  const handleParameterSubmit = async (inputValues: Record<string, string>) => {
+    // Update chat state with parameters
+    setChat({
+      ...chat,
+      recipeParameters: inputValues,
+    });
+    setIsParameterModalOpen(false);
+
+    try {
+      await updateSystemPromptWithParameters(
+        chat.sessionId,
+        inputValues,
+        recipeConfig || undefined
+      );
+      await updateSessionMetadataWithParameters(chat.sessionId, inputValues);
+    } catch (error) {
+      console.error('Failed to update system prompt with parameters:', error);
+    }
+  };
+
+  const handleRecipeAccept = async () => {
+    await recipeState.acceptRecipe();
+    setIsRecipeWarningModalOpen(false);
+  };
+
+  const handleRecipeCancel = () => {
+    setIsRecipeWarningModalOpen(false);
+    window.electron.closeWindow();
+  };
+
+  const handleAutoExecution = React.useCallback(
+    (append: (message: Message) => void, isLoading: boolean, onAutoExecute?: () => void) => {
+      if (
+        recipeConfig?.isScheduledExecution &&
+        recipeConfig?.prompt &&
+        (!recipeState.requiresParameters || recipeParameters) &&
+        messages.length === 0 &&
+        !isLoading &&
+        readyForAutoUserPrompt &&
+        recipeAccepted
+      ) {
+        const finalPrompt = recipeParameters
+          ? substituteParameters(recipeConfig.prompt, recipeParameters)
+          : recipeConfig.prompt;
+
+        const userMessage = createUserMessage(finalPrompt);
+        append(userMessage);
+        onAutoExecute?.();
+      }
+    },
+    [
+      recipeConfig?.isScheduledExecution,
+      recipeConfig?.prompt,
+      recipeState.requiresParameters,
+      recipeParameters,
+      messages.length,
+      readyForAutoUserPrompt,
+      recipeAccepted,
+    ]
+  );
+
+  const handleRecipeCreated = (recipe: Recipe, onRecipeCreated?: (recipe: Recipe) => void) => {
+    // Delegate toast/notification responsibility to the caller
+    onRecipeCreated?.(recipe);
+  };
+
+  const handleStartRecipe = (recipe: Recipe) => {
+    setChat({
+      ...chat,
+      messages: [],
+      recipeConfig: recipe,
+      recipeParameters: null,
+    });
+  };
 
   // Reset recipe usage tracking when recipe changes
   useEffect(() => {

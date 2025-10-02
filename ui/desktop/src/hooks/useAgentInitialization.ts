@@ -140,20 +140,18 @@ export function useAgentInitialization(): UseAgentInitializationReturn {
           }
         }
 
-        // Prepare chat data with validation
-        const recipeConfig = initContext.recipeConfig || agentSession.recipe;
+        // Prepare chat data - trust what the agent returns
+        // For start_agent: agent returns the recipe we provided + empty conversation
+        // For resume_agent: agent returns existing recipe + existing conversation
         const conversation = agentSession.conversation || [];
-        const messages =
-          initContext.recipeConfig && !initContext.resumeSessionId
-            ? []
-            : conversation.map(convertApiMessageToFrontendMessage);
+        const messages = conversation.map(convertApiMessageToFrontendMessage);
 
         const initChat: ChatType = {
           sessionId: agentSession.id,
           title: agentSession.recipe?.title || agentSession.description || 'New Session',
           messageHistoryIndex: 0,
           messages: messages,
-          recipeConfig: recipeConfig,
+          recipeConfig: agentSession.recipe, // Always trust what the agent returns
           recipeParameters: agentSession.recipe_parameters || null,
         };
 

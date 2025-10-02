@@ -17,16 +17,16 @@ export const useRecipeManager = (chat: ChatType, recipeConfig?: Recipe | null) =
   }, [chat.messages]);
 
   // Core recipe state and business logic
-  const recipeState = useRecipeState(chat, recipeConfig);
+  const recipeState = useRecipeState(recipeConfig || chat.recipeConfig || null);
 
   // UI-specific recipe interactions
   const recipeUI = useRecipeUI(
     chat,
     recipeState.recipeAccepted,
     recipeState.requiresParameters,
-    recipeState.hasAllRequiredParameters,
+    recipeState.hasAllRequiredParameters(chat.recipeParameters || null),
     recipeState.hasSecurityWarnings,
-    recipeState.recipeConfig
+    recipeState.recipe
   );
 
   // Compose handlers that need both state and UI logic
@@ -35,17 +35,18 @@ export const useRecipeManager = (chat: ChatType, recipeConfig?: Recipe | null) =
     recipeUI.setIsRecipeWarningModalOpen(false);
   };
 
-  const handleStartRecipe = (recipe: Recipe) => {
-    recipeState.startRecipe(recipe);
+  const handleStartRecipe = (_recipe: Recipe) => {
+    // Note: startRecipe functionality needs to be handled at the component level
+    // since useRecipeState doesn't manage chat state
     recipeUI.setIsParameterModalOpen(false);
   };
 
   return {
     // State from useRecipeState
-    recipeConfig: recipeState.recipeConfig,
-    recipeParameters: recipeState.recipeParameters,
+    recipeConfig: recipeState.recipe,
+    recipeParameters: chat.recipeParameters,
     filteredParameters: recipeState.filteredParameters,
-    initialPrompt: recipeState.initialPrompt,
+    initialPrompt: recipeState.getInitialPrompt(chat.recipeParameters || null),
     recipeAccepted: recipeState.recipeAccepted,
     hasSecurityWarnings: recipeState.hasSecurityWarnings,
     recipeError: recipeState.recipeError,
