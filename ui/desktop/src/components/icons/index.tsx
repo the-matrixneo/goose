@@ -38,6 +38,7 @@ import Send from './Send';
 import Settings from './Settings';
 import Time from './Time';
 import { Gear } from './Gear';
+import { Key } from './Key';
 import Youtube from './Youtube';
 import { Microphone } from './Microphone';
 import { Watch0 } from './Watch0';
@@ -79,6 +80,7 @@ export {
   GlassWater,
   Grape,
   Idea,
+  Key,
   LinkedIn,
   Microphone,
   More,

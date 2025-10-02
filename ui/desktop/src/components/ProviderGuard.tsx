@@ -4,14 +4,12 @@ import { useConfig } from './ConfigContext';
 import { SetupModal } from './SetupModal';
 import { startOpenRouterSetup } from '../utils/openRouterSetup';
 import { startTetrateSetup } from '../utils/tetrateSetup';
-import { startOpenAISetup } from '../utils/openaiSetup';
-import { startAnthropicSetup } from '../utils/anthropicSetup';
 import WelcomeGooseLogo from './WelcomeGooseLogo';
 import { toastService } from '../toasts';
 import { OllamaSetup } from './OllamaSetup';
 import ApiKeyTester from './ApiKeyTester';
 
-import { Goose, OpenRouter, OpenAI, Anthropic, Tetrate } from './icons';
+import { Goose, OpenRouter, Tetrate } from './icons';
 
 interface ProviderGuardProps {
   didSelectProvider: boolean;
@@ -167,28 +165,6 @@ export default function ProviderGuard({ didSelectProvider, children }: ProviderG
     }
   };
 
-  const handleOpenAISetup = async () => {
-    const result = await startOpenAISetup();
-    if (result.requiresManualSetup) {
-      // Navigate to provider settings with OpenAI pre-selected
-      navigate('/welcome', { 
-        replace: true,
-        state: { preselectedProvider: 'openai' }
-      });
-    }
-  };
-
-  const handleAnthropicSetup = async () => {
-    const result = await startAnthropicSetup();
-    if (result.requiresManualSetup) {
-      // Navigate to provider settings with Anthropic pre-selected
-      navigate('/welcome', { 
-        replace: true,
-        state: { preselectedProvider: 'anthropic' }
-      });
-    }
-  };
-
   const handleApiKeySuccess = (provider: string, model: string) => {
     // Mark as having provider and close setup
     setShowFirstTimeSetup(false);
@@ -316,7 +292,10 @@ export default function ProviderGuard({ didSelectProvider, children }: ProviderG
                 </p>
               </div>
 
-              {/* Provider options in 2x2 grid */}
+              {/* API Key Tester - TOP OPTION */}
+              <ApiKeyTester onSuccess={handleApiKeySuccess} />
+
+              {/* Provider options - now just 2 cards in a row */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl mx-auto">
                 {/* Tetrate Card - Recommended */}
                 <div className="relative">
@@ -373,56 +352,7 @@ export default function ProviderGuard({ didSelectProvider, children }: ProviderG
                     </p>
                   </div>
                 </div>
-
-                {/* OpenAI Card */}
-                <div
-                  onClick={handleOpenAISetup}
-                  className="w-full p-4 sm:p-6 bg-background-muted border border-background-hover rounded-xl hover:border-text-muted transition-all duration-200 cursor-pointer group h-full"
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1">
-                      <OpenAI className="w-4 h-4 mb-3 text-text-standard" />
-                      <h3 className="font-medium text-text-standard text-sm sm:text-base">
-                        OpenAI
-                      </h3>
-                    </div>
-                    <div className="text-text-muted group-hover:text-text-standard transition-colors">
-                      <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </div>
-                  </div>
-                  <p className="text-text-muted text-sm sm:text-base">
-                    Direct access to GPT-4, GPT-4o, and other OpenAI models with your API key.
-                  </p>
-                </div>
-
-                {/* Anthropic Card */}
-                <div
-                  onClick={handleAnthropicSetup}
-                  className="w-full p-4 sm:p-6 bg-background-muted border border-background-hover rounded-xl hover:border-text-muted transition-all duration-200 cursor-pointer group h-full"
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1">
-                      <Anthropic className="w-4 h-4 mb-3 text-text-standard" />
-                      <h3 className="font-medium text-text-standard text-sm sm:text-base">
-                        Anthropic
-                      </h3>
-                    </div>
-                    <div className="text-text-muted group-hover:text-text-standard transition-colors">
-                      <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </div>
-                  </div>
-                  <p className="text-text-muted text-sm sm:text-base">
-                    Access Claude 3.5 Sonnet, Claude 3 Opus, and other Anthropic models.
-                  </p>
-                </div>
               </div>
-
-              {/* API Key Tester */}
-              <ApiKeyTester onSuccess={handleApiKeySuccess} />
 
               {/* Other providers option */}
               <div className="mt-6 max-w-4xl mx-auto">
