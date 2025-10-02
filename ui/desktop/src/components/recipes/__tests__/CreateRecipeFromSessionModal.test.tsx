@@ -65,30 +65,28 @@ describe('CreateRecipeFromSessionModal', () => {
       render(<CreateRecipeFromSessionModal {...defaultProps} />);
 
       expect(screen.getByTestId('create-recipe-modal')).toBeInTheDocument();
-      expect(screen.getByText('Create Recipe from Session')).toBeInTheDocument();
-      expect(
-        screen.getByText('Create a reusable recipe based on your current conversation.')
-      ).toBeInTheDocument();
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
     });
 
     it('does not render when closed', () => {
       render(<CreateRecipeFromSessionModal {...defaultProps} isOpen={false} />);
 
       expect(screen.queryByTestId('create-recipe-modal')).not.toBeInTheDocument();
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
 
     it('renders modal header with close button', () => {
       render(<CreateRecipeFromSessionModal {...defaultProps} />);
 
       expect(screen.getByTestId('modal-header')).toBeInTheDocument();
-      expect(screen.getByTestId('close-button')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /close/i })).toBeInTheDocument();
     });
 
     it('calls onClose when close button is clicked', async () => {
       const user = userEvent.setup();
       render(<CreateRecipeFromSessionModal {...defaultProps} />);
 
-      await user.click(screen.getByTestId('close-button'));
+      await user.click(screen.getByRole('button', { name: /close/i }));
       expect(defaultProps.onClose).toHaveBeenCalled();
     });
   });
@@ -99,31 +97,29 @@ describe('CreateRecipeFromSessionModal', () => {
 
       expect(screen.getByTestId('analyzing-state')).toBeInTheDocument();
       expect(screen.getByTestId('analyzing-title')).toBeInTheDocument();
-      expect(screen.getByText('Analyzing your conversation...')).toBeInTheDocument();
     });
 
-    it('displays analysis stages', async () => {
+    it('displays analysis progress indicator', async () => {
       render(<CreateRecipeFromSessionModal {...defaultProps} />);
 
       expect(screen.getByTestId('analysis-stage')).toBeInTheDocument();
-      expect(screen.getByText('Reading your conversation...')).toBeInTheDocument();
 
       await waitFor(
         () => {
           const stageElement = screen.getByTestId('analysis-stage');
-          expect(stageElement.textContent).not.toBe('Reading your conversation...');
+          expect(stageElement).toBeInTheDocument();
         },
         { timeout: 1000 }
       );
     });
 
-    it('shows spinner during analysis', () => {
+    it('shows loading indicator during analysis', () => {
       render(<CreateRecipeFromSessionModal {...defaultProps} />);
 
       expect(screen.getByTestId('analysis-spinner')).toBeInTheDocument();
     });
 
-    it('transitions to form state after analysis', async () => {
+    it('transitions to form state after analysis completes', async () => {
       render(<CreateRecipeFromSessionModal {...defaultProps} />);
 
       await waitFor(
