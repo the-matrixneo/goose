@@ -54,7 +54,7 @@ pub static PLATFORM_EXTENSIONS: Lazy<HashMap<&'static str, PlatformExtensionDef>
 
 #[derive(Debug, Clone)]
 pub struct PlatformExtensionContext {
-    pub session_id: String,
+    pub session_id: Option<String>,
 }
 
 #[derive(Debug, Clone)]

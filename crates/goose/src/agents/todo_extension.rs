@@ -20,6 +20,7 @@ pub static EXTENSION_NAME: &str = "todo";
 pub struct TodoClient {
     info: InitializeResult,
     context: PlatformExtensionContext,
+    fallback_content: tokio::sync::RwLock<String>,
 }
 
 impl TodoClient {
@@ -45,7 +46,7 @@ impl TodoClient {
             },
             instructions: Some(indoc! {r#"
                 Task Management
-            
+
                 Use todo_read and todo_write for tasks with 2+ steps, multiple files/components, or uncertain scope.
 
                 Workflow:
@@ -67,19 +68,28 @@ impl TodoClient {
             "#}.to_string()),
         };
 
-        Ok(Self { info, context })
+        Ok(Self {
+            info,
+            context,
+            fallback_content: tokio::sync::RwLock::new(String::new()),
+        })
     }
 
     async fn handle_read_todo(&self) -> Result<Vec<Content>, String> {
-        match SessionManager::get_session(&self.context.session_id, false).await {
-            Ok(metadata) => {
-                let content =
-                    extension_data::TodoState::from_extension_data(&metadata.extension_data)
-                        .map(|state| state.content)
-                        .unwrap_or_default();
-                Ok(vec![Content::text(content)])
+        if let Some(session_id) = &self.context.session_id {
+            match SessionManager::get_session(session_id, false).await {
+                Ok(metadata) => {
+                    let content =
+                        extension_data::TodoState::from_extension_data(&metadata.extension_data)
+                            .map(|state| state.content)
+                            .unwrap_or_default();
+                    Ok(vec![Content::text(content)])
+                }
+                Err(_) => Ok(vec![Content::text(String::new())]),
             }
-            Err(_) => Ok(vec![Content::text(String::new())]),
+        } else {
+            let content = self.fallback_content.read().await;
+            Ok(vec![Content::text(content.clone())])
         }
     }
 
@@ -108,29 +118,38 @@ impl TodoClient {
             ));
         }
 
-        match SessionManager::get_session(&self.context.session_id, false).await {
-            Ok(mut session) => {
-                let todo_state = extension_data::TodoState::new(content);
-                if todo_state
-                    .to_extension_data(&mut session.extension_data)
-                    .is_ok()
-                {
-                    match SessionManager::update_session(&self.context.session_id)
-                        .extension_data(session.extension_data)
-                        .apply()
-                        .await
+        if let Some(session_id) = &self.context.session_id {
+            match SessionManager::get_session(session_id, false).await {
+                Ok(mut session) => {
+                    let todo_state = extension_data::TodoState::new(content);
+                    if todo_state
+                        .to_extension_data(&mut session.extension_data)
+                        .is_ok()
                     {
-                        Ok(_) => Ok(vec![Content::text(format!(
-                            "Updated ({} chars)",
-                            char_count
-                        ))]),
-                        Err(_) => Err("Failed to update session metadata".to_string()),
+                        match SessionManager::update_session(session_id)
+                            .extension_data(session.extension_data)
+                            .apply()
+                            .await
+                        {
+                            Ok(_) => Ok(vec![Content::text(format!(
+                                "Updated ({} chars)",
+                                char_count
+                            ))]),
+                            Err(_) => Err("Failed to update session metadata".to_string()),
+                        }
+                    } else {
+                        Err("Failed to serialize TODO state".to_string())
                     }
-                } else {
-                    Err("Failed to serialize TODO state".to_string())
                 }
+                Err(_) => Err("Failed to read session metadata".to_string()),
             }
-            Err(_) => Err("Failed to read session metadata".to_string()),
+        } else {
+            let mut fallback = self.fallback_content.write().await;
+            *fallback = content;
+            Ok(vec![Content::text(format!(
+                "Updated ({} chars)",
+                char_count
+            ))])
         }
     }
 
@@ -172,7 +191,7 @@ impl TodoClient {
                     The tool will create the TODO file if it doesn't exist, or overwrite it if it does.
                     Returns an error if the file cannot be written due to permissions or other I/O issues.
                 "#}.to_string(),
-                            object!({
+                object!({
                     "type": "object",
                     "properties": {
                         "content": {

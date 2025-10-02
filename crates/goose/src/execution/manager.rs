@@ -123,7 +123,7 @@ impl AgentManager {
         agent
             .extension_manager
             .set_context(PlatformExtensionContext {
-                session_id: session_id.clone(),
+                session_id: Some(session_id.clone()),
             })
             .await;
         if let Some(provider) = &*self.default_provider.read().await {

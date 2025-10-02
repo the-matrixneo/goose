@@ -88,7 +88,7 @@ impl Extension {
 /// Manages goose extensions / MCP clients and their interactions
 pub struct ExtensionManager {
     extensions: Mutex<HashMap<String, Extension>>,
-    context: Mutex<Option<PlatformExtensionContext>>,
+    context: Mutex<PlatformExtensionContext>,
 }
 
 /// A flattened representation of a resource used by the agent to prepare inference
@@ -238,15 +238,15 @@ impl ExtensionManager {
     pub fn new() -> Self {
         Self {
             extensions: Mutex::new(HashMap::new()),
-            context: Mutex::new(None),
+            context: Mutex::new(PlatformExtensionContext { session_id: None }),
         }
     }
 
     pub async fn set_context(&self, context: PlatformExtensionContext) {
-        *self.context.lock().await = Some(context);
+        *self.context.lock().await = context;
     }
 
-    pub async fn get_context(&self) -> Option<PlatformExtensionContext> {
+    pub async fn get_context(&self) -> PlatformExtensionContext {
         self.context.lock().await.clone()
     }
 
@@ -454,12 +454,7 @@ impl ExtensionManager {
                 let def = PLATFORM_EXTENSIONS.get(name.as_str()).ok_or_else(|| {
                     ExtensionError::ConfigError(format!("Unknown platform extension: {}", name))
                 })?;
-                let context = self.get_context().await.ok_or_else(|| {
-                    ExtensionError::ConfigError(format!(
-                        "No platform context available for {}",
-                        name
-                    ))
-                })?;
+                let context = self.get_context().await;
                 (def.client_factory)(context)
             }
             ExtensionConfig::InlinePython {
