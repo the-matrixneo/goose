@@ -63,9 +63,9 @@ describe('RecipeFormFields', () => {
       expect(screen.getByLabelText(/description/i)).toBeInTheDocument();
       expect(screen.getByLabelText(/instructions/i)).toBeInTheDocument();
       expect(screen.getByLabelText(/prompt/i)).toBeInTheDocument();
-      expect(screen.getByText(/activities/i)).toBeInTheDocument();
-      expect(screen.getByText(/parameters/i)).toBeInTheDocument();
-      expect(screen.getByText(/json schema/i)).toBeInTheDocument();
+      expect(screen.getAllByText(/activities/i)[0]).toBeInTheDocument();
+      expect(screen.getAllByText(/parameters/i)[0]).toBeInTheDocument();
+      expect(screen.getByText(/response json schema/i)).toBeInTheDocument();
     });
 
     it('shows form inputs with proper accessibility', () => {

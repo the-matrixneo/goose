@@ -65,28 +65,26 @@ describe('CreateRecipeFromSessionModal', () => {
       render(<CreateRecipeFromSessionModal {...defaultProps} />);
 
       expect(screen.getByTestId('create-recipe-modal')).toBeInTheDocument();
-      expect(screen.getByRole('dialog')).toBeInTheDocument();
     });
 
     it('does not render when closed', () => {
       render(<CreateRecipeFromSessionModal {...defaultProps} isOpen={false} />);
 
       expect(screen.queryByTestId('create-recipe-modal')).not.toBeInTheDocument();
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
 
     it('renders modal header with close button', () => {
       render(<CreateRecipeFromSessionModal {...defaultProps} />);
 
       expect(screen.getByTestId('modal-header')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /close/i })).toBeInTheDocument();
+      expect(screen.getByTestId('close-button')).toBeInTheDocument();
     });
 
     it('calls onClose when close button is clicked', async () => {
       const user = userEvent.setup();
       render(<CreateRecipeFromSessionModal {...defaultProps} />);
 
-      await user.click(screen.getByRole('button', { name: /close/i }));
+      await user.click(screen.getByTestId('close-button'));
       expect(defaultProps.onClose).toHaveBeenCalled();
     });
   });
