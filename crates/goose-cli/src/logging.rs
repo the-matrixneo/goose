@@ -94,7 +94,7 @@ fn setup_logging_internal(
             });
 
             // Console filter - same but only show WARN and above for most things, except llama_cpp which is OFF
-            let console_filter = EnvFilter::new("")
+            let _console_filter = EnvFilter::new("")
                 // Suppress llama_cpp warnings completely
                 .add_directive("llama_cpp=off".parse().unwrap())
                 .add_directive("llama=off".parse().unwrap())
