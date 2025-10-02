@@ -650,15 +650,7 @@ The tool will execute immediately and you'll receive the result (success or erro
             vec![MessageContent::text(generated_text.clone())],
         );
 
-        // Estimate token usage
-        let prompt_tokens = (prompt.len() / 4) as i32;
-        let completion_tokens = (generated_text.len() / 4) as i32;
-
-        let usage = Usage {
-            input_tokens: Some(prompt_tokens),
-            output_tokens: Some(completion_tokens),
-            total_tokens: Some(prompt_tokens + completion_tokens),
-        };
+        let usage = Usage::default();
 
         // Debug tracing
         let payload = json!({
