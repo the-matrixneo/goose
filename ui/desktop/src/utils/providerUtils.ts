@@ -82,7 +82,7 @@ export const filterValidUsedParameters = (
   parameters: RecipeParameter[] | undefined,
   recipeContent: { prompt?: string; instructions?: string; activities?: string[] }
 ): RecipeParameter[] => {
-  if (!parameters || !Array.isArray(parameters)) {
+  if (!parameters) {
     return [];
   }
 
