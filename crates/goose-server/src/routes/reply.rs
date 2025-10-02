@@ -10,14 +10,13 @@ use bytes::Bytes;
 use futures::{stream::StreamExt, Stream};
 use goose::conversation::message::{Message, MessageContent};
 use goose::conversation::Conversation;
-use goose::execution::SessionExecutionMode;
+use goose::mcp_utils::ToolResult;
 use goose::permission::{Permission, PermissionConfirmation};
 use goose::session::SessionManager;
 use goose::{
     agents::{AgentEvent, SessionConfig},
     permission::permission_confirmation::PrincipalType,
 };
-use mcp_core::ToolResult;
 use rmcp::model::{Content, ServerNotification};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -66,7 +65,7 @@ fn track_tool_telemetry(content: &MessageContent, all_messages: &[Message]) {
                         }
                     })
                 })
-                .unwrap_or_else(|| "unknown".to_string());
+                .unwrap_or_else(|| "unknown".to_string().into());
 
             let success = tool_response.tool_result.is_ok();
             let result_status = if success { "success" } else { "error" };
@@ -207,10 +206,7 @@ async fn reply_handler(
     let task_tx = tx.clone();
 
     drop(tokio::spawn(async move {
-        let agent = match state
-            .get_agent(session_id.clone(), SessionExecutionMode::Interactive)
-            .await
-        {
+        let agent = match state.get_agent(session_id.clone()).await {
             Ok(agent) => agent,
             Err(e) => {
                 tracing::error!("Failed to get session agent: {}", e);

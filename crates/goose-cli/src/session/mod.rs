@@ -758,6 +758,11 @@ impl CliSession {
                 }
             }
         }
+
+        if let Some(id) = &self.session_id {
+            println!("Closing session. Session ID: {}", console::style(id).cyan());
+        }
+
         Ok(())
     }
 
@@ -1050,11 +1055,10 @@ impl CliSession {
                                                     }
                                                 })
                                             })
-                                            .unwrap_or_else(|| "unknown".to_string());
+                                            .unwrap_or_else(|| "unknown".to_string().into());
 
                                         let success = tool_response.tool_result.is_ok();
                                         let result_status = if success { "success" } else { "error" };
-
                                         tracing::info!(
                                             counter.goose.tool_completions = 1,
                                             tool_name = %tool_name,
@@ -1328,7 +1332,12 @@ impl CliSession {
             let mut response_message = Message::user();
             let last_tool_name = tool_requests
                 .last()
-                .and_then(|(_, tool_call)| tool_call.as_ref().ok().map(|tool| tool.name.clone()))
+                .and_then(|(_, tool_call)| {
+                    tool_call
+                        .as_ref()
+                        .ok()
+                        .map(|tool| tool.name.to_string().clone())
+                })
                 .unwrap_or_else(|| "tool".to_string());
 
             let notification = if interrupt {
