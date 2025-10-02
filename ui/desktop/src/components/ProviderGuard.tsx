@@ -9,6 +9,7 @@ import { startAnthropicSetup } from '../utils/anthropicSetup';
 import WelcomeGooseLogo from './WelcomeGooseLogo';
 import { toastService } from '../toasts';
 import { OllamaSetup } from './OllamaSetup';
+import ApiKeyTester from './ApiKeyTester';
 
 import { Goose, OpenRouter, OpenAI, Anthropic, Tetrate } from './icons';
 
@@ -186,6 +187,13 @@ export default function ProviderGuard({ didSelectProvider, children }: ProviderG
         state: { preselectedProvider: 'anthropic' }
       });
     }
+  };
+
+  const handleApiKeySuccess = (provider: string, model: string) => {
+    // Mark as having provider and close setup
+    setShowFirstTimeSetup(false);
+    setHasProvider(true);
+    navigate('/', { replace: true });
   };
 
   useEffect(() => {
@@ -412,6 +420,9 @@ export default function ProviderGuard({ didSelectProvider, children }: ProviderG
                   </p>
                 </div>
               </div>
+
+              {/* API Key Tester */}
+              <ApiKeyTester onSuccess={handleApiKeySuccess} />
 
               {/* Other providers option */}
               <div className="mt-6 max-w-4xl mx-auto">
