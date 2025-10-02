@@ -104,16 +104,18 @@ impl Agent {
         };
 
         // Call the provider to get a response
-        // messages_for_provider already contains only agent-visible messages
+        // messages_for_provider is a Conversation created from input messages (which are already agent-visible from upstream)
+        // Use agent_visible_messages() to be explicit, even though all messages in it are agent-visible
+        let messages_vec = messages_for_provider.agent_visible_messages();
         let (mut response, mut usage) = provider
-            .complete(system_prompt, messages_for_provider.all_messages(), tools)
+            .complete(system_prompt, &messages_vec, tools)
             .await?;
 
         // Ensure we have token counts, estimating if necessary
         usage
             .ensure_tokens(
                 system_prompt,
-                messages_for_provider.all_messages(),
+                &messages_vec,
                 &response,
                 tools,
             )
@@ -152,13 +154,15 @@ impl Agent {
         let toolshim_tools = toolshim_tools.to_owned();
         let provider = provider.clone();
 
-        // messages_for_provider already contains only agent-visible messages
+        // messages_for_provider is a Conversation created from input messages (already agent-visible from upstream)
+        // Use agent_visible_messages() to be explicit
+        let messages_vec = messages_for_provider.agent_visible_messages();
         let mut stream = if provider.supports_streaming() {
             debug!("WAITING_LLM_STREAM_START");
             let msg_stream = provider
                 .stream(
                     system_prompt.as_str(),
-                    messages_for_provider.all_messages(),
+                    &messages_vec,
                     &tools,
                 )
                 .await?;
@@ -169,7 +173,7 @@ impl Agent {
             let (message, mut usage) = provider
                 .complete(
                     system_prompt.as_str(),
-                    messages_for_provider.all_messages(),
+                    &messages_vec,
                     &tools,
                 )
                 .await?;
@@ -179,7 +183,7 @@ impl Agent {
             usage
                 .ensure_tokens(
                     system_prompt.as_str(),
-                    messages_for_provider.all_messages(),
+                    &messages_vec,
                     &message,
                     &tools,
                 )

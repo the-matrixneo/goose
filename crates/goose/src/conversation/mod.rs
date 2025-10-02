@@ -180,11 +180,30 @@ impl<'a> IntoIterator for &'a Conversation {
 
 /// Fix a conversation that we're about to send to an LLM. So the last and first
 /// messages should always be from the user.
+///
+/// Only operates on agent-visible messages. Non-agent-visible messages are preserved as-is.
 pub fn fix_conversation(conversation: Conversation) -> (Conversation, Vec<String>) {
-    // fix_conversation operates on all messages passed to it (should be pre-filtered to agent_visible if needed)
-    let messages = conversation.all_messages().clone();
-    let (messages, issues) = fix_messages(messages);
-    (Conversation::new_unvalidated(messages), issues)
+    // Split messages by visibility
+    let all_messages = conversation.all_messages().clone();
+    let mut agent_visible_msgs = Vec::new();
+    let mut non_agent_visible_msgs = Vec::new();
+
+    for msg in all_messages {
+        if msg.is_agent_visible() {
+            agent_visible_msgs.push(msg);
+        } else {
+            non_agent_visible_msgs.push(msg);
+        }
+    }
+
+    // Fix only the agent-visible messages
+    let (fixed_agent_msgs, issues) = fix_messages(agent_visible_msgs);
+
+    // Reconstruct: non-agent-visible messages first (history), then fixed agent-visible messages
+    let mut result_messages = non_agent_visible_msgs;
+    result_messages.extend(fixed_agent_msgs);
+
+    (Conversation::new_unvalidated(result_messages), issues)
 }
 
 fn fix_messages(messages: Vec<Message>) -> (Vec<Message>, Vec<String>) {

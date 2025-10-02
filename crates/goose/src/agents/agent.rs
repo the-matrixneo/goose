@@ -245,26 +245,24 @@ impl Agent {
         conversation: Conversation,
         session: &Option<SessionConfig>,
     ) -> Result<ReplyContext> {
-        // Filter to agent-visible messages before fixing to avoid visibility boundary issues.
-        // This prevents orphaned tool_use blocks when summarization marks messages as agent_visible=false
-        // while their corresponding tool_result remains in the conversation.
-        // We only fix messages that will actually be sent to the LLM.
+        // fix_conversation now internally handles visibility - it only fixes agent-visible messages
+        // while preserving non-agent-visible messages as-is
         let unfixed_agent_messages = conversation.agent_visible_messages();
-        let agent_conversation = Conversation::new_unvalidated(unfixed_agent_messages.clone());
+        let (fixed_conversation, issues) = fix_conversation(conversation);
 
-        let (fixed_conversation, issues) = fix_conversation(agent_conversation);
         if !issues.is_empty() {
             debug!(
                 "Conversation issue fixed: {}",
                 debug_conversation_fix(
                     unfixed_agent_messages.as_slice(),
-                    fixed_conversation.all_messages(), // Using all_messages for debugging/logging
+                    &fixed_conversation.agent_visible_messages(),
                     &issues
                 )
             );
         }
-        // initial_messages are the agent-visible, fixed messages that will be sent to the LLM
-        let initial_messages = fixed_conversation.all_messages().clone();
+
+        // initial_messages are the agent-visible messages (now fixed) that will be sent to the LLM
+        let initial_messages = fixed_conversation.agent_visible_messages();
         let config = Config::global();
 
         let (tools, toolshim_tools, system_prompt) = self.prepare_tools_and_prompt().await?;
@@ -1022,7 +1020,8 @@ impl Agent {
     ) -> Result<BoxStream<'_, Result<AgentEvent>>> {
         let context = self.prepare_reply_context(conversation, &session).await?;
         let ReplyContext {
-            mut conversation,
+            mut conversation, // NOTE: This conversation contains ALL messages (visible + invisible history)
+                              // Use .agent_visible_messages() when sending to LLM, .all_messages() for storage
             mut tools,
             mut toolshim_tools,
             mut system_prompt,
@@ -1127,11 +1126,11 @@ impl Agent {
                     }
                 }
 
-                // At this point, conversation only contains agent-visible messages (filtered in prepare_reply_context)
+                // Send agent-visible messages to the provider
                 let mut stream = Self::stream_response_from_provider(
                     self.provider().await?,
                     &system_prompt,
-                    conversation.all_messages(), // Already filtered to agent-visible in prepare_reply_context
+                    &conversation.agent_visible_messages(),
                     &tools,
                     &toolshim_tools,
                 ).await?;
@@ -1220,11 +1219,11 @@ impl Agent {
                                     }
                                 } else {
                                     // Run all tool inspectors (security, repetition, permission, etc.)
-                                    // Inspectors need the agent-visible conversation to check for patterns/repetition
+                                    // Inspectors analyze the agent-visible conversation
                                     let inspection_results = self.tool_inspection_manager
                                         .inspect_tools(
                                             &remaining_requests,
-                                            conversation.all_messages(), // Already agent-visible only from prepare_reply_context
+                                            &conversation.agent_visible_messages(),
                                         )
                                         .await?;
 
@@ -1330,9 +1329,11 @@ impl Agent {
                         Err(ProviderError::ContextLengthExceeded(error_msg)) => {
                             info!("Context length exceeded, attempting compaction");
 
-                            // Compaction needs all messages (including visibility metadata)
-                            match auto_compact::perform_compaction(self, conversation.all_messages()).await {
+                            // Compact the agent-visible messages
+                            // Compaction will create new invisible summary messages and return a full conversation
+                            match auto_compact::perform_compaction(self, &conversation.agent_visible_messages()).await {
                                 Ok(compact_result) => {
+                                    // compact_result.messages is a FULL conversation with both visible and invisible messages
                                     conversation = compact_result.messages;
 
                                     yield AgentEvent::Message(
@@ -1340,7 +1341,7 @@ impl Agent {
                                             "Context limit reached. Conversation has been automatically compacted to continue."
                                         )
                                     );
-                                    // HistoryReplaced sends all messages for storage
+                                    // HistoryReplaced needs all messages (visible and invisible) for storage
                                     yield AgentEvent::HistoryReplaced(conversation.all_messages().to_vec());
                                     if let Some(session_to_store) = &session {
                                         SessionManager::replace_conversation(&session_to_store.id, &conversation).await?
@@ -1589,8 +1590,8 @@ impl Agent {
                 tracing::error!("{}", error);
                 error
             })?
-            // Recipe creation uses all messages to generate comprehensive recipe
-            .complete(&system_prompt, messages.all_messages(), &tools)
+            // Recipe creation needs agent-visible messages only (what the LLM actually saw)
+            .complete(&system_prompt, &messages.agent_visible_messages(), &tools)
             .await
             .map_err(|e| {
                 tracing::error!("Provider completion failed during recipe creation: {}", e);

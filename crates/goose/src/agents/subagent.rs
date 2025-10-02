@@ -162,11 +162,12 @@ impl SubAgent {
         loop {
             loop_count += 1;
 
-            // Subagents use all messages in their context (no visibility filtering)
+            // Subagents work with their own isolated message history
+            // Use agent_visible_messages even though typically all messages are visible in subagent context
             match Agent::generate_response_from_provider(
                 Arc::clone(provider),
                 &system_prompt,
-                messages.all_messages(),
+                &messages.agent_visible_messages(),
                 &tools,
                 &toolshim_tools,
             )
