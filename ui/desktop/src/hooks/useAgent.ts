@@ -56,11 +56,19 @@ export function useAgent(): UseAgentReturn {
 
   const { getExtensions, addExtension, read } = useConfig();
 
-  const resetChat = useCallback(() => {
+  const resetChat = useCallback(async () => {
+    if (initPromiseRef.current) {
+      try {
+        await initPromiseRef.current;
+      } catch (error) {
+        console.warn('Error during pending initialization cleanup:', error);
+      }
+    }
+
     setSessionId(null);
     setAgentState(AgentState.UNINITIALIZED);
     setRecipeFromAppConfig(null);
-    initPromiseRef.current = null; // Clear any pending initialization
+    initPromiseRef.current = null;
   }, []);
 
   const agentIsInitialized = agentState === AgentState.INITIALIZED;
@@ -68,6 +76,14 @@ export function useAgent(): UseAgentReturn {
     async (initContext: InitializationContext): Promise<ChatType> => {
       // If forceReset is true, always reinitialize
       if (initContext.forceReset) {
+        if (initPromiseRef.current) {
+          try {
+            await initPromiseRef.current;
+          } catch (error) {
+            console.warn('Error during pending initialization cleanup:', error);
+          }
+        }
+
         setSessionId(null);
         setAgentState(AgentState.UNINITIALIZED);
         initPromiseRef.current = null;
