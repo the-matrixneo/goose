@@ -143,10 +143,11 @@ pub async fn detect_read_only_tools(
     let system_prompt = render_global_file("permission_judge.md", &context)
         .unwrap_or_else(|_| "You are a good analyst and can detect operations whether they have read-only operations.".to_string());
 
+    // Permission judge analyzes all messages to understand context
     let res = provider
         .complete(
             &system_prompt,
-            check_messages.messages(),
+            check_messages.all_messages(),
             std::slice::from_ref(&tool),
         )
         .await;

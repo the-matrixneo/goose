@@ -96,6 +96,7 @@ impl Agent {
         let config = provider.get_model_config();
 
         // Convert tool messages to text if toolshim is enabled
+        // Input messages are already filtered to agent-visible in prepare_reply_context
         let messages_for_provider = if config.toolshim {
             convert_tool_messages_to_text(messages)
         } else {
@@ -103,15 +104,16 @@ impl Agent {
         };
 
         // Call the provider to get a response
+        // messages_for_provider already contains only agent-visible messages
         let (mut response, mut usage) = provider
-            .complete(system_prompt, messages_for_provider.messages(), tools)
+            .complete(system_prompt, messages_for_provider.all_messages(), tools)
             .await?;
 
         // Ensure we have token counts, estimating if necessary
         usage
             .ensure_tokens(
                 system_prompt,
-                messages_for_provider.messages(),
+                messages_for_provider.all_messages(),
                 &response,
                 tools,
             )
@@ -150,12 +152,13 @@ impl Agent {
         let toolshim_tools = toolshim_tools.to_owned();
         let provider = provider.clone();
 
+        // messages_for_provider already contains only agent-visible messages
         let mut stream = if provider.supports_streaming() {
             debug!("WAITING_LLM_STREAM_START");
             let msg_stream = provider
                 .stream(
                     system_prompt.as_str(),
-                    messages_for_provider.messages(),
+                    messages_for_provider.all_messages(),
                     &tools,
                 )
                 .await?;
@@ -166,7 +169,7 @@ impl Agent {
             let (message, mut usage) = provider
                 .complete(
                     system_prompt.as_str(),
-                    messages_for_provider.messages(),
+                    messages_for_provider.all_messages(),
                     &tools,
                 )
                 .await?;
@@ -176,7 +179,7 @@ impl Agent {
             usage
                 .ensure_tokens(
                     system_prompt.as_str(),
-                    messages_for_provider.messages(),
+                    messages_for_provider.all_messages(),
                     &message,
                     &tools,
                 )

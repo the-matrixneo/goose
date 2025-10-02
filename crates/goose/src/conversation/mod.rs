@@ -37,6 +37,25 @@ impl Conversation {
         Self::new_unvalidated([])
     }
 
+    /// Get all messages regardless of visibility.
+    ///
+    /// ⚠️ WARNING: This method should rarely be used directly. Consider:
+    /// - `agent_visible_messages()` - For sending to LLM providers
+    /// - `user_visible_messages()` - For displaying to users
+    /// - Storage/persistence operations only
+    ///
+    /// If you're calling this for anything other than storage, you probably
+    /// want one of the visibility-filtered methods instead.
+    pub fn all_messages(&self) -> &Vec<Message> {
+        &self.0
+    }
+
+    /// Deprecated: Use `all_messages()` and be explicit about visibility needs.
+    /// This will be removed in a future version.
+    #[deprecated(
+        since = "1.9.0",
+        note = "Use `all_messages()`, `agent_visible_messages()`, or `user_visible_messages()` to be explicit about visibility"
+    )]
     pub fn messages(&self) -> &Vec<Message> {
         &self.0
     }
@@ -162,7 +181,8 @@ impl<'a> IntoIterator for &'a Conversation {
 /// Fix a conversation that we're about to send to an LLM. So the last and first
 /// messages should always be from the user.
 pub fn fix_conversation(conversation: Conversation) -> (Conversation, Vec<String>) {
-    let messages = conversation.messages().clone();
+    // fix_conversation operates on all messages passed to it (should be pre-filtered to agent_visible if needed)
+    let messages = conversation.all_messages().clone();
     let (messages, issues) = fix_messages(messages);
     (Conversation::new_unvalidated(messages), issues)
 }
@@ -415,9 +435,9 @@ mod tests {
             0,
             "Fixed conversation should have no issues, but found: {:?}\n\n{}",
             issues_with_fixed,
-            debug_conversation_fix(&messages, fixed.messages(), &issues)
+            debug_conversation_fix(&messages, fixed.all_messages(), &issues)
         );
-        (fixed.messages().clone(), issues)
+        (fixed.all_messages().clone(), issues)
     }
 
     #[test]
@@ -454,8 +474,8 @@ mod tests {
                     issues
                 );
                 assert_eq!(
-                    fixed.messages(),
-                    messages.messages(),
+                    fixed.all_messages(),
+                    messages.all_messages(),
                     "Step {}: Messages should be unchanged",
                     i
                 );
@@ -659,7 +679,7 @@ mod tests {
         );
 
         // Verify no tool requests remain in the fixed conversation
-        for msg in fixed.messages() {
+        for msg in fixed.all_messages() {
             for content in &msg.content {
                 assert!(
                     !matches!(content, MessageContent::ToolRequest(_)),

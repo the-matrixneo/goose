@@ -232,8 +232,9 @@ impl SessionManager {
             .conversation
             .ok_or_else(|| anyhow::anyhow!("No messages found"))?;
 
+        // Count all user messages for session naming (both visible and invisible)
         let user_message_count = conversation
-            .messages()
+            .all_messages()
             .iter()
             .filter(|m| matches!(m.role, Role::User))
             .count();
@@ -624,7 +625,8 @@ impl SessionStorage {
 
         if include_messages {
             let conv = self.get_conversation(&session.id).await?;
-            session.message_count = conv.messages().len();
+            // Count all messages (both visible and invisible) for session metadata
+            session.message_count = conv.all_messages().len();
             session.conversation = Some(conv);
         } else {
             let count =
@@ -780,7 +782,8 @@ impl SessionStorage {
             .execute(&mut *tx)
             .await?;
 
-        for message in conversation.messages() {
+        // Store all messages (both visible and invisible) for persistence
+        for message in conversation.all_messages() {
             sqlx::query(
                 r#"
             INSERT INTO messages (session_id, role, content_json, created_timestamp)

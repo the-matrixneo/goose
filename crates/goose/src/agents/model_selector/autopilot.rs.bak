@@ -262,7 +262,7 @@ impl AutoPilot {
     /// Count the current turn number (number of user messages)
     fn count_turns(&self, conversation: &Conversation) -> usize {
         conversation
-            .all_messages()
+            .messages()
             .iter()
             .filter(|msg| msg.role == rmcp::model::Role::User)
             .count()
@@ -432,7 +432,7 @@ impl AutoPilot {
 
     /// Check if the trigger source matches the last message
     fn check_source(&self, conversation: &Conversation, source: &TriggerSource) -> bool {
-        let last_msg = conversation.all_messages().last();
+        let last_msg = conversation.messages().last();
 
         match source {
             TriggerSource::Human => {
@@ -449,7 +449,7 @@ impl AutoPilot {
 
     /// Count consecutive tool uses at the end of the conversation
     fn count_consecutive_tools(&self, conversation: &Conversation) -> usize {
-        let messages = conversation.all_messages();
+        let messages = conversation.messages();
         let mut count = 0;
 
         // Work backwards through assistant messages
@@ -475,7 +475,7 @@ impl AutoPilot {
 
     /// Count consecutive tool failures
     fn count_consecutive_failures(&self, conversation: &Conversation) -> usize {
-        let messages = conversation.all_messages();
+        let messages = conversation.messages();
         let mut count = 0;
 
         // Work backwards looking for tool responses
@@ -505,7 +505,7 @@ impl AutoPilot {
 
     /// Count messages since last human input
     fn count_messages_since_human(&self, conversation: &Conversation) -> usize {
-        let messages = conversation.all_messages();
+        let messages = conversation.messages();
         let mut count = 0;
 
         // Work backwards counting messages until we find a User message
@@ -521,7 +521,7 @@ impl AutoPilot {
 
     /// Count tool calls since last human message
     fn count_tools_since_human(&self, conversation: &Conversation) -> usize {
-        let messages = conversation.all_messages();
+        let messages = conversation.messages();
         let mut tool_count = 0;
 
         // Work backwards counting tool requests until we find a User message
@@ -543,7 +543,7 @@ impl AutoPilot {
 
     /// Count consecutive machine messages (assistant messages without human interruption)
     fn count_machine_messages_without_human(&self, conversation: &Conversation) -> usize {
-        let messages = conversation.all_messages();
+        let messages = conversation.messages();
         let mut count = 0;
 
         // Work backwards counting assistant messages until we find a user message
@@ -561,7 +561,7 @@ impl AutoPilot {
     fn check_recent_failure(&self, conversation: &Conversation) -> bool {
         // Look for actual tool failures in recent messages
         conversation
-            .all_messages()
+            .messages()
             .iter()
             .rev()
             .take(3) // Check last 3 messages
@@ -597,7 +597,7 @@ impl AutoPilot {
 
         if !triggers.keywords.is_empty() {
             if let Some(text) = conversation
-                .all_messages()
+                .messages()
                 .iter()
                 .rev()
                 .find(|msg| msg.role == rmcp::model::Role::User)
@@ -622,7 +622,7 @@ impl AutoPilot {
 
         if triggers.after_tool_use {
             let has_recent_tool = conversation
-                .all_messages()
+                .messages()
                 .iter()
                 .rev()
                 .find(|msg| msg.role == rmcp::model::Role::Assistant)
@@ -664,7 +664,7 @@ impl AutoPilot {
 
         if let Some(ref threshold) = triggers.complexity_threshold {
             if let Some(text) = conversation
-                .all_messages()
+                .messages()
                 .iter()
                 .rev()
                 .find(|msg| msg.role == rmcp::model::Role::User)

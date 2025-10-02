@@ -32,10 +32,11 @@ pub async fn run_complete_subagent_task_with_options(
         .await?;
 
     // Extract text content based on return_last_only flag
+    // Use all_messages since we want to extract text from all messages (agent returns everything)
     let response_text = if return_last_only {
         // Get only the last message's text content
         messages
-            .messages()
+            .all_messages()
             .last()
             .and_then(|message| {
                 message.content.iter().find_map(|content| match content {

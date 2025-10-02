@@ -258,12 +258,13 @@ impl Agent {
                 "Conversation issue fixed: {}",
                 debug_conversation_fix(
                     unfixed_agent_messages.as_slice(),
-                    fixed_conversation.messages(),
+                    fixed_conversation.all_messages(), // Using all_messages for debugging/logging
                     &issues
                 )
             );
         }
-        let initial_messages = fixed_conversation.messages().clone();
+        // initial_messages are the agent-visible, fixed messages that will be sent to the LLM
+        let initial_messages = fixed_conversation.all_messages().clone();
         let config = Config::global();
 
         let (tools, toolshim_tools, system_prompt) = self.prepare_tools_and_prompt().await?;
@@ -975,8 +976,9 @@ impl Agent {
         cancel_token: Option<CancellationToken>,
     ) -> Result<BoxStream<'_, Result<AgentEvent>>> {
         // Handle auto-compaction before processing
+        // Auto-compaction needs all messages to calculate token counts accurately
         let (conversation, compaction_msg, _summarization_usage) = match self
-            .handle_auto_compaction(unfixed_conversation.messages(), &session)
+            .handle_auto_compaction(unfixed_conversation.all_messages(), &session)
             .await?
         {
             Some((compacted_messages, msg, usage)) => (compacted_messages, Some(msg), usage),
@@ -992,7 +994,8 @@ impl Agent {
         if let Some(compaction_msg) = compaction_msg {
             return Ok(Box::pin(async_stream::try_stream! {
                 yield AgentEvent::Message(Message::assistant().with_summarization_requested(compaction_msg));
-                yield AgentEvent::HistoryReplaced(conversation.messages().clone());
+                // HistoryReplaced sends all messages (visible and invisible) for storage
+                yield AgentEvent::HistoryReplaced(conversation.all_messages().clone());
                 if let Some(session_to_store) = &session {
                     SessionManager::replace_conversation(&session_to_store.id, &conversation).await?
                 }
@@ -1124,10 +1127,11 @@ impl Agent {
                     }
                 }
 
+                // At this point, conversation only contains agent-visible messages (filtered in prepare_reply_context)
                 let mut stream = Self::stream_response_from_provider(
                     self.provider().await?,
                     &system_prompt,
-                    conversation.messages(),
+                    conversation.all_messages(), // Already filtered to agent-visible in prepare_reply_context
                     &tools,
                     &toolshim_tools,
                 ).await?;
@@ -1216,10 +1220,11 @@ impl Agent {
                                     }
                                 } else {
                                     // Run all tool inspectors (security, repetition, permission, etc.)
+                                    // Inspectors need the agent-visible conversation to check for patterns/repetition
                                     let inspection_results = self.tool_inspection_manager
                                         .inspect_tools(
                                             &remaining_requests,
-                                            conversation.messages(),
+                                            conversation.all_messages(), // Already agent-visible only from prepare_reply_context
                                         )
                                         .await?;
 
@@ -1325,7 +1330,8 @@ impl Agent {
                         Err(ProviderError::ContextLengthExceeded(error_msg)) => {
                             info!("Context length exceeded, attempting compaction");
 
-                            match auto_compact::perform_compaction(self, conversation.messages()).await {
+                            // Compaction needs all messages (including visibility metadata)
+                            match auto_compact::perform_compaction(self, conversation.all_messages()).await {
                                 Ok(compact_result) => {
                                     conversation = compact_result.messages;
 
@@ -1334,7 +1340,8 @@ impl Agent {
                                             "Context limit reached. Conversation has been automatically compacted to continue."
                                         )
                                     );
-                                    yield AgentEvent::HistoryReplaced(conversation.messages().to_vec());
+                                    // HistoryReplaced sends all messages for storage
+                                    yield AgentEvent::HistoryReplaced(conversation.all_messages().to_vec());
                                     if let Some(session_to_store) = &session {
                                         SessionManager::replace_conversation(&session_to_store.id, &conversation).await?
                                     }
@@ -1582,7 +1589,8 @@ impl Agent {
                 tracing::error!("{}", error);
                 error
             })?
-            .complete(&system_prompt, messages.messages(), &tools)
+            // Recipe creation uses all messages to generate comprehensive recipe
+            .complete(&system_prompt, messages.all_messages(), &tools)
             .await
             .map_err(|e| {
                 tracing::error!("Provider completion failed during recipe creation: {}", e);
