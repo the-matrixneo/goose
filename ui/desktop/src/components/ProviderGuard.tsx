@@ -297,16 +297,11 @@ export default function ProviderGuard({ didSelectProvider, children }: ProviderG
 
               {/* Provider options - now just 2 cards in a row */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl mx-auto">
-                {/* Tetrate Card - Recommended */}
+                {/* Tetrate Card */}
                 <div className="relative">
-                  <div className="absolute -top-2 -right-2 sm:-top-3 sm:-right-3 z-20">
-                    <span className="inline-block px-2 py-1 text-xs font-medium bg-blue-600 text-white rounded-full">
-                      Recommended
-                    </span>
-                  </div>
                   <div
                     onClick={handleTetrateSetup}
-                    className="w-full p-4 sm:p-6 bg-background-muted border border-background-hover rounded-xl hover:border-text-muted transition-all duration-200 cursor-pointer group h-full"
+                    className="w-full p-4 sm:p-6 bg-transparent border border-background-hover rounded-xl hover:border-text-muted transition-all duration-200 cursor-pointer group h-full"
                   >
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1">
@@ -331,7 +326,7 @@ export default function ProviderGuard({ didSelectProvider, children }: ProviderG
                 <div className="relative">
                   <div
                     onClick={handleOpenRouterSetup}
-                    className="relative w-full p-4 sm:p-6 bg-background-muted border border-background-hover rounded-xl hover:border-text-muted transition-all duration-200 cursor-pointer group overflow-hidden h-full"
+                    className="relative w-full p-4 sm:p-6 bg-transparent border border-background-hover rounded-xl hover:border-text-muted transition-all duration-200 cursor-pointer group overflow-hidden h-full"
                   >
                     <div className="absolute inset-0 -translate-x-full animate-shimmer bg-gradient-to-r from-transparent via-white/8 to-transparent"></div>
                     <div className="relative flex items-start justify-between mb-3">
