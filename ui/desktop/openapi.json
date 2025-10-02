@@ -1763,19 +1763,6 @@
           }
         }
       },
-      "Annotated": {
-        "oneOf": [
-          {
-            "$ref": "#/components/schemas/RawTextContent"
-          },
-          {
-            "$ref": "#/components/schemas/RawImageContent"
-          },
-          {
-            "$ref": "#/components/schemas/RawEmbeddedResource"
-          }
-        ]
-      },
       "Annotations": {
         "type": "object",
         "properties": {
@@ -1906,7 +1893,7 @@
           {
             "allOf": [
               {
-                "$ref": "#/components/schemas/Annotated"
+                "$ref": "#/components/schemas/RawAudioContent"
               }
             ]
           },
@@ -2613,6 +2600,23 @@
           }
         }
       },
+      "Icon": {
+        "type": "object",
+        "required": [
+          "src"
+        ],
+        "properties": {
+          "mimeType": {
+            "type": "string"
+          },
+          "sizes": {
+            "type": "string"
+          },
+          "src": {
+            "type": "string"
+          }
+        }
+      },
       "ImageContent": {
         "type": "object",
         "required": [
@@ -3126,6 +3130,21 @@
           }
         }
       },
+      "RawAudioContent": {
+        "type": "object",
+        "required": [
+          "data",
+          "mimeType"
+        ],
+        "properties": {
+          "data": {
+            "type": "string"
+          },
+          "mimeType": {
+            "type": "string"
+          }
+        }
+      },
       "RawEmbeddedResource": {
         "type": "object",
         "required": [
@@ -3170,6 +3189,12 @@
           "description": {
             "type": "string"
           },
+          "icons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Icon"
+            }
+          },
           "mimeType": {
             "type": "string"
           },
@@ -3179,6 +3204,9 @@
           "size": {
             "type": "integer",
             "minimum": 0
+          },
+          "title": {
+            "type": "string"
           },
           "uri": {
             "type": "string"
@@ -3616,7 +3644,8 @@
             "nullable": true
           },
           "created_at": {
-            "type": "string"
+            "type": "string",
+            "format": "date-time"
           },
           "description": {
             "type": "string"
@@ -3666,7 +3695,8 @@
             "nullable": true
           },
           "updated_at": {
-            "type": "string"
+            "type": "string",
+            "format": "date-time"
           },
           "working_dir": {
             "type": "string"
@@ -3978,6 +4008,12 @@
           "description": {
             "type": "string"
           },
+          "icons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Icon"
+            }
+          },
           "inputSchema": {
             "type": "object",
             "additionalProperties": true
@@ -3988,6 +4024,9 @@
           "outputSchema": {
             "type": "object",
             "additionalProperties": true
+          },
+          "title": {
+            "type": "string"
           }
         }
       },
