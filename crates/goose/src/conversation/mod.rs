@@ -144,9 +144,245 @@ impl Default for Conversation {
 /// Fix a conversation that we're about to send to an LLM. So the last and first
 /// messages should always be from the user.
 pub fn fix_conversation(conversation: Conversation) -> (Conversation, Vec<String>) {
-    let messages = conversation.messages().clone();
-    let (messages, issues) = fix_messages(messages);
-    (Conversation::new_unvalidated(messages), issues)
+    let all_messages = conversation.messages().clone();
+
+    // If no messages, return empty
+    if all_messages.is_empty() {
+        return (conversation, vec![]);
+    }
+
+    // Check if there are any agent-visible messages
+    let has_agent_visible = all_messages.iter().any(|m| m.is_agent_visible());
+    if !has_agent_visible {
+        return (
+            conversation,
+            vec!["No agent-visible messages to fix".to_string()],
+        );
+    }
+
+    // Apply fixes with visibility awareness
+    let (fixed_messages, issues) = fix_messages_with_visibility(all_messages);
+
+    (Conversation::new_unvalidated(fixed_messages), issues)
+}
+
+fn fix_messages_with_visibility(messages: Vec<Message>) -> (Vec<Message>, Vec<String>) {
+    // First pass: remove empty agent-visible messages
+    let (messages_1, empty_removed) = remove_empty_agent_visible_messages(messages);
+
+    // Second pass: fix tool calling for agent-visible messages
+    let (messages_2, tool_calling_fixed) = fix_tool_calling_with_visibility(messages_1);
+
+    // Third pass: merge consecutive agent-visible messages (but not if separated by non-agent-visible)
+    let (messages_3, messages_merged) = merge_consecutive_agent_visible_messages(messages_2);
+
+    // Fourth pass: fix leading/trailing for agent-visible messages
+    let (messages_4, lead_trail_fixed) = fix_lead_trail_agent_visible(messages_3);
+
+    // Fifth pass: populate if no agent-visible messages
+    let (messages_5, populated_if_empty) = populate_if_no_agent_visible(messages_4);
+
+    let mut issues = Vec::new();
+    issues.extend(empty_removed);
+    issues.extend(tool_calling_fixed);
+    issues.extend(messages_merged);
+    issues.extend(lead_trail_fixed);
+    issues.extend(populated_if_empty);
+
+    (messages_5, issues)
+}
+
+fn remove_empty_agent_visible_messages(messages: Vec<Message>) -> (Vec<Message>, Vec<String>) {
+    let mut issues = Vec::new();
+    let filtered_messages = messages
+        .into_iter()
+        .filter(|msg| {
+            if msg.is_agent_visible() && msg.content.is_empty() {
+                issues.push("Removed empty agent-visible message".to_string());
+                false
+            } else {
+                true
+            }
+        })
+        .collect();
+    (filtered_messages, issues)
+}
+
+fn fix_tool_calling_with_visibility(mut messages: Vec<Message>) -> (Vec<Message>, Vec<String>) {
+    let mut issues = Vec::new();
+    let mut pending_tool_requests: HashSet<String> = HashSet::new();
+
+    for message in &mut messages {
+        // Only process agent-visible messages
+        if !message.is_agent_visible() {
+            continue;
+        }
+
+        let mut content_to_remove = Vec::new();
+
+        match message.role {
+            Role::User => {
+                for (idx, content) in message.content.iter().enumerate() {
+                    match content {
+                        MessageContent::ToolRequest(req) => {
+                            content_to_remove.push(idx);
+                            issues.push(format!(
+                                "Removed tool request '{}' from user message",
+                                req.id
+                            ));
+                        }
+                        MessageContent::ToolConfirmationRequest(req) => {
+                            content_to_remove.push(idx);
+                            issues.push(format!(
+                                "Removed tool confirmation request '{}' from user message",
+                                req.id
+                            ));
+                        }
+                        MessageContent::Thinking(_) | MessageContent::RedactedThinking(_) => {
+                            content_to_remove.push(idx);
+                            issues.push("Removed thinking content from user message".to_string());
+                        }
+                        MessageContent::ToolResponse(resp) => {
+                            if pending_tool_requests.contains(&resp.id) {
+                                pending_tool_requests.remove(&resp.id);
+                            } else {
+                                content_to_remove.push(idx);
+                                issues
+                                    .push(format!("Removed orphaned tool response '{}'", resp.id));
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            Role::Assistant => {
+                for (idx, content) in message.content.iter().enumerate() {
+                    match content {
+                        MessageContent::ToolResponse(resp) => {
+                            content_to_remove.push(idx);
+                            issues.push(format!(
+                                "Removed tool response '{}' from assistant message",
+                                resp.id
+                            ));
+                        }
+                        MessageContent::FrontendToolRequest(req) => {
+                            content_to_remove.push(idx);
+                            issues.push(format!(
+                                "Removed frontend tool request '{}' from assistant message",
+                                req.id
+                            ));
+                        }
+                        MessageContent::ToolRequest(req) => {
+                            pending_tool_requests.insert(req.id.clone());
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+
+        for &idx in content_to_remove.iter().rev() {
+            message.content.remove(idx);
+        }
+    }
+
+    // Remove orphaned tool requests from agent-visible assistant messages
+    for message in &mut messages {
+        if message.is_agent_visible() && message.role == Role::Assistant {
+            let mut content_to_remove = Vec::new();
+            for (idx, content) in message.content.iter().enumerate() {
+                if let MessageContent::ToolRequest(req) = content {
+                    if pending_tool_requests.contains(&req.id) {
+                        content_to_remove.push(idx);
+                        issues.push(format!("Removed orphaned tool request '{}'", req.id));
+                    }
+                }
+            }
+            for &idx in content_to_remove.iter().rev() {
+                message.content.remove(idx);
+            }
+        }
+    }
+
+    let (messages, empty_removed) = remove_empty_agent_visible_messages(messages);
+    issues.extend(empty_removed);
+    (messages, issues)
+}
+
+fn merge_consecutive_agent_visible_messages(messages: Vec<Message>) -> (Vec<Message>, Vec<String>) {
+    let mut issues = Vec::new();
+    let mut merged_messages: Vec<Message> = Vec::new();
+
+    for message in messages {
+        // If message is not agent-visible, just add it
+        if !message.is_agent_visible() {
+            merged_messages.push(message);
+            continue;
+        }
+
+        // Check if we can merge with the last agent-visible message
+        // Find the last agent-visible message
+        let last_agent_visible_idx = merged_messages.iter().rposition(|m| m.is_agent_visible());
+
+        if let Some(idx) = last_agent_visible_idx {
+            // Check if they are truly consecutive from agent's perspective
+            // (no other agent-visible messages between them)
+            let has_other_agent_visible_between = merged_messages[idx + 1..]
+                .iter()
+                .any(|m| m.is_agent_visible());
+
+            if !has_other_agent_visible_between {
+                // Check if they have the same effective role
+                let effective = effective_role(&message);
+                if effective_role(&merged_messages[idx]) == effective {
+                    // Merge the content
+                    merged_messages[idx].content.extend(message.content);
+                    issues.push(format!("Merged consecutive {} messages", effective));
+                    continue;
+                }
+            }
+        }
+
+        merged_messages.push(message);
+    }
+
+    (merged_messages, issues)
+}
+
+fn fix_lead_trail_agent_visible(mut messages: Vec<Message>) -> (Vec<Message>, Vec<String>) {
+    let mut issues = Vec::new();
+
+    // Find first agent-visible message
+    if let Some(first_idx) = messages.iter().position(|m| m.is_agent_visible()) {
+        if messages[first_idx].role == Role::Assistant {
+            messages.remove(first_idx);
+            issues.push("Removed leading agent-visible assistant message".to_string());
+        }
+    }
+
+    // Find last agent-visible message
+    if let Some(last_idx) = messages.iter().rposition(|m| m.is_agent_visible()) {
+        if last_idx < messages.len() && messages[last_idx].role == Role::Assistant {
+            messages.remove(last_idx);
+            issues.push("Removed trailing agent-visible assistant message".to_string());
+        }
+    }
+
+    (messages, issues)
+}
+
+fn populate_if_no_agent_visible(mut messages: Vec<Message>) -> (Vec<Message>, Vec<String>) {
+    let mut issues = Vec::new();
+
+    // Check if there are any agent-visible messages
+    let has_agent_visible = messages.iter().any(|m| m.is_agent_visible());
+
+    if !has_agent_visible {
+        issues.push("Added placeholder user message as no agent-visible messages".to_string());
+        messages.push(Message::user().with_text(PLACEHOLDER_USER_MESSAGE));
+    }
+
+    (messages, issues)
 }
 
 fn fix_messages(messages: Vec<Message>) -> (Vec<Message>, Vec<String>) {
@@ -502,7 +738,9 @@ mod tests {
 
         assert_eq!(fixed.len(), 1);
 
-        assert!(issues.iter().any(|i| i.contains("Removed empty message")));
+        assert!(issues
+            .iter()
+            .any(|i| i.contains("Removed empty agent-visible message")));
         assert!(issues
             .iter()
             .any(|i| i.contains("Removed orphaned tool response 'wrong_id'")));
@@ -549,5 +787,78 @@ mod tests {
 
         let (_fixed, issues) = run_verify(messages);
         assert_eq!(issues.len(), 0);
+    }
+
+    #[test]
+    fn test_mixed_visibility_messages_preserved() {
+        use crate::conversation::message::MessageMetadata;
+
+        let messages = vec![
+            Message::user().with_text("Visible to all"),
+            Message::assistant()
+                .with_text("Agent-only response")
+                .with_metadata(MessageMetadata::agent_only()),
+            Message::user()
+                .with_text("User-only comment")
+                .with_metadata(MessageMetadata::user_only()),
+            Message::assistant().with_text("Visible to all again"),
+            Message::user().with_text("Final visible message"),
+        ];
+
+        let conversation = Conversation::new_unvalidated(messages.clone());
+        let (fixed, issues) = fix_conversation(conversation);
+
+        // The two assistant messages get merged from agent's perspective
+        // because the user-only message between them is not agent-visible
+        assert_eq!(
+            fixed.len(),
+            4,
+            "Messages after merging consecutive assistant messages"
+        );
+
+        // Check visibility is preserved
+        assert!(fixed.messages()[0].is_user_visible() && fixed.messages()[0].is_agent_visible());
+        // The merged assistant message
+        assert!(!fixed.messages()[1].is_user_visible() && fixed.messages()[1].is_agent_visible());
+        // User-only message preserved
+        assert!(fixed.messages()[2].is_user_visible() && !fixed.messages()[2].is_agent_visible());
+        // Final user message
+        assert!(fixed.messages()[3].is_user_visible() && fixed.messages()[3].is_agent_visible());
+
+        // Should have merge issue
+        assert_eq!(issues.len(), 1);
+        assert!(issues[0].contains("Merged consecutive assistant messages"));
+    }
+
+    #[test]
+    fn test_fixing_with_non_agent_visible_preserved() {
+        use crate::conversation::message::MessageMetadata;
+
+        let messages = vec![
+            Message::user().with_text("Start"),
+            Message::user().with_text("Duplicate user message"), // This should be merged for agent
+            Message::assistant()
+                .with_text("User-only status")
+                .with_metadata(MessageMetadata::user_only()), // Not visible to agent
+            Message::assistant().with_text("Response 1"),
+            Message::assistant().with_text("Response 2"), // Should be merged with Response 1
+            Message::user().with_text("End"),
+        ];
+
+        let conversation = Conversation::new_unvalidated(messages);
+        let (fixed, issues) = fix_conversation(conversation);
+
+        // The user-only assistant message should be preserved
+        // Agent-visible messages get fixed (consecutive messages merged)
+        assert_eq!(fixed.len(), 4); // Start + Duplicate merged, user-only preserved, Response 1+2 merged, End
+
+        // Check that the user-only message is still there
+        let user_only_messages = fixed.user_visible_messages();
+        assert!(user_only_messages
+            .iter()
+            .any(|m| m.as_concat_text().contains("User-only status")));
+
+        // Should have merge issues
+        assert!(issues.iter().any(|i| i.contains("Merged consecutive")));
     }
 }
