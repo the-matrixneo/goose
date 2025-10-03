@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import CreateRecipeFromSessionModal from '../CreateRecipeFromSessionModal';
 import { createRecipe } from '../../../api/sdk.gen';
 import type { CreateRecipeResponse } from '../../../api/types.gen';
@@ -60,21 +61,25 @@ describe('CreateRecipeFromSessionModal', () => {
     });
   });
 
+  const renderWithRouter = (component: React.ReactElement) => {
+    return render(<MemoryRouter>{component}</MemoryRouter>);
+  };
+
   describe('Modal Rendering', () => {
     it('renders modal when open', () => {
-      render(<CreateRecipeFromSessionModal {...defaultProps} />);
+      renderWithRouter(<CreateRecipeFromSessionModal {...defaultProps} />);
 
       expect(screen.getByTestId('create-recipe-modal')).toBeInTheDocument();
     });
 
     it('does not render when closed', () => {
-      render(<CreateRecipeFromSessionModal {...defaultProps} isOpen={false} />);
+      renderWithRouter(<CreateRecipeFromSessionModal {...defaultProps} isOpen={false} />);
 
       expect(screen.queryByTestId('create-recipe-modal')).not.toBeInTheDocument();
     });
 
     it('renders modal header with close button', () => {
-      render(<CreateRecipeFromSessionModal {...defaultProps} />);
+      renderWithRouter(<CreateRecipeFromSessionModal {...defaultProps} />);
 
       expect(screen.getByTestId('modal-header')).toBeInTheDocument();
       expect(screen.getByTestId('close-button')).toBeInTheDocument();
@@ -82,7 +87,7 @@ describe('CreateRecipeFromSessionModal', () => {
 
     it('calls onClose when close button is clicked', async () => {
       const user = userEvent.setup();
-      render(<CreateRecipeFromSessionModal {...defaultProps} />);
+      renderWithRouter(<CreateRecipeFromSessionModal {...defaultProps} />);
 
       await user.click(screen.getByTestId('close-button'));
       expect(defaultProps.onClose).toHaveBeenCalled();
@@ -91,14 +96,14 @@ describe('CreateRecipeFromSessionModal', () => {
 
   describe('Analysis Workflow', () => {
     it('shows analyzing state initially', () => {
-      render(<CreateRecipeFromSessionModal {...defaultProps} />);
+      renderWithRouter(<CreateRecipeFromSessionModal {...defaultProps} />);
 
       expect(screen.getByTestId('analyzing-state')).toBeInTheDocument();
       expect(screen.getByTestId('analyzing-title')).toBeInTheDocument();
     });
 
     it('displays analysis progress indicator', async () => {
-      render(<CreateRecipeFromSessionModal {...defaultProps} />);
+      renderWithRouter(<CreateRecipeFromSessionModal {...defaultProps} />);
 
       expect(screen.getByTestId('analysis-stage')).toBeInTheDocument();
 
@@ -112,13 +117,13 @@ describe('CreateRecipeFromSessionModal', () => {
     });
 
     it('shows loading indicator during analysis', () => {
-      render(<CreateRecipeFromSessionModal {...defaultProps} />);
+      renderWithRouter(<CreateRecipeFromSessionModal {...defaultProps} />);
 
       expect(screen.getByTestId('analysis-spinner')).toBeInTheDocument();
     });
 
     it('transitions to form state after analysis completes', async () => {
-      render(<CreateRecipeFromSessionModal {...defaultProps} />);
+      renderWithRouter(<CreateRecipeFromSessionModal {...defaultProps} />);
 
       await waitFor(
         () => {
@@ -133,7 +138,7 @@ describe('CreateRecipeFromSessionModal', () => {
 
   describe('Form Pre-filling', () => {
     it('pre-fills form with analyzed data', async () => {
-      render(<CreateRecipeFromSessionModal {...defaultProps} />);
+      renderWithRouter(<CreateRecipeFromSessionModal {...defaultProps} />);
 
       // Wait for analysis to complete and form to be pre-filled
       await waitFor(
@@ -152,7 +157,7 @@ describe('CreateRecipeFromSessionModal', () => {
     });
 
     it('shows recipe form fields after analysis', async () => {
-      render(<CreateRecipeFromSessionModal {...defaultProps} />);
+      renderWithRouter(<CreateRecipeFromSessionModal {...defaultProps} />);
 
       await waitFor(
         () => {
@@ -169,7 +174,7 @@ describe('CreateRecipeFromSessionModal', () => {
     });
 
     it('shows save location options', async () => {
-      render(<CreateRecipeFromSessionModal {...defaultProps} />);
+      renderWithRouter(<CreateRecipeFromSessionModal {...defaultProps} />);
 
       await waitFor(
         () => {
@@ -186,7 +191,7 @@ describe('CreateRecipeFromSessionModal', () => {
   describe('Form Interactions', () => {
     it('allows editing form fields', async () => {
       const user = userEvent.setup();
-      render(<CreateRecipeFromSessionModal {...defaultProps} />);
+      renderWithRouter(<CreateRecipeFromSessionModal {...defaultProps} />);
 
       await waitFor(
         () => {
@@ -204,7 +209,7 @@ describe('CreateRecipeFromSessionModal', () => {
 
     it('allows changing save location', async () => {
       const user = userEvent.setup();
-      render(<CreateRecipeFromSessionModal {...defaultProps} />);
+      renderWithRouter(<CreateRecipeFromSessionModal {...defaultProps} />);
 
       await waitFor(
         () => {
@@ -219,7 +224,7 @@ describe('CreateRecipeFromSessionModal', () => {
 
     it('validates required fields', async () => {
       const user = userEvent.setup();
-      render(<CreateRecipeFromSessionModal {...defaultProps} />);
+      renderWithRouter(<CreateRecipeFromSessionModal {...defaultProps} />);
 
       await waitFor(
         () => {
@@ -238,7 +243,7 @@ describe('CreateRecipeFromSessionModal', () => {
 
   describe('Recipe Creation', () => {
     it('enables create button when form is valid', async () => {
-      render(<CreateRecipeFromSessionModal {...defaultProps} />);
+      renderWithRouter(<CreateRecipeFromSessionModal {...defaultProps} />);
 
       await waitFor(
         () => {
@@ -251,7 +256,7 @@ describe('CreateRecipeFromSessionModal', () => {
 
     it('creates recipe when form is submitted', async () => {
       const user = userEvent.setup();
-      render(<CreateRecipeFromSessionModal {...defaultProps} />);
+      renderWithRouter(<CreateRecipeFromSessionModal {...defaultProps} />);
 
       await waitFor(
         () => {
@@ -275,7 +280,7 @@ describe('CreateRecipeFromSessionModal', () => {
   describe('Success State Actions', () => {
     it('calls onStartRecipe when Start Recipe button is clicked', async () => {
       const user = userEvent.setup();
-      render(<CreateRecipeFromSessionModal {...defaultProps} />);
+      renderWithRouter(<CreateRecipeFromSessionModal {...defaultProps} />);
 
       // Wait for form and create recipe
       await waitFor(
@@ -299,7 +304,7 @@ describe('CreateRecipeFromSessionModal', () => {
 
     it('closes modal when Done button is clicked', async () => {
       const user = userEvent.setup();
-      render(<CreateRecipeFromSessionModal {...defaultProps} />);
+      renderWithRouter(<CreateRecipeFromSessionModal {...defaultProps} />);
 
       // Wait for form and create recipe
       await waitFor(
@@ -323,7 +328,7 @@ describe('CreateRecipeFromSessionModal', () => {
 
   describe('Modal Footer', () => {
     it('shows cancel button in all states', async () => {
-      render(<CreateRecipeFromSessionModal {...defaultProps} />);
+      renderWithRouter(<CreateRecipeFromSessionModal {...defaultProps} />);
 
       expect(screen.getByTestId('cancel-button')).toBeInTheDocument();
 
@@ -339,7 +344,7 @@ describe('CreateRecipeFromSessionModal', () => {
 
     it('calls onClose when cancel button is clicked', async () => {
       const user = userEvent.setup();
-      render(<CreateRecipeFromSessionModal {...defaultProps} />);
+      renderWithRouter(<CreateRecipeFromSessionModal {...defaultProps} />);
 
       await user.click(screen.getByTestId('cancel-button'));
       expect(defaultProps.onClose).toHaveBeenCalled();
@@ -347,7 +352,7 @@ describe('CreateRecipeFromSessionModal', () => {
 
     it('shows different button states based on workflow stage', async () => {
       const user = userEvent.setup();
-      render(<CreateRecipeFromSessionModal {...defaultProps} />);
+      renderWithRouter(<CreateRecipeFromSessionModal {...defaultProps} />);
 
       expect(screen.getByTestId('cancel-button')).toBeInTheDocument();
       expect(screen.queryByTestId('create-recipe-button')).not.toBeInTheDocument();
@@ -370,14 +375,14 @@ describe('CreateRecipeFromSessionModal', () => {
 
   describe('Error Handling', () => {
     it('handles analysis errors gracefully', async () => {
-      render(<CreateRecipeFromSessionModal {...defaultProps} sessionId="" />);
+      renderWithRouter(<CreateRecipeFromSessionModal {...defaultProps} sessionId="" />);
 
       expect(screen.getByTestId('create-recipe-modal')).toBeInTheDocument();
     });
 
     it('handles form validation errors', async () => {
       const user = userEvent.setup();
-      render(<CreateRecipeFromSessionModal {...defaultProps} />);
+      renderWithRouter(<CreateRecipeFromSessionModal {...defaultProps} />);
 
       await waitFor(
         () => {

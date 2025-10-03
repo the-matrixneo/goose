@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useForm } from '@tanstack/react-form';
+import { useNavigate } from 'react-router-dom';
 import { Recipe } from '../../recipe';
 import { Geese } from '../icons/Geese';
 import { X, Save, Play, Loader2 } from 'lucide-react';
@@ -152,7 +153,9 @@ export default function CreateRecipeFromSessionModal({
     return unsubscribe;
   }, [form]);
 
-  const handleCreateRecipe = async (formData: RecipeFormData) => {
+  const navigate = useNavigate();
+
+  const handleCreateRecipe = async (formData: RecipeFormData, runAfterSave = false) => {
     if (!isFormValid) {
       return;
     }
@@ -194,8 +197,15 @@ export default function CreateRecipeFromSessionModal({
         global: formData.global,
       });
 
-      setCreatedRecipe(recipe);
-      onRecipeCreated?.(recipe);
+      if (runAfterSave) {
+        // Close modal first
+        onClose();
+        // Navigate to pair chat with the recipe loaded
+        navigate('/pair', { state: { recipe } });
+      } else {
+        setCreatedRecipe(recipe);
+        onRecipeCreated?.(recipe);
+      }
     } catch (error) {
       console.error('Failed to create recipe:', error);
       toastError({
@@ -287,12 +297,7 @@ export default function CreateRecipeFromSessionModal({
             </div>
           ) : (
             <div data-testid="form-state">
-              <RecipeFormFields
-                form={form}
-                showRecipeNameField={true}
-                showSaveLocationField={true}
-                autoGenerateRecipeName={true}
-              />
+              <RecipeFormFields form={form} />
             </div>
           )}
         </div>
@@ -334,17 +339,31 @@ export default function CreateRecipeFromSessionModal({
                 </Button>
               </div>
             ) : (
-              <Button
-                onClick={() => {
-                  form.handleSubmit();
-                }}
-                disabled={!isFormValid || isCreating}
-                className="px-4 py-2 bg-textProminent text-bgApp rounded-lg hover:bg-opacity-90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                data-testid="create-recipe-button"
-              >
-                <Save className="w-4 h-4 mr-2" />
-                {isCreating ? 'Creating...' : 'Create Recipe'}
-              </Button>
+              <>
+                <Button
+                  onClick={() => {
+                    form.handleSubmit();
+                  }}
+                  disabled={!isFormValid || isCreating}
+                  variant="outline"
+                  className="px-4 py-2 border border-borderStandard rounded-lg hover:bg-bgSubtle transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  data-testid="create-recipe-button"
+                >
+                  <Save className="w-4 h-4 mr-2" />
+                  {isCreating ? 'Creating...' : 'Create Recipe'}
+                </Button>
+                <Button
+                  onClick={() => {
+                    handleCreateRecipe(form.state.values, true);
+                  }}
+                  disabled={!isFormValid || isCreating}
+                  className="px-4 py-2 bg-textProminent text-bgApp rounded-lg hover:bg-opacity-90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  data-testid="create-and-run-recipe-button"
+                >
+                  <Play className="w-4 h-4 mr-2" />
+                  {isCreating ? 'Creating...' : 'Create & Run Recipe'}
+                </Button>
+              </>
             )}
           </div>
         </div>
