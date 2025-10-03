@@ -5,12 +5,14 @@ use std::sync::Arc;
 use axum::routing::get;
 use axum::{extract::State, http::StatusCode, routing::post, Json, Router};
 use goose::conversation::{message::Message, Conversation};
+use goose::recipe::recipe_library;
 use goose::recipe::Recipe;
 use goose::recipe_deeplink;
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+use crate::routes::errors::ErrorResponse;
 use crate::routes::recipe_utils::get_all_recipes_manifests;
 use crate::state::AppState;
 
@@ -25,6 +27,7 @@ pub struct CreateRecipeRequest {
     activities: Option<Vec<String>>,
     #[serde(default)]
     author: Option<AuthorRequest>,
+    session_id: String,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -71,11 +74,25 @@ pub struct ScanRecipeResponse {
     has_security_warnings: bool,
 }
 
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct SaveRecipeRequest {
+    recipe: Recipe,
+    id: Option<String>,
+    is_global: Option<bool>,
+}
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct ParseRecipeRequest {
+    pub content: String,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct ParseRecipeResponse {
+    pub recipe: Recipe,
+}
+
 #[derive(Debug, Serialize, ToSchema)]
 pub struct RecipeManifestResponse {
     name: String,
-    #[serde(rename = "isGlobal")]
-    is_global: bool,
     recipe: Recipe,
     #[serde(rename = "lastModified")]
     last_modified: String,
@@ -108,13 +125,13 @@ pub struct ListRecipeResponse {
 async fn create_recipe(
     State(state): State<Arc<AppState>>,
     Json(request): Json<CreateRecipeRequest>,
-) -> Result<Json<CreateRecipeResponse>, (StatusCode, Json<CreateRecipeResponse>)> {
+) -> Result<Json<CreateRecipeResponse>, StatusCode> {
     tracing::info!(
         "Recipe creation request received with {} messages",
         request.messages.len()
     );
 
-    let agent = state.get_agent().await;
+    let agent = state.get_agent_for_route(request.session_id).await?;
 
     // Create base recipe from agent state and messages
     let recipe_result = agent
@@ -143,12 +160,7 @@ async fn create_recipe(
         }
         Err(e) => {
             tracing::error!("Error details: {:?}", e);
-            let error_message = format!("Recipe creation failed: {}", e);
-            let error_response = CreateRecipeResponse {
-                recipe: None,
-                error: Some(error_message),
-            };
-            Err((StatusCode::BAD_REQUEST, Json(error_response)))
+            Err(StatusCode::BAD_REQUEST)
         }
     }
 }
@@ -239,7 +251,6 @@ async fn list_recipes(
             recipe_file_hash_map.insert(id.clone(), file_path);
             RecipeManifestResponse {
                 name: recipe_manifest_with_path.name.clone(),
-                is_global: recipe_manifest_with_path.is_global,
                 recipe: recipe_manifest_with_path.recipe.clone(),
                 id: id.clone(),
                 last_modified: recipe_manifest_with_path.last_modified.clone(),
@@ -282,6 +293,57 @@ async fn delete_recipe(
     StatusCode::NO_CONTENT
 }
 
+#[utoipa::path(
+    post,
+    path = "/recipes/save",
+    request_body = SaveRecipeRequest,
+    responses(
+        (status = 204, description = "Recipe saved to file successfully"),
+        (status = 401, description = "Unauthorized - Invalid or missing API key"),
+        (status = 500, description = "Internal server error", body = ErrorResponse)
+    ),
+    tag = "Recipe Management"
+)]
+async fn save_recipe(
+    State(state): State<Arc<AppState>>,
+    Json(request): Json<SaveRecipeRequest>,
+) -> Result<StatusCode, ErrorResponse> {
+    let file_path = match request.id {
+        Some(id) => state.recipe_file_hash_map.lock().await.get(&id).cloned(),
+        None => None,
+    };
+
+    match recipe_library::save_recipe_to_file(request.recipe, request.is_global, file_path) {
+        Ok(_) => Ok(StatusCode::NO_CONTENT),
+        Err(e) => Err(ErrorResponse {
+            message: e.to_string(),
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+        }),
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/recipes/parse",
+    request_body = ParseRecipeRequest,
+    responses(
+        (status = 200, description = "Recipe parsed successfully", body = ParseRecipeResponse),
+        (status = 400, description = "Bad request - Invalid recipe format", body = ErrorResponse),
+        (status = 500, description = "Internal server error", body = ErrorResponse)
+    ),
+    tag = "Recipe Management"
+)]
+async fn parse_recipe(
+    Json(request): Json<ParseRecipeRequest>,
+) -> Result<Json<ParseRecipeResponse>, ErrorResponse> {
+    let recipe = Recipe::from_content(&request.content).map_err(|e| ErrorResponse {
+        message: format!("Invalid recipe format: {}", e),
+        status: StatusCode::BAD_REQUEST,
+    })?;
+
+    Ok(Json(ParseRecipeResponse { recipe }))
+}
+
 pub fn routes(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/recipes/create", post(create_recipe))
@@ -290,6 +352,8 @@ pub fn routes(state: Arc<AppState>) -> Router {
         .route("/recipes/scan", post(scan_recipe))
         .route("/recipes/list", get(list_recipes))
         .route("/recipes/delete", post(delete_recipe))
+        .route("/recipes/save", post(save_recipe))
+        .route("/recipes/parse", post(parse_recipe))
         .with_state(state)
 }
 

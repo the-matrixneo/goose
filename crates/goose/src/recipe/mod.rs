@@ -12,6 +12,7 @@ use utoipa::ToSchema;
 
 pub mod build_recipe;
 pub mod read_recipe_file_content;
+pub mod recipe_library;
 pub mod template_recipe;
 
 pub const BUILT_IN_RECIPE_DIR_PARAM: &str = "recipe_dir";
@@ -21,7 +22,7 @@ fn default_version() -> String {
 }
 
 /// A Recipe represents a personalized, user-generated agent configuration that defines
-/// specific behaviors and capabilities within the Goose system.
+/// specific behaviors and capabilities within the goose system.
 ///
 /// # Fields
 ///
