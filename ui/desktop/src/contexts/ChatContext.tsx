@@ -58,7 +58,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       title: DEFAULT_CHAT_TITLE,
       messages: [],
       messageHistoryIndex: 0,
-      recipeConfig: null,
+      recipe: null,
       recipeParameters: null,
     });
     clearDraft();
@@ -67,7 +67,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
   const setRecipeConfig = (recipe: Recipe | null) => {
     setChat({
       ...chat,
-      recipeConfig: recipe,
+      recipe: recipe,
       recipeParameters: null,
     });
   };
@@ -75,7 +75,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
   const clearRecipeConfig = () => {
     setChat({
       ...chat,
-      recipeConfig: null,
+      recipe: null,
     });
   };
 

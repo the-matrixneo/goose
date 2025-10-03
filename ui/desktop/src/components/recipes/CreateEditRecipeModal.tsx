@@ -28,7 +28,7 @@ export default function CreateEditRecipeModal({
   isCreateMode = false,
 }: CreateEditRecipeModalProps) {
   const { getExtensions } = useConfig();
-  const [recipeConfig] = useState<Recipe | undefined>(config);
+  const [recipe] = useState<Recipe | undefined>(config);
 
   const getInitialValues = React.useCallback((): RecipeFormData => {
     if (config) {
@@ -171,7 +171,7 @@ export default function CreateEditRecipeModal({
     }
 
     return {
-      ...recipeConfig,
+      ...recipe,
       title,
       description,
       instructions,
@@ -197,7 +197,7 @@ export default function CreateEditRecipeModal({
         .filter(Boolean) as ExtensionConfig[],
     };
   }, [
-    recipeConfig,
+    recipe,
     title,
     description,
     instructions,

@@ -30,7 +30,7 @@ export interface ResetOptions {
  */
 export interface InitializationContext {
   /** Recipe configuration to initialize with */
-  recipeConfig?: Recipe;
+  recipe?: Recipe;
   /** Session ID to resume from */
   resumeSessionId?: string;
   /** Callback to set waiting message during initialization */

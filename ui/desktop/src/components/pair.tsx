@@ -76,13 +76,13 @@ export default function Pair({
           // Load a fresh chat session with new recipe reset behavior
           const newChat = await loadCurrentChat({
             resumeSessionId: undefined,
-            recipeConfig: recipe,
+            recipe: recipe,
             setAgentWaitingMessage,
             resetOptions: {
               resetSession: true,
               clearMessages: true,
               clearRecipeParameters: true,
-              // Keep the new recipe from recipeConfig
+              // Keep the new recipe from recipe
             },
           });
 
@@ -116,13 +116,13 @@ export default function Pair({
         // BUT only if we're resuming the same session (not starting a new chat)
         let finalChat = loadedChat;
         if (
-          !loadedChat.recipeConfig &&
-          currentChat?.recipeConfig &&
+          !loadedChat.recipe &&
+          currentChat?.recipe &&
           resumeSessionId === currentChat.sessionId
         ) {
           finalChat = {
             ...loadedChat,
-            recipeConfig: currentChat.recipeConfig,
+            recipe: currentChat.recipe,
             recipeParameters: currentChat.recipeParameters || null,
           };
         }
@@ -171,7 +171,7 @@ export default function Pair({
 
   const { initialPrompt: recipeInitialPrompt } = useRecipeManager(
     chat,
-    recipe || chat.recipeConfig || null
+    recipe || chat.recipe || null
   );
 
   const handleMessageSubmit = () => {

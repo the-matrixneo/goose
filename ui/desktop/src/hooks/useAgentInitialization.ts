@@ -79,7 +79,7 @@ export function useAgentInitialization(): UseAgentInitializationReturn {
             : await startAgent({
                 body: {
                   working_dir: window.appConfig.get('GOOSE_WORKING_DIR') as string,
-                  recipe: recipeFromAppConfig ?? initContext.recipeConfig,
+                  recipe: recipeFromAppConfig ?? initContext.recipe,
                 },
                 throwOnError: true,
               });
@@ -116,13 +116,13 @@ export function useAgentInitialization(): UseAgentInitializationReturn {
         // Initialize system and extensions with error boundary
         initContext.setAgentWaitingMessage('Extensions are loading');
         try {
-          const recipeConfigForInit = initContext.recipeConfig || agentSession.recipe || undefined;
+          const recipeForInit = initContext.recipe || agentSession.recipe || undefined;
           await initializeSystem(agentSession.id, provider as string, model as string, {
             getExtensions,
             addExtension,
             setIsExtensionsLoading: initContext.setIsExtensionsLoading,
             recipeParameters: agentSession.user_recipe_values,
-            recipeConfig: recipeConfigForInit,
+            recipe: recipeForInit,
           });
         } catch (error) {
           throw new AgentInitializationError(
@@ -150,9 +150,9 @@ export function useAgentInitialization(): UseAgentInitializationReturn {
           messages = [];
         }
 
-        let recipeConfig = agentSession.recipe;
+        let recipe = agentSession.recipe;
         if (resetOptions.clearRecipe) {
-          recipeConfig = null;
+          recipe = null;
         }
 
         let recipeParameters = agentSession.user_recipe_values || null;
@@ -162,10 +162,10 @@ export function useAgentInitialization(): UseAgentInitializationReturn {
 
         const initChat: ChatType = {
           sessionId: agentSession.id,
-          title: recipeConfig?.title || agentSession.description || 'New Session',
+          title: recipe?.title || agentSession.description || 'New Session',
           messageHistoryIndex: 0,
           messages: messages,
-          recipeConfig: recipeConfig,
+          recipe: recipe,
           recipeParameters: recipeParameters,
         };
 
@@ -217,7 +217,7 @@ export function useAgentInitialization(): UseAgentInitializationReturn {
           title: agentSession.recipe?.title || agentSession.description,
           messageHistoryIndex: 0,
           messages: messages?.map(convertApiMessageToFrontendMessage),
-          recipeConfig: agentSession.recipe,
+          recipe: agentSession.recipe,
           recipeParameters: agentSession.user_recipe_values || null,
         };
       }

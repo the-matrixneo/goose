@@ -9,7 +9,7 @@ import { useRecipeUI } from './useRecipeUI';
  * This is a transitional hook - long term plan is to eliminate it entirely
  * and use useRecipeState and useRecipeUI directly in components
  */
-export const useRecipeManager = (chat: ChatType, recipeConfig?: Recipe | null) => {
+export const useRecipeManager = (chat: ChatType, recipe?: Recipe | null) => {
   const messagesRef = useRef(chat.messages);
 
   useEffect(() => {
@@ -17,7 +17,7 @@ export const useRecipeManager = (chat: ChatType, recipeConfig?: Recipe | null) =
   }, [chat.messages]);
 
   // Core recipe state and business logic
-  const recipeState = useRecipeState(recipeConfig || chat.recipeConfig || null);
+  const recipeState = useRecipeState(recipe || chat.recipe || null);
 
   // UI-specific recipe interactions
   const recipeUI = useRecipeUI(
@@ -43,7 +43,7 @@ export const useRecipeManager = (chat: ChatType, recipeConfig?: Recipe | null) =
 
   return {
     // State from useRecipeState
-    recipeConfig: recipeState.recipe,
+    recipe: recipeState.recipe,
     recipeParameters: chat.recipeParameters,
     filteredParameters: recipeState.filteredParameters,
     initialPrompt: recipeState.getInitialPrompt(chat.recipeParameters || null),
