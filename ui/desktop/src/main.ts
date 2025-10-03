@@ -605,12 +605,14 @@ const createChat = async (
     },
   });
 
-  installExtension(REACT_DEVELOPER_TOOLS, {
-    loadExtensionOptions: { allowFileAccess: true },
-    session: mainWindow.webContents.session,
-  })
-    .then((name) => console.log('added extension', name))
-    .catch((name) => console.log('failed to install', name));
+  if (!app.isPackaged) {
+    installExtension(REACT_DEVELOPER_TOOLS, {
+      loadExtensionOptions: { allowFileAccess: true },
+      session: mainWindow.webContents.session,
+    })
+      .then((name) => console.log('added extension', name))
+      .catch((name) => console.log('failed to install', name));
+  }
 
   const goosedClient = createClient(
     createConfig({
