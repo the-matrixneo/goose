@@ -125,8 +125,6 @@ pub async fn check_compaction_needed(
 /// This function directly performs compaction on the provided messages.
 /// If the most recent message is a user message, it will be preserved by removing it
 /// before compaction and adding it back afterwards.
-/// If the last assistant message contains a tool request, it will be removed to
-/// prevent orphaned tool responses.
 ///
 /// # Arguments
 /// * `agent` - The agent to use for context management
@@ -523,58 +521,6 @@ mod tests {
         // After compaction and fix_conversation, we should have some messages
         // Note: fix_conversation may remove messages (e.g., trailing assistant messages)
         assert!(!result.messages.is_empty());
-    }
-
-    #[tokio::test]
-    #[ignore = "Flaky test - skipping pending tool request check interferes with compaction trigger"]
-    async fn test_auto_compact_respects_config() {
-        let mock_provider = Arc::new(MockProvider {
-            model_config: ModelConfig::new("test-model")
-                .unwrap()
-                .with_context_limit(Some(30_000)), // Smaller context limit to make threshold easier to hit
-        });
-
-        let agent = Agent::new();
-        let _ = agent.update_provider(mock_provider).await;
-
-        // Create enough messages to trigger compaction with low threshold
-        let mut messages = Vec::new();
-        // With 30k context limit, after overhead we have ~27k usable tokens
-        // 10% of 27k = 2.7k tokens, so we need messages that exceed that
-        for i in 0..200 {
-            messages.push(create_test_message(&format!(
-                "Message {} with enough content to ensure we exceed 10% of the context limit. \
-                 Adding more content to increase token count substantially. This message contains \
-                 multiple sentences to increase the token count. We need to ensure that our total \
-                 token usage exceeds 10% of the available context limit after accounting for \
-                 system prompt and tools overhead.",
-                i
-            )));
-        }
-
-        // Set config value
-        let config = Config::global();
-        config
-            .set_param("GOOSE_AUTO_COMPACT_THRESHOLD", serde_json::Value::from(0.1))
-            .unwrap();
-
-        // Should use config value when no override provided
-        let result = check_and_compact_messages(&agent, &messages, None, None)
-            .await
-            .unwrap();
-
-        // Debug info if not compacted
-        if !result.compacted {
-            eprintln!("Test failed - compaction not triggered");
-        }
-
-        // With such a low threshold (10%), it should compact
-        assert!(result.compacted);
-
-        // Clean up config
-        config
-            .set_param("GOOSE_AUTO_COMPACT_THRESHOLD", serde_json::Value::from(0.3))
-            .unwrap();
     }
 
     #[tokio::test]
