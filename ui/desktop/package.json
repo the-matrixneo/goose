@@ -9,7 +9,12 @@
   "main": ".vite/build/main.js",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "generate-api": "openapi-ts",
+    "generate-api": "npm run generate-api:typescript && npm run generate-api:clients",
+    "generate-api:typescript": "openapi-ts",
+    "generate-api:clients": "npm run generate-api:python && npm run generate-api:swift && npm run generate-api:bash",
+    "generate-api:python": "openapi-generator-cli generate -i ./openapi.json -g python -o ../../api_clients/python --skip-validate-spec --package-name goose_api --additional-properties=packageVersion=1.0.0",
+    "generate-api:swift": "openapi-generator-cli generate -i ./openapi.json -g swift5 -o ../../api_clients/swift --skip-validate-spec --additional-properties=projectName=GooseAPI",
+    "generate-api:bash": "openapi-generator-cli generate -i ./openapi.json -g bash -o ../../api_clients/bash --skip-validate-spec --additional-properties=scriptName=goose-api",
     "start-gui": "npm run generate-api && electron-forge start",
     "start-gui-debug": "npm run generate-api && electron-forge start -- --inspect=9229",
     "start": "cd ../.. && just run-ui",
@@ -92,6 +97,7 @@
   },
   "devDependencies": {
     "@electron-forge/cli": "^7.8.3",
+    "@openapitools/openapi-generator-cli": "^2.24.0",
     "@electron-forge/maker-deb": "^7.8.3",
     "@electron-forge/maker-rpm": "^7.8.3",
     "@electron-forge/maker-squirrel": "^7.8.3",

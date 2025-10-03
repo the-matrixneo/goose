@@ -1,0 +1,11 @@
+# AddSubRecipesRequest
+
+## Properties
+Name | Type | Description | Notes
+------------ | ------------- | ------------- | -------------
+**sessionUnderscoreid** | **string** |  | [default to null]
+**subUnderscorerecipes** | [**array[SubRecipe]**](SubRecipe.md) |  | [default to null]
+
+[[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)
+
+
