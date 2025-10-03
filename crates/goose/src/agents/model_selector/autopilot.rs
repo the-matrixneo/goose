@@ -161,7 +161,7 @@ impl AutoPilot {
                 .into_iter()
                 .map(|r| (r.role, r.rules))
                 .collect(),
-            Err(e) => HashMap::new(),
+            Err(_e) => HashMap::new(),
         }
     }
 
@@ -704,7 +704,7 @@ impl AutoPilot {
 
         candidates.sort_by_key(|(_, priority)| -priority);
 
-        if let Some((best_model, priority)) = candidates.first() {
+        if let Some((best_model, _priority)) = candidates.first() {
             let state = self.model_states.get_mut(&best_model.role).unwrap();
             state.last_invoked_turn = Some(current_turn);
             state.invocation_count += 1;

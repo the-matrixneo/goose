@@ -257,7 +257,7 @@ impl GithubCopilotProvider {
     }
 
     async fn get_access_token(&self) -> Result<String> {
-        for attempt in 0..3 {
+        for _attempt in 0..3 {
             match self.login().await {
                 Ok(token) => return Ok(token),
                 Err(err) => tracing::warn!("failed to get access token: {}", err),
@@ -424,7 +424,7 @@ impl Provider for GithubCopilotProvider {
         let usage = response
             .get("usage")
             .map(get_usage)
-            .unwrap_or_else(|| Usage::default());
+            .unwrap_or_else(Usage::default);
         let response_model = get_model(&response);
         emit_debug_trace(model_config, &payload, &response, &usage);
         Ok((message, ProviderUsage::new(response_model, usage)))

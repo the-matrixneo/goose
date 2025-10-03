@@ -979,24 +979,6 @@ pub async fn cli() -> Result<()> {
                     (input_config, None)
                 }
                 (_, _, Some(recipe_name)) => {
-                    let recipe_display_name = std::path::Path::new(&recipe_name)
-                        .file_name()
-                        .and_then(|name| name.to_str())
-                        .unwrap_or(&recipe_name);
-
-                    let recipe_version =
-                        crate::recipes::search_recipe::retrieve_recipe_file(&recipe_name)
-                            .ok()
-                            .and_then(|rf| {
-                                goose::recipe::template_recipe::parse_recipe_content(
-                                    &rf.content,
-                                    rf.parent_dir.to_string_lossy().to_string(),
-                                )
-                                .ok()
-                                .map(|(r, _)| r.version)
-                            })
-                            .unwrap_or_else(|| "unknown".to_string());
-
                     if explain {
                         explain_recipe(&recipe_name, params)?;
                         return Ok(());

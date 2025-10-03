@@ -47,7 +47,7 @@ fn setup_logging_internal(
         ErrorCaptureLayer::register_error_vector(errors);
     }
 
-    let mut setup = || {
+    let setup = || {
         result = (|| {
             // Set up file appender for goose module logs
             let log_dir = get_log_directory()?;

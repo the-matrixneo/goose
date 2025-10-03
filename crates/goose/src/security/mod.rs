@@ -48,7 +48,7 @@ impl SecurityManager {
             return Ok(vec![]);
         }
 
-        let scanner = self.scanner.get_or_init(|| PromptInjectionScanner::new());
+        let scanner = self.scanner.get_or_init(PromptInjectionScanner::new);
 
         let mut results = Vec::new();
 

@@ -288,7 +288,7 @@ impl Provider for DatabricksProvider {
         let usage = response
             .get("usage")
             .map(get_usage)
-            .unwrap_or_else(|| Usage::default());
+            .unwrap_or_else(Usage::default);
         let response_model = get_model(&response);
         super::utils::emit_debug_trace(&self.model, &payload, &response, &usage);
 
@@ -369,7 +369,7 @@ impl Provider for DatabricksProvider {
             .await
         {
             Ok(resp) => resp,
-            Err(e) => {
+            Err(_e) => {
                 return Ok(None);
             }
         };

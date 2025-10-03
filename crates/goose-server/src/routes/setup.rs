@@ -28,7 +28,7 @@ pub fn routes(state: Arc<AppState>) -> Router {
     ),
 )]
 async fn start_openrouter_setup() -> Result<Json<SetupResponse>, StatusCode> {
-    let mut auth_flow = OpenRouterAuth::new().map_err(|e| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let mut auth_flow = OpenRouterAuth::new().map_err(|_e| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     match auth_flow.complete_flow().await {
         Ok(api_key) => {
@@ -61,7 +61,7 @@ async fn start_openrouter_setup() -> Result<Json<SetupResponse>, StatusCode> {
     ),
 )]
 async fn start_tetrate_setup() -> Result<Json<SetupResponse>, StatusCode> {
-    let mut auth_flow = TetrateAuth::new().map_err(|e| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let mut auth_flow = TetrateAuth::new().map_err(|_e| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     match auth_flow.complete_flow().await {
         Ok(api_key) => {

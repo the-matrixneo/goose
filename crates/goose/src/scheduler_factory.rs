@@ -51,7 +51,7 @@ impl SchedulerFactory {
             }
             SchedulerType::Temporal => match TemporalScheduler::new().await {
                 Ok(scheduler) => Ok(scheduler as Arc<dyn SchedulerTrait>),
-                Err(e) => {
+                Err(_e) => {
                     eprintln!(
                         "⚠️  Temporal scheduler unavailable, using legacy scheduler instead."
                     );

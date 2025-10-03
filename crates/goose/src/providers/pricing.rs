@@ -169,7 +169,7 @@ impl PricingCache {
         };
 
         // Log how many models we fetched
-        let total_models: usize = cached_data
+        let _total_models: usize = cached_data
             .pricing
             .values()
             .map(|models| models.len())

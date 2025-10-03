@@ -6,7 +6,6 @@ use goose::agents::{extension::Envs, ExtensionConfig};
 use http::StatusCode;
 use rmcp::model::Tool;
 use serde::{Deserialize, Serialize};
-use tracing;
 
 /// Enum representing the different types of extension configuration requests.
 #[derive(Deserialize)]

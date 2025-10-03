@@ -33,7 +33,7 @@ use crate::agents::types::SessionConfig;
 use crate::agents::types::{FrontendTool, ToolResultReceiver};
 use crate::config::{Config, ExtensionConfigManager};
 use crate::context_mgmt::auto_compact;
-use crate::conversation::{debug_conversation_fix, fix_conversation, Conversation};
+use crate::conversation::{fix_conversation, Conversation};
 use crate::mcp_utils::ToolResult;
 use crate::permission::permission_inspector::PermissionInspector;
 use crate::permission::permission_judge::PermissionCheckResult;
@@ -1496,7 +1496,7 @@ impl Agent {
 
     pub async fn create_recipe(&self, mut messages: Conversation) -> Result<Recipe> {
         let extensions_info = self.extension_manager.get_extensions_info().await;
-        let provider = self.provider().await.map_err(|e| e)?;
+        let provider = self.provider().await?;
         let model_config = provider.get_model_config();
         let model_name = &model_config.model_name;
 
@@ -1515,8 +1515,7 @@ impl Agent {
         let tools = self
             .extension_manager
             .get_prefixed_tools(None)
-            .await
-            .map_err(|e| e)?;
+            .await?;
         messages.push(Message::user().with_text(recipe_prompt));
 
         let (messages, issues) = fix_conversation(messages);

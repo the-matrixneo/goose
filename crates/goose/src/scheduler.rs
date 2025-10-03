@@ -1123,7 +1123,7 @@ async fn run_scheduled_job_internal(
             error: format!("Failed to set provider on agent: {}", e),
         });
     }
-    let execution_mode = job.execution_mode.as_deref().unwrap_or("background");
+    let _execution_mode = job.execution_mode.as_deref().unwrap_or("background");
 
     let current_dir = match std::env::current_dir() {
         Ok(cd) => cd,

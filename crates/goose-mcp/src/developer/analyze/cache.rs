@@ -1,6 +1,6 @@
 use lru::LruCache;
 use std::num::NonZeroUsize;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
 
@@ -33,18 +33,14 @@ impl AnalysisCache {
         }
     }
 
-    pub fn get(&self, path: &PathBuf, modified: SystemTime) -> Option<AnalysisResult> {
+    pub fn get(&self, path: &Path, modified: SystemTime) -> Option<AnalysisResult> {
         let mut cache = lock_or_recover(&self.cache, |c| c.clear());
         let key = CacheKey {
-            path: path.clone(),
+            path: path.to_path_buf(),
             modified,
         };
 
-        if let Some(result) = cache.get(&key) {
-            Some((**result).clone())
-        } else {
-            None
-        }
+        cache.get(&key).map(|result| (**result).clone())
     }
 
     pub fn put(&self, path: PathBuf, modified: SystemTime, result: AnalysisResult) {

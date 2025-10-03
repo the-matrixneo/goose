@@ -80,7 +80,7 @@ fn get_openai_config() -> Result<(String, String), StatusCode> {
 
     let api_key: String = config
         .get_secret("OPENAI_API_KEY")
-        .map_err(|e| StatusCode::PRECONDITION_FAILED)?;
+        .map_err(|_e| StatusCode::PRECONDITION_FAILED)?;
 
     let openai_host = match config.get("OPENAI_HOST", false) {
         Ok(value) => value
@@ -105,7 +105,7 @@ async fn send_openai_request(
     let part = reqwest::multipart::Part::bytes(audio_bytes)
         .file_name(format!("audio.{}", file_extension))
         .mime_str(mime_type)
-        .map_err(|e| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let form = reqwest::multipart::Form::new()
         .part("file", part)
@@ -116,7 +116,7 @@ async fn send_openai_request(
     let client = Client::builder()
         .timeout(Duration::from_secs(OPENAI_TIMEOUT_SECONDS))
         .build()
-        .map_err(|e| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let response = client
         .post(format!("{}/v1/audio/transcriptions", openai_host))
@@ -134,9 +134,6 @@ async fn send_openai_request(
 
     if !response.status().is_success() {
         let status = response.status();
-        let error_text = response.text().await.unwrap_or_default();
-
-        // Check for specific error codes
         if status == 401 {
             return Err(StatusCode::UNAUTHORIZED);
         } else if status == 429 {
@@ -149,7 +146,7 @@ async fn send_openai_request(
     let whisper_response: WhisperResponse = response
         .json()
         .await
-        .map_err(|e| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     Ok(whisper_response)
 }
@@ -263,7 +260,7 @@ async fn transcribe_elevenlabs_handler(
     let client = Client::builder()
         .timeout(Duration::from_secs(OPENAI_TIMEOUT_SECONDS))
         .build()
-        .map_err(|e| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|_e| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let response = client
         .post("https://api.elevenlabs.io/v1/speech-to-text")
@@ -284,7 +281,6 @@ async fn transcribe_elevenlabs_handler(
         })?;
 
     if !response.status().is_success() {
-        let status = response.status();
         let error_text = response.text().await.unwrap_or_default();
 
         if error_text.contains("Unauthorized") || error_text.contains("Invalid API key") {
@@ -296,7 +292,6 @@ async fn transcribe_elevenlabs_handler(
         return Err(StatusCode::BAD_GATEWAY);
     }
 
-    // Parse ElevenLabs response
     #[derive(Debug, Deserialize)]
     struct ElevenLabsResponse {
         text: String,
@@ -308,7 +303,7 @@ async fn transcribe_elevenlabs_handler(
     let elevenlabs_response: ElevenLabsResponse = response
         .json()
         .await
-        .map_err(|e| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|_e| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     Ok(Json(TranscribeResponse {
         text: elevenlabs_response.text,

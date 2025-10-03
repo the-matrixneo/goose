@@ -101,7 +101,7 @@ impl Provider for GroqProvider {
         let usage = response
             .get("usage")
             .map(get_usage)
-            .unwrap_or_else(|| Usage::default());
+            .unwrap_or_else(Usage::default);
         let response_model = get_model(&response);
         super::utils::emit_debug_trace(model_config, &payload, &response, &usage);
         Ok((message, ProviderUsage::new(response_model, usage)))

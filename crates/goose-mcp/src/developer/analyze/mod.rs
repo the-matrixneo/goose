@@ -176,12 +176,10 @@ impl CodeAnalyzer {
             )
         })?;
 
-        // Check cache
-        if let Some(cached) = self.cache.get(&path.to_path_buf(), modified) {
+        if let Some(cached) = self.cache.get(path, modified) {
             return Ok(cached);
         }
 
-        // Read file content - handle binary files gracefully
         let content = match std::fs::read_to_string(path) {
             Ok(content) => content,
             Err(e) => {
@@ -190,10 +188,7 @@ impl CodeAnalyzer {
             }
         };
 
-        // Count lines
         let line_count = content.lines().count();
-
-        // Get language
         let language = lang::get_language_identifier(path);
         if language.is_empty() {
             tracing::trace!("Unsupported file type: {:?}", path);
