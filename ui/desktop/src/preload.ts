@@ -120,8 +120,6 @@ type ElectronAPI = {
     secret: string;
     appUrl: string;
     qrCodeDataUrl: string;
-    qrCodePath: string;
-    ntfyUrl: string;
   }>;
   tunnelStop: () => Promise<boolean>;
   tunnelStatus: () => Promise<{
@@ -130,7 +128,6 @@ type ElectronAPI = {
       port: number;
       secret: string;
       url?: string;
-      qrCodePath?: string;
       qrCodeDataUrl?: string;
     } | null;
   }>;

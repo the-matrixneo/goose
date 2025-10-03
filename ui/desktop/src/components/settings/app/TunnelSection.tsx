@@ -9,8 +9,6 @@ interface TunnelConnectionInfo {
   secret: string;
   appUrl: string;
   qrCodeDataUrl: string;
-  qrCodePath: string;
-  ntfyUrl: string;
 }
 
 interface TunnelStatus {
@@ -50,8 +48,6 @@ export default function TunnelSection() {
           secret: status.config.secret,
           appUrl: '', // We'll reconstruct this if needed
           qrCodeDataUrl: status.config.qrCodeDataUrl || '',
-          qrCodePath: status.config.qrCodePath || '',
-          ntfyUrl: '', // We don't have this from stored config, but it'll be set on tunnel start
         });
       }
     } catch (error) {
@@ -72,7 +68,6 @@ export default function TunnelSection() {
           secret: info.secret,
           url: info.url,
           qrCodeDataUrl: info.qrCodeDataUrl,
-          qrCodePath: info.qrCodePath,
         },
       });
       setShowQRModal(true);
@@ -160,14 +155,14 @@ export default function TunnelSection() {
                         <span className="text-xs text-text-muted">Connection URL:</span>
                         <div className="flex items-center gap-2">
                           <code className="text-xs bg-background-secondary px-2 py-1 rounded">
-                            {tunnelInfo.ntfyUrl}
+                            {tunnelInfo.url}
                           </code>
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => copyToClipboard(tunnelInfo.ntfyUrl, 'ntfy')}
+                            onClick={() => copyToClipboard(tunnelInfo.url, 'url')}
                           >
-                            {copiedField === 'ntfy' ? (
+                            {copiedField === 'url' ? (
                               <Check className="h-3 w-3" />
                             ) : (
                               <Copy className="h-3 w-3" />
@@ -250,9 +245,9 @@ export default function TunnelSection() {
                 </p>
                 <div className="w-full space-y-2 text-xs">
                   <div className="flex justify-between">
-                    <span className="text-text-muted">ntfy.sh URL:</span>
+                    <span className="text-text-muted">Tunnel URL:</span>
                     <code className="bg-background-secondary px-2 py-1 rounded">
-                      {tunnelInfo.ntfyUrl}
+                      {tunnelInfo.url}
                     </code>
                   </div>
                   <div className="flex justify-between">
