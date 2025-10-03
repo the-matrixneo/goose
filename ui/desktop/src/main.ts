@@ -2200,11 +2200,6 @@ async function appMain() {
       const tunnelInfo = await startTunnel(appConfig.GOOSE_PORT, SERVER_SECRET);
       log.info('Tunnel started:', tunnelInfo.url);
 
-      // Open QR code image
-      if (tunnelInfo.qrCodePath) {
-        shell.openPath(tunnelInfo.qrCodePath);
-      }
-
       return tunnelInfo;
     } catch (error) {
       log.error('Failed to start tunnel:', error);
@@ -2233,11 +2228,8 @@ async function appMain() {
   ipcMain.handle('tunnel-show-qr', () => {
     try {
       const config = getTunnelConfig();
-      if (config?.qrCodePath) {
-        shell.openPath(config.qrCodePath);
-        return true;
-      }
-      return false;
+      // QR code is now displayed in the UI via qrCodeDataUrl, no file to open
+      return config?.qrCodeDataUrl ? true : false;
     } catch (error) {
       log.error('Failed to show QR code:', error);
       return false;
