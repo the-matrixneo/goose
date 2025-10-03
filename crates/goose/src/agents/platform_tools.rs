@@ -2,11 +2,10 @@ use indoc::indoc;
 use rmcp::model::{Tool, ToolAnnotations};
 use rmcp::object;
 
-pub const PLATFORM_READ_RESOURCE_TOOL_NAME: &str = "platform__read_resource";
-pub const PLATFORM_LIST_RESOURCES_TOOL_NAME: &str = "platform__list_resources";
-pub const PLATFORM_SEARCH_AVAILABLE_EXTENSIONS_TOOL_NAME: &str =
-    "platform__search_available_extensions";
-pub const PLATFORM_MANAGE_EXTENSIONS_TOOL_NAME: &str = "platform__manage_extensions";
+use super::extension_manager_extension::{
+    LIST_RESOURCES_TOOL_NAME, MANAGE_EXTENSIONS_TOOL_NAME,
+    PLATFORM_READ_RESOURCE_TOOL_NAME, SEARCH_AVAILABLE_EXTENSIONS_TOOL_NAME,
+};
 pub const PLATFORM_MANAGE_SCHEDULE_TOOL_NAME: &str = "platform__manage_schedule";
 
 pub fn read_resource_tool() -> Tool {
@@ -39,7 +38,7 @@ pub fn read_resource_tool() -> Tool {
 
 pub fn list_resources_tool() -> Tool {
     Tool::new(
-        PLATFORM_LIST_RESOURCES_TOOL_NAME.to_string(),
+        LIST_RESOURCES_TOOL_NAME.to_string(),
         indoc! {r#"
             List resources from an extension(s).
 
@@ -67,7 +66,7 @@ pub fn list_resources_tool() -> Tool {
 
 pub fn search_available_extensions_tool() -> Tool {
     Tool::new(
-        PLATFORM_SEARCH_AVAILABLE_EXTENSIONS_TOOL_NAME.to_string(),
+        SEARCH_AVAILABLE_EXTENSIONS_TOOL_NAME.to_string(),
         "Searches for additional extensions available to help complete tasks.
         Use this tool when you're unable to find a specific feature or functionality you need to complete your task, or when standard approaches aren't working.
         These extensions might provide the exact tools needed to solve your problem.
@@ -88,7 +87,7 @@ pub fn search_available_extensions_tool() -> Tool {
 
 pub fn manage_extensions_tool() -> Tool {
     Tool::new(
-        PLATFORM_MANAGE_EXTENSIONS_TOOL_NAME.to_string(),
+        MANAGE_EXTENSIONS_TOOL_NAME.to_string(),
         "Tool to manage extensions and tools in goose context.
             Enable or disable extensions to help complete tasks.
             Enable or disable an extension by providing the extension name.

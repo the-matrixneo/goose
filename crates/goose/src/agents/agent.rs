@@ -11,11 +11,11 @@ use uuid::Uuid;
 use crate::agents::extension::{ExtensionConfig, ExtensionError, ExtensionResult, ToolInfo};
 use crate::agents::extension_manager::{get_parameter_names, ExtensionManager};
 use crate::agents::final_output_tool::{FINAL_OUTPUT_CONTINUATION_MESSAGE, FINAL_OUTPUT_TOOL_NAME};
-use crate::agents::platform_tools::{
-    PLATFORM_LIST_RESOURCES_TOOL_NAME, PLATFORM_MANAGE_EXTENSIONS_TOOL_NAME,
-    PLATFORM_MANAGE_SCHEDULE_TOOL_NAME, PLATFORM_READ_RESOURCE_TOOL_NAME,
-    PLATFORM_SEARCH_AVAILABLE_EXTENSIONS_TOOL_NAME,
+use crate::agents::extension_manager_extension::{
+    LIST_RESOURCES_TOOL_NAME, MANAGE_EXTENSIONS_TOOL_NAME,
+    PLATFORM_READ_RESOURCE_TOOL_NAME, SEARCH_AVAILABLE_EXTENSIONS_TOOL_NAME,
 };
+use crate::agents::platform_tools::PLATFORM_MANAGE_SCHEDULE_TOOL_NAME;
 use crate::agents::prompt_manager::PromptManager;
 use crate::agents::recipe_tools::dynamic_task_tools::{
     create_dynamic_task, create_dynamic_task_tool, DYNAMIC_TASK_TOOL_NAME_PREFIX,
@@ -395,7 +395,7 @@ impl Agent {
             return (request_id, Ok(ToolCallResult::from(result)));
         }
 
-        if tool_call.name == PLATFORM_MANAGE_EXTENSIONS_TOOL_NAME {
+        if tool_call.name == MANAGE_EXTENSIONS_TOOL_NAME {
             let extension_name = tool_call
                 .arguments
                 .as_ref()
@@ -490,7 +490,7 @@ impl Agent {
                     .read_resource(arguments, cancellation_token.unwrap_or_default())
                     .await,
             )
-        } else if tool_call.name == PLATFORM_LIST_RESOURCES_TOOL_NAME {
+        } else if tool_call.name == LIST_RESOURCES_TOOL_NAME {
             let arguments = tool_call
                 .arguments
                 .clone()
@@ -501,7 +501,7 @@ impl Agent {
                     .list_resources(arguments, cancellation_token.unwrap_or_default())
                     .await,
             )
-        } else if tool_call.name == PLATFORM_SEARCH_AVAILABLE_EXTENSIONS_TOOL_NAME {
+        } else if tool_call.name == SEARCH_AVAILABLE_EXTENSIONS_TOOL_NAME {
             ToolCallResult::from(self.extension_manager.search_available_extensions().await)
         } else if self.is_frontend_tool(&tool_call.name).await {
             // For frontend tools, return an error indicating we need frontend execution
@@ -1134,7 +1134,7 @@ impl Agent {
                                     let mut enable_extension_request_ids = vec![];
                                     for request in &remaining_requests {
                                         if let Ok(tool_call) = &request.tool_call {
-                                            if tool_call.name == PLATFORM_MANAGE_EXTENSIONS_TOOL_NAME {
+                                            if tool_call.name == MANAGE_EXTENSIONS_TOOL_NAME {
                                                 enable_extension_request_ids.push(request.id.clone());
                                             }
                                         }
