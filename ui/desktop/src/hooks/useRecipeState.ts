@@ -2,9 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { Recipe, scanRecipe } from '../recipe';
 import { filterValidUsedParameters, substituteParameters } from '../utils/providerUtils';
 
-/**
- * Recipe state hook with explicit, predictable behavior
- */
 export function useRecipeState(recipe: Recipe | null) {
   const [recipeAccepted, setRecipeAccepted] = useState(false);
   const [hasSecurityWarnings, setHasSecurityWarnings] = useState(false);
@@ -31,15 +28,12 @@ export function useRecipeState(recipe: Recipe | null) {
         if (hasAccepted) {
           setRecipeAccepted(true);
         } else {
-          // Need to show warning modal - scan for security issues
           const securityScanResult = await scanRecipe(recipe);
           setHasSecurityWarnings(securityScanResult.has_security_warnings);
-          // Don't auto-accept - let UI handle the modal
         }
       } catch (error) {
         console.error('Error checking recipe acceptance:', error);
         setHasSecurityWarnings(false);
-        // Don't auto-accept - let UI handle the modal
       }
     };
 
@@ -58,7 +52,6 @@ export function useRecipeState(recipe: Recipe | null) {
     });
   }, [recipe]);
 
-  // Check if template variables are actually used in the recipe content
   const requiresParameters = useMemo(() => {
     return filteredParameters.length > 0;
   }, [filteredParameters]);
