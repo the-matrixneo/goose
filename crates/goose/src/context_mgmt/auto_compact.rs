@@ -186,8 +186,6 @@ pub async fn perform_compaction(agent: &Agent, messages: &[Message]) -> Result<A
 /// This is a convenience wrapper function that combines checking and compaction.
 /// If the most recent message is a user message, it will be preserved by removing it
 /// before compaction and adding it back afterwards.
-/// If the last assistant message contains a tool request, it will be removed to
-/// prevent orphaned tool responses.
 ///
 /// # Arguments
 /// * `agent` - The agent to use for context management
