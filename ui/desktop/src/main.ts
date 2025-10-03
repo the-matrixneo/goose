@@ -52,6 +52,7 @@ import { Recipe } from './recipe';
 import './utils/recipeHash';
 import { decodeRecipe } from './api';
 import { Client, createClient, createConfig } from './api/client';
+import installExtension, { REACT_DEVELOPER_TOOLS } from 'electron-devtools-installer';
 
 async function decodeRecipeMain(client: Client, deeplink: string): Promise<Recipe | null> {
   try {
@@ -603,6 +604,13 @@ const createChat = async (
       partition: 'persist:goose', // Add this line to ensure persistence
     },
   });
+
+  installExtension(REACT_DEVELOPER_TOOLS, {
+    loadExtensionOptions: { allowFileAccess: true },
+    session: mainWindow.webContents.session,
+  })
+    .then((name) => console.log('added extension', name))
+    .catch((name) => console.log('failed to install', name));
 
   const goosedClient = createClient(
     createConfig({
