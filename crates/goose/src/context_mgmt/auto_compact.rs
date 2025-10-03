@@ -693,7 +693,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_auto_compact_removes_pending_tool_request() {
-        use mcp_core::tool::ToolCall;
+        use rmcp::model::CallToolRequestParam;
 
         let mock_provider = Arc::new(MockProvider {
             model_config: ModelConfig::new("test-model")
@@ -711,7 +711,10 @@ mod tests {
         ];
 
         // Add an assistant message with a tool request
-        let tool_call = ToolCall::new("test_tool", serde_json::json!({}));
+        let tool_call = CallToolRequestParam {
+            name: "test_tool".into(),
+            arguments: Some(serde_json::Map::new()),
+        };
 
         let assistant_msg = Message::assistant()
             .with_tool_request("test_tool_id".to_string(), Ok(tool_call))
@@ -719,8 +722,10 @@ mod tests {
         messages.push(assistant_msg);
 
         // Create session metadata with high token count to trigger compaction
-        let mut session_metadata = crate::session::storage::SessionMetadata::default();
-        session_metadata.total_tokens = Some(9000); // High enough to trigger compaction
+        let _session_metadata = crate::session::Session {
+            total_tokens: Some(9000), // High enough to trigger compaction
+            ..Default::default()
+        };
 
         // Perform compaction
         let result = perform_compaction(&agent, &messages).await.unwrap();
