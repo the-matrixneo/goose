@@ -149,11 +149,10 @@ pub async fn perform_compaction(agent: &Agent, messages: &[Message]) -> Result<A
         }
     }
 
-    // Check if the most recent message is a user message
+    // Check if the most recent message is a user message. Re-add it after compaction.
     let (messages_to_compact, preserved_user_message) =
         if let Some(last_message) = messages_to_process.last() {
             if matches!(last_message.role, rmcp::model::Role::User) {
-                // Remove the last user message before compaction
                 (
                     &messages_to_process[..messages_to_process.len() - 1],
                     Some(last_message.clone()),
@@ -686,9 +685,6 @@ mod tests {
 
         // Verify the compacted messages are returned
         assert!(!result.messages.is_empty());
-
-        // After compaction and fix_conversation, we should have some messages
-        // Note: fix_conversation may remove messages (e.g., trailing assistant messages)
     }
 
     #[tokio::test]
