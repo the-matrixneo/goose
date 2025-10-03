@@ -1512,10 +1512,7 @@ impl Agent {
         );
 
         let recipe_prompt = prompt_manager.get_recipe_prompt().await;
-        let tools = self
-            .extension_manager
-            .get_prefixed_tools(None)
-            .await?;
+        let tools = self.extension_manager.get_prefixed_tools(None).await?;
         messages.push(Message::user().with_text(recipe_prompt));
 
         let (messages, issues) = fix_conversation(messages);
