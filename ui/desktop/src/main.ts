@@ -610,8 +610,8 @@ const createChat = async (
       loadExtensionOptions: { allowFileAccess: true },
       session: mainWindow.webContents.session,
     })
-      .then((name) => console.log('added extension', name))
-      .catch((name) => console.log('failed to install', name));
+      .then(() => log.info('added react dev tools'))
+      .catch((err) => log.info('failed to install react dev tools:', err));
   }
 
   const goosedClient = createClient(
