@@ -41,7 +41,7 @@
  * while remaining flexible enough to support different UI contexts (Hub vs Pair).
  */
 
-import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { SearchView } from './conversation/SearchView';
 import { AgentHeader } from './AgentHeader';
@@ -59,9 +59,7 @@ import ParameterInputModal from './ParameterInputModal';
 import CreateRecipeFromSessionModal from './recipes/CreateRecipeFromSessionModal';
 import { useChatEngine } from '../hooks/useChatEngine';
 import { useRecipeState } from '../hooks/useRecipeState';
-import { updateSystemPromptWithParameters, substituteParameters } from '../utils/providerUtils';
-import { updateSessionUserRecipeValues } from '../api';
-import { createUserMessage } from '../types/message';
+import { useRecipeUI } from '../hooks/useRecipeUI';
 import { Recipe } from '../recipe';
 import { useRecipeCreationModal } from '../hooks/useRecipeCreationModal';
 import { useFileDrop } from '../hooks/useFileDrop';
@@ -159,15 +157,7 @@ function BaseChatContent({
     },
   });
 
-  // Use recipe state - no complex heuristics
   const recipeState = useRecipeState(location.state?.recipe || chat.recipe);
-
-  // Local UI state for modals
-  const [isParameterModalOpen, setIsParameterModalOpen] = useState(false);
-  const [isRecipeWarningModalOpen, setIsRecipeWarningModalOpen] = useState(false);
-  const [readyForAutoUserPrompt, setReadyForAutoUserPrompt] = useState(false);
-
-  // Computed values using the simple approach
   const recipe = recipeState.recipe;
   const recipeParameters = chat.recipeParameters;
   const filteredParameters = recipeState.filteredParameters;
@@ -176,114 +166,38 @@ function BaseChatContent({
   const recipeAccepted = recipeState.recipeAccepted;
   const hasSecurityWarnings = recipeState.hasSecurityWarnings;
 
+  const recipeUI = useRecipeUI(
+    chat,
+    recipeAccepted,
+    recipeState.requiresParameters,
+    hasAllRequiredParameters,
+    hasSecurityWarnings,
+    recipe
+  );
+
   // Use recipe creation modal hook for UI-specific functionality
   const { isCreateRecipeModalOpen, setIsCreateRecipeModalOpen } = useRecipeCreationModal(
     chat.sessionId
   );
 
-  // Handle parameter modal display logic
-  useEffect(() => {
-    // Only show parameter modal if:
-    // 1. Recipe requires parameters
-    // 2. Recipe has been accepted
-    // 3. Not all required parameters have been filled in yet
-    // 4. Parameter modal is not already open (prevent multiple opens)
-    // 5. No messages in chat yet (don't show after conversation has started)
-    if (
-      recipeState.requiresParameters &&
-      recipeAccepted &&
-      !hasAllRequiredParameters &&
-      !isParameterModalOpen &&
-      messages.length === 0
-    ) {
-      setIsParameterModalOpen(true);
-    }
-  }, [
-    recipeState.requiresParameters,
-    hasAllRequiredParameters,
-    recipeAccepted,
-    isParameterModalOpen,
-    messages.length,
-    chat.sessionId,
-    recipe?.title,
-  ]);
+  // Custom handlers that need BaseChat-specific logic
+  const handleRecipeAccept = async () => {
+    await recipeState.acceptRecipe();
+    recipeUI.setIsRecipeWarningModalOpen(false);
+  };
 
-  // Handle recipe warning modal display
-  useEffect(() => {
-    if (recipe && !recipeAccepted && hasSecurityWarnings) {
-      setIsRecipeWarningModalOpen(true);
-    }
-  }, [recipe, recipeAccepted, hasSecurityWarnings]);
+  const handleRecipeCancel = () => {
+    recipeUI.handleRecipeCancel(() => {
+      window.electron.closeWindow();
+    });
+  };
 
-  useEffect(() => {
-    setReadyForAutoUserPrompt(true);
-  }, []);
-
-  // UI interaction handlers
   const handleParameterSubmit = async (inputValues: Record<string, string>) => {
-    // Update chat state with parameters
     setChat({
       ...chat,
       recipeParameters: inputValues,
     });
-    setIsParameterModalOpen(false);
-
-    try {
-      await updateSystemPromptWithParameters(chat.sessionId, inputValues, recipe || undefined);
-      // Update session user recipe values via API
-      await updateSessionUserRecipeValues({
-        path: { session_id: chat.sessionId },
-        body: { userRecipeValues: inputValues },
-      });
-    } catch (error) {
-      console.error('Failed to update system prompt with parameters:', error);
-    }
-  };
-
-  const handleRecipeAccept = async () => {
-    await recipeState.acceptRecipe();
-    setIsRecipeWarningModalOpen(false);
-  };
-
-  const handleRecipeCancel = () => {
-    setIsRecipeWarningModalOpen(false);
-    window.electron.closeWindow();
-  };
-
-  const handleAutoExecution = React.useCallback(
-    (append: (message: Message) => void, isLoading: boolean, onAutoExecute?: () => void) => {
-      if (
-        recipe?.isScheduledExecution &&
-        recipe?.prompt &&
-        (!recipeState.requiresParameters || recipeParameters) &&
-        messages.length === 0 &&
-        !isLoading &&
-        readyForAutoUserPrompt &&
-        recipeAccepted
-      ) {
-        const finalPrompt = recipeParameters
-          ? substituteParameters(recipe.prompt, recipeParameters)
-          : recipe.prompt;
-
-        const userMessage = createUserMessage(finalPrompt);
-        append(userMessage);
-        onAutoExecute?.();
-      }
-    },
-    [
-      recipe?.isScheduledExecution,
-      recipe?.prompt,
-      recipeState.requiresParameters,
-      recipeParameters,
-      messages.length,
-      readyForAutoUserPrompt,
-      recipeAccepted,
-    ]
-  );
-
-  const handleRecipeCreated = (recipe: Recipe, onRecipeCreated?: (recipe: Recipe) => void) => {
-    // Delegate toast/notification responsibility to the caller
-    onRecipeCreated?.(recipe);
+    await recipeUI.handleParameterSubmit(inputValues);
   };
 
   const handleStartRecipe = (recipe: Recipe) => {
@@ -322,10 +236,10 @@ function BaseChatContent({
   useEffect(() => {
     const isProcessingResponse =
       chatState !== ChatState.Idle && chatState !== ChatState.WaitingForUserInput;
-    handleAutoExecution(append, isProcessingResponse, () => {
+    recipeUI.handleAutoExecution(append, isProcessingResponse, () => {
       setHasStartedUsingRecipe(true);
     });
-  }, [handleAutoExecution, append, chatState]);
+  }, [recipeUI, append, chatState]);
 
   // Use shared file drop
   const { droppedFiles, setDroppedFiles, handleDrop, handleDragOver } = useFileDrop();
@@ -608,7 +522,7 @@ function BaseChatContent({
 
       {/* Recipe Warning Modal */}
       <RecipeWarningModal
-        isOpen={isRecipeWarningModalOpen}
+        isOpen={recipeUI.isRecipeWarningModalOpen}
         onConfirm={handleRecipeAccept}
         onCancel={() => handleRecipeCancel()}
         recipeDetails={{
@@ -620,11 +534,11 @@ function BaseChatContent({
       />
 
       {/* Recipe Parameter Modal */}
-      {isParameterModalOpen && filteredParameters.length > 0 && (
+      {recipeUI.isParameterModalOpen && filteredParameters.length > 0 && (
         <ParameterInputModal
           parameters={filteredParameters}
           onSubmit={handleParameterSubmit}
-          onClose={() => setIsParameterModalOpen(false)}
+          onClose={() => recipeUI.setIsParameterModalOpen(false)}
         />
       )}
 
@@ -634,8 +548,7 @@ function BaseChatContent({
         onClose={() => setIsCreateRecipeModalOpen(false)}
         sessionId={chat.sessionId}
         onRecipeCreated={(recipe) =>
-          handleRecipeCreated(recipe, (recipe) => {
-            // Handle toast notification at the component level
+          recipeUI.handleRecipeCreated(recipe, (recipe) => {
             import('../toasts').then(({ toastSuccess }) => {
               toastSuccess({
                 title: 'Recipe created successfully!',

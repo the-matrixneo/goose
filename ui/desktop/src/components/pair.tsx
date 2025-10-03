@@ -73,7 +73,7 @@ export default function Pair({
         prevRecipeRef.current = recipe;
 
         try {
-          // Load a fresh chat session with new recipe reset behavior
+          // Load a fresh chat session with recipe reset behavior
           const newChat = await loadCurrentChat({
             resumeSessionId: undefined,
             recipe: recipe,
@@ -82,7 +82,6 @@ export default function Pair({
               resetSession: true,
               clearMessages: true,
               clearRecipeParameters: true,
-              // Keep the new recipe from recipe
             },
           });
 

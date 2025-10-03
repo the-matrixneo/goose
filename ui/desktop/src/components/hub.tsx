@@ -39,7 +39,7 @@ export default function Hub({
 
     if (combinedTextFromInput.trim()) {
       // Navigate to pair page with the message to be submitted
-      // resetChat() is called in App.tsx before navigation to ensure clean state
+      // Pair will handle creating the new chat session
       resetChat();
       setView('pair', {
         disableAnimation: true,

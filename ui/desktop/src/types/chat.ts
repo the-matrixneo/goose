@@ -6,6 +6,6 @@ export interface ChatType {
   title: string;
   messageHistoryIndex: number;
   messages: Message[];
-  recipe?: Recipe | null; // Add recipe configuration to chat state
+  recipe?: Recipe | null;
   recipeParameters?: Record<string, string> | null; // Add recipe parameters to chat state
 }

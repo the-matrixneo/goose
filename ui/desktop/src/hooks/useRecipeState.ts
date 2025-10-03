@@ -4,7 +4,6 @@ import { filterValidUsedParameters, substituteParameters } from '../utils/provid
 
 /**
  * Recipe state hook with explicit, predictable behavior
- * No complex heuristics - components tell us exactly what they want
  */
 export function useRecipeState(recipe: Recipe | null) {
   const [recipeAccepted, setRecipeAccepted] = useState(false);
@@ -98,7 +97,6 @@ export function useRecipeState(recipe: Recipe | null) {
     };
   }, [recipe, recipeAccepted, requiresParameters]);
 
-  // Business logic functions
   const acceptRecipe = async () => {
     try {
       if (recipe) {
@@ -112,22 +110,15 @@ export function useRecipeState(recipe: Recipe | null) {
   };
 
   return {
-    // State
     recipe,
     recipeAccepted,
     hasSecurityWarnings,
     recipeError,
     setRecipeError,
-
-    // Computed values
     filteredParameters,
     requiresParameters,
-
-    // Functions that take parameters as input (no internal state)
     hasAllRequiredParameters,
     getInitialPrompt,
-
-    // Actions
     acceptRecipe,
   };
 }

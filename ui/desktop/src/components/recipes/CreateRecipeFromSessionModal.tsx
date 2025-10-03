@@ -198,9 +198,7 @@ export default function CreateRecipeFromSessionModal({
       });
 
       if (runAfterSave) {
-        // Close modal first
         onClose();
-        // Navigate to pair chat with the recipe loaded
         navigate('/pair', { state: { recipe } });
       } else {
         setCreatedRecipe(recipe);

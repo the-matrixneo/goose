@@ -26,7 +26,6 @@ import {
 
 /**
  * Hook for managing agent initialization state and process
- * Extracted from useAgent to reduce complexity and improve testability
  */
 export function useAgentInitialization(): UseAgentInitializationReturn {
   const [agentState, setAgentState] = useState<AgentState>(AgentState.UNINITIALIZED);
@@ -172,7 +171,6 @@ export function useAgentInitialization(): UseAgentInitializationReturn {
         setAgentState(AgentState.INITIALIZED);
         return initChat;
       } catch (error) {
-        // Improved error classification
         if (error instanceof NoProviderOrModelError) {
           setAgentState(AgentState.NO_PROVIDER);
         } else if (

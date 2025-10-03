@@ -138,14 +138,11 @@ export function useRecipeUI(
   };
 
   return {
-    // Modal states
     isParameterModalOpen,
     setIsParameterModalOpen,
     isRecipeWarningModalOpen,
     setIsRecipeWarningModalOpen,
     readyForAutoUserPrompt,
-
-    // Handlers
     handleParameterSubmit,
     handleRecipeCancel,
     handleRecipeAccept,
