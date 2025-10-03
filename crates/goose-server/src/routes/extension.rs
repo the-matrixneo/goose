@@ -107,11 +107,6 @@ async fn add_extension(
     Json(request): Json<AddExtensionRequest>,
 ) -> Result<Json<ExtensionResponse>, StatusCode> {
     // Log the request for debugging
-    tracing::info!(
-        "Received extension request for session: {}",
-        request.session_id
-    );
-
     let session_id = request.session_id.clone();
     let extension_request = request.config;
 

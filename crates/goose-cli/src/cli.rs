@@ -843,13 +843,6 @@ pub async fn cli() -> Result<()> {
                     let session_start = std::time::Instant::now();
                     let session_type = if resume { "resumed" } else { "new" };
 
-                    tracing::info!(
-                        counter.goose.session_starts = 1,
-                        session_type,
-                        interactive = true,
-                        "Session started"
-                    );
-
                     let session_id = if let Some(id) = identifier {
                         Some(get_session_id(id).await?)
                     } else {
@@ -907,20 +900,6 @@ pub async fn cli() -> Result<()> {
                         message_count,
                         "Session completed"
                     );
-
-                    tracing::info!(
-                        counter.goose.session_duration_ms = session_duration.as_millis() as u64,
-                        session_type,
-                        "Session duration"
-                    );
-
-                    if total_tokens > 0 {
-                        tracing::info!(
-                            counter.goose.session_tokens = total_tokens,
-                            session_type,
-                            "Session tokens"
-                        );
-                    }
 
                     Ok(())
                 }
@@ -1030,15 +1009,6 @@ pub async fn cli() -> Result<()> {
                         return Ok(());
                     }
 
-                    tracing::info!(
-                        counter.goose.recipe_runs = 1,
-                        recipe_name = %recipe_display_name,
-                        recipe_version = %recipe_version,
-                        session_type = "recipe",
-                        interface = "cli",
-                        "Recipe execution started"
-                    );
-
                     let (input_config, recipe_info) =
                         extract_recipe_info_from_cli(recipe_name, params, additional_sub_recipes)?;
                     (input_config, Some(recipe_info))
@@ -1093,13 +1063,6 @@ pub async fn cli() -> Result<()> {
                     "run"
                 };
 
-                tracing::info!(
-                    counter.goose.session_starts = 1,
-                    session_type,
-                    interactive = false,
-                    "Headless session started"
-                );
-
                 let result = session.headless(contents).await;
 
                 let session_duration = session_start.elapsed();
@@ -1121,20 +1084,6 @@ pub async fn cli() -> Result<()> {
                     interactive = false,
                     "Headless session completed"
                 );
-
-                tracing::info!(
-                    counter.goose.session_duration_ms = session_duration.as_millis() as u64,
-                    session_type,
-                    "Headless session duration"
-                );
-
-                if total_tokens > 0 {
-                    tracing::info!(
-                        counter.goose.session_tokens = total_tokens,
-                        session_type,
-                        "Headless session tokens"
-                    );
-                }
 
                 result?;
             } else {

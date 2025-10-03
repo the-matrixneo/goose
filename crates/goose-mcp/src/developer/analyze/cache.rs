@@ -22,8 +22,6 @@ struct CacheKey {
 
 impl AnalysisCache {
     pub fn new(max_size: usize) -> Self {
-        tracing::info!("Initializing analysis cache with size {}", max_size);
-
         let size = NonZeroUsize::new(max_size).unwrap_or_else(|| {
             tracing::warn!("Invalid cache size {}, using default 100", max_size);
             NonZeroUsize::new(100).unwrap()
@@ -43,10 +41,8 @@ impl AnalysisCache {
         };
 
         if let Some(result) = cache.get(&key) {
-            tracing::trace!("Cache hit for {:?}", path);
             Some((**result).clone())
         } else {
-            tracing::trace!("Cache miss for {:?}", path);
             None
         }
     }
@@ -58,14 +54,12 @@ impl AnalysisCache {
             modified,
         };
 
-        tracing::trace!("Caching result for {:?}", path);
         cache.put(key, Arc::new(result));
     }
 
     pub fn clear(&self) {
         let mut cache = lock_or_recover(&self.cache, |c| c.clear());
         cache.clear();
-        tracing::debug!("Cache cleared");
     }
 
     pub fn len(&self) -> usize {

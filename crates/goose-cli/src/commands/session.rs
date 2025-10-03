@@ -74,7 +74,6 @@ pub async fn handle_session_remove(id: Option<String>, regex_string: Option<Stri
     let all_sessions = match SessionManager::list_sessions().await {
         Ok(sessions) => sessions,
         Err(e) => {
-            tracing::error!("Failed to retrieve sessions: {:?}", e);
             return Err(anyhow::anyhow!("Failed to retrieve sessions"));
         }
     };

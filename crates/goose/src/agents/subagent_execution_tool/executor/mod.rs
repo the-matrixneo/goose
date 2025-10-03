@@ -207,7 +207,6 @@ async fn collect_results(
 }
 
 fn create_error_response(error: String) -> ExecutionResponse {
-    tracing::error!("Creating error response: {}", error);
     ExecutionResponse {
         status: "failed".to_string(),
         results: vec![],

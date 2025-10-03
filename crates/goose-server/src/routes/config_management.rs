@@ -631,10 +631,7 @@ pub async fn recover_config() -> Result<Json<String>, StatusCode> {
                 )))
             }
         }
-        Err(e) => {
-            tracing::error!("Config recovery failed: {}", e);
-            Err(StatusCode::INTERNAL_SERVER_ERROR)
-        }
+        Err(e) => Err(StatusCode::INTERNAL_SERVER_ERROR),
     }
 }
 
@@ -660,15 +657,9 @@ pub async fn validate_config() -> Result<Json<String>, StatusCode> {
     match std::fs::read_to_string(&config_path) {
         Ok(content) => match serde_yaml::from_str::<serde_yaml::Value>(&content) {
             Ok(_) => Ok(Json("Config file is valid".to_string())),
-            Err(e) => {
-                tracing::warn!("Config validation failed: {}", e);
-                Err(StatusCode::UNPROCESSABLE_ENTITY)
-            }
+            Err(e) => Err(StatusCode::UNPROCESSABLE_ENTITY),
         },
-        Err(e) => {
-            tracing::error!("Failed to read config file: {}", e);
-            Err(StatusCode::INTERNAL_SERVER_ERROR)
-        }
+        Err(e) => Err(StatusCode::INTERNAL_SERVER_ERROR),
     }
 }
 

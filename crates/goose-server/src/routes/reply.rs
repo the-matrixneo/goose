@@ -209,7 +209,6 @@ async fn reply_handler(
         let agent = match state.get_agent(session_id.clone()).await {
             Ok(agent) => agent,
             Err(e) => {
-                tracing::error!("Failed to get session agent: {}", e);
                 let _ = stream_event(
                     MessageEvent::Error {
                         error: format!("Failed to get session agent: {}", e),
@@ -225,7 +224,6 @@ async fn reply_handler(
         let session = match SessionManager::get_session(&session_id, false).await {
             Ok(metadata) => metadata,
             Err(e) => {
-                tracing::error!("Failed to read session for {}: {}", session_id, e);
                 let _ = stream_event(
                     MessageEvent::Error {
                         error: format!("Failed to read session: {}", e),
