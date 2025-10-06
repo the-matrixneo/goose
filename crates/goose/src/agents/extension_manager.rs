@@ -92,6 +92,7 @@ pub struct ExtensionManager {
     extensions: Mutex<HashMap<String, Extension>>,
     context: Mutex<PlatformExtensionContext>,
     provider: Arc<Mutex<Option<Arc<dyn Provider>>>>,
+    sampling_interface: Arc<Mutex<Option<Arc<dyn crate::agents::sampling_interface::SamplingInterface>>>>,
 }
 
 /// A flattened representation of a resource used by the agent to prepare inference
@@ -253,6 +254,7 @@ impl ExtensionManager {
             extensions: Mutex::new(HashMap::new()),
             context: Mutex::new(PlatformExtensionContext { session_id: None }),
             provider: Arc::new(Mutex::new(None)),
+            sampling_interface: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -272,6 +274,16 @@ impl ExtensionManager {
     /// Get the provider for handling sampling requests
     pub async fn get_provider(&self) -> Option<Arc<dyn Provider>> {
         self.provider.lock().await.clone()
+    }
+
+    /// Set the sampling interface for handling sampling requests with UI confirmation
+    pub async fn set_sampling_interface(&self, interface: Arc<dyn crate::agents::sampling_interface::SamplingInterface>) {
+        *self.sampling_interface.lock().await = Some(interface);
+    }
+
+    /// Get the sampling interface
+    pub async fn get_sampling_interface(&self) -> Option<Arc<dyn crate::agents::sampling_interface::SamplingInterface>> {
+        self.sampling_interface.lock().await.clone()
     }
 
     pub async fn supports_resources(&self) -> bool {
@@ -346,6 +358,7 @@ impl ExtensionManager {
 
         // Create sampling handler for this extension
         let sampling_handler = Box::new(ExtensionSamplingHandler::new(
+            self.sampling_interface.clone(),
             self.provider.clone(),
             sanitized_name.clone(),
         ));
@@ -1145,15 +1158,21 @@ impl ExtensionManager {
 /// Wrapper struct to implement SamplingHandler for ExtensionManager
 #[derive(Clone)]
 pub struct ExtensionSamplingHandler {
+    sampling_interface: Arc<Mutex<Option<Arc<dyn crate::agents::sampling_interface::SamplingInterface>>>>,
     provider: Arc<Mutex<Option<Arc<dyn Provider>>>>,
-    _extension_name: String,
+    extension_name: String,
 }
 
 impl ExtensionSamplingHandler {
-    pub fn new(provider: Arc<Mutex<Option<Arc<dyn Provider>>>>, extension_name: String) -> Self {
+    pub fn new(
+        sampling_interface: Arc<Mutex<Option<Arc<dyn crate::agents::sampling_interface::SamplingInterface>>>>,
+        provider: Arc<Mutex<Option<Arc<dyn Provider>>>>,
+        extension_name: String,
+    ) -> Self {
         Self {
+            sampling_interface,
             provider,
-            _extension_name: extension_name,
+            extension_name,
         }
     }
 }
@@ -1165,7 +1184,25 @@ impl SamplingHandler for ExtensionSamplingHandler {
         params: CreateMessageRequestParam,
         _extension_name: String,
     ) -> Result<CreateMessageResult, ServiceError> {
-        // Get the provider from the shared reference
+        // First check if we have a sampling interface for UI confirmation
+        let sampling_interface_lock = self.sampling_interface.lock().await;
+        let interface_opt = sampling_interface_lock.clone();
+        drop(sampling_interface_lock); // Release lock early
+        
+        if let Some(interface) = interface_opt {
+            // Use the sampling interface which will handle UI confirmation
+            let result = interface
+                .request_sampling(self.extension_name.clone(), params)
+                .await
+                .map_err(|e| {
+                    tracing::error!("Sampling interface error: {}", e);
+                    ServiceError::UnexpectedResponse
+                })?;
+            
+            return Ok(result);
+        }
+
+        // Fall back to direct provider call if no sampling interface is available
         let provider_lock = self.provider.lock().await;
         let provider = provider_lock
             .as_ref()

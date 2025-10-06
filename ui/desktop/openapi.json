@@ -3183,6 +3183,20 @@
           }
         }
       },
+      "ModelPreferences": {
+        "type": "object",
+        "description": "Model preferences for sampling",
+        "properties": {
+          "hints": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Hints for model selection",
+            "nullable": true
+          }
+        }
+      },
       "ParseRecipeRequest": {
         "type": "object",
         "required": [
@@ -3730,6 +3744,86 @@
         "properties": {
           "session_id": {
             "type": "string"
+          }
+        }
+      },
+      "SamplingConfirmationRequest": {
+        "type": "object",
+        "description": "Request sent from MCP extension to UI for user confirmation",
+        "required": [
+          "request_id",
+          "extension_name",
+          "messages"
+        ],
+        "properties": {
+          "extension_name": {
+            "type": "string",
+            "description": "Name of the extension making the request"
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SamplingMessage"
+            },
+            "description": "Messages to be sent to the model"
+          },
+          "model_preferences": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ModelPreferences"
+              }
+            ],
+            "nullable": true
+          },
+          "request_id": {
+            "type": "string",
+            "description": "Unique identifier for this request"
+          },
+          "system_prompt": {
+            "type": "string",
+            "description": "System prompt if provided",
+            "nullable": true
+          }
+        }
+      },
+      "SamplingConfirmationResponse": {
+        "type": "object",
+        "description": "Response from UI for a sampling request",
+        "required": [
+          "request_id",
+          "approved"
+        ],
+        "properties": {
+          "approved": {
+            "type": "boolean",
+            "description": "Whether the request was approved"
+          },
+          "request_id": {
+            "type": "string",
+            "description": "The request ID this response is for"
+          },
+          "response_content": {
+            "type": "string",
+            "description": "Optional response content if approved",
+            "nullable": true
+          }
+        }
+      },
+      "SamplingMessage": {
+        "type": "object",
+        "description": "A message in the sampling request",
+        "required": [
+          "role",
+          "content"
+        ],
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "Content of the message"
+          },
+          "role": {
+            "type": "string",
+            "description": "Role of the message sender"
           }
         }
       },

@@ -14,6 +14,7 @@ mod reply_parts;
 pub mod retry;
 mod router_tool_selector;
 mod router_tools;
+pub mod sampling_interface;
 mod schedule_tool;
 pub mod sub_recipe_manager;
 pub mod subagent;

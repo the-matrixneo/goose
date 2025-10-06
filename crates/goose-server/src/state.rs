@@ -5,7 +5,10 @@ use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
-use tokio::sync::Mutex;
+use tokio::sync::{mpsc, oneshot, Mutex};
+
+use crate::routes::sampling::{SamplingConfirmationRequest, SamplingConfirmationResponse};
+
 #[derive(Clone)]
 pub struct AppState {
     pub(crate) agent_manager: Arc<AgentManager>,
@@ -13,6 +16,11 @@ pub struct AppState {
     pub session_counter: Arc<AtomicUsize>,
     /// Tracks sessions that have already emitted recipe telemetry to prevent double counting.
     recipe_session_tracker: Arc<Mutex<HashSet<String>>>,
+    /// Channel for sending sampling requests to the UI
+    pub sampling_tx: Arc<Mutex<Option<mpsc::Sender<SamplingConfirmationRequest>>>>,
+    /// Map of pending sampling requests waiting for UI response
+    pub pending_sampling_requests:
+        Arc<Mutex<HashMap<String, oneshot::Sender<SamplingConfirmationResponse>>>>,
 }
 
 impl AppState {
@@ -23,6 +31,8 @@ impl AppState {
             recipe_file_hash_map: Arc::new(Mutex::new(HashMap::new())),
             session_counter: Arc::new(AtomicUsize::new(0)),
             recipe_session_tracker: Arc::new(Mutex::new(HashSet::new())),
+            sampling_tx: Arc::new(Mutex::new(None)),
+            pending_sampling_requests: Arc::new(Mutex::new(HashMap::new())),
         }))
     }
 

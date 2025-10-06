@@ -443,6 +443,16 @@ export type ModelInfo = {
     supports_cache_control?: boolean | null;
 };
 
+/**
+ * Model preferences for sampling
+ */
+export type ModelPreferences = {
+    /**
+     * Hints for model selection
+     */
+    hints?: Array<string> | null;
+};
+
 export type ParseRecipeRequest = {
     content: string;
 };
@@ -642,6 +652,61 @@ export type Role = string;
 
 export type RunNowResponse = {
     session_id: string;
+};
+
+/**
+ * Request sent from MCP extension to UI for user confirmation
+ */
+export type SamplingConfirmationRequest = {
+    /**
+     * Name of the extension making the request
+     */
+    extension_name: string;
+    /**
+     * Messages to be sent to the model
+     */
+    messages: Array<SamplingMessage>;
+    model_preferences?: ModelPreferences | null;
+    /**
+     * Unique identifier for this request
+     */
+    request_id: string;
+    /**
+     * System prompt if provided
+     */
+    system_prompt?: string | null;
+};
+
+/**
+ * Response from UI for a sampling request
+ */
+export type SamplingConfirmationResponse = {
+    /**
+     * Whether the request was approved
+     */
+    approved: boolean;
+    /**
+     * The request ID this response is for
+     */
+    request_id: string;
+    /**
+     * Optional response content if approved
+     */
+    response_content?: string | null;
+};
+
+/**
+ * A message in the sampling request
+ */
+export type SamplingMessage = {
+    /**
+     * Content of the message
+     */
+    content: string;
+    /**
+     * Role of the message sender
+     */
+    role: string;
 };
 
 export type SaveRecipeRequest = {

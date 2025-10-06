@@ -479,6 +479,10 @@ derive_utoipa!(Icon as IconSchema);
         super::routes::agent::ResumeAgentRequest,
         super::routes::agent::ErrorResponse,
         super::routes::setup::SetupResponse,
+        super::routes::sampling::SamplingConfirmationRequest,
+        super::routes::sampling::SamplingConfirmationResponse,
+        super::routes::sampling::SamplingMessage,
+        super::routes::sampling::ModelPreferences,
     ))
 )]
 pub struct ApiDoc;

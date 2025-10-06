@@ -59,7 +59,7 @@ async fn test_mcp_sampling_handler_integration() {
     #[async_trait::async_trait]
     impl goose::providers::base::Provider for TestProvider {
         fn metadata(&self) -> goose::providers::base::ProviderMetadata {
-            goose::providers::base::ProviderMetadata::default()
+            goose::providers::base::ProviderMetadata::empty()
         }
 
         async fn complete(
@@ -67,10 +67,14 @@ async fn test_mcp_sampling_handler_integration() {
             _system_prompt: &str,
             _messages: &[Message],
             _tools: &[Tool],
-        ) -> Result<(Message, goose::providers::base::Usage), anyhow::Error> {
+        ) -> Result<
+            (Message, goose::providers::base::ProviderUsage),
+            goose::providers::errors::ProviderError,
+        > {
             Ok((
                 Message::assistant().with_text("Test response"),
-                goose::providers::base::Usage {
+                goose::providers::base::ProviderUsage {
+                    model: "test-model".to_string(),
                     input_tokens: Some(10),
                     output_tokens: Some(5),
                     total_tokens: Some(15),
@@ -78,18 +82,8 @@ async fn test_mcp_sampling_handler_integration() {
             ))
         }
 
-        async fn complete_with_model(
-            &self,
-            _model: &str,
-            system_prompt: &str,
-            messages: &[Message],
-            tools: &[Tool],
-        ) -> Result<(Message, goose::providers::base::Usage), anyhow::Error> {
-            self.complete(system_prompt, messages, tools).await
-        }
-
-        fn get_model_config(&self, _model: &str) -> Option<goose::providers::base::ModelConfig> {
-            None
+        fn get_model_config(&self) -> goose::providers::base::ModelConfig {
+            goose::providers::base::ModelConfig::default()
         }
     }
 
@@ -107,7 +101,9 @@ async fn test_mcp_sampling_handler_integration() {
     let provider_ref = Arc::new(Mutex::new(Some(
         mock_provider.clone() as Arc<dyn goose::providers::base::Provider>
     )));
+    let sampling_interface_ref = Arc::new(Mutex::new(None));
     let sampling_handler = goose::agents::extension_manager::ExtensionSamplingHandler::new(
+        sampling_interface_ref,
         provider_ref,
         "test-extension".to_string(),
     );
@@ -138,7 +134,7 @@ async fn test_mcp_sampling_handler_integration() {
     );
     let response = result.unwrap();
     assert_eq!(response.message.role, Role::Assistant);
-    assert!(response.model.contains("mock")); // MockProvider returns "mock" as model
+    assert!(response.model.contains("test")); // TestProvider returns "test-model" as model
 }
 
 #[tokio::test]

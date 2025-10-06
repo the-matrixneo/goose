@@ -16,6 +16,8 @@ import { ToastContainer } from 'react-toastify';
 import { GoosehintsModal } from './components/GoosehintsModal';
 import AnnouncementModal from './components/AnnouncementModal';
 import ProviderGuard from './components/ProviderGuard';
+import { SamplingModal } from './components/ui/SamplingModal';
+import { useSamplingManager } from './hooks/useSamplingManager';
 
 import { ChatType } from './types/chat';
 import Hub from './components/hub';
@@ -300,6 +302,15 @@ export function AppInner() {
 
   const { addExtension } = useConfig();
   const { agentState, loadCurrentChat, resetChat } = useAgent();
+  
+  // Add sampling manager hook
+  const {
+    currentRequest,
+    isModalOpen,
+    pendingCount,
+    handleApprove,
+    handleDeny,
+  } = useSamplingManager();
   const resetChatIfNecessary = useCallback(() => {
     if (chat.messages.length > 0) {
       setSearchParams((prev) => {
@@ -590,6 +601,21 @@ export function AppInner() {
           directory={window.appConfig?.get('GOOSE_WORKING_DIR') as string}
           setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
         />
+      )}
+      
+      {/* Sampling Modal - Always rendered but controlled by isModalOpen */}
+      <SamplingModal
+        isOpen={isModalOpen}
+        request={currentRequest}
+        onApprove={handleApprove}
+        onDeny={handleDeny}
+      />
+      
+      {/* Optional: Show pending count badge */}
+      {pendingCount > 0 && !isModalOpen && (
+        <div className="fixed bottom-4 right-4 bg-orange-500 text-white rounded-full px-3 py-1 z-50">
+          {pendingCount} pending sampling request{pendingCount > 1 ? 's' : ''}
+        </div>
       )}
     </>
   );
