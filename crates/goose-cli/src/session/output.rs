@@ -495,7 +495,6 @@ fn render_dynamic_task_request(call: &CallToolRequestParam, debug: bool) {
 fn render_todo_request(call: &CallToolRequestParam, _debug: bool) {
     print_tool_header(call);
 
-    // For todo_write, always show the full content without redaction
     if let Some(args) = &call.arguments {
         if let Some(Value::String(content)) = args.get("content") {
             println!("{}: {}", style("content").dim(), style(content).green());

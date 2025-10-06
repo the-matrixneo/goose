@@ -1,6 +1,5 @@
 use crate::agents::extension_manager::ExtensionManager;
 use crate::agents::SessionConfig;
-use crate::config::Config;
 use crate::conversation::message::{Message, MessageContent};
 use uuid::Uuid;
 
@@ -13,15 +12,6 @@ pub async fn inject_moim(
     extension_manager: &ExtensionManager,
     _session: &Option<SessionConfig>,
 ) -> Vec<Message> {
-    let config = Config::global();
-    let moim_enabled = config
-        .get_param::<bool>("goose_moim_enabled")
-        .unwrap_or(true);
-
-    if !moim_enabled {
-        tracing::debug!("MOIM disabled by configuration");
-        return messages.to_vec();
-    }
 
     let moim_content = match extension_manager.collect_moim().await {
         Some(content) if !content.trim().is_empty() => content,
@@ -84,11 +74,9 @@ fn find_moim_insertion_point(messages: &[Message]) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serial_test::serial;
 
     #[tokio::test]
     async fn test_moim_insertion_empty_conversation() {
-        // MOIM is enabled by default
         let messages = vec![];
         let extension_manager = ExtensionManager::new();
 
@@ -121,23 +109,6 @@ mod tests {
         // Verify the message contains timestamp
         let content = result[1].content.first().and_then(|c| c.as_text()).unwrap();
         assert!(content.contains("Current date and time:"));
-    }
-
-    #[tokio::test]
-    #[serial]
-    async fn test_moim_disabled() {
-        std::env::set_var("GOOSE_MOIM_ENABLED", "false");
-
-        let messages = vec![Message::user().with_text("Hello")];
-        let extension_manager = ExtensionManager::new();
-
-        let result = inject_moim(&messages, &extension_manager, &None).await;
-
-        // Should return original messages unchanged
-        assert_eq!(result.len(), 1);
-        assert!(result[0].id.is_none() || !result[0].id.as_ref().unwrap().starts_with("moim_"));
-
-        std::env::remove_var("GOOSE_MOIM_ENABLED");
     }
 
     #[test]
