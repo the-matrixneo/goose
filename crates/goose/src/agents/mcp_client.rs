@@ -73,13 +73,6 @@ pub trait McpClientTrait: Send + Sync {
 
     fn get_info(&self) -> Option<&InitializeResult>;
 
-    /// Get MOIM (Minus One Info Message) content from this extension.
-    ///
-    /// MOIM content is ephemeral context injected into LLM calls without
-    /// modifying conversation history. Extensions can provide dynamic,
-    /// session-aware content that will be included automatically.
-    ///
-    /// Returns None if this extension doesn't provide MOIM content.
     async fn get_moim(&self) -> Option<String> {
         None // Default: most extensions won't provide MOIM
     }
