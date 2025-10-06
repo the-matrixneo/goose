@@ -875,120 +875,6 @@ impl Agent {
         Ok(None)
     }
 
-    /// Inject MOIM (Minus One Info Message) into conversation.
-    ///
-    /// MOIM provides ephemeral context that's included in LLM calls
-    /// but never persisted to conversation history.
-    ///
-    /// The message is injected at a "safe" position that won't break
-    /// tool call/response pairs.
-    #[cfg(test)]
-    pub async fn inject_moim(
-        &self,
-        messages: &[Message],
-        _session: &Option<SessionConfig>,
-    ) -> Vec<Message> {
-        self.inject_moim_internal(messages, _session).await
-    }
-
-    #[cfg(not(test))]
-    async fn inject_moim(
-        &self,
-        messages: &[Message],
-        _session: &Option<SessionConfig>,
-    ) -> Vec<Message> {
-        self.inject_moim_internal(messages, _session).await
-    }
-
-    async fn inject_moim_internal(
-        &self,
-        messages: &[Message],
-        _session: &Option<SessionConfig>,
-    ) -> Vec<Message> {
-        // Check if MOIM is enabled (default: true)
-        let config = Config::global();
-        let moim_enabled = config
-            .get_param::<bool>("goose_moim_enabled")
-            .unwrap_or(true);
-
-        if !moim_enabled {
-            tracing::debug!("MOIM disabled by configuration");
-            return messages.to_vec();
-        }
-
-        // Collect MOIM content from extension manager
-        let moim_content = match self.extension_manager.collect_moim().await {
-            Some(content) if !content.trim().is_empty() => content,
-            _ => {
-                tracing::debug!("No MOIM content available");
-                return messages.to_vec();
-            }
-        };
-
-        tracing::debug!("Injecting MOIM: {} chars", moim_content.len());
-
-        // Create MOIM message
-        let moim_message = Message::user()
-            .with_text(moim_content)
-            .with_id(format!("moim_{}", Uuid::new_v4()));
-
-        // Find safe insertion point and inject
-        let mut messages_with_moim = messages.to_vec();
-
-        if messages_with_moim.is_empty() {
-            // Empty conversation: MOIM becomes first message
-            messages_with_moim.push(moim_message);
-        } else {
-            // Find safe position (approximately -1, avoiding tool pairs)
-            let insert_pos = Self::find_moim_insertion_point(&messages_with_moim);
-            messages_with_moim.insert(insert_pos, moim_message);
-        }
-
-        messages_with_moim
-    }
-
-    /// Find a safe insertion point for MOIM that won't break tool call/response pairs.
-    ///
-    /// Strategy:
-    /// - Default: insert before last message (position -1)
-    /// - If that would break a tool pair: insert before the tool call
-    /// - Never insert in the middle of a tool call/response sequence
-    fn find_moim_insertion_point(messages: &[Message]) -> usize {
-        use crate::conversation::message::MessageContent;
-
-        if messages.is_empty() {
-            return 0;
-        }
-
-        // Default: before last message
-        let last_pos = messages.len() - 1;
-
-        // Safety check: don't break tool call/response pairs
-        if last_pos > 0 {
-            let prev_msg = &messages[last_pos - 1];
-            let curr_msg = &messages[last_pos];
-
-            // Check if previous message has tool calls and current has responses
-            let prev_has_tool_calls = prev_msg
-                .content
-                .iter()
-                .any(|c| matches!(c, MessageContent::ToolRequest(_)));
-
-            let curr_has_tool_responses = curr_msg
-                .content
-                .iter()
-                .any(|c| matches!(c, MessageContent::ToolResponse(_)));
-
-            if prev_has_tool_calls && curr_has_tool_responses {
-                // Would break a tool pair - insert before the tool call instead
-                tracing::debug!("MOIM: Adjusting position to avoid breaking tool pair");
-                return last_pos.saturating_sub(1);
-            }
-        }
-
-        last_pos
-    }
-
     #[instrument(skip(self, unfixed_conversation, session), fields(user_message))]
     pub async fn reply(
         &self,
@@ -1146,11 +1032,10 @@ impl Agent {
                     }
                 }
 
-                // MOIM INJECTION POINT
-                // Inject ephemeral context just before provider call
-                // This ensures fresh context for each LLM interaction
-                let messages_with_moim = self.inject_moim(
+                // Inject MOIM ephemeral context just before provider call
+                let messages_with_moim = super::moim::inject_moim(
                     conversation.messages(),
+                    &self.extension_manager,
                     &session
                 ).await;
 
