@@ -12,7 +12,6 @@ pub async fn inject_moim(
     extension_manager: &ExtensionManager,
     _session: &Option<SessionConfig>,
 ) -> Vec<Message> {
-
     let moim_content = match extension_manager.collect_moim().await {
         Some(content) if !content.trim().is_empty() => content,
         _ => {
