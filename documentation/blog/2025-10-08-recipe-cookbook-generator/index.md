@@ -181,15 +181,21 @@ description: |
 prompt: |
   I want to analyze my goose session history and create recipes from common workflows I've used. I've done a variety of work, and I'd like your help finding repetitive tasks that we can turn into goose recipes to build my own personal 'cookbook' based on my goose usage patterns.
 
+  {% if work_priorities %}My work priorities are: {{ work_priorities }}{% endif %}
+  {% if exclusion_keywords %}Please skip sessions containing these topics: {{ exclusion_keywords }}{% endif %}
+  
+  I want to organize the recipes {{ organization_preference }} and review them in {{ review_mode }} mode.
+  
   The process should:
-  1. Find and analyze my goose session files
-  2. Identify successful workflows, prioritizing those I use repeatedly
+  1. Find and analyze my goose session files{% if session_storage_path %} (located at {{ session_storage_path }}){% endif %}
+  2. Identify successful workflows, prioritizing those I use repeatedly (at least {{ min_workflow_frequency }} times)
   3. Distinguish between repetitive patterns (high priority) and one-off tasks (user choice)
-  4. Let me choose which patterns to turn into recipes, and subtasks that could be turned into subrecipes where the subrecipe could be run standalone or as part of a larger workflow
+  4. Let me choose which patterns to turn into recipes, and subtasks that could be turned into subrecipes
   5. Generate parameterized YAML recipes with proper templating
   6. Handle sensitive data appropriately
+  {% if include_test_mode == "true" %}7. Test generated recipes against recent sessions to validate they work{% endif %}
   
-  Ask me where I want to store the generated recipes, and guide me through the interactive process of selecting which workflows to convert. Track the date and time of when I last ran this cookbook generator so the next time I run it you only look at sessions I've made since the last run.
+  Store the generated recipes in {{ recipe_output_dir }} and track when this cookbook generator last ran so future runs only analyze new sessions.
 
 parameters:
   - key: recipe_output_dir
@@ -200,11 +206,34 @@ parameters:
     description: Path to goose session storage (will auto-detect if not provided)
     input_type: string
     requirement: optional
+  - key: work_priorities
+    description: What types of work should I prioritize? (e.g., content, research, analysis, automation, development)
+    input_type: string
+    requirement: optional
+  - key: exclusion_keywords
+    description: Skip sessions containing these words/topics (comma-separated)
+    input_type: string
+    requirement: optional
+  - key: organization_preference
+    description: How to organize recipes - flat, by_category, by_date, by_frequency
+    input_type: string
+    requirement: optional
+    default: "by_category"
+  - key: review_mode
+    description: How to review findings - interactive, batch_file
+    input_type: string
+    requirement: optional
+    default: "interactive"
   - key: min_workflow_frequency
     description: Minimum number of times a workflow pattern must appear to be considered
     input_type: string
     requirement: optional
     default: "2"
+  - key: include_test_mode
+    description: Whether to validate generated recipes against recent sessions
+    input_type: string
+    requirement: optional
+    default: "true"
 
 instructions: |
   You are helping the user build a 'cookbook' of goose recipes based on their actual usage patterns.
@@ -212,73 +241,107 @@ instructions: |
   ## Step 1: Setup and Discovery
   - Determine the goose session storage path (try default locations like ~/.local/share/goose/sessions, or ask the user)
   - Check if this is an incremental run by looking for last-run timestamp in recipe_output_dir
+  - Look for existing analysis metadata file (cookbook_analysis.json) to reuse previous work
   - Identify which session files to analyze (all files or only newer than last run)
-    - ignore 0-byte session files
+    - ignore 0-byte session files and corrupted/incomplete files
+  - If exclusion_keywords provided, skip sessions containing those terms
   
-  ## Step 2: Session Analysis  
-  - Parse session files to extract user requests, tool usage patterns, and outcomes
-  - Identify successful workflows (completed tasks, satisfied user responses)
+  ## Step 2: Intelligent Session Analysis  
+  - Parse .jsonl session files to extract user requests, tool usage patterns, and outcomes
+  - Use LLM analysis to automatically tag sessions with:
+    - Intent categories (research, content-creation, analysis, automation, development)
+    - Topic domains (extracted from session content - don't hardcode domains)
+    - Action patterns (analyze, summarize, generate, outline, compare, etc.)
+    - Tool usage sequences that indicate workflow patterns
+  - Identify successful workflows by looking for:
+    - Iterative refinement patterns (request → refine → refine → stop)
+    - File creation/export outcomes
+    - User satisfaction indicators
+    - Task completion signals
   - Group similar workflows by analyzing:
-    - User intent/request patterns
-    - Tool usage sequences (e.g., "read file → analyze → write summary")
-    - Content types worked with (e.g., "blog posts", "video scripts", "code analysis")
-  - Categorize findings into:
+    - Semantic similarity in user requests ("give me 5 ideas for...", "help me outline...")
+    - Tool usage sequences (web_scrape → analyze → summarize)
+    - Content types and domains worked with
+    - Parameter patterns (file paths, URLs, content types)
+  - Categorize findings:
     - HIGH PRIORITY: Patterns occurring >= min_workflow_frequency times
     - USER CHOICE: One-off tasks that might be worth generalizing
-  - Focus on recurring content creation, analysis, and automation workflows
+  - Focus on work_priorities if specified by user
   
-  ## Step 3: Interactive Selection
-  - Present HIGH PRIORITY patterns first (repetitive workflows):
-    - Show frequency count (e.g., "Used 5 times")
-    - Suggested recipe name
-    - Brief description of what the recipe would do
-    - What parameters would be needed
-    - Any sensitive data concerns detected
-  - Then present USER CHOICE patterns (one-off tasks):
-    - Clearly label as "One-time task - include anyway?"
-    - Explain potential value if generalized
-    - Let user decide whether to include
-  - For each selected pattern, confirm:
-    - Recipe scope and flexibility
-    - Parameter names and types
-    - Any customization preferences
-  - Be concise with the output so the user can easily see everything, and number them so the user can simply enter the numbers corresponding with the patterns to turn into recipes
+  ## Step 3: User Review Process
+  Based on review_mode parameter:
   
-  ## Step 4: Recipe Generation
-  - Create YAML recipes following goose conventions
-  - Use parameters and minijinja templating ({% if %}, {% for %}, etc.) where appropriate
+  ### Interactive Mode (default):
+  - Present HIGH PRIORITY patterns first with numbering:
+    - "1. Content Ideas Generator (Used 5 times)"
+    - Brief description: "Generate ideas for blog posts, videos, workshops"
+    - Parameters needed: content_type, topic_area, number_of_ideas
+    - Sensitive data warnings if detected
+  - Then present USER CHOICE patterns similarly
+  - User can select by numbers: "1,3,5,7" or "all" or "none"
+  
+  ### Batch File Mode:
+  - Generate a markdown summary file: "cookbook_review.md" in recipe_output_dir
+  - Include all patterns with checkboxes: "- [ ] Content Ideas Generator..."
+  - User edits file to check desired patterns
+  - User tells you when ready to proceed
+  
+  ## Step 4: Recipe Generation with Subagents
+  - For each confirmed pattern, launch a subagent to generate the recipe
+  - Each subagent gets context about:
+    - The specific workflow pattern
+    - Example sessions that match the pattern
+    - Suggested parameters and their default values
+    - Organization preference for naming/structure
+  - Subagents work in parallel to generate recipes faster
+  - Each recipe includes:
+    - Proper goose YAML format with version, title, description
+    - Parameterized prompts using minijinja templating
+    - Comprehensive instructions for headless mode
+    - Custom metadata: cookbook_generator_metadata with source info
   - Generate subrecipes when workflows share common patterns
-  - Include proper metadata: name, description, prompt, parameters, instructions
-  - Ensure recipes can run in headless mode with good initial prompts
+  - Ensure unique naming and handle subrecipe dependencies
   
-  ## Step 5: Finalization
-  - Save all generated recipes to recipe_output_dir
-  - Update last-run timestamp for future incremental runs, store this in a file within recipe_output_dir
-  - Provide a summary of what was created in a README.md file in recipe_output_dir
+  ## Step 5: Testing and Finalization
+  - If include_test_mode is true:
+    - Validate each generated recipe against recent matching sessions
+    - Report any recipes that might not work as expected
+  - Organize recipes according to organization_preference:
+    - flat: All recipes in recipe_output_dir
+    - by_category: Create subdirectories by workflow type
+    - by_date: Organize by when patterns were first detected
+    - by_frequency: Most frequent patterns in priority folders
+  - Save analysis metadata to cookbook_analysis.json for incremental runs
+  - Update last-run timestamp
+  - Generate comprehensive README.md with:
+    - Summary of generated recipes
+    - Usage instructions
+    - Parameter explanations
+    - Tips for customization
   
-  ## Guidelines:
-  - PRIORITIZE REPETITIVE PATTERNS: Focus analysis on workflows that appear multiple times
-  - Be interactive - ask for clarification when unsure about success/failure of sessions
-  - Look for content creation patterns (blog analysis, video scripts, code review workflows)
-  - Identify tool usage sequences that indicate reusable workflows
-  - Prioritize fewer, more flexible recipes over many specific ones
-  - Use parameters extensively for paths, URLs, content types, etc.
-  - Detect and warn about sensitive data but let user decide how to handle it
-  - Follow goose recipe YAML format conventions
-  - Make recipes fun and useful with good descriptions and prompts
-  - Since some session files might be quite large, do everything possible to reduce the input and output token usage
+  ## Advanced Guidelines:
+  - SMART PATTERN DETECTION: Use LLM intelligence to find semantic patterns, not just keyword matching
+  - PARAMETER INTELLIGENCE: Suggest default values based on most common values in sessions
+  - SUBRECIPE OPPORTUNITIES: Identify shared workflow components for reusability
+  - INCREMENTAL LEARNING: On subsequent runs, suggest updates to existing recipes
+  - TOKEN EFFICIENCY: Summarize large sessions, focus on key patterns, batch similar analyses
+  - CROSS-SESSION LEARNING: Weight patterns higher if they appear across different time periods
+  - SENSITIVE DATA HANDLING: Detect API keys, file paths, personal info - warn but let user decide
+  - RECIPE QUALITY: Ensure recipes are actionable, well-parameterized, and genuinely useful
   
-  ## Pattern Recognition Focus:
-  - Content analysis workflows (analyze X → create Y)
-  - File processing patterns (read → transform → write)
-  - Research and documentation workflows
-  - Code analysis and improvement patterns
-  - Multi-step content creation processes
-  - Recurring automation tasks
+  ## Pattern Recognition Intelligence:
+  - Look for linguistic patterns: "give me X ideas", "help me outline", "research and summarize"
+  - Detect workflow stages: ideation → planning → creation → refinement
+  - Identify content domains from session content (don't assume specific domains)
+  - Recognize tool usage signatures that indicate reusable processes
+  - Find parameter opportunities in repeated values (paths, URLs, content types)
+  - Distinguish setup tasks (one-time) from creative/analytical processes (repetitive)
 
 extensions:
   - type: builtin
     name: developer
+  - type: builtin
+    name: dynamic_task
 
 activities:
   - analyze_sessions
