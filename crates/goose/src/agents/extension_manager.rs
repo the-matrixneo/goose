@@ -1107,6 +1107,45 @@ impl ExtensionManager {
             .get(&name.into())
             .map(|ext| ext.get_client())
     }
+
+    /// Collect and aggregate MOIM content from all platform extensions.
+    ///
+    /// MOIM (Minus One Info Message) provides ephemeral context that's
+    /// injected into LLM calls without modifying conversation history.
+    ///
+    /// Always includes:
+    /// - Current timestamp
+    ///
+    /// May include (from platform extensions):
+    /// - TODO content
+    /// - Memory/context from other extensions
+    /// - Any dynamic, session-aware information
+    pub async fn collect_moim(&self) -> Option<String> {
+        use chrono::Local;
+
+        // Always start with timestamp
+        let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+        let mut content = format!("Current date and time: {}\n", timestamp);
+
+        // Collect from platform extensions only
+        // Platform extensions run in-process and can provide session-aware content
+        let extensions = self.extensions.lock().await;
+        for (name, extension) in extensions.iter() {
+            // Only platform extensions can provide MOIM
+            if let ExtensionConfig::Platform { .. } = &extension.config {
+                let client = extension.get_client();
+                let client_guard = client.lock().await;
+                if let Some(moim_content) = client_guard.get_moim().await {
+                    tracing::debug!("MOIM content from {}: {} chars", name, moim_content.len());
+                    content.push('\n');
+                    content.push_str(&moim_content);
+                }
+            }
+        }
+
+        // Always return content (at minimum, timestamp)
+        Some(content)
+    }
 }
 
 #[cfg(test)]
