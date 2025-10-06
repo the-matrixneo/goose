@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::fs;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use axum::routing::get;
@@ -13,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::routes::errors::ErrorResponse;
-use crate::routes::recipe_utils::{get_all_recipes_manifests, save_recipe_file_hash_map, find_recipe_file_path_by_id};
+use crate::routes::recipe_utils::get_all_recipes_manifests;
 use crate::state::AppState;
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -250,6 +251,7 @@ async fn scan_recipe(
     tag = "Recipe Management"
 )]
 async fn list_recipes(
+    State(state): State<Arc<AppState>>,
 ) -> Result<Json<ListRecipeResponse>, StatusCode> {
     let recipe_manifest_with_paths = get_all_recipes_manifests().unwrap_or_default();
     let mut recipe_file_hash_map = HashMap::new();
@@ -267,10 +269,7 @@ async fn list_recipes(
             }
         })
         .collect::<Vec<RecipeManifestResponse>>();
-    if let Err(e) = save_recipe_file_hash_map(&recipe_file_hash_map) {
-        tracing::error!("Failed to save recipe file hash map to temp file: {}", e);
-        return Err(StatusCode::INTERNAL_SERVER_ERROR);
-    }
+    state.set_recipe_file_hash_map(recipe_file_hash_map).await;
 
     Ok(Json(ListRecipeResponse {
         recipe_manifest_responses,
@@ -290,14 +289,12 @@ async fn list_recipes(
     tag = "Recipe Management"
 )]
 async fn delete_recipe(
+    State(state): State<Arc<AppState>>,
     Json(request): Json<DeleteRecipeRequest>,
 ) -> StatusCode {
-    let file_path = match find_recipe_file_path_by_id(&request.id) {
+    let file_path = match get_recipe_file_path_by_id(state.clone(), &request.id).await {
         Ok(path) => path,
-        Err(e) => {
-            tracing::error!("Failed to find recipe file path: {}", e);
-            return StatusCode::NOT_FOUND;
-        }
+        Err(err) => return err.status,
     };
 
     if fs::remove_file(file_path).is_err() {
@@ -319,19 +316,11 @@ async fn delete_recipe(
     tag = "Recipe Management"
 )]
 async fn save_recipe(
+    State(state): State<Arc<AppState>>,
     Json(request): Json<SaveRecipeRequest>,
 ) -> Result<StatusCode, ErrorResponse> {
-    let file_path = match request.id {
-        Some(id) => match find_recipe_file_path_by_id(&id) {
-            Ok(path) => Some(path),
-            Err(e) => {
-                tracing::error!("Failed to find recipe file path: {}", e);
-                return Err(ErrorResponse {
-                    message: format!("Recipe not found: {}", e),
-                    status: StatusCode::NOT_FOUND,
-                });
-            }
-        },
+    let file_path = match request.id.as_ref() {
+        Some(id) => Some(get_recipe_file_path_by_id(state.clone(), id).await?),
         None => None,
     };
 
@@ -342,6 +331,41 @@ async fn save_recipe(
             status: StatusCode::INTERNAL_SERVER_ERROR,
         }),
     }
+}
+
+async fn get_recipe_file_path_by_id(
+    state: Arc<AppState>,
+    id: &str,
+) -> Result<PathBuf, ErrorResponse> {
+    let cached_path = {
+        let map = state.recipe_file_hash_map.lock().await;
+        map.get(id).cloned()
+    };
+
+    if let Some(path) = cached_path {
+        return Ok(path);
+    }
+
+    let recipe_manifest_with_paths = get_all_recipes_manifests().unwrap_or_default();
+    let mut recipe_file_hash_map = HashMap::new();
+    let mut resolved_path: Option<PathBuf> = None;
+
+    for recipe_manifest_with_path in &recipe_manifest_with_paths {
+        if recipe_manifest_with_path.id == id {
+            resolved_path = Some(recipe_manifest_with_path.file_path.clone());
+        }
+        recipe_file_hash_map.insert(
+            recipe_manifest_with_path.id.clone(),
+            recipe_manifest_with_path.file_path.clone(),
+        );
+    }
+
+    state.set_recipe_file_hash_map(recipe_file_hash_map).await;
+
+    resolved_path.ok_or_else(|| ErrorResponse {
+        message: format!("Recipe not found: {}", id),
+        status: StatusCode::NOT_FOUND,
+    })
 }
 
 #[utoipa::path(
