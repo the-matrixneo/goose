@@ -15,7 +15,7 @@ Myself, I had over a hundred goose sessions and as many megabytes of conversatio
 
 ## The Problem with Manual Recipe Creation
 
-Creating recipes manually is time-consuming, especially if you're looking through dozens or hundreds of previous sessions like I was.
+Creating recipes manually is time-consuming, especially if you're looking through dozens or hundreds of previous sessions like I was, to do the following:
 
 - Figure out which sessions were successful or not
 - Extract the core workflow from lengthy conversations  
@@ -25,7 +25,7 @@ Creating recipes manually is time-consuming, especially if you're looking throug
 
 Isn't this the goal of having an AI agent in the first place? To save time and effort?
 
-Let's boose our productivity gains by implementing some automation. We're gonna get goose to write a recipe to write OTHER recipes!
+Let's boost our productivity by implementing some automation. We're gonna get goose to write a recipe that creates OTHER recipes!
 
 ## What is the Cookbook Generator Recipe?
 
@@ -98,7 +98,7 @@ From that, I had goose think about the following ideas as it considered how to m
 - Parameter validation and defaults
 - Conditional logic for different scenarios
 - Loop constructs for repetitive tasks
-- Sub-recipe integration where appropriate
+- Subrecipe integration where appropriate
 
 ## Real-World Results
 
@@ -116,11 +116,13 @@ The recipes were about 90% workable, and I went through and refined some of thos
 
 ### Do the recipes ACTUALLY work though?
 
-- The outline for this blog post was created by the outline generator; I always hand-write my blog posts.
-- The thumbnail on this blog post was generated in part by the image generator (the conveyor belt)
-- You found this blog post because of the social media post generator; that's 100% goose writing that for me!
-- The short video you saw in the social media post that brought you here had its script outlined by the outline generator
-- The longer YouTube video the outlines more of this was also outlined by the outline generator
+By running the outline generator recipe (three times), the image generator recipe, and social media recipe, goose took care of the following work:
+
+- the outline for this blog post, so I could write the content faster
+- the "conveyor belt" image at the top of this post (via Gemini)
+- the social media posts you saw that brought you here
+- the video script for the short video in the social media posts
+- the script outline for a longer video going on our [YouTube channel](https://youtube.com/@goose-oss)
 
 So, yeah. They work!
 
