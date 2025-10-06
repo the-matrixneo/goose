@@ -490,7 +490,6 @@ let appConfig = {
 };
 
 const windowMap = new Map<number, BrowserWindow>();
-
 const goosedClients = new Map<number, Client>();
 
 // Track power save blockers per window
@@ -512,28 +511,7 @@ const createChat = async (
   let workingDir = '';
   let goosedProcess: import('child_process').ChildProcess | null = null;
 
-  if (viewType === 'recipeEditor') {
-    // For recipeEditor, get the port from existing windows' config
-    const existingWindows = BrowserWindow.getAllWindows();
-    if (existingWindows.length > 0) {
-      // Get the config from localStorage through an existing window
-      try {
-        const config = await existingWindows[0].webContents.executeJavaScript(
-          `window.electron.getConfig()`
-        );
-        if (config) {
-          port = config.GOOSE_PORT;
-          workingDir = config.GOOSE_WORKING_DIR;
-        }
-      } catch (e) {
-        console.error('Failed to get config from localStorage:', e);
-      }
-    }
-    if (port === 0) {
-      console.error('No existing Goose process found for recipeEditor');
-      throw new Error('Cannot create recipeEditor window: No existing Goose process found');
-    }
-  } else {
+  {
     // Apply current environment settings before creating chat
     updateEnvironmentVariables(envToggles);
 
@@ -625,6 +603,12 @@ const createChat = async (
   );
   goosedClients.set(mainWindow.id, goosedClient);
 
+  console.log('[Main] Waiting for backend server to be ready...');
+  const serverReady = await checkServerStatus(goosedClient);
+  if (!serverReady) {
+    throw new Error('Backend server failed to start in time');
+  }
+
   // Let windowStateKeeper manage the window
   mainWindowState.manage(mainWindow);
 
@@ -698,7 +682,6 @@ const createChat = async (
     permission: '/permission',
     ConfigureProviders: '/configure-providers',
     sharedSession: '/shared-session',
-    recipeEditor: '/recipe-editor',
     welcome: '/welcome',
   };
 
@@ -1092,7 +1075,6 @@ ipcMain.handle('get-goosed-host-port', async (event) => {
   if (!client) {
     return null;
   }
-  await checkServerStatus(client);
   return client.getConfig().baseUrl || null;
 });
 
