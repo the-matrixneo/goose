@@ -13,7 +13,7 @@ vi.mock('../../../toasts', () => ({
   toastError: vi.fn(),
 }));
 
-vi.mock('../../../recipe/recipeStorage', () => ({
+vi.mock('../../../recipe/recipe_management', () => ({
   saveRecipe: vi.fn(),
 }));
 
