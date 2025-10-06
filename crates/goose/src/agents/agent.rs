@@ -1042,7 +1042,7 @@ impl Agent {
                 let mut stream = Self::stream_response_from_provider(
                     self.provider().await?,
                     &system_prompt,
-                    &messages_with_moim,  // <-- Use MOIM-injected messages
+                    &messages_with_moim,
                     &tools,
                     &toolshim_tools,
                 ).await?;
