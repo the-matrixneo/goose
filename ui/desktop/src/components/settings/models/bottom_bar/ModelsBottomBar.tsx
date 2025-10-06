@@ -27,6 +27,7 @@ interface ModelsBottomBarProps {
   setView: (view: View) => void;
   alerts: Alert[];
   recipe?: Recipe | null;
+  recipeId?: string | null;
   hasMessages?: boolean; // Add prop to know if there are messages to create a recipe from
 }
 
@@ -36,6 +37,7 @@ export default function ModelsBottomBar({
   setView,
   alerts,
   recipe,
+  recipeId,
   hasMessages = false,
 }: ModelsBottomBarProps) {
   const {
@@ -262,6 +264,7 @@ export default function ModelsBottomBar({
           isOpen={showSaveDialog}
           onClose={() => setShowSaveDialog(false)}
           recipe={recipe}
+          recipeId={recipeId}
         />
       )}
 
@@ -272,6 +275,7 @@ export default function ModelsBottomBar({
           isOpen={showViewRecipeModal}
           onClose={() => setShowViewRecipeModal(false)}
           recipe={recipe}
+          recipeId={recipeId}
           recipeName={generateRecipeFilename(recipe)}
         />
       )}

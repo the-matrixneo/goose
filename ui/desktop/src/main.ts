@@ -503,7 +503,8 @@ const createChat = async (
   recipe?: Recipe, // Recipe configuration when already loaded, takes precedence over deeplink
   viewType?: string,
   recipeDeeplink?: string, // Raw deeplink used as a fallback when recipe is not loaded. Required on new windows as we need to wait for the window to load before decoding.
-  scheduledJobId?: string // Scheduled job ID if applicable
+  scheduledJobId?: string, // Scheduled job ID if applicable
+  recipeId?: string
 ) => {
   // Initialize variables for process and configuration
   let port = 0;
@@ -576,6 +577,7 @@ const createChat = async (
           GOOSE_BASE_URL_SHARE: baseUrlShare,
           GOOSE_VERSION: version,
           recipe: recipe,
+          recipeId: recipeId,
         }),
       ],
       partition: 'persist:goose', // Add this line to ensure persistence
@@ -1952,18 +1954,32 @@ async function appMain() {
     }
   });
 
-  ipcMain.on('create-chat-window', (_, query, dir, version, resumeSessionId, recipe, viewType) => {
-    if (!dir?.trim()) {
-      const recentDirs = loadRecentDirs();
-      dir = recentDirs.length > 0 ? recentDirs[0] : undefined;
+  ipcMain.on(
+    'create-chat-window',
+    (_, query, dir, version, resumeSessionId, recipe, viewType, recipeId) => {
+      if (!dir?.trim()) {
+        const recentDirs = loadRecentDirs();
+        dir = recentDirs.length > 0 ? recentDirs[0] : undefined;
+      }
+
+      // Log the recipe for debugging
+      console.log('Creating chat window with recipe:', recipe);
+
+      // Pass recipe as part of viewOptions when viewType is recipeEditor
+      createChat(
+        app,
+        query,
+        dir,
+        version,
+        resumeSessionId,
+        recipe,
+        viewType,
+        undefined,
+        undefined,
+        recipeId
+      );
     }
-
-    // Log the recipe for debugging
-    console.log('Creating chat window with recipe:', recipe);
-
-    // Pass recipe as part of viewOptions when viewType is recipeEditor
-    createChat(app, query, dir, version, resumeSessionId, recipe, viewType);
-  });
+  );
 
   ipcMain.on('notify', (_event, data) => {
     try {

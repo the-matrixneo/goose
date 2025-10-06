@@ -11,8 +11,8 @@ import { Button } from '../ui/button';
 
 import { RecipeFormFields } from './shared/RecipeFormFields';
 import { RecipeFormData } from './shared/recipeFormSchema';
-import { saveRecipe, generateRecipeFilename } from '../../recipe/recipeStorage';
 import { toastSuccess, toastError } from '../../toasts';
+import { saveRecipe } from '../../recipe/recipe_management';
 
 interface CreateEditRecipeModalProps {
   isOpen: boolean;
@@ -20,6 +20,7 @@ interface CreateEditRecipeModalProps {
   recipe?: Recipe;
   recipeName?: string;
   isCreateMode?: boolean;
+  recipeId?: string | null;
 }
 
 export default function CreateEditRecipeModal({
@@ -28,6 +29,7 @@ export default function CreateEditRecipeModal({
   recipe,
   recipeName: initialRecipeName,
   isCreateMode = false,
+  recipeId,
 }: CreateEditRecipeModalProps) {
   const { getExtensions } = useConfig();
 
@@ -312,10 +314,7 @@ export default function CreateEditRecipeModal({
     try {
       const recipe = getCurrentRecipe();
 
-      await saveRecipe(recipe, {
-        name: (recipeName || '').trim(),
-        global: global,
-      });
+      await saveRecipe(recipe, global, recipeId);
 
       onClose(true);
 
@@ -348,18 +347,22 @@ export default function CreateEditRecipeModal({
     setIsSaving(true);
     try {
       const recipe = getCurrentRecipe();
-      const recipeName = generateRecipeFilename(recipe);
 
-      await saveRecipe(recipe, {
-        name: recipeName,
-        global: true,
-      });
+      await saveRecipe(recipe, true, recipeId);
 
       // Close modal first
       onClose(true);
 
       // Open recipe in a new window instead of navigating in the same window
-      window.electron.createChatWindow(undefined, undefined, undefined, undefined, recipe);
+      window.electron.createChatWindow(
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        recipe,
+        undefined,
+        recipeId ?? undefined
+      );
 
       toastSuccess({
         title: recipeName,
@@ -509,7 +512,8 @@ export default function CreateEditRecipeModal({
             undefined,
             undefined,
             undefined,
-            'schedules'
+            'schedules',
+            undefined
           );
           // Store the deep link in localStorage for the schedules view to pick up
           localStorage.setItem('pendingScheduleDeepLink', deepLink);

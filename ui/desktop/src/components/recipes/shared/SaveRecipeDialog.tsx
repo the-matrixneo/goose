@@ -1,16 +1,18 @@
 import React, { useState } from 'react';
 import { Button } from '../../ui/button';
 import { Recipe } from '../../../recipe';
-import { saveRecipe, generateRecipeFilename } from '../../../recipe/recipeStorage';
+import { generateRecipeFilename } from '../../../recipe/recipeStorage';
 import { toastSuccess, toastError } from '../../../toasts';
 import { useEscapeKey } from '../../../hooks/useEscapeKey';
 import { Play } from 'lucide-react';
+import { saveRecipe } from '../../../recipe/recipe_management';
 
 interface SaveRecipeDialogProps {
   isOpen: boolean;
   onClose: (wasSaved?: boolean) => void;
   onSuccess?: () => void;
   recipe: Recipe;
+  recipeId?: string | null;
   suggestedName?: string;
   showSaveAndRun?: boolean;
   onSaveAndRun?: (recipe: Recipe) => void;
@@ -21,6 +23,7 @@ export default function SaveRecipeDialog({
   onClose,
   onSuccess,
   recipe,
+  recipeId,
   suggestedName,
   showSaveAndRun = false,
   onSaveAndRun,
@@ -52,10 +55,7 @@ export default function SaveRecipeDialog({
         throw new Error('Invalid recipe configuration: missing required fields');
       }
 
-      await saveRecipe(recipe, {
-        name: saveRecipeName.trim(),
-        global: saveGlobal,
-      });
+      await saveRecipe(recipe, saveGlobal, recipeId);
 
       setSaveRecipeName('');
       onClose(true);
@@ -90,10 +90,7 @@ export default function SaveRecipeDialog({
         throw new Error('Invalid recipe configuration: missing required fields');
       }
 
-      await saveRecipe(recipe, {
-        name: saveRecipeName.trim(),
-        global: saveGlobal,
-      });
+      await saveRecipe(recipe, saveGlobal, recipeId);
 
       setSaveRecipeName('');
       onClose(true);

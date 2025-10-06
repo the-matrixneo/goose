@@ -65,8 +65,9 @@ export default function RecipesView() {
     }
   };
 
-  const handleLoadRecipe = async (recipe: Recipe) => {
+  const handleLoadRecipe = async (recipe: Recipe, recipeId: string) => {
     try {
+      console.log('====== RecipesView handleLoadRecipe recipeId:', recipeId);
       // onLoadRecipe is not working for loading recipes. It looks correct
       // but the instructions are not flowing through to the server.
       // Needs a fix but commenting out to get prod back up and running.
@@ -82,7 +83,8 @@ export default function RecipesView() {
         undefined, // version
         undefined, // resumeSessionId
         recipe, // recipe config
-        undefined // view type
+        undefined, // view type,
+        recipeId // recipe id
       );
       // }
     } catch (err) {
@@ -174,7 +176,7 @@ export default function RecipesView() {
           <Button
             onClick={(e) => {
               e.stopPropagation();
-              handleLoadRecipe(recipe);
+              handleLoadRecipe(recipe, recipeManifestResponse.id);
             }}
             size="sm"
             className="h-8 w-8 p-0"
@@ -340,6 +342,7 @@ export default function RecipesView() {
           onClose={handleEditorClose}
           recipe={selectedRecipe.recipe}
           recipeName={selectedRecipe.name}
+          recipeId={selectedRecipe.id}
         />
       )}
 
