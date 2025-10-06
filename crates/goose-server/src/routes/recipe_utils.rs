@@ -1,8 +1,10 @@
 use std::collections::HashMap;
 use std::fs;
+use std::fs::OpenOptions;
 use std::hash::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
+use fs2::FileExt;
 
 use anyhow::Result;
 
@@ -67,9 +69,40 @@ pub fn save_recipe_file_hash_map(hash_map: &HashMap<String, std::path::PathBuf>)
     let temp_path = get_recipe_temp_file_path();
     let json_data = serde_json::to_string(hash_map)
         .map_err(|e| anyhow::anyhow!("Failed to serialize hash map: {}", e))?;
-    fs::write(temp_path, json_data)
-        .map_err(|e| anyhow::anyhow!("Failed to write recipe id to file: {}", e))?;
-    Ok(())
+
+    const MAX_RETRIES: u32 = 10;
+    const RETRY_DELAY_MS: u64 = 50;
+
+    for attempt in 0..MAX_RETRIES {
+        let file = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(&temp_path)
+            .map_err(|e| anyhow::anyhow!("Failed to open recipe file for writing: {}", e))?;
+
+        match file.try_lock_exclusive() {
+            Ok(_) => {
+                fs::write(&temp_path, json_data)
+                    .map_err(|e| anyhow::anyhow!("Failed to write recipe id to file: {}", e))?;
+
+                return Ok(());
+            }
+            Err(_) if attempt < MAX_RETRIES - 1 => {
+                std::thread::sleep(std::time::Duration::from_millis(RETRY_DELAY_MS));
+                continue;
+            }
+            Err(e) => {
+                return Err(anyhow::anyhow!(
+                    "Failed to acquire lock on recipe file after {} attempts: {}",
+                    MAX_RETRIES,
+                    e
+                ));
+            }
+        }
+    }
+
+    Err(anyhow::anyhow!("Failed to save recipe file hash map"))
 }
 
 fn load_recipe_file_hash_map() -> Result<HashMap<String, std::path::PathBuf>> {
