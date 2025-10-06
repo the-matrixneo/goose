@@ -5,12 +5,12 @@ import { Download } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Recipe, decodeRecipe } from '../../recipe';
-import * as yaml from 'yaml';
 import { toastSuccess, toastError } from '../../toasts';
 import { useEscapeKey } from '../../hooks/useEscapeKey';
 import { RecipeTitleField } from './shared/RecipeTitleField';
 import { getRecipeJsonSchema } from '../../recipe/validation';
 import { saveRecipe } from '../../recipe/recipe_management';
+import { parseRecipe } from '../../api';
 
 interface ImportRecipeFormProps {
   isOpen: boolean;
@@ -86,30 +86,14 @@ export default function ImportRecipeForm({ isOpen, onClose, onSuccess }: ImportR
     }
   };
 
-  const parseRecipeUploadFile = async (fileContent: string, fileName: string): Promise<Recipe> => {
-    const isJsonFile = fileName.toLowerCase().endsWith('.json');
-    let parsed;
-
-    try {
-      if (isJsonFile) {
-        parsed = JSON.parse(fileContent);
-      } else {
-        parsed = yaml.parse(fileContent);
-      }
-    } catch (error) {
-      throw new Error(
-        `Failed to parse ${isJsonFile ? 'JSON' : 'YAML'} file: ${error instanceof Error ? error.message : 'Invalid format'}`
-      );
-    }
-
-    if (!parsed) {
-      throw new Error(`${isJsonFile ? 'JSON' : 'YAML'} file is empty or contains invalid content`);
-    }
-
-    // Handle both CLI format (flat structure) and Desktop format (nested under 'recipe' key)
-    const recipe = parsed.recipe || parsed;
-
-    return recipe as Recipe;
+  const parseRecipeFromFile = async (fileContent: string): Promise<Recipe> => {
+    let response = await parseRecipe({
+      body: {
+        content: fileContent,
+      },
+      throwOnError: true,
+    });
+    return response.data.recipe;
   };
 
   const importRecipeForm = useForm({
@@ -136,7 +120,7 @@ export default function ImportRecipeForm({ isOpen, onClose, onSuccess }: ImportR
           recipe = parsedRecipe;
         } else {
           const fileContent = await value.recipeUploadFile!.text();
-          recipe = await parseRecipeUploadFile(fileContent, value.recipeUploadFile!.name);
+          recipe = await parseRecipeFromFile(fileContent);
         }
 
         recipe.title = value.recipeTitle.trim();
@@ -221,7 +205,7 @@ export default function ImportRecipeForm({ isOpen, onClose, onSuccess }: ImportR
     if (file) {
       try {
         const fileContent = await file.text();
-        const recipe = await parseRecipeUploadFile(fileContent, file.name);
+        const recipe = await parseRecipeFromFile(fileContent);
         if (recipe.title) {
           if (recipeTitleFieldRef) {
             recipeTitleFieldRef.handleChange(recipe.title);
