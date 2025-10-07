@@ -25,10 +25,10 @@ pub async fn inject_moim(
     let moim_message = Message::user()
         .with_text(moim_content)
         .with_id(format!("moim_{}", Uuid::new_v4()))
-        .agent_only(); // Visible to agent, not user
+        .agent_only();
 
     let mut messages_with_moim = messages.to_vec();
-    messages_with_moim.push(moim_message); // Simple append to end
+    messages_with_moim.push(moim_message);
 
     messages_with_moim
 }
@@ -44,15 +44,12 @@ mod tests {
 
         let result = inject_moim(&messages, &extension_manager, &None).await;
 
-        // MOIM always includes timestamp, so should have one message
         assert_eq!(result.len(), 1);
         assert!(result[0].id.as_ref().unwrap().starts_with("moim_"));
 
-        // Verify the message contains timestamp
         let content = result[0].content.first().and_then(|c| c.as_text()).unwrap();
         assert!(content.contains("Current date and time:"));
 
-        // Verify agent_only metadata
         assert!(!result[0].is_user_visible());
         assert!(result[0].is_agent_visible());
     }
@@ -67,22 +64,17 @@ mod tests {
 
         let result = inject_moim(&messages, &extension_manager, &None).await;
 
-        // MOIM appends to end, so should have 3 messages
         assert_eq!(result.len(), 3);
 
-        // MOIM should be at the last position
         let moim_msg = &result[2];
         assert!(moim_msg.id.as_ref().unwrap().starts_with("moim_"));
 
-        // Verify the message contains timestamp
         let content = moim_msg.content.first().and_then(|c| c.as_text()).unwrap();
         assert!(content.contains("Current date and time:"));
 
-        // Verify agent_only metadata
         assert!(!moim_msg.is_user_visible());
         assert!(moim_msg.is_agent_visible());
 
-        // Verify original messages unchanged
         assert_eq!(result[0].as_concat_text(), "Hello");
         assert_eq!(result[1].as_concat_text(), "Hi there");
     }
