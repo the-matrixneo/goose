@@ -708,8 +708,8 @@ mod final_output_tool_tests {
             ) -> Result<MessageStream, ProviderError> {
                 if let Some(last_msg) = _messages
                     .iter()
-                    .filter(|m| !m.id.as_ref().map_or(false, |id| id.starts_with("moim_")))
-                    .last()
+                    .filter(|m| !m.id.as_ref().is_some_and(|id| id.starts_with("moim_")))
+                    .next_back()
                 {
                     for content in &last_msg.content {
                         if let goose::conversation::message::MessageContent::Text(text_content) =
