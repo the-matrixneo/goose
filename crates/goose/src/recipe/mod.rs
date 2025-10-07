@@ -254,31 +254,19 @@ impl Recipe {
     }
 
     pub fn from_content(content: &str) -> Result<Self> {
-        // Parse using YAML parser (since JSON is a subset of YAML, this handles both)
-        let mut value: serde_yaml::Value = serde_yaml::from_str(content)
-            .map_err(|e| anyhow::anyhow!("Failed to parse recipe content as YAML/JSON: {}", e))?;
-
-        // Handle nested legacy recipe format
-        if let Some(nested_recipe) = value.get("recipe") {
-            value = nested_recipe.clone();
-        }
-
-        if let Some(extensions) = value
-            .get_mut("extensions")
-            .and_then(|v| v.as_sequence_mut())
-        {
-            extensions
-                .iter_mut()
-                .filter_map(|ext| ext.as_mapping_mut())
-                .for_each(|obj| {
-                    if obj.get("description").is_none_or(|v| v.is_null()) {
-                        obj.insert("description".into(), "".into());
-                    }
-                });
-        }
-
-        let recipe: Recipe = serde_yaml::from_value(value)
-            .map_err(|e| anyhow::anyhow!("Failed to parse recipe: {}", e))?;
+        let recipe: Recipe = match serde_yaml::from_str::<serde_yaml::Value>(content) {
+            Ok(yaml_value) => {
+                if let Some(nested_recipe) = yaml_value.get("recipe") {
+                    serde_yaml::from_value(nested_recipe.clone())
+                        .map_err(|e| anyhow::anyhow!("Failed to parse nested recipe: {}", e))?
+                } else {
+                    serde_yaml::from_str(content)
+                        .map_err(|e| anyhow::anyhow!("Failed to parse recipe: {}", e))?
+                }
+            }
+            Err(_) => serde_yaml::from_str(content)
+                .map_err(|e| anyhow::anyhow!("Failed to parse recipe: {}", e))?,
+        };
 
         if let Some(ref retry_config) = recipe.retry {
             if let Err(validation_error) = retry_config.validate() {

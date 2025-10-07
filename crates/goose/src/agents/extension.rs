@@ -9,10 +9,17 @@ use once_cell::sync::Lazy;
 use rmcp::model::Tool;
 use rmcp::service::ClientInitializeError;
 use rmcp::ServiceError as ClientError;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use thiserror::Error;
 use tracing::warn;
 use utoipa::ToSchema;
+
+fn deserialize_string_or_empty<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Ok(Option::<String>::deserialize(deserializer)?.unwrap_or_default())
+}
 
 #[derive(Error, Debug)]
 #[error("process quit before initialization: stderr = {stderr}")]
@@ -184,6 +191,7 @@ pub enum ExtensionConfig {
     Sse {
         /// The name used to identify this extension
         name: String,
+        #[serde(default, deserialize_with = "deserialize_string_or_empty")]
         description: String,
         uri: String,
         #[serde(default)]
@@ -203,6 +211,7 @@ pub enum ExtensionConfig {
     Stdio {
         /// The name used to identify this extension
         name: String,
+        #[serde(default, deserialize_with = "deserialize_string_or_empty")]
         description: String,
         cmd: String,
         args: Vec<String>,
@@ -221,6 +230,7 @@ pub enum ExtensionConfig {
     Builtin {
         /// The name used to identify this extension
         name: String,
+        #[serde(default, deserialize_with = "deserialize_string_or_empty")]
         description: String,
         display_name: Option<String>, // needed for the UI
         timeout: Option<u64>,
@@ -234,6 +244,7 @@ pub enum ExtensionConfig {
     Platform {
         /// The name used to identify this extension
         name: String,
+        #[serde(default, deserialize_with = "deserialize_string_or_empty")]
         description: String,
         #[serde(default)]
         bundled: Option<bool>,
@@ -245,6 +256,7 @@ pub enum ExtensionConfig {
     StreamableHttp {
         /// The name used to identify this extension
         name: String,
+        #[serde(default, deserialize_with = "deserialize_string_or_empty")]
         description: String,
         uri: String,
         #[serde(default)]
@@ -266,6 +278,7 @@ pub enum ExtensionConfig {
     Frontend {
         /// The name used to identify this extension
         name: String,
+        #[serde(default, deserialize_with = "deserialize_string_or_empty")]
         description: String,
         /// The tools provided by the frontend
         tools: Vec<Tool>,
@@ -281,6 +294,7 @@ pub enum ExtensionConfig {
     InlinePython {
         /// The name used to identify this extension
         name: String,
+        #[serde(default)]
         description: String,
         /// The Python code to execute
         code: String,
