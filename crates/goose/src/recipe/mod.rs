@@ -266,17 +266,14 @@ impl Recipe {
             .get_mut("extensions")
             .and_then(|v| v.as_sequence_mut())
         {
-            for ext in extensions.iter_mut() {
-                if let Some(obj) = ext.as_mapping_mut() {
-                    if let Some(desc) = obj.get("description") {
-                        if desc.is_null() || desc.as_str().is_some_and(|s| s.is_empty()) {
-                            if let Some(name) = obj.get("name").and_then(|n| n.as_str()) {
-                                obj.insert("description".into(), name.into());
-                            }
-                        }
+            extensions
+                .iter_mut()
+                .filter_map(|ext| ext.as_mapping_mut())
+                .for_each(|obj| {
+                    if obj.get("description").is_none_or(|v| v.is_null()) {
+                        obj.insert("description".into(), "".into());
                     }
-                }
-            }
+                });
         }
 
         let recipe: Recipe = serde_yaml::from_value(value)

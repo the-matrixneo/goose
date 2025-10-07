@@ -134,7 +134,7 @@ fn scan_directory_for_recipes(dir: &Path) -> Result<Vec<(PathBuf, Recipe)>> {
     Ok(recipes)
 }
 
-fn generate_recipe_filename(title: &str) -> String {
+fn generate_recipe_filename(title: &str, recipe_library_dir: &Path) -> PathBuf {
     let base_name = title
         .to_lowercase()
         .chars()
@@ -149,7 +149,20 @@ fn generate_recipe_filename(title: &str) -> String {
     } else {
         base_name
     };
-    format!("{}.yaml", filename)
+
+    let mut candidate = recipe_library_dir.join(format!("{}.yaml", filename));
+    if !candidate.exists() {
+        return candidate;
+    }
+
+    let mut counter = 1;
+    loop {
+        candidate = recipe_library_dir.join(format!("{}-{}.yaml", filename, counter));
+        if !candidate.exists() {
+            return candidate;
+        }
+        counter += 1;
+    }
 }
 
 pub fn save_recipe_to_file(
@@ -159,31 +172,12 @@ pub fn save_recipe_to_file(
 ) -> anyhow::Result<PathBuf> {
     let is_global_value = is_global.unwrap_or(true);
 
-    let default_file_path =
-        get_recipe_library_dir(is_global_value).join(generate_recipe_filename(&recipe.title));
+    let recipe_library_dir = get_recipe_library_dir(is_global_value);
 
     let file_path_value = match file_path {
         Some(path) => path,
-        None => {
-            if default_file_path.exists() {
-                return Err(anyhow::anyhow!(
-                    "Recipe file already exists at: {:?}",
-                    default_file_path
-                ));
-            }
-            default_file_path
-        }
+        None => generate_recipe_filename(&recipe.title, &recipe_library_dir),
     };
-    let all_recipes = list_local_recipes()?;
-
-    for (existing_path, existing_recipe) in &all_recipes {
-        if existing_recipe.title == recipe.title && existing_path != &file_path_value {
-            return Err(anyhow::anyhow!(
-                "Recipe with title '{}' already exists",
-                recipe.title
-            ));
-        }
-    }
 
     let yaml_content = serde_yaml::to_string(&recipe)?;
     fs::write(&file_path_value, yaml_content)?;

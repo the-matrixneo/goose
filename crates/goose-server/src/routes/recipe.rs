@@ -3,6 +3,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use axum::extract::rejection::JsonRejection;
 use axum::routing::get;
 use axum::{extract::State, http::StatusCode, routing::post, Json, Router};
 use goose::recipe::local_recipes;
@@ -317,8 +318,9 @@ async fn delete_recipe(
 )]
 async fn save_recipe(
     State(state): State<Arc<AppState>>,
-    Json(request): Json<SaveRecipeRequest>,
+    payload: Result<Json<SaveRecipeRequest>, JsonRejection>,
 ) -> Result<StatusCode, ErrorResponse> {
+    let Json(request) = payload.map_err(json_rejection_to_error_response)?;
     let file_path = match request.id.as_ref() {
         Some(id) => Some(get_recipe_file_path_by_id(state.clone(), id).await?),
         None => None,
@@ -330,6 +332,13 @@ async fn save_recipe(
             message: e.to_string(),
             status: StatusCode::INTERNAL_SERVER_ERROR,
         }),
+    }
+}
+
+fn json_rejection_to_error_response(rejection: JsonRejection) -> ErrorResponse {
+    ErrorResponse {
+        message: rejection.body_text(),
+        status: StatusCode::BAD_REQUEST,
     }
 }
 
