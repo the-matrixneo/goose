@@ -8,6 +8,10 @@ use futures::stream::BoxStream;
 use futures::{stream, FutureExt, Stream, StreamExt, TryStreamExt};
 use uuid::Uuid;
 
+use super::final_output_tool::FinalOutputTool;
+use super::model_selector::autopilot::AutoPilot;
+use super::platform_tools;
+use super::tool_execution::{ToolCallResult, CHAT_MODE_TOOL_SKIPPED_RESPONSE, DECLINED_RESPONSE};
 use crate::agents::extension::{ExtensionConfig, ExtensionError, ExtensionResult, ToolInfo};
 use crate::agents::extension_manager::{get_parameter_names, ExtensionManager};
 use crate::agents::final_output_tool::{FINAL_OUTPUT_CONTINUATION_MESSAGE, FINAL_OUTPUT_TOOL_NAME};
@@ -27,12 +31,14 @@ use crate::agents::subagent_execution_tool::subagent_execute_task_tool::{
     self, SUBAGENT_EXECUTE_TASK_TOOL_NAME,
 };
 use crate::agents::subagent_execution_tool::tasks_manager::TasksManager;
+use crate::agents::subagent_task_config::TaskConfig;
 use crate::agents::tool_route_manager::ToolRouteManager;
 use crate::agents::tool_router_index_manager::ToolRouterIndexManager;
 use crate::agents::types::SessionConfig;
 use crate::agents::types::{FrontendTool, ToolResultReceiver};
-use crate::config::{Config, ExtensionConfigManager};
+use crate::config::{get_enabled_extensions, get_extension_by_name, Config};
 use crate::context_mgmt::auto_compact;
+use crate::conversation::message::{Message, ToolRequest};
 use crate::conversation::{fix_conversation, Conversation};
 use crate::mcp_utils::ToolResult;
 use crate::permission::permission_inspector::PermissionInspector;
@@ -43,6 +49,8 @@ use crate::providers::errors::ProviderError;
 use crate::recipe::{Author, Recipe, Response, Settings, SubRecipe};
 use crate::scheduler_trait::SchedulerTrait;
 use crate::security::security_inspector::SecurityInspector;
+use crate::session::extension_data::{EnabledExtensionsState, ExtensionState};
+use crate::session::SessionManager;
 use crate::tool_inspection::ToolInspectionManager;
 use crate::tool_monitor::RepetitionInspector;
 use crate::utils::is_token_cancelled;
@@ -55,18 +63,7 @@ use serde_json::Value;
 use tokio::sync::{mpsc, Mutex};
 use tokio_util::sync::CancellationToken;
 use tracing;
-
-use super::final_output_tool::FinalOutputTool;
-use super::model_selector::autopilot::AutoPilot;
-use super::platform_tools;
-use super::tool_execution::{ToolCallResult, CHAT_MODE_TOOL_SKIPPED_RESPONSE, DECLINED_RESPONSE};
-use crate::agents::subagent_task_config::TaskConfig;
-use crate::agents::todo_tools::{
-    todo_read_tool, todo_write_tool, TODO_READ_TOOL_NAME, TODO_WRITE_TOOL_NAME,
-};
-use crate::conversation::message::{Message, ToolRequest};
-use crate::session::extension_data::ExtensionState;
-use crate::session::{extension_data, SessionManager};
+use tracing::log::warn;
 
 const DEFAULT_MAX_TURNS: u32 = 1000;
 
@@ -289,7 +286,6 @@ impl Agent {
         permission_check_result: &PermissionCheckResult,
         message_tool_response: Arc<Mutex<Message>>,
         cancel_token: Option<tokio_util::sync::CancellationToken>,
-        session: &Option<SessionConfig>,
     ) -> Result<Vec<(String, ToolStream)>> {
         let mut tool_futures: Vec<(String, ToolStream)> = Vec::new();
 
@@ -297,12 +293,7 @@ impl Agent {
         for request in &permission_check_result.approved {
             if let Ok(tool_call) = request.tool_call.clone() {
                 let (req_id, tool_result) = self
-                    .dispatch_tool_call(
-                        tool_call,
-                        request.id.clone(),
-                        cancel_token.clone(),
-                        session,
-                    )
+                    .dispatch_tool_call(tool_call, request.id.clone(), cancel_token.clone())
                     .await;
 
                 tool_futures.push((
@@ -382,7 +373,6 @@ impl Agent {
         tool_call: CallToolRequestParam,
         request_id: String,
         cancellation_token: Option<CancellationToken>,
-        session: &Option<SessionConfig>,
     ) -> (String, Result<ToolCallResult, ErrorData>) {
         if tool_call.name == PLATFORM_MANAGE_SCHEDULE_TOOL_NAME {
             let arguments = tool_call
@@ -509,93 +499,6 @@ impl Agent {
                 "Frontend tool execution required".to_string(),
                 None,
             )))
-        } else if tool_call.name == TODO_READ_TOOL_NAME {
-            // Handle task planner read tool
-            let todo_content = if let Some(session_config) = session {
-                SessionManager::get_session(&session_config.id, false)
-                    .await
-                    .ok()
-                    .and_then(|metadata| {
-                        extension_data::TodoState::from_extension_data(&metadata.extension_data)
-                            .map(|state| state.content)
-                    })
-                    .unwrap_or_default()
-            } else {
-                String::new()
-            };
-
-            ToolCallResult::from(Ok(vec![Content::text(todo_content)]))
-        } else if tool_call.name == TODO_WRITE_TOOL_NAME {
-            // Handle task planner write tool
-            let content = match tool_call.arguments {
-                Some(args) => args
-                    .get("content")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("")
-                    .to_string(),
-                None => "".to_string(),
-            };
-
-            // Character limit validation
-            let char_count = content.chars().count();
-            let max_chars = std::env::var("GOOSE_TODO_MAX_CHARS")
-                .ok()
-                .and_then(|s| s.parse().ok())
-                .unwrap_or(50_000);
-
-            if max_chars > 0 && char_count > max_chars {
-                ToolCallResult::from(Err(ErrorData::new(
-                    ErrorCode::INTERNAL_ERROR,
-                    format!(
-                        "Todo list too large: {} chars (max: {})",
-                        char_count, max_chars
-                    ),
-                    None,
-                )))
-            } else if let Some(session_config) = session {
-                match SessionManager::get_session(&session_config.id, false).await {
-                    Ok(mut session) => {
-                        let todo_state = extension_data::TodoState::new(content);
-                        if todo_state
-                            .to_extension_data(&mut session.extension_data)
-                            .is_ok()
-                        {
-                            match SessionManager::update_session(&session_config.id)
-                                .extension_data(session.extension_data)
-                                .apply()
-                                .await
-                            {
-                                Ok(_) => ToolCallResult::from(Ok(vec![Content::text(format!(
-                                    "Updated ({} chars)",
-                                    char_count
-                                ))])),
-                                Err(_) => ToolCallResult::from(Err(ErrorData::new(
-                                    ErrorCode::INTERNAL_ERROR,
-                                    "Failed to update session metadata".to_string(),
-                                    None,
-                                ))),
-                            }
-                        } else {
-                            ToolCallResult::from(Err(ErrorData::new(
-                                ErrorCode::INTERNAL_ERROR,
-                                "Failed to serialize TODO state".to_string(),
-                                None,
-                            )))
-                        }
-                    }
-                    Err(_) => ToolCallResult::from(Err(ErrorData::new(
-                        ErrorCode::INTERNAL_ERROR,
-                        "Failed to read session metadata".to_string(),
-                        None,
-                    ))),
-                }
-            } else {
-                ToolCallResult::from(Err(ErrorData::new(
-                    ErrorCode::INTERNAL_ERROR,
-                    "TODO tools require an active session to persist data".to_string(),
-                    None,
-                )))
-            }
         } else if tool_call.name == ROUTER_LLM_SEARCH_TOOL_NAME {
             match self
                 .tool_route_manager
@@ -631,6 +534,27 @@ impl Agent {
                 ),
             }),
         )
+    }
+
+    /// Save current extension state to session metadata
+    /// Should be called after any extension add/remove operation
+    pub async fn save_extension_state(&self, session: &SessionConfig) -> Result<()> {
+        let extension_configs = self.extension_manager.get_extension_configs().await;
+
+        let extensions_state = EnabledExtensionsState::new(extension_configs);
+
+        let mut session_data = SessionManager::get_session(&session.id, false).await?;
+
+        if let Err(e) = extensions_state.to_extension_data(&mut session_data.extension_data) {
+            return Err(anyhow!("Extension state serialization failed: {}", e));
+        }
+
+        SessionManager::update_session(&session.id)
+            .extension_data(session_data.extension_data)
+            .apply()
+            .await?;
+
+        Ok(())
     }
 
     #[allow(clippy::too_many_lines)]
@@ -679,9 +603,9 @@ impl Agent {
             return (request_id, result);
         }
 
-        let config = match ExtensionConfigManager::get_config_by_name(&extension_name) {
-            Ok(Some(config)) => config,
-            Ok(None) => {
+        let config = match get_extension_by_name(&extension_name) {
+            Some(config) => config,
+            None => {
                 return (
                     request_id,
                     Err(ErrorData::new(
@@ -690,16 +614,6 @@ impl Agent {
                         "Extension '{}' not found. Please check the extension name and try again.",
                         extension_name
                     ),
-                        None,
-                    )),
-                )
-            }
-            Err(e) => {
-                return (
-                    request_id,
-                    Err(ErrorData::new(
-                        ErrorCode::INTERNAL_ERROR,
-                        format!("Failed to get extension config: {}", e),
                         None,
                     )),
                 )
@@ -742,17 +656,16 @@ impl Agent {
                 }
             }
         }
+
         (request_id, result)
     }
 
     pub async fn add_extension(&self, extension: ExtensionConfig) -> ExtensionResult<()> {
         match &extension {
             ExtensionConfig::Frontend {
-                name: _,
                 tools,
                 instructions,
-                bundled: _,
-                available_tools: _,
+                ..
             } => {
                 // For frontend tools, just store them in the frontend_tools map
                 let mut frontend_tools = self.frontend_tools.lock().await;
@@ -820,10 +733,6 @@ impl Agent {
                 platform_tools::manage_extensions_tool(),
                 platform_tools::manage_schedule_tool(),
             ]);
-
-            // Add task planner tools
-            prefixed_tools.extend([todo_read_tool(), todo_write_tool()]);
-
             // Dynamic task tool
             prefixed_tools.push(create_dynamic_task_tool());
 
@@ -880,6 +789,10 @@ impl Agent {
             .list_extensions()
             .await
             .expect("Failed to list extensions")
+    }
+
+    pub async fn get_extension_configs(&self) -> Vec<ExtensionConfig> {
+        self.extension_manager.get_extension_configs().await
     }
 
     /// Handle a confirmation response for a tool request
@@ -1233,7 +1146,6 @@ impl Agent {
                                         &permission_check_result,
                                         message_tool_response.clone(),
                                         cancel_token.clone(),
-                                        &session
                                     ).await?;
 
                                     let tool_futures_arc = Arc::new(Mutex::new(tool_futures));
@@ -1289,7 +1201,12 @@ impl Agent {
                                         }
                                     }
 
-                                    if all_install_successful {
+                                    if all_install_successful && !enable_extension_request_ids.is_empty() {
+                                        if let Some(ref session_config) = session {
+                                            if let Err(e) = self.save_extension_state(session_config).await {
+                                                warn!("Failed to save extension state after runtime changes: {}", e);
+                                            }
+                                        }
                                         tools_updated = true;
                                     }
                                 }
@@ -1575,14 +1492,11 @@ impl Agent {
                 (instructions, activities)
             } else {
                 tracing::warn!("Failed to parse JSON, falling back to string parsing");
-                // If we can't get valid JSON, try string parsing
-                // Use split_once to get the content after "Instructions:".
                 let after_instructions = content
                     .split_once("instructions:")
                     .map(|(_, rest)| rest)
                     .unwrap_or(&content);
 
-                // Split once more to separate instructions from activities.
                 let (instructions_part, activities_text) = after_instructions
                     .split_once("activities:")
                     .unwrap_or((after_instructions, ""));
@@ -1607,12 +1521,7 @@ impl Agent {
                 (instructions, activities)
             };
 
-        let extensions = ExtensionConfigManager::get_all().unwrap_or_default();
-        let extension_configs: Vec<_> = extensions
-            .iter()
-            .filter(|e| e.enabled)
-            .map(|e| e.config.clone())
-            .collect();
+        let extension_configs = get_enabled_extensions();
 
         let author = Author {
             contact: std::env::var("USER")
@@ -1640,9 +1549,31 @@ impl Agent {
             extension_configs.len()
         );
 
+        let (title, description) =
+            if let Ok(json_content) = serde_json::from_str::<Value>(&clean_content) {
+                let title = json_content
+                    .get("title")
+                    .and_then(|t| t.as_str())
+                    .unwrap_or("Custom recipe from chat")
+                    .to_string();
+
+                let description = json_content
+                    .get("description")
+                    .and_then(|d| d.as_str())
+                    .unwrap_or("a custom recipe instance from this chat session")
+                    .to_string();
+
+                (title, description)
+            } else {
+                (
+                    "Custom recipe from chat".to_string(),
+                    "a custom recipe instance from this chat session".to_string(),
+                )
+            };
+
         let recipe = Recipe::builder()
-            .title("Custom recipe from chat")
-            .description("a custom recipe instance from this chat session")
+            .title(title)
+            .description(description)
             .instructions(instructions)
             .activities(activities)
             .extensions(extension_configs)
@@ -1696,21 +1627,6 @@ mod tests {
         let final_output_tool_system_prompt =
             final_output_tool_ref.as_ref().unwrap().system_prompt();
         assert!(system_prompt.contains(&final_output_tool_system_prompt));
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_todo_tools_integration() -> Result<()> {
-        let agent = Agent::new();
-
-        // Test that task planner tools are listed
-        let tools = agent.list_tools(None).await;
-
-        let todo_read = tools.iter().find(|tool| tool.name == TODO_READ_TOOL_NAME);
-        let todo_write = tools.iter().find(|tool| tool.name == TODO_WRITE_TOOL_NAME);
-
-        assert!(todo_read.is_some(), "TODO read tool should be present");
-        assert!(todo_write.is_some(), "TODO write tool should be present");
         Ok(())
     }
 
