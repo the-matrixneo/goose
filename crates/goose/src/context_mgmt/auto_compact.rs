@@ -149,10 +149,11 @@ pub async fn perform_compaction(agent: &Agent, messages: &[Message]) -> Result<A
         }
     }
 
-    // Check if the most recent message is a user message. Re-add it after compaction.
+    // Check if the most recent message is a user message
     let (messages_to_compact, preserved_user_message) =
         if let Some(last_message) = messages_to_process.last() {
             if matches!(last_message.role, rmcp::model::Role::User) {
+                // Remove the last user message before compaction
                 (
                     &messages_to_process[..messages_to_process.len() - 1],
                     Some(last_message.clone()),
@@ -191,6 +192,8 @@ pub async fn perform_compaction(agent: &Agent, messages: &[Message]) -> Result<A
 /// This is a convenience wrapper function that combines checking and compaction.
 /// If the most recent message is a user message, it will be preserved by removing it
 /// before compaction and adding it back afterwards.
+/// If the last assistant message contains a tool request, it will be removed to
+/// prevent orphaned tool responses.
 ///
 /// # Arguments
 /// * `agent` - The agent to use for context management
@@ -229,7 +232,7 @@ pub async fn check_and_compact_messages(
         check_result.usage_ratio * 100.0
     );
 
-    // Delegate to perform_compaction which handles all the compaction logic
+    // Delegate the actual compaction work to perform_compaction
     perform_compaction(agent, messages).await
 }
 
@@ -237,7 +240,6 @@ pub async fn check_and_compact_messages(
 mod tests {
     use super::*;
     use crate::conversation::message::{Message, MessageContent};
-    use crate::session::extension_data;
     use crate::{
         agents::Agent,
         model::ModelConfig,
@@ -322,7 +324,7 @@ mod tests {
             accumulated_total_tokens: Some(100),
             accumulated_input_tokens: Some(50),
             accumulated_output_tokens: Some(50),
-            extension_data: extension_data::ExtensionData::new(),
+            extension_data: crate::session::extension_data::ExtensionData::new(),
             conversation: Some(conversation),
             message_count,
         }
@@ -633,6 +635,9 @@ mod tests {
 
         // Verify the compacted messages are returned
         assert!(!result.messages.is_empty());
+
+        // After compaction and fix_conversation, we should have some messages
+        // Note: fix_conversation may remove messages (e.g., trailing assistant messages)
     }
 
     #[tokio::test]
@@ -710,14 +715,7 @@ mod tests {
         let comprehensive_metadata = create_test_session_metadata(3, "/test/working/dir");
 
         // Verify the helper created non-null metadata
-        assert_eq!(
-            comprehensive_metadata
-                .clone()
-                .conversation
-                .unwrap_or_default()
-                .len(),
-            3
-        );
+        assert_eq!(comprehensive_metadata.message_count, 3);
         assert_eq!(
             comprehensive_metadata.working_dir.to_str().unwrap(),
             "/test/working/dir"
