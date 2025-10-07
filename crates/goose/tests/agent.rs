@@ -706,7 +706,11 @@ mod final_output_tool_tests {
                 _messages: &[Message],
                 _tools: &[Tool],
             ) -> Result<MessageStream, ProviderError> {
-                if let Some(last_msg) = _messages.last() {
+                if let Some(last_msg) = _messages
+                    .iter()
+                    .filter(|m| !m.id.as_ref().map_or(false, |id| id.starts_with("moim_")))
+                    .last()
+                {
                     for content in &last_msg.content {
                         if let goose::conversation::message::MessageContent::Text(text_content) =
                             content
