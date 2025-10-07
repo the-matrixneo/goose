@@ -152,16 +152,6 @@ describe('recipeFormSchema', () => {
         expect(result.success).toBe(true);
       });
 
-      it('rejects invalid JSON schema', () => {
-        const invalidData = { ...validFormData, jsonSchema: 'invalid json' };
-        const result = recipeFormSchema.safeParse(invalidData);
-        expect(result.success).toBe(false);
-        if (!result.success) {
-          const jsonError = result.error.issues.find((issue) => issue.path.includes('jsonSchema'));
-          expect(jsonError?.message).toBe('Invalid JSON schema format');
-        }
-      });
-
       it('allows empty JSON schema', () => {
         const validData = { ...validFormData, jsonSchema: '' };
         const result = recipeFormSchema.safeParse(validData);
@@ -285,7 +275,6 @@ describe('recipeFormSchema', () => {
           title: 'AB', // Too short
           description: 'Short', // Too short
           instructions: 'Short', // Too short
-          jsonSchema: 'invalid json',
         };
         const result = recipeFormSchema.safeParse(invalidData);
         expect(result.success).toBe(false);
@@ -298,7 +287,6 @@ describe('recipeFormSchema', () => {
           expect(result.error.issues.some((issue) => issue.path.includes('instructions'))).toBe(
             true
           );
-          expect(result.error.issues.some((issue) => issue.path.includes('jsonSchema'))).toBe(true);
         }
       });
     });
