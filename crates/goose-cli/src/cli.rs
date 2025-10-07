@@ -843,6 +843,13 @@ pub async fn cli() -> Result<()> {
                     let session_start = std::time::Instant::now();
                     let session_type = if resume { "resumed" } else { "new" };
 
+                    tracing::info!(
+                        counter.goose.session_starts = 1,
+                        session_type,
+                        interactive = true,
+                        "Session started"
+                    );
+
                     let session_id = if let Some(id) = identifier {
                         Some(get_session_id(id).await?)
                     } else {
@@ -900,6 +907,20 @@ pub async fn cli() -> Result<()> {
                         message_count,
                         "Session completed"
                     );
+
+                    tracing::info!(
+                        counter.goose.session_duration_ms = session_duration.as_millis() as u64,
+                        session_type,
+                        "Session duration"
+                    );
+
+                    if total_tokens > 0 {
+                        tracing::info!(
+                            counter.goose.session_tokens = total_tokens,
+                            session_type,
+                            "Session tokens"
+                        );
+                    }
 
                     Ok(())
                 }
