@@ -37,7 +37,6 @@ pub fn handle_validate(recipe_name: &str) -> Result<()> {
 ///
 /// Result indicating success or failure
 pub fn handle_deeplink(recipe_name: &str) -> Result<String> {
-    
     match generate_deeplink(recipe_name) {
         Ok((deeplink_url, recipe)) => {
             println!(
@@ -177,8 +176,9 @@ pub fn handle_list(format: &str, verbose: bool) -> Result<()> {
 ///
 /// Result containing the deeplink URL and recipe
 fn generate_deeplink(recipe_name: &str) -> Result<(String, goose::recipe::Recipe)> {
+    let recipe_file = load_recipe_file(recipe_name)?;
     // Load the recipe file first to validate it
-    let recipe = load_recipe_for_validation(recipe_name)?;
+    let recipe = validate_recipe_template_from_file(&recipe_file)?;
     match recipe_deeplink::encode(&recipe) {
         Ok(encoded) => {
             let full_url = format!("goose://recipe?config={}", encoded);
