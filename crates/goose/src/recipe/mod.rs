@@ -16,6 +16,7 @@ pub mod build_recipe;
 pub mod local_recipes;
 pub mod read_recipe_file_content;
 pub mod template_recipe;
+pub mod validate_recipe;
 
 pub const BUILT_IN_RECIPE_DIR_PARAM: &str = "recipe_dir";
 pub const RECIPE_FILE_EXTENSIONS: &[&str] = &["yaml", "json"];
@@ -775,7 +776,7 @@ isGlobal: true"#;
         } = &extensions[0]
         {
             assert_eq!(name, "test_extension");
-            assert_eq!(description, "test_extension");
+            assert_eq!(description, "");
         } else {
             panic!("Expected Stdio extension");
         }

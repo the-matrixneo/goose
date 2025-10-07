@@ -1,9 +1,9 @@
 use anyhow::Result;
 use console::style;
+use goose::recipe::validate_recipe::validate_recipe_template_from_file;
 
 use crate::recipes::github_recipe::RecipeSource;
-use crate::recipes::recipe::load_recipe_for_validation;
-use crate::recipes::search_recipe::list_available_recipes;
+use crate::recipes::search_recipe::{list_available_recipes, load_recipe_file};
 use goose::recipe_deeplink;
 
 /// Validates a recipe file
@@ -17,7 +17,8 @@ use goose::recipe_deeplink;
 /// Result indicating success or failure
 pub fn handle_validate(recipe_name: &str) -> Result<()> {
     // Load and validate the recipe file
-    match load_recipe_for_validation(recipe_name) {
+    let recipe_file = load_recipe_file(recipe_name)?;
+    match validate_recipe_template_from_file(&recipe_file) {
         Ok(_) => {
             println!("{} recipe file is valid", style("✓").green().bold());
             Ok(())
@@ -39,8 +40,9 @@ pub fn handle_validate(recipe_name: &str) -> Result<()> {
 ///
 /// Result indicating success or failure
 pub fn handle_deeplink(recipe_name: &str) -> Result<String> {
+    let recipe_file = load_recipe_file(recipe_name)?;
     // Load the recipe file first to validate it
-    match load_recipe_for_validation(recipe_name) {
+    match validate_recipe_template_from_file(&recipe_file) {
         Ok(recipe) => match recipe_deeplink::encode(&recipe) {
             Ok(encoded) => {
                 println!(
