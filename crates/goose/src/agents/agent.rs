@@ -29,7 +29,7 @@ use crate::agents::tool_route_manager::ToolRouteManager;
 use crate::agents::tool_router_index_manager::ToolRouterIndexManager;
 use crate::agents::types::SessionConfig;
 use crate::agents::types::{FrontendTool, ToolResultReceiver};
-use crate::config::{get_enabled_extensions, get_extension_by_name, Config};
+use crate::config::{get_enabled_extensions, Config};
 use crate::context_mgmt::auto_compact;
 use crate::conversation::{debug_conversation_fix, fix_conversation, Conversation};
 use crate::mcp_utils::ToolResult;
@@ -601,109 +601,6 @@ impl Agent {
             .await?;
 
         Ok(())
-    }
-
-    #[allow(clippy::too_many_lines)]
-    pub(super) async fn manage_extensions(
-        &self,
-        action: String,
-        extension_name: String,
-        request_id: String,
-    ) -> (String, Result<Vec<Content>, ErrorData>) {
-        if self.tool_route_manager.is_router_functional().await {
-            let selector = self.tool_route_manager.get_router_tool_selector().await;
-            if let Some(selector) = selector {
-                let selector_action = if action == "disable" { "remove" } else { "add" };
-                let selector = Arc::new(selector);
-                if let Err(e) = ToolRouterIndexManager::update_extension_tools(
-                    &selector,
-                    &self.extension_manager,
-                    &extension_name,
-                    selector_action,
-                )
-                .await
-                {
-                    return (
-                        request_id,
-                        Err(ErrorData::new(
-                            ErrorCode::INTERNAL_ERROR,
-                            format!("Failed to update LLM index: {}", e),
-                            None,
-                        )),
-                    );
-                }
-            }
-        }
-        if action == "disable" {
-            let result = self
-                .extension_manager
-                .remove_extension(&extension_name)
-                .await
-                .map(|_| {
-                    vec![Content::text(format!(
-                        "The extension '{}' has been disabled successfully",
-                        extension_name
-                    ))]
-                })
-                .map_err(|e| ErrorData::new(ErrorCode::INTERNAL_ERROR, e.to_string(), None));
-            return (request_id, result);
-        }
-
-        let config = match get_extension_by_name(&extension_name) {
-            Some(config) => config,
-            None => {
-                return (
-                    request_id,
-                    Err(ErrorData::new(
-                        ErrorCode::RESOURCE_NOT_FOUND,
-                        format!(
-                        "Extension '{}' not found. Please check the extension name and try again.",
-                        extension_name
-                    ),
-                        None,
-                    )),
-                )
-            }
-        };
-        let result = self
-            .extension_manager
-            .add_extension(config)
-            .await
-            .map(|_| {
-                vec![Content::text(format!(
-                    "The extension '{}' has been installed successfully",
-                    extension_name
-                ))]
-            })
-            .map_err(|e| ErrorData::new(ErrorCode::INTERNAL_ERROR, e.to_string(), None));
-
-        // Update LLM index if operation was successful and LLM routing is functional
-        if result.is_ok() && self.tool_route_manager.is_router_functional().await {
-            let selector = self.tool_route_manager.get_router_tool_selector().await;
-            if let Some(selector) = selector {
-                let llm_action = if action == "disable" { "remove" } else { "add" };
-                let selector = Arc::new(selector);
-                if let Err(e) = ToolRouterIndexManager::update_extension_tools(
-                    &selector,
-                    &self.extension_manager,
-                    &extension_name,
-                    llm_action,
-                )
-                .await
-                {
-                    return (
-                        request_id,
-                        Err(ErrorData::new(
-                            ErrorCode::INTERNAL_ERROR,
-                            format!("Failed to update LLM index: {}", e),
-                            None,
-                        )),
-                    );
-                }
-            }
-        }
-
-        (request_id, result)
     }
 
     pub async fn add_extension(&self, extension: ExtensionConfig) -> ExtensionResult<()> {
