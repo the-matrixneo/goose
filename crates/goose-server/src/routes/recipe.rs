@@ -7,12 +7,35 @@ use axum::extract::rejection::JsonRejection;
 use axum::routing::get;
 use axum::{extract::State, http::StatusCode, routing::post, Json, Router};
 use goose::recipe::local_recipes;
+use goose::recipe::validate_recipe::validate_recipe_template_from_content;
 use goose::recipe::Recipe;
 use goose::recipe_deeplink;
 use goose::session::SessionManager;
 
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use serde_path_to_error::deserialize as deserialize_with_path;
 use utoipa::ToSchema;
+
+fn format_json_rejection_message(rejection: &JsonRejection) -> String {
+    match rejection {
+        JsonRejection::JsonDataError(err) => {
+            format!("Request body validation failed: {}", clean_data_error(err))
+        }
+        JsonRejection::JsonSyntaxError(err) => format!("Invalid JSON payload: {}", err.body_text()),
+        JsonRejection::MissingJsonContentType(err) => err.body_text(),
+        JsonRejection::BytesRejection(err) => err.body_text(),
+        _ => rejection.body_text(),
+    }
+}
+
+fn clean_data_error(err: &axum::extract::rejection::JsonDataError) -> String {
+    let message = err.body_text();
+    message
+        .strip_prefix("Failed to deserialize the JSON body into the target type: ")
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| message.to_string())
+}
 
 use crate::routes::errors::ErrorResponse;
 use crate::routes::recipe_utils::get_all_recipes_manifests;
@@ -311,9 +334,12 @@ async fn delete_recipe(
 )]
 async fn save_recipe(
     State(state): State<Arc<AppState>>,
-    payload: Result<Json<SaveRecipeRequest>, JsonRejection>,
+    payload: Result<Json<Value>, JsonRejection>,
 ) -> Result<StatusCode, ErrorResponse> {
-    let Json(request) = payload.map_err(json_rejection_to_error_response)?;
+    let Json(raw_json) = payload.map_err(json_rejection_to_error_response)?;
+    let request = deserialize_save_recipe_request(raw_json)?;
+    validate_incoming_recipe(&request.recipe)?;
+
     let file_path = match request.id.as_ref() {
         Some(id) => Some(get_recipe_file_path_by_id(state.clone(), id).await?),
         None => None,
@@ -330,9 +356,46 @@ async fn save_recipe(
 
 fn json_rejection_to_error_response(rejection: JsonRejection) -> ErrorResponse {
     ErrorResponse {
-        message: rejection.body_text(),
+        message: format_json_rejection_message(&rejection),
         status: StatusCode::BAD_REQUEST,
     }
+}
+
+fn validate_incoming_recipe(recipe: &Recipe) -> Result<(), ErrorResponse> {
+    let recipe_json = serde_json::to_string(recipe).map_err(|err| ErrorResponse {
+        message: format!("Failed to prepare recipe for validation: {}", err),
+        status: StatusCode::BAD_REQUEST,
+    })?;
+
+    validate_recipe_template_from_content(&recipe_json).map_err(|err| ErrorResponse {
+        message: err.to_string(),
+        status: StatusCode::BAD_REQUEST,
+    })?;
+
+    Ok(())
+}
+
+fn deserialize_save_recipe_request(value: Value) -> Result<SaveRecipeRequest, ErrorResponse> {
+    let payload = value.to_string();
+    let mut deserializer = serde_json::Deserializer::from_str(&payload);
+    let result: Result<SaveRecipeRequest, _> = deserialize_with_path(&mut deserializer);
+    result.map_err(|err| {
+        let path = err.path().to_string();
+        let inner = err.into_inner();
+        let message = if path.is_empty() {
+            format!("Recipe validation failed: {}", inner)
+        } else {
+            format!(
+                "Request validation failed at {}: {}",
+                path.trim_start_matches('.'),
+                inner
+            )
+        };
+        ErrorResponse {
+            message,
+            status: StatusCode::BAD_REQUEST,
+        }
+    })
 }
 
 async fn get_recipe_file_path_by_id(
@@ -384,10 +447,11 @@ async fn get_recipe_file_path_by_id(
 async fn parse_recipe(
     Json(request): Json<ParseRecipeRequest>,
 ) -> Result<Json<ParseRecipeResponse>, ErrorResponse> {
-    let recipe = Recipe::from_content(&request.content).map_err(|e| ErrorResponse {
-        message: format!("Invalid recipe format: {}", e),
-        status: StatusCode::BAD_REQUEST,
-    })?;
+    let recipe =
+        validate_recipe_template_from_content(&request.content).map_err(|e| ErrorResponse {
+            message: format!("Invalid recipe format: {}", e),
+            status: StatusCode::BAD_REQUEST,
+        })?;
 
     Ok(Json(ParseRecipeResponse { recipe }))
 }

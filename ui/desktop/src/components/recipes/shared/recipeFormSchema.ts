@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { validateJsonSchema } from '../../../recipe/validation';
 
 // Zod schema for Parameter - matching API RecipeParameter type
 const parameterSchema = z.object({
@@ -39,19 +38,7 @@ export const recipeFormSchema = z.object({
 
   parameters: z.array(parameterSchema).default([]),
 
-  jsonSchema: z
-    .string()
-    .optional()
-    .refine((value) => {
-      if (!value || !value.trim()) return true;
-      try {
-        const parsed = JSON.parse(value.trim());
-        const validationResult = validateJsonSchema(parsed);
-        return validationResult.success;
-      } catch {
-        return false;
-      }
-    }, 'Invalid JSON schema format'),
+  jsonSchema: z.string().optional(),
 });
 
 export type RecipeFormData = z.infer<typeof recipeFormSchema>;

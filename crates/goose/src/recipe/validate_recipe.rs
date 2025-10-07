@@ -36,11 +36,8 @@ pub fn validate_recipe_template_from_file(recipe_file: &RecipeFile) -> Result<Re
     validate_recipe_template(&recipe_file.content, Some(recipe_dir))
 }
 
-pub fn validate_recipe_template_from_content(
-    recipe_content: &str,
-    recipe_dir: Option<String>,
-) -> Result<Recipe> {
-    validate_recipe_template(recipe_content, recipe_dir)
+pub fn validate_recipe_template_from_content(recipe_content: &str) -> Result<Recipe> {
+    validate_recipe_template(recipe_content, None)
 }
 
 fn validate_recipe_template(recipe_content: &str, recipe_dir: Option<String>) -> Result<Recipe> {

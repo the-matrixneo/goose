@@ -76,13 +76,21 @@ export default function ImportRecipeForm({ isOpen, onClose, onSuccess }: ImportR
   };
 
   const parseRecipeFromFile = async (fileContent: string): Promise<Recipe> => {
-    let response = await parseRecipe({
-      body: {
-        content: fileContent,
-      },
-      throwOnError: true,
-    });
-    return response.data.recipe;
+    try {
+      let response = await parseRecipe({
+        body: {
+          content: fileContent,
+        },
+        throwOnError: true,
+      });
+      return response.data.recipe;
+    } catch (error) {
+      let error_message = 'unknown error';
+      if (typeof error === 'object' && error !== null && 'message' in error) {
+        error_message = error.message as string;
+      }
+      throw new Error(error_message);
+    }
   };
 
   const importRecipeForm = useForm({
@@ -175,7 +183,7 @@ export default function ImportRecipeForm({ isOpen, onClose, onSuccess }: ImportR
       } catch (error) {
         toastError({
           title: 'Invalid Recipe File',
-          msg: `The recipe file format is invalid: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          msg: error instanceof Error ? error.message : 'Unknown error',
         });
       }
     }

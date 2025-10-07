@@ -2338,7 +2338,6 @@
             "description": "Server-sent events client with a URI endpoint",
             "required": [
               "name",
-              "description",
               "uri",
               "type"
             ],
@@ -2391,7 +2390,6 @@
             "description": "Standard I/O client with command and arguments",
             "required": [
               "name",
-              "description",
               "cmd",
               "args",
               "type"
@@ -2451,7 +2449,6 @@
             "description": "Built-in extension that is part of the bundled goose MCP server",
             "required": [
               "name",
-              "description",
               "type"
             ],
             "properties": {
@@ -2495,7 +2492,6 @@
             "description": "Platform extensions that have direct access to the agent etc and run in the agent process",
             "required": [
               "name",
-              "description",
               "type"
             ],
             "properties": {
@@ -2529,7 +2525,6 @@
             "description": "Streamable HTTP client with a URI endpoint using MCP Streamable HTTP specification",
             "required": [
               "name",
-              "description",
               "uri",
               "type"
             ],
@@ -2588,7 +2583,6 @@
             "description": "Frontend-provided tools that will be called through the frontend",
             "required": [
               "name",
-              "description",
               "tools",
               "type"
             ],
@@ -2635,7 +2629,6 @@
             "description": "Inline Python code that will be executed using uvx",
             "required": [
               "name",
-              "description",
               "code",
               "type"
             ],

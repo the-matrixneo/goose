@@ -1,5 +1,3 @@
-import type { Recipe } from '../api/types.gen';
-
 /**
  * OpenAPI-based validation utilities for Recipe objects.
  *
@@ -112,79 +110,6 @@ function resolveRefs(
 
   // Return schema as-is if no refs to resolve
   return schema;
-}
-
-export type RecipeValidationResult = {
-  success: boolean;
-  errors: string[];
-  data?: Recipe | unknown;
-};
-
-// TODO: Lifei Remove this
-/**
- * JSON schema validation for the response.json_schema field.
- * Uses basic structural validation instead of AJV to avoid CSP eval security issues.
- */
-export function validateJsonSchema(schema: unknown): RecipeValidationResult {
-  try {
-    // Allow null/undefined schemas
-    if (schema === null || schema === undefined) {
-      return { success: true, errors: [], data: schema as unknown };
-    }
-
-    if (typeof schema !== 'object') {
-      return {
-        success: false,
-        errors: ['JSON Schema must be an object'],
-        data: undefined,
-      };
-    }
-
-    const schemaObj = schema as Record<string, unknown>;
-    const errors: string[] = [];
-
-    // Check for valid JSON Schema structure
-    if (schemaObj.type && typeof schemaObj.type !== 'string' && !Array.isArray(schemaObj.type)) {
-      errors.push('Invalid type field: must be a string or array');
-    }
-
-    // Check for valid properties structure if it exists
-    if (schemaObj.properties && typeof schemaObj.properties !== 'object') {
-      errors.push('Invalid properties field: must be an object');
-    }
-
-    // Check for valid required array if it exists
-    if (schemaObj.required && !Array.isArray(schemaObj.required)) {
-      errors.push('Invalid required field: must be an array');
-    }
-
-    // Check for valid items structure if it exists (for array types)
-    if (schemaObj.items && typeof schemaObj.items !== 'object' && !Array.isArray(schemaObj.items)) {
-      errors.push('Invalid items field: must be an object or array');
-    }
-
-    if (errors.length > 0) {
-      return {
-        success: false,
-        errors: errors.map((err) => `Invalid JSON Schema: ${err}`),
-        data: undefined,
-      };
-    }
-
-    return {
-      success: true,
-      errors: [],
-      data: schema as unknown,
-    };
-  } catch (error) {
-    return {
-      success: false,
-      errors: [
-        `JSON Schema validation error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      ],
-      data: undefined,
-    };
-  }
 }
 
 /**
