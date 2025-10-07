@@ -165,14 +165,8 @@ fn generate_recipe_filename(title: &str, recipe_library_dir: &Path) -> PathBuf {
     }
 }
 
-pub fn save_recipe_to_file(
-    recipe: Recipe,
-    is_global: Option<bool>,
-    file_path: Option<PathBuf>,
-) -> anyhow::Result<PathBuf> {
-    let is_global_value = is_global.unwrap_or(true);
-
-    let recipe_library_dir = get_recipe_library_dir(is_global_value);
+pub fn save_recipe_to_file(recipe: Recipe, file_path: Option<PathBuf>) -> anyhow::Result<PathBuf> {
+    let recipe_library_dir = get_recipe_library_dir(true);
 
     let file_path_value = match file_path {
         Some(path) => path,

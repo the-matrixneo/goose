@@ -21,7 +21,6 @@ use crate::state::AppState;
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateRecipeRequest {
     session_id: String,
-    // Optional fields
     #[serde(default)]
     author: Option<AuthorRequest>,
 }
@@ -74,7 +73,6 @@ pub struct ScanRecipeResponse {
 pub struct SaveRecipeRequest {
     recipe: Recipe,
     id: Option<String>,
-    is_global: Option<bool>,
 }
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct ParseRecipeRequest {
@@ -88,7 +86,6 @@ pub struct ParseRecipeResponse {
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct RecipeManifestResponse {
-    name: String,
     recipe: Recipe,
     #[serde(rename = "lastModified")]
     last_modified: String,
@@ -117,7 +114,6 @@ pub struct ListRecipeResponse {
     ),
     tag = "Recipe Management"
 )]
-/// Create a Recipe configuration from the current session
 async fn create_recipe(
     State(state): State<Arc<AppState>>,
     Json(request): Json<CreateRecipeRequest>,
@@ -127,7 +123,6 @@ async fn create_recipe(
         request.session_id
     );
 
-    // Load messages from session
     let session = match SessionManager::get_session(&request.session_id, true).await {
         Ok(session) => session,
         Err(e) => {
@@ -150,7 +145,6 @@ async fn create_recipe(
 
     let agent = state.get_agent_for_route(request.session_id).await?;
 
-    // Create base recipe from agent state and messages
     let recipe_result = agent.create_recipe(conversation).await;
 
     match recipe_result {
@@ -263,7 +257,6 @@ async fn list_recipes(
             let file_path = recipe_manifest_with_path.file_path.clone();
             recipe_file_hash_map.insert(id.clone(), file_path);
             RecipeManifestResponse {
-                name: recipe_manifest_with_path.name.clone(),
                 recipe: recipe_manifest_with_path.recipe.clone(),
                 id: id.clone(),
                 last_modified: recipe_manifest_with_path.last_modified.clone(),
@@ -326,7 +319,7 @@ async fn save_recipe(
         None => None,
     };
 
-    match local_recipes::save_recipe_to_file(request.recipe, request.is_global, file_path) {
+    match local_recipes::save_recipe_to_file(request.recipe, file_path) {
         Ok(_) => Ok(StatusCode::NO_CONTENT),
         Err(e) => Err(ErrorResponse {
             message: e.to_string(),

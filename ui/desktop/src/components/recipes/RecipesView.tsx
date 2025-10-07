@@ -99,7 +99,7 @@ export default function RecipesView() {
       buttons: ['Cancel', 'Delete'],
       defaultId: 0,
       title: 'Delete Recipe',
-      message: `Are you sure you want to delete "${recipeManifest.name}"?`,
+      message: `Are you sure you want to delete "${recipeManifest.recipe.title}"?`,
       detail: 'Recipe file will be deleted.',
     });
 
@@ -111,7 +111,7 @@ export default function RecipesView() {
       await deleteRecipe({ body: { id: recipeManifest.id } });
       await loadSavedRecipes();
       toastSuccess({
-        title: recipeManifest.name,
+        title: recipeManifest.recipe.title,
         msg: 'Recipe deleted successfully',
       });
     } catch (err) {
