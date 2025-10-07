@@ -18,7 +18,6 @@ interface CreateEditRecipeModalProps {
   isOpen: boolean;
   onClose: (wasSaved?: boolean) => void;
   recipe?: Recipe;
-  recipeName?: string;
   isCreateMode?: boolean;
   recipeId?: string | null;
 }
@@ -27,7 +26,6 @@ export default function CreateEditRecipeModal({
   isOpen,
   onClose,
   recipe,
-  recipeName: initialRecipeName,
   isCreateMode = false,
   recipeId,
 }: CreateEditRecipeModalProps) {
@@ -45,8 +43,6 @@ export default function CreateEditRecipeModal({
         jsonSchema: recipe.response?.json_schema
           ? JSON.stringify(recipe.response.json_schema, null, 2)
           : '',
-        recipeName: initialRecipeName || '',
-        global: true,
       };
     }
     return {
@@ -57,10 +53,8 @@ export default function CreateEditRecipeModal({
       activities: [],
       parameters: [],
       jsonSchema: '',
-      recipeName: '',
-      global: true,
     };
-  }, [recipe, initialRecipeName]);
+  }, [recipe]);
 
   const form = useForm({
     defaultValues: getInitialValues(),
@@ -85,16 +79,12 @@ export default function CreateEditRecipeModal({
       setActivities(form.state.values.activities);
       setParameters(form.state.values.parameters);
       setJsonSchema(form.state.values.jsonSchema);
-      setRecipeName(form.state.values.recipeName);
-      setGlobal(form.state.values.global);
     });
   }, [form]);
   const [extensionOptions, setExtensionOptions] = useState<FixedExtensionEntry[]>([]);
   const [extensionsLoaded, setExtensionsLoaded] = useState(false);
   const [copied, setCopied] = useState(false);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
-  const [recipeName, setRecipeName] = useState(form.state.values.recipeName);
-  const [global, setGlobal] = useState(form.state.values.global);
   const [isSaving, setIsSaving] = useState(false);
 
   // Initialize selected extensions for the recipe
@@ -314,12 +304,12 @@ export default function CreateEditRecipeModal({
     try {
       const recipe = getCurrentRecipe();
 
-      await saveRecipe(recipe, global, recipeId);
+      await saveRecipe(recipe, true, recipeId);
 
       onClose(true);
 
       toastSuccess({
-        title: (recipeName || '').trim(),
+        title: (recipe.title || '').trim(),
         msg: 'Recipe saved successfully',
       });
     } catch (error) {
@@ -365,7 +355,7 @@ export default function CreateEditRecipeModal({
       );
 
       toastSuccess({
-        title: recipeName,
+        title: recipe.title,
         msg: 'Recipe saved and launched successfully',
       });
     } catch (error) {

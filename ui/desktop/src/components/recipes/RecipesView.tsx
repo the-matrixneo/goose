@@ -67,7 +67,6 @@ export default function RecipesView() {
 
   const handleLoadRecipe = async (recipe: Recipe, recipeId: string) => {
     try {
-      console.log('====== RecipesView handleLoadRecipe recipeId:', recipeId);
       // onLoadRecipe is not working for loading recipes. It looks correct
       // but the instructions are not flowing through to the server.
       // Needs a fix but commenting out to get prod back up and running.
@@ -341,7 +340,6 @@ export default function RecipesView() {
           isOpen={showEditor}
           onClose={handleEditorClose}
           recipe={selectedRecipe.recipe}
-          recipeName={selectedRecipe.name}
           recipeId={selectedRecipe.id}
         />
       )}

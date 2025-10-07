@@ -17,8 +17,6 @@ describe('recipeFormSchema', () => {
       },
     ],
     jsonSchema: '{"type": "object"}',
-    recipeName: 'test_recipe',
-    global: true,
   };
 
   describe('Zod Schema Validation', () => {
@@ -177,31 +175,6 @@ describe('recipeFormSchema', () => {
       });
     });
 
-    describe('Recipe Name Validation', () => {
-      it('allows empty recipe name', () => {
-        const validData = { ...validFormData, recipeName: '' };
-        const result = recipeFormSchema.safeParse(validData);
-        expect(result.success).toBe(true);
-      });
-
-      it('allows undefined recipe name', () => {
-        const validData = { ...validFormData, recipeName: undefined };
-        const result = recipeFormSchema.safeParse(validData);
-        expect(result.success).toBe(true);
-      });
-
-      it('rejects invalid recipe name characters', () => {
-        // The regex /^[^<>:"/\\|?*]+$/ rejects these specific characters
-        const invalidData = { ...validFormData, recipeName: 'invalid<name' };
-        const result = recipeFormSchema.safeParse(invalidData);
-        expect(result.success).toBe(false);
-        if (!result.success) {
-          const nameError = result.error.issues.find((issue) => issue.path.includes('recipeName'));
-          expect(nameError?.message).toContain('invalid characters');
-        }
-      });
-    });
-
     describe('Parameter Validation', () => {
       it('validates parameters with all required fields', () => {
         const validData = {
@@ -302,20 +275,6 @@ describe('recipeFormSchema', () => {
         if (!result.success) {
           expect(result.error.issues.some((issue) => issue.path.includes('activities'))).toBe(true);
         }
-      });
-    });
-
-    describe('Global Field Validation', () => {
-      it('validates global field as boolean true', () => {
-        const validData = { ...validFormData, global: true };
-        const result = recipeFormSchema.safeParse(validData);
-        expect(result.success).toBe(true);
-      });
-
-      it('validates global field as boolean false', () => {
-        const validData = { ...validFormData, global: false };
-        const result = recipeFormSchema.safeParse(validData);
-        expect(result.success).toBe(true);
       });
     });
 

@@ -52,16 +52,6 @@ export const recipeFormSchema = z.object({
         return false;
       }
     }, 'Invalid JSON schema format'),
-
-  recipeName: z
-    .string()
-    .optional()
-    .refine((name) => {
-      if (!name || !name.trim()) return true;
-      return /^[^<>:"/\\|?*]+$/.test(name.trim());
-    }, 'Recipe name contains invalid characters (< > : " / \\ | ? *)'),
-
-  global: z.boolean().default(true),
 });
 
 export type RecipeFormData = z.infer<typeof recipeFormSchema>;

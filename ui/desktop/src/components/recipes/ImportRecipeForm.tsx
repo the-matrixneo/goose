@@ -7,7 +7,6 @@ import { Input } from '../ui/input';
 import { Recipe, decodeRecipe } from '../../recipe';
 import { toastSuccess, toastError } from '../../toasts';
 import { useEscapeKey } from '../../hooks/useEscapeKey';
-import { RecipeTitleField } from './shared/RecipeTitleField';
 import { getRecipeJsonSchema } from '../../recipe/validation';
 import { saveRecipe } from '../../recipe/recipe_management';
 import { parseRecipe } from '../../api';
@@ -34,16 +33,6 @@ const importRecipeSchema = z
         if (!file) return true;
         return file.size <= 1024 * 1024;
       }, 'File is too large, max size is 1MB'),
-    recipeTitle: z
-      .string()
-      .min(1, 'Recipe title is required')
-      .max(100, 'Recipe title must be 100 characters or less')
-      .refine((title) => title.trim().length > 0, 'Recipe title cannot be empty')
-      .refine(
-        (title) => /^[^<>:"/\\|?*]+$/.test(title.trim()),
-        'Recipe title contains invalid characters (< > : " / \\ | ? *)'
-      ),
-    global: z.boolean(),
   })
   .refine((data) => (data.deeplink && data.deeplink.trim()) || data.recipeUploadFile, {
     message: 'Either of deeplink or recipe file are required',
@@ -100,8 +89,6 @@ export default function ImportRecipeForm({ isOpen, onClose, onSuccess }: ImportR
     defaultValues: {
       deeplink: '',
       recipeUploadFile: null as File | null,
-      recipeTitle: '',
-      global: true,
     },
     validators: {
       onChange: importRecipeSchema,
@@ -123,23 +110,19 @@ export default function ImportRecipeForm({ isOpen, onClose, onSuccess }: ImportR
           recipe = await parseRecipeFromFile(fileContent);
         }
 
-        recipe.title = value.recipeTitle.trim();
-
-        await saveRecipe(recipe, value.global, null);
+        await saveRecipe(recipe, true, null);
 
         // Reset dialog state
         importRecipeForm.reset({
           deeplink: '',
           recipeUploadFile: null,
-          recipeTitle: '',
-          global: true,
         });
         onClose();
 
         onSuccess();
 
         toastSuccess({
-          title: value.recipeTitle.trim(),
+          title: recipe.title.trim(),
           msg: 'Recipe imported successfully',
         });
       } catch (error) {
@@ -160,13 +143,9 @@ export default function ImportRecipeForm({ isOpen, onClose, onSuccess }: ImportR
     importRecipeForm.reset({
       deeplink: '',
       recipeUploadFile: null,
-      recipeTitle: '',
-      global: true,
     });
     onClose();
   };
-
-  let recipeTitleFieldRef: { handleChange: (value: string) => void } | null = null;
 
   const handleDeeplinkChange = async (
     value: string,
@@ -176,25 +155,12 @@ export default function ImportRecipeForm({ isOpen, onClose, onSuccess }: ImportR
 
     if (value.trim()) {
       try {
-        const recipe = await parseDeeplink(value.trim());
-        if (recipe && recipe.title) {
-          if (recipeTitleFieldRef) {
-            recipeTitleFieldRef.handleChange(recipe.title);
-          } else {
-            importRecipeForm.setFieldValue('recipeTitle', recipe.title);
-          }
-        }
+        await parseDeeplink(value.trim());
       } catch (error) {
         toastError({
           title: 'Invalid Deeplink',
           msg: `The deeplink format is invalid: ${error instanceof Error ? error.message : 'Unknown error'}`,
         });
-      }
-    } else {
-      if (recipeTitleFieldRef) {
-        recipeTitleFieldRef.handleChange('');
-      } else {
-        importRecipeForm.setFieldValue('recipeTitle', '');
       }
     }
   };
@@ -205,25 +171,12 @@ export default function ImportRecipeForm({ isOpen, onClose, onSuccess }: ImportR
     if (file) {
       try {
         const fileContent = await file.text();
-        const recipe = await parseRecipeFromFile(fileContent);
-        if (recipe.title) {
-          if (recipeTitleFieldRef) {
-            recipeTitleFieldRef.handleChange(recipe.title);
-          } else {
-            importRecipeForm.setFieldValue('recipeTitle', recipe.title);
-          }
-        }
+        await parseRecipeFromFile(fileContent);
       } catch (error) {
         toastError({
           title: 'Invalid Recipe File',
           msg: `The recipe file format is invalid: ${error instanceof Error ? error.message : 'Unknown error'}`,
         });
-      }
-    } else {
-      if (recipeTitleFieldRef) {
-        recipeTitleFieldRef.handleChange('');
-      } else {
-        importRecipeForm.setFieldValue('recipeTitle', '');
       }
     }
   };
@@ -366,61 +319,6 @@ export default function ImportRecipeForm({ isOpen, onClose, onSuccess }: ImportR
                 Ensure you review contents of recipe files before adding them to your goose
                 interface.
               </p>
-
-              <importRecipeForm.Field name="recipeTitle">
-                {(field) => {
-                  // Store reference to the field for programmatic updates
-                  recipeTitleFieldRef = field;
-
-                  return (
-                    <RecipeTitleField
-                      id="import-recipe-title"
-                      value={field.state.value}
-                      onChange={field.handleChange}
-                      onBlur={field.handleBlur}
-                      errors={field.state.meta.errors.map((error) =>
-                        typeof error === 'string' ? error : error?.message || String(error)
-                      )}
-                    />
-                  );
-                }}
-              </importRecipeForm.Field>
-
-              <importRecipeForm.Field name="global">
-                {(field) => (
-                  <div>
-                    <label className="block text-sm font-medium text-text-standard mb-2">
-                      Save Location
-                    </label>
-                    <div className="space-y-2">
-                      <label className="flex items-center">
-                        <input
-                          type="radio"
-                          name="import-save-location"
-                          checked={field.state.value === true}
-                          onChange={() => field.handleChange(true)}
-                          className="mr-2"
-                        />
-                        <span className="text-sm text-text-standard">
-                          Global - Available across all Goose sessions
-                        </span>
-                      </label>
-                      <label className="flex items-center">
-                        <input
-                          type="radio"
-                          name="import-save-location"
-                          checked={field.state.value === false}
-                          onChange={() => field.handleChange(false)}
-                          className="mr-2"
-                        />
-                        <span className="text-sm text-text-standard">
-                          Directory - Available in the working directory
-                        </span>
-                      </label>
-                    </div>
-                  </div>
-                )}
-              </importRecipeForm.Field>
             </div>
 
             <div className="flex justify-end space-x-3 mt-6">
