@@ -25,8 +25,9 @@ use super::{
     venice::VeniceProvider,
     xai::XaiProvider,
 };
-use crate::config::custom_providers::{custom_providers_dir, register_custom_providers};
+use crate::config::declarative_providers::register_declarative_providers;
 use crate::model::ModelConfig;
+use crate::providers::provider_registry::ProviderType;
 use anyhow::Result;
 use once_cell::sync::Lazy;
 
@@ -36,26 +37,26 @@ const DEFAULT_FALLBACK_TURNS: usize = 2;
 
 static REGISTRY: Lazy<RwLock<ProviderRegistry>> = Lazy::new(|| {
     let registry = ProviderRegistry::new().with_providers(|registry| {
-        registry.register::<AnthropicProvider, _>(AnthropicProvider::from_env);
-        registry.register::<AzureProvider, _>(AzureProvider::from_env);
-        registry.register::<BedrockProvider, _>(BedrockProvider::from_env);
-        registry.register::<ClaudeCodeProvider, _>(ClaudeCodeProvider::from_env);
-        registry.register::<CursorAgentProvider, _>(CursorAgentProvider::from_env);
-        registry.register::<DatabricksProvider, _>(DatabricksProvider::from_env);
-        registry.register::<GcpVertexAIProvider, _>(GcpVertexAIProvider::from_env);
-        registry.register::<GeminiCliProvider, _>(GeminiCliProvider::from_env);
-        registry.register::<GithubCopilotProvider, _>(GithubCopilotProvider::from_env);
-        registry.register::<GoogleProvider, _>(GoogleProvider::from_env);
-        registry.register::<GroqProvider, _>(GroqProvider::from_env);
-        registry.register::<LiteLLMProvider, _>(LiteLLMProvider::from_env);
-        registry.register::<OllamaProvider, _>(OllamaProvider::from_env);
-        registry.register::<OpenAiProvider, _>(OpenAiProvider::from_env);
-        registry.register::<OpenRouterProvider, _>(OpenRouterProvider::from_env);
-        registry.register::<SageMakerTgiProvider, _>(SageMakerTgiProvider::from_env);
-        registry.register::<SnowflakeProvider, _>(SnowflakeProvider::from_env);
-        registry.register::<TetrateProvider, _>(TetrateProvider::from_env);
-        registry.register::<VeniceProvider, _>(VeniceProvider::from_env);
-        registry.register::<XaiProvider, _>(XaiProvider::from_env);
+        registry.register::<AnthropicProvider, _>(AnthropicProvider::from_env, true);
+        registry.register::<AzureProvider, _>(AzureProvider::from_env, false);
+        registry.register::<BedrockProvider, _>(BedrockProvider::from_env, false);
+        registry.register::<ClaudeCodeProvider, _>(ClaudeCodeProvider::from_env, true);
+        registry.register::<CursorAgentProvider, _>(CursorAgentProvider::from_env, false);
+        registry.register::<DatabricksProvider, _>(DatabricksProvider::from_env, true);
+        registry.register::<GcpVertexAIProvider, _>(GcpVertexAIProvider::from_env, false);
+        registry.register::<GeminiCliProvider, _>(GeminiCliProvider::from_env, false);
+        registry.register::<GithubCopilotProvider, _>(GithubCopilotProvider::from_env, false);
+        registry.register::<GoogleProvider, _>(GoogleProvider::from_env, true);
+        registry.register::<GroqProvider, _>(GroqProvider::from_env, false);
+        registry.register::<LiteLLMProvider, _>(LiteLLMProvider::from_env, false);
+        registry.register::<OllamaProvider, _>(OllamaProvider::from_env, true);
+        registry.register::<OpenAiProvider, _>(OpenAiProvider::from_env, true);
+        registry.register::<OpenRouterProvider, _>(OpenRouterProvider::from_env, true);
+        registry.register::<SageMakerTgiProvider, _>(SageMakerTgiProvider::from_env, false);
+        registry.register::<SnowflakeProvider, _>(SnowflakeProvider::from_env, false);
+        registry.register::<TetrateProvider, _>(TetrateProvider::from_env, true);
+        registry.register::<VeniceProvider, _>(VeniceProvider::from_env, false);
+        registry.register::<XaiProvider, _>(XaiProvider::from_env, false);
 
         if let Err(e) = load_custom_providers_into_registry(registry) {
             tracing::warn!("Failed to load custom providers: {}", e);
@@ -65,12 +66,10 @@ static REGISTRY: Lazy<RwLock<ProviderRegistry>> = Lazy::new(|| {
 });
 
 fn load_custom_providers_into_registry(registry: &mut ProviderRegistry) -> Result<()> {
-    let config_dir = custom_providers_dir();
-    register_custom_providers(registry, &config_dir)
+    register_declarative_providers(registry)
 }
-
-pub fn providers() -> Vec<ProviderMetadata> {
-    REGISTRY.read().unwrap().all_metadata()
+pub fn providers() -> Vec<(ProviderMetadata, ProviderType)> {
+    REGISTRY.read().unwrap().all_metadata_with_types()
 }
 
 pub fn refresh_custom_providers() -> Result<()> {

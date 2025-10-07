@@ -8,7 +8,7 @@ use goose::agents::platform_tools::{
 };
 use goose::agents::Agent;
 use goose::agents::{extension::Envs, ExtensionConfig};
-use goose::config::custom_providers::CustomProviderConfig;
+use goose::config::declarative_providers::DeclarativeProviderConfig;
 use goose::config::extensions::{
     get_all_extension_names, get_all_extensions, get_enabled_extensions, get_extension_by_name,
     name_to_key, remove_extension, set_extension, set_extension_enabled,
@@ -1915,7 +1915,7 @@ fn add_provider() -> Result<(), Box<dyn Error>> {
         .initial_value(true)
         .interact()?;
 
-    CustomProviderConfig::create_and_save(
+    DeclarativeProviderConfig::create_and_save(
         provider_type,
         display_name.clone(),
         api_url,
@@ -1929,9 +1929,9 @@ fn add_provider() -> Result<(), Box<dyn Error>> {
 }
 
 fn remove_provider() -> Result<(), Box<dyn Error>> {
-    let custom_providers_dir = goose::config::custom_providers::custom_providers_dir();
+    let custom_providers_dir = goose::config::declarative_providers::custom_providers_dir();
     let custom_providers = if custom_providers_dir.exists() {
-        goose::config::custom_providers::load_custom_providers(&custom_providers_dir)?
+        goose::config::declarative_providers::load_custom_providers(&custom_providers_dir)?
     } else {
         Vec::new()
     };
@@ -1950,7 +1950,7 @@ fn remove_provider() -> Result<(), Box<dyn Error>> {
         .items(&provider_items)
         .interact()?;
 
-    CustomProviderConfig::remove(selected_id)?;
+    DeclarativeProviderConfig::remove(selected_id)?;
     cliclack::outro(format!("Removed custom provider: {}", selected_id))?;
     Ok(())
 }

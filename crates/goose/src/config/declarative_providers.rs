@@ -5,10 +5,14 @@ use crate::providers::anthropic::AnthropicProvider;
 use crate::providers::base::ModelInfo;
 use crate::providers::ollama::OllamaProvider;
 use crate::providers::openai::OpenAiProvider;
+use crate::providers::provider_registry::ProviderType;
 use anyhow::Result;
+use include_dir::{include_dir, Dir};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
+
+static FIXED_PROVIDERS: Dir = include_dir!("$CARGO_MANIFEST_DIR/src/providers/declarative");
 
 pub fn custom_providers_dir() -> std::path::PathBuf {
     Paths::config_dir().join("custom_providers")
@@ -23,7 +27,7 @@ pub enum ProviderEngine {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CustomProviderConfig {
+pub struct DeclarativeProviderConfig {
     pub name: String,
     pub engine: ProviderEngine,
     pub display_name: String,
@@ -36,7 +40,7 @@ pub struct CustomProviderConfig {
     pub supports_streaming: Option<bool>,
 }
 
-impl CustomProviderConfig {
+impl DeclarativeProviderConfig {
     pub fn id(&self) -> &str {
         &self.name
     }
@@ -76,7 +80,7 @@ impl CustomProviderConfig {
             .map(|name| ModelInfo::new(name, 128000))
             .collect();
 
-        let provider_config = CustomProviderConfig {
+        let provider_config = DeclarativeProviderConfig {
             name: id.clone(),
             engine: match provider_type {
                 "openai_compatible" => ProviderEngine::OpenAI,
@@ -121,7 +125,7 @@ impl CustomProviderConfig {
     }
 }
 
-pub fn load_custom_providers(dir: &Path) -> Result<Vec<CustomProviderConfig>> {
+pub fn load_custom_providers(dir: &Path) -> Result<Vec<DeclarativeProviderConfig>> {
     if !dir.exists() {
         return Ok(Vec::new());
     }
@@ -139,74 +143,106 @@ pub fn load_custom_providers(dir: &Path) -> Result<Vec<CustomProviderConfig>> {
         .collect()
 }
 
-pub fn register_custom_providers(
-    registry: &mut crate::providers::provider_registry::ProviderRegistry,
-    dir: &Path,
-) -> Result<()> {
-    let configs = load_custom_providers(dir)?;
-
-    for config in configs {
-        let config_clone = config.clone();
-        let description = config
-            .description
-            .clone()
-            .unwrap_or_else(|| format!("Custom {} provider", config.display_name));
-        let default_model = config
-            .models
-            .first()
-            .map(|m| m.name.clone())
-            .unwrap_or_default();
-        let known_models: Vec<ModelInfo> = config
-            .models
-            .iter()
-            .map(|m| ModelInfo {
-                name: m.name.clone(),
-                context_limit: m.context_limit,
-                input_token_cost: m.input_token_cost,
-                output_token_cost: m.output_token_cost,
-                currency: m.currency.clone(),
-                supports_cache_control: Some(m.supports_cache_control.unwrap_or(false)),
-            })
-            .collect();
-
-        match config.engine {
-            ProviderEngine::OpenAI => {
-                registry.register_with_name::<OpenAiProvider, _>(
-                    config.name.clone(),
-                    config.display_name.clone(),
-                    description,
-                    default_model,
-                    known_models,
-                    move |model: ModelConfig| {
-                        OpenAiProvider::from_custom_config(model, config_clone.clone())
-                    },
-                );
-            }
-            ProviderEngine::Ollama => {
-                registry.register_with_name::<OllamaProvider, _>(
-                    config.name.clone(),
-                    config.display_name.clone(),
-                    description,
-                    default_model,
-                    known_models,
-                    move |model: ModelConfig| {
-                        OllamaProvider::from_custom_config(model, config_clone.clone())
-                    },
-                );
-            }
-            ProviderEngine::Anthropic => {
-                registry.register_with_name::<AnthropicProvider, _>(
-                    config.name.clone(),
-                    config.display_name.clone(),
-                    description,
-                    default_model,
-                    known_models,
-                    move |model: ModelConfig| {
-                        AnthropicProvider::from_custom_config(model, config_clone.clone())
-                    },
-                );
-            }
+fn load_fixed_providers() -> Result<Vec<DeclarativeProviderConfig>> {
+    let mut res = Vec::new();
+    for file in FIXED_PROVIDERS.files() {
+        if file.path().extension().and_then(|s| s.to_str()) != Some("json") {
+            continue;
         }
+
+        let content = file
+            .contents_utf8()
+            .ok_or_else(|| anyhow::anyhow!("Failed to read file as UTF-8: {:?}", file.path()))?;
+
+        let config: DeclarativeProviderConfig = serde_json::from_str(content)?;
+        res.push(config)
     }
+
+    Ok(res)
+}
+
+pub fn register_declarative_providers(
+    registry: &mut crate::providers::provider_registry::ProviderRegistry,
+) -> Result<()> {
+    let dir = custom_providers_dir();
+    let custom_providers = load_custom_providers(&dir)?;
+    let fixed_providers = load_fixed_providers()?;
+    for config in fixed_providers {
+        register_declarative_provider(registry, config, ProviderType::Declarative);
+    }
+
+    for config in custom_providers {
+        register_declarative_provider(registry, config, ProviderType::Custom);
+    }
+
     Ok(())
+}
+
+pub fn register_declarative_provider(
+    registry: &mut crate::providers::provider_registry::ProviderRegistry,
+    config: DeclarativeProviderConfig,
+    provider_type: ProviderType,
+) {
+    let config_clone = config.clone();
+    let description = config
+        .description
+        .clone()
+        .unwrap_or_else(|| format!("Custom {} provider", config.display_name));
+    let default_model = config
+        .models
+        .first()
+        .map(|m| m.name.clone())
+        .unwrap_or_default();
+    let known_models: Vec<ModelInfo> = config
+        .models
+        .iter()
+        .map(|m| ModelInfo {
+            name: m.name.clone(),
+            context_limit: m.context_limit,
+            input_token_cost: m.input_token_cost,
+            output_token_cost: m.output_token_cost,
+            currency: m.currency.clone(),
+            supports_cache_control: Some(m.supports_cache_control.unwrap_or(false)),
+        })
+        .collect();
+
+    match config.engine {
+        ProviderEngine::OpenAI => {
+            registry.register_with_name::<OpenAiProvider, _>(
+                config.name.clone(),
+                config.display_name.clone(),
+                description,
+                default_model,
+                known_models,
+                provider_type,
+                move |model: ModelConfig| {
+                    OpenAiProvider::from_custom_config(model, config_clone.clone())
+                },
+            );
+        }
+        ProviderEngine::Ollama => {
+            registry.register_with_name::<OllamaProvider, _>(
+                config.name.clone(),
+                config.display_name.clone(),
+                description,
+                default_model,
+                known_models,
+                provider_type,
+                move |model: ModelConfig| {
+                    OllamaProvider::from_custom_config(model, config_clone.clone())
+                },
+            );
+        }
+        ProviderEngine::Anthropic => registry.register_with_name::<AnthropicProvider, _>(
+            config.name.clone(),
+            config.display_name.clone(),
+            description,
+            default_model,
+            known_models,
+            provider_type,
+            move |model: ModelConfig| {
+                AnthropicProvider::from_custom_config(model, config_clone.clone())
+            },
+        ),
+    };
 }

@@ -6,9 +6,18 @@ use std::sync::Arc;
 
 type ProviderConstructor = Box<dyn Fn(ModelConfig) -> Result<Arc<dyn Provider>> + Send + Sync>;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProviderType {
+    Preferred,
+    Builtin,
+    Declarative,
+    Custom,
+}
+
 struct ProviderEntry {
     metadata: ProviderMetadata,
     constructor: ProviderConstructor,
+    provider_type: ProviderType,
 }
 
 #[derive(Default)]
@@ -23,7 +32,7 @@ impl ProviderRegistry {
         }
     }
 
-    pub fn register<P, F>(&mut self, constructor: F)
+    pub fn register<P, F>(&mut self, constructor: F, preferred: bool)
     where
         P: Provider + 'static,
         F: Fn(ModelConfig) -> Result<P> + Send + Sync + 'static,
@@ -36,6 +45,11 @@ impl ProviderRegistry {
             ProviderEntry {
                 metadata,
                 constructor: Box::new(move |model| Ok(Arc::new(constructor(model)?))),
+                provider_type: if preferred {
+                    ProviderType::Preferred
+                } else {
+                    ProviderType::Builtin
+                },
             },
         );
     }
@@ -48,6 +62,7 @@ impl ProviderRegistry {
         description: String,
         default_model: String,
         known_models: Vec<super::base::ModelInfo>,
+        provider_type: ProviderType,
         constructor: F,
     ) where
         P: Provider + 'static,
@@ -69,6 +84,7 @@ impl ProviderRegistry {
             ProviderEntry {
                 metadata: custom_metadata,
                 constructor: Box::new(move |model| Ok(Arc::new(constructor(model)?))),
+                provider_type,
             },
         );
     }
@@ -92,8 +108,11 @@ impl ProviderRegistry {
         (entry.constructor)(model)
     }
 
-    pub fn all_metadata(&self) -> Vec<ProviderMetadata> {
-        self.entries.values().map(|e| e.metadata.clone()).collect()
+    pub fn all_metadata_with_types(&self) -> Vec<(ProviderMetadata, ProviderType)> {
+        self.entries
+            .values()
+            .map(|e| (e.metadata.clone(), e.provider_type))
+            .collect()
     }
 
     pub fn remove_custom_providers(&mut self) {
