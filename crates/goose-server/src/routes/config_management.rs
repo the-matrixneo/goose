@@ -13,6 +13,7 @@ use goose::providers::base::ProviderMetadata;
 use goose::providers::pricing::{
     get_all_pricing, get_model_pricing, parse_model_id, refresh_pricing,
 };
+use goose::providers::provider_registry::ProviderType;
 use goose::providers::providers as get_providers;
 use goose::{agents::ExtensionConfig, config::permission::PermissionLevel};
 use http::StatusCode;
@@ -57,7 +58,7 @@ pub struct ProviderDetails {
     pub name: String,
     pub metadata: ProviderMetadata,
     pub is_configured: bool,
-    pub is_custom_provider: bool,
+    pub provider_type: ProviderType,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -226,9 +227,7 @@ pub async fn add_extension(
         (status = 500, description = "Internal server error")
     )
 )]
-pub async fn remove_extension(
-    axum::extract::Path(name): axum::extract::Path<String>,
-) -> Result<Json<String>, StatusCode> {
+pub async fn remove_extension(Path(name): Path<String>) -> Result<Json<String>, StatusCode> {
     let key = goose::config::extensions::name_to_key(&name);
     goose::config::remove_extension(&key);
     Ok(Json(format!("Removed extension {}", name)))
@@ -311,11 +310,22 @@ fn load_declarative_providers(
     )
 )]
 pub async fn providers() -> Result<Json<Vec<ProviderDetails>>, StatusCode> {
-    let providers: Vec<ProviderDetails> = get_providers()
+    let providers = get_providers();
+    let providers_response: Vec<ProviderDetails> = providers
         .into_iter()
-        .map(|m| ProviderDetails {})
+        .map(|(metadata, provider_type)| {
+            let is_configured = check_provider_configured(&metadata);
+
+            ProviderDetails {
+                name: metadata.name.clone(),
+                metadata,
+                is_configured,
+                provider_type,
+            }
+        })
         .collect();
-    Ok(Json(providers))
+
+    Ok(Json(providers_response))
 }
 
 #[utoipa::path(
@@ -435,10 +445,7 @@ pub async fn get_pricing(
             }
         }
     } else {
-        // Get only configured providers' pricing
-        let providers_metadata = get_providers();
-
-        for metadata in providers_metadata {
+        for (metadata, _) in get_providers() {
             // Skip unconfigured providers if filtering
             if !check_provider_configured(&metadata) {
                 continue;
@@ -782,10 +789,7 @@ mod tests {
         );
         let status_code = result.unwrap_err();
 
-        assert!(status_code == StatusCode::BAD_REQUEST,
-                "Expected BAD_REQUEST (authentication error) or INTERNAL_SERVER_ERROR (other errors), got: {}",
-                status_code
-        );
+        assert_eq!(status_code, StatusCode::BAD_REQUEST, "Expected BAD_REQUEST (authentication error) or INTERNAL_SERVER_ERROR (other errors), got: {}", status_code);
 
         std::env::remove_var("OPENAI_API_KEY");
     }

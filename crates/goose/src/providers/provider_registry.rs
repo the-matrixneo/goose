@@ -1,12 +1,14 @@
-use super::base::{Provider, ProviderMetadata};
+use super::base::{ModelInfo, Provider, ProviderMetadata};
+use crate::config::DeclarativeProviderConfig;
 use crate::model::ModelConfig;
 use anyhow::Result;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 
 type ProviderConstructor = Box<dyn Fn(ModelConfig) -> Result<Arc<dyn Provider>> + Send + Sync>;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ProviderType {
     Preferred,
     Builtin,
@@ -54,14 +56,9 @@ impl ProviderRegistry {
         );
     }
 
-    /// create provider with custom name
     pub fn register_with_name<P, F>(
         &mut self,
-        custom_name: String,
-        display_name: String,
-        description: String,
-        default_model: String,
-        known_models: Vec<super::base::ModelInfo>,
+        config: &DeclarativeProviderConfig,
         provider_type: ProviderType,
         constructor: F,
     ) where
@@ -69,9 +66,31 @@ impl ProviderRegistry {
         F: Fn(ModelConfig) -> Result<P> + Send + Sync + 'static,
     {
         let base_metadata = P::metadata();
+        let description = config
+            .description
+            .clone()
+            .unwrap_or_else(|| format!("Custom {} provider", config.display_name));
+        let default_model = config
+            .models
+            .first()
+            .map(|m| m.name.clone())
+            .unwrap_or_default();
+        let known_models: Vec<ModelInfo> = config
+            .models
+            .iter()
+            .map(|m| ModelInfo {
+                name: m.name.clone(),
+                context_limit: m.context_limit,
+                input_token_cost: m.input_token_cost,
+                output_token_cost: m.output_token_cost,
+                currency: m.currency.clone(),
+                supports_cache_control: Some(m.supports_cache_control.unwrap_or(false)),
+            })
+            .collect();
+
         let custom_metadata = ProviderMetadata {
-            name: custom_name.clone(),
-            display_name,
+            name: config.name.clone(),
+            display_name: config.display_name.clone(),
             description,
             default_model,
             known_models,
@@ -80,7 +99,7 @@ impl ProviderRegistry {
         };
 
         self.entries.insert(
-            custom_name,
+            config.name.clone(),
             ProviderEntry {
                 metadata: custom_metadata,
                 constructor: Box::new(move |model| Ok(Arc::new(constructor(model)?))),

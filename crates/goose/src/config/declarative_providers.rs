@@ -1,6 +1,5 @@
 use crate::config::paths::Paths;
 use crate::config::Config;
-use crate::model::ModelConfig;
 use crate::providers::anthropic::AnthropicProvider;
 use crate::providers::base::ModelInfo;
 use crate::providers::ollama::OllamaProvider;
@@ -184,65 +183,28 @@ pub fn register_declarative_provider(
     provider_type: ProviderType,
 ) {
     let config_clone = config.clone();
-    let description = config
-        .description
-        .clone()
-        .unwrap_or_else(|| format!("Custom {} provider", config.display_name));
-    let default_model = config
-        .models
-        .first()
-        .map(|m| m.name.clone())
-        .unwrap_or_default();
-    let known_models: Vec<ModelInfo> = config
-        .models
-        .iter()
-        .map(|m| ModelInfo {
-            name: m.name.clone(),
-            context_limit: m.context_limit,
-            input_token_cost: m.input_token_cost,
-            output_token_cost: m.output_token_cost,
-            currency: m.currency.clone(),
-            supports_cache_control: Some(m.supports_cache_control.unwrap_or(false)),
-        })
-        .collect();
 
     match config.engine {
         ProviderEngine::OpenAI => {
             registry.register_with_name::<OpenAiProvider, _>(
-                config.name.clone(),
-                config.display_name.clone(),
-                description,
-                default_model,
-                known_models,
+                &config,
                 provider_type,
-                move |model: ModelConfig| {
-                    OpenAiProvider::from_custom_config(model, config_clone.clone())
-                },
+                move |model| OpenAiProvider::from_custom_config(model, config_clone.clone()),
             );
         }
         ProviderEngine::Ollama => {
             registry.register_with_name::<OllamaProvider, _>(
-                config.name.clone(),
-                config.display_name.clone(),
-                description,
-                default_model,
-                known_models,
+                &config,
                 provider_type,
-                move |model: ModelConfig| {
-                    OllamaProvider::from_custom_config(model, config_clone.clone())
-                },
+                move |model| OllamaProvider::from_custom_config(model, config_clone.clone()),
             );
         }
-        ProviderEngine::Anthropic => registry.register_with_name::<AnthropicProvider, _>(
-            config.name.clone(),
-            config.display_name.clone(),
-            description,
-            default_model,
-            known_models,
-            provider_type,
-            move |model: ModelConfig| {
-                AnthropicProvider::from_custom_config(model, config_clone.clone())
-            },
-        ),
-    };
+        ProviderEngine::Anthropic => {
+            registry.register_with_name::<AnthropicProvider, _>(
+                &config,
+                provider_type,
+                move |model| AnthropicProvider::from_custom_config(model, config_clone.clone()),
+            );
+        }
+    }
 }
