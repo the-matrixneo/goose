@@ -2,7 +2,7 @@
 set -e
 
 # Configuration
-PORT=55123
+PORT=62996
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 GOOSED_BINARY="${SCRIPT_DIR}/target/release/goosed"
 
