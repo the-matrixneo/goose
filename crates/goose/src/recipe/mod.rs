@@ -278,7 +278,7 @@ impl Recipe {
         }
 
         let recipe: Recipe = serde_yaml::from_value(value)
-            .map_err(|e| anyhow::anyhow!("Failed to deserialize recipe: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to parse recipe: {}", e))?;
 
         if let Some(ref retry_config) = recipe.retry {
             if let Err(validation_error) = retry_config.validate() {

@@ -23,10 +23,7 @@ pub fn handle_validate(recipe_name: &str) -> Result<()> {
             println!("{} recipe file is valid", style("✓").green().bold());
             Ok(())
         }
-        Err(err) => {
-            println!("{} {}", style("✗").red().bold(), err);
-            Err(err)
-        }
+        Err(err) => Err(err),
     }
 }
 
@@ -54,19 +51,9 @@ pub fn handle_deeplink(recipe_name: &str) -> Result<String> {
                 println!("{}", full_url);
                 Ok(full_url)
             }
-            Err(err) => {
-                println!(
-                    "{} Failed to encode recipe: {}",
-                    style("✗").red().bold(),
-                    err
-                );
-                Err(anyhow::anyhow!("Failed to encode recipe: {}", err))
-            }
+            Err(err) => Err(anyhow::anyhow!("Failed to encode recipe: {}", err)),
         },
-        Err(err) => {
-            println!("{} {}", style("✗").red().bold(), err);
-            Err(err)
-        }
+        Err(err) => Err(err),
     }
 }
 
