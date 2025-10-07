@@ -1,16 +1,11 @@
 import { Recipe, saveRecipe as saveRecipeApi } from '../api';
 
-export async function saveRecipe(
-  recipe: Recipe,
-  isGlobal: boolean | null,
-  recipeId?: string | null
-): Promise<void> {
+export async function saveRecipe(recipe: Recipe, recipeId?: string | null): Promise<void> {
   try {
     await saveRecipeApi({
       body: {
         recipe,
         id: recipeId,
-        is_global: isGlobal,
       },
       throwOnError: true,
     });

@@ -110,7 +110,7 @@ export default function ImportRecipeForm({ isOpen, onClose, onSuccess }: ImportR
           recipe = await parseRecipeFromFile(fileContent);
         }
 
-        await saveRecipe(recipe, true, null);
+        await saveRecipe(recipe, null);
 
         // Reset dialog state
         importRecipeForm.reset({

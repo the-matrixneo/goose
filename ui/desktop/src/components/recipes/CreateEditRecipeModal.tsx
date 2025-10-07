@@ -304,7 +304,7 @@ export default function CreateEditRecipeModal({
     try {
       const recipe = getCurrentRecipe();
 
-      await saveRecipe(recipe, true, recipeId);
+      await saveRecipe(recipe, recipeId);
 
       onClose(true);
 
@@ -338,7 +338,7 @@ export default function CreateEditRecipeModal({
     try {
       const recipe = getCurrentRecipe();
 
-      await saveRecipe(recipe, true, recipeId);
+      await saveRecipe(recipe, recipeId);
 
       // Close modal first
       onClose(true);

@@ -183,7 +183,7 @@ export default function CreateRecipeFromSessionModal({
         extensions: [], // Will be populated based on current extensions
       };
 
-      await saveRecipe(recipe, true, null);
+      await saveRecipe(recipe, null);
 
       onRecipeCreated?.(recipe);
       onClose();
