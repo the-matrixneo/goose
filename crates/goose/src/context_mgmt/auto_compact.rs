@@ -327,6 +327,7 @@ mod tests {
             extension_data: crate::session::extension_data::ExtensionData::new(),
             conversation: Some(conversation),
             message_count,
+            user_recipe_values: None,
         }
     }
 
