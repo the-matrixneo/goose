@@ -189,7 +189,7 @@ export type ExtendPromptResponse = {
 export type ExtensionConfig = {
     available_tools?: Array<string>;
     bundled?: boolean | null;
-    description?: string;
+    description: string;
     env_keys?: Array<string>;
     envs?: Envs;
     /**
@@ -204,7 +204,7 @@ export type ExtensionConfig = {
     available_tools?: Array<string>;
     bundled?: boolean | null;
     cmd: string;
-    description?: string;
+    description: string;
     env_keys?: Array<string>;
     envs?: Envs;
     /**
@@ -216,7 +216,7 @@ export type ExtensionConfig = {
 } | {
     available_tools?: Array<string>;
     bundled?: boolean | null;
-    description?: string;
+    description: string;
     display_name?: string | null;
     /**
      * The name used to identify this extension
@@ -227,7 +227,7 @@ export type ExtensionConfig = {
 } | {
     available_tools?: Array<string>;
     bundled?: boolean | null;
-    description?: string;
+    description: string;
     /**
      * The name used to identify this extension
      */
@@ -236,7 +236,7 @@ export type ExtensionConfig = {
 } | {
     available_tools?: Array<string>;
     bundled?: boolean | null;
-    description?: string;
+    description: string;
     env_keys?: Array<string>;
     envs?: Envs;
     headers?: {
@@ -252,7 +252,7 @@ export type ExtensionConfig = {
 } | {
     available_tools?: Array<string>;
     bundled?: boolean | null;
-    description?: string;
+    description: string;
     /**
      * Instructions for how to use these tools
      */

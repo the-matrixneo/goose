@@ -15,6 +15,7 @@ use utoipa::ToSchema;
 pub mod build_recipe;
 pub mod local_recipes;
 pub mod read_recipe_file_content;
+mod recipe_extension_adapter;
 pub mod template_recipe;
 pub mod validate_recipe;
 
@@ -43,7 +44,11 @@ pub struct Recipe {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prompt: Option<String>, // the prompt to start the session with
 
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        default,
+        deserialize_with = "recipe_extension_adapter::deserialize_recipe_extensions"
+    )]
     pub extensions: Option<Vec<ExtensionConfig>>, // a list of extensions to enable
 
     #[serde(skip_serializing_if = "Option::is_none")]
