@@ -4,8 +4,7 @@ import { Recipe, generateDeepLink, Parameter } from '../../recipe';
 import { Geese } from '../icons/Geese';
 import Copy from '../icons/Copy';
 import { Check, Save, Calendar, X, Play } from 'lucide-react';
-import { ExtensionConfig, useConfig } from '../ConfigContext';
-import { FixedExtensionEntry } from '../ConfigContext';
+import { ExtensionConfig } from '../ConfigContext';
 import { ScheduleFromRecipeModal } from '../schedule/ScheduleFromRecipeModal';
 import { Button } from '../ui/button';
 
@@ -29,8 +28,6 @@ export default function CreateEditRecipeModal({
   isCreateMode = false,
   recipeId,
 }: CreateEditRecipeModalProps) {
-  const { getExtensions } = useConfig();
-
   const getInitialValues = React.useCallback((): RecipeFormData => {
     if (recipe) {
       return {
@@ -81,16 +78,14 @@ export default function CreateEditRecipeModal({
       setJsonSchema(form.state.values.jsonSchema);
     });
   }, [form]);
-  const [extensionOptions, setExtensionOptions] = useState<FixedExtensionEntry[]>([]);
-  const [extensionsLoaded, setExtensionsLoaded] = useState(false);
   const [copied, setCopied] = useState(false);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   // Initialize selected extensions for the recipe
-  const [recipeExtensions] = useState<string[]>(() => {
+  const [recipeExtensions] = useState<ExtensionConfig[]>(() => {
     if (recipe?.extensions) {
-      return recipe.extensions.map((ext) => ext.name);
+      return recipe.extensions;
     }
     return [];
   });
@@ -102,31 +97,6 @@ export default function CreateEditRecipeModal({
       form.reset(newValues);
     }
   }, [recipe, form, getInitialValues]);
-
-  // Load extensions when modal opens
-  useEffect(() => {
-    if (isOpen && !extensionsLoaded) {
-      const loadExtensions = async () => {
-        try {
-          const extensions = await getExtensions(false);
-          console.log('Loading extensions for recipe modal');
-
-          if (extensions && extensions.length > 0) {
-            const initializedExtensions = extensions.map((ext) => ({
-              ...ext,
-              enabled: recipeExtensions.includes(ext.name),
-            }));
-
-            setExtensionOptions(initializedExtensions);
-            setExtensionsLoaded(true);
-          }
-        } catch (error) {
-          console.error('Failed to load extensions:', error);
-        }
-      };
-      loadExtensions();
-    }
-  }, [isOpen, getExtensions, recipeExtensions, extensionsLoaded]);
 
   const getCurrentRecipe = useCallback((): Recipe => {
     // Transform the internal parameters state into the desired output format.
@@ -172,22 +142,10 @@ export default function CreateEditRecipeModal({
       prompt: prompt || undefined,
       parameters: formattedParameters,
       response: responseConfig,
-      extensions: recipeExtensions
-        .map((name) => {
-          const extension = extensionOptions.find((e) => e.name === name);
-          if (!extension) return null;
-
-          // Create a clean copy of the extension configuration
-          const { enabled: _enabled, ...cleanExtension } = extension;
-          // Remove legacy envs which could potentially include secrets
-          if ('envs' in cleanExtension) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const { envs: _envs, ...finalExtension } = cleanExtension as any;
-            return finalExtension;
-          }
-          return cleanExtension;
-        })
-        .filter(Boolean) as ExtensionConfig[],
+      // Strip envs to avoid leaking secrets
+      extensions: recipeExtensions.map((extension) =>
+        'envs' in extension ? { ...extension, envs: undefined } : extension
+      ) as ExtensionConfig[],
     };
   }, [
     recipe,
@@ -199,7 +157,6 @@ export default function CreateEditRecipeModal({
     parameters,
     jsonSchema,
     recipeExtensions,
-    extensionOptions,
   ]);
 
   const requiredFieldsAreFilled = () => {
