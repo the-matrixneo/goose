@@ -1590,6 +1590,32 @@ export type ManageContextResponses = {
 
 export type ManageContextResponse = ManageContextResponses[keyof ManageContextResponses];
 
+export type GreetingStreamData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * Secret key for authentication
+         */
+        secretKey: string;
+    };
+    url: '/greeting';
+};
+
+export type GreetingStreamErrors = {
+    /**
+     * Unauthorized - invalid secret key
+     */
+    401: unknown;
+};
+
+export type GreetingStreamResponses = {
+    /**
+     * SSE stream of greeting messages
+     */
+    200: unknown;
+};
+
 export type StartOpenrouterSetupData = {
     body?: never;
     path?: never;

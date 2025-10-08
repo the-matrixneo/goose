@@ -373,6 +373,7 @@ derive_utoipa!(Icon as IconSchema);
         super::routes::recipe::parse_recipe,
         super::routes::setup::start_openrouter_setup,
         super::routes::setup::start_tetrate_setup,
+        super::routes::greeting::greeting_stream,
     ),
     components(schemas(
         super::routes::config_management::UpsertConfigQuery,

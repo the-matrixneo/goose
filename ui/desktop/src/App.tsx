@@ -16,6 +16,8 @@ import { ToastContainer } from 'react-toastify';
 import { GoosehintsModal } from './components/GoosehintsModal';
 import AnnouncementModal from './components/AnnouncementModal';
 import ProviderGuard from './components/ProviderGuard';
+import { GreetingModal } from './components/ui/GreetingModal';
+import { useGreetingSSE } from './hooks/useGreetingSSE';
 
 import { ChatType } from './types/chat';
 import Hub from './components/hub';
@@ -283,6 +285,9 @@ export function AppInner() {
   const [sharedSessionError, setSharedSessionError] = useState<string | null>(null);
   const [isExtensionsLoading, setIsExtensionsLoading] = useState(false);
   const [didSelectProvider, setDidSelectProvider] = useState<boolean>(false);
+
+  // Use the greeting SSE hook
+  const { greeting, dismissGreeting } = useGreetingSSE();
 
   const navigate = useNavigate();
   const setView = useNavigation();
@@ -589,6 +594,13 @@ export function AppInner() {
         <GoosehintsModal
           directory={window.appConfig?.get('GOOSE_WORKING_DIR') as string}
           setIsGoosehintsModalOpen={setIsGoosehintsModalOpen}
+        />
+      )}
+      {greeting && (
+        <GreetingModal
+          isOpen={!!greeting}
+          greeting={greeting}
+          onDismiss={dismissGreeting}
         />
       )}
     </>

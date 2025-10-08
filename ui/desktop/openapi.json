@@ -886,6 +886,33 @@
         ]
       }
     },
+    "/greeting": {
+      "get": {
+        "tags": [
+          "super::routes::greeting"
+        ],
+        "operationId": "greeting_stream",
+        "parameters": [
+          {
+            "name": "secretKey",
+            "in": "query",
+            "description": "Secret key for authentication",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "SSE stream of greeting messages"
+          },
+          "401": {
+            "description": "Unauthorized - invalid secret key"
+          }
+        }
+      }
+    },
     "/handle_openrouter": {
       "post": {
         "tags": [
