@@ -338,7 +338,7 @@ async fn save_recipe(
 ) -> Result<StatusCode, ErrorResponse> {
     let Json(raw_json) = payload.map_err(json_rejection_to_error_response)?;
     let request = deserialize_save_recipe_request(raw_json)?;
-    validate_incoming_recipe(&request.recipe)?;
+    validate_recipe(&request.recipe)?;
 
     let file_path = match request.id.as_ref() {
         Some(id) => Some(get_recipe_file_path_by_id(state.clone(), id).await?),
@@ -361,9 +361,9 @@ fn json_rejection_to_error_response(rejection: JsonRejection) -> ErrorResponse {
     }
 }
 
-fn validate_incoming_recipe(recipe: &Recipe) -> Result<(), ErrorResponse> {
+fn validate_recipe(recipe: &Recipe) -> Result<(), ErrorResponse> {
     let recipe_json = serde_json::to_string(recipe).map_err(|err| ErrorResponse {
-        message: format!("Failed to prepare recipe for validation: {}", err),
+        message: err.to_string(),
         status: StatusCode::BAD_REQUEST,
     })?;
 
@@ -383,10 +383,10 @@ fn deserialize_save_recipe_request(value: Value) -> Result<SaveRecipeRequest, Er
         let path = err.path().to_string();
         let inner = err.into_inner();
         let message = if path.is_empty() {
-            format!("Recipe validation failed: {}", inner)
+            format!("Save recipe validation failed: {}", inner)
         } else {
             format!(
-                "Request validation failed at {}: {}",
+                "save recipe validation failed at {}: {}",
                 path.trim_start_matches('.'),
                 inner
             )

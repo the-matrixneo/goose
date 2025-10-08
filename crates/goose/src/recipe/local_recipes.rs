@@ -119,8 +119,16 @@ fn scan_directory_for_recipes(dir: &Path) -> Result<Vec<(PathBuf, Recipe)>> {
         if path.is_file() {
             if let Some(extension) = path.extension() {
                 if RECIPE_FILE_EXTENSIONS.contains(&extension.to_string_lossy().as_ref()) {
-                    if let Ok(recipe) = Recipe::from_file_path(&path) {
-                        recipes.push((path.clone(), recipe));
+                    match Recipe::from_file_path(&path) {
+                        Ok(recipe) => recipes.push((path.clone(), recipe)),
+                        Err(e) => {
+                            let error_message = format!(
+                                "Failed to load recipe from file {}: {}",
+                                path.display(),
+                                e
+                            );
+                            tracing::error!("{}", error_message);
+                        }
                     }
                 }
             }

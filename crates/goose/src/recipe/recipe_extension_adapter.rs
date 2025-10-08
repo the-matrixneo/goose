@@ -106,127 +106,77 @@ enum RecipeExtensionConfigInternal {
     },
 }
 
+macro_rules! map_recipe_extensions {
+    ($value:expr; $( $variant:ident { $( $field:ident ),* $(,)? } ),+ $(,)?) => {{
+        match $value {
+            $(
+                RecipeExtensionConfigInternal::$variant {
+                    name,
+                    description,
+                    $( $field ),*
+                } => ExtensionConfig::$variant {
+                    name,
+                    description: description.unwrap_or_default(),
+                    $( $field ),*
+                },
+            )+
+        }
+    }};
+}
+
 impl From<RecipeExtensionConfigInternal> for ExtensionConfig {
     fn from(internal_variant: RecipeExtensionConfigInternal) -> Self {
-        match internal_variant {
-            RecipeExtensionConfigInternal::Sse {
-                name,
-                description,
+        map_recipe_extensions!(
+            internal_variant;
+            Sse {
                 uri,
                 envs,
                 env_keys,
                 timeout,
                 bundled,
-                available_tools,
-            } => ExtensionConfig::Sse {
-                name,
-                description: description.unwrap_or_default(),
-                uri,
-                envs,
-                env_keys,
-                timeout,
-                bundled,
-                available_tools,
+                available_tools
             },
-            RecipeExtensionConfigInternal::Stdio {
-                name,
-                description,
+            Stdio {
                 cmd,
                 args,
                 envs,
                 env_keys,
                 timeout,
                 bundled,
-                available_tools,
-            } => ExtensionConfig::Stdio {
-                name,
-                description: description.unwrap_or_default(),
-                cmd,
-                args,
-                envs,
-                env_keys,
-                timeout,
-                bundled,
-                available_tools,
+                available_tools
             },
-            RecipeExtensionConfigInternal::Builtin {
-                name,
-                description,
+            Builtin {
                 display_name,
                 timeout,
                 bundled,
-                available_tools,
-            } => ExtensionConfig::Builtin {
-                name,
-                description: description.unwrap_or_default(),
-                display_name,
-                timeout,
-                bundled,
-                available_tools,
+                available_tools
             },
-            RecipeExtensionConfigInternal::Platform {
-                name,
-                description,
+            Platform {
                 bundled,
-                available_tools,
-            } => ExtensionConfig::Platform {
-                name,
-                description: description.unwrap_or_default(),
-                bundled,
-                available_tools,
+                available_tools
             },
-            RecipeExtensionConfigInternal::StreamableHttp {
-                name,
-                description,
+            StreamableHttp {
                 uri,
                 envs,
                 env_keys,
                 headers,
                 timeout,
                 bundled,
-                available_tools,
-            } => ExtensionConfig::StreamableHttp {
-                name,
-                description: description.unwrap_or_default(),
-                uri,
-                envs,
-                env_keys,
-                headers,
-                timeout,
-                bundled,
-                available_tools,
+                available_tools
             },
-            RecipeExtensionConfigInternal::Frontend {
-                name,
-                description,
+            Frontend {
                 tools,
                 instructions,
                 bundled,
-                available_tools,
-            } => ExtensionConfig::Frontend {
-                name,
-                description: description.unwrap_or_default(),
-                tools,
-                instructions,
-                bundled,
-                available_tools,
+                available_tools
             },
-            RecipeExtensionConfigInternal::InlinePython {
-                name,
-                description,
+            InlinePython {
                 code,
                 timeout,
                 dependencies,
-                available_tools,
-            } => ExtensionConfig::InlinePython {
-                name,
-                description: description.unwrap_or_default(),
-                code,
-                timeout,
-                dependencies,
-                available_tools,
-            },
-        }
+                available_tools
+            }
+        )
     }
 }
 
@@ -243,4 +193,91 @@ where
             .map(ExtensionConfig::from)
             .collect::<Vec<_>>()
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde::Deserialize;
+    use serde_json::json;
+
+    #[derive(Deserialize)]
+    struct Wrapper {
+        #[serde(deserialize_with = "deserialize_recipe_extensions")]
+        extensions: Option<Vec<ExtensionConfig>>,
+    }
+
+    #[test]
+    fn builtin_extension_defaults_description() {
+        let wrapper: Wrapper = serde_json::from_value(json!({
+            "extensions": [{
+                "type": "builtin",
+                "name": "test-builtin",
+                "display_name": "Test Builtin",
+                "timeout": 120,
+                "bundled": true,
+                "available_tools": ["tool_a", "tool_b"],
+            }]
+        }))
+        .expect("failed to deserialize extensions");
+
+        let extensions = wrapper.extensions.expect("expected extensions");
+        assert_eq!(extensions.len(), 1);
+
+        match &extensions[0] {
+            ExtensionConfig::Builtin {
+                name,
+                description,
+                display_name,
+                timeout,
+                bundled,
+                available_tools,
+            } => {
+                assert_eq!(name, "test-builtin");
+                assert_eq!(description, "");
+                assert_eq!(display_name.as_deref(), Some("Test Builtin"));
+                assert_eq!(*timeout, Some(120));
+                assert_eq!(*bundled, Some(true));
+                assert_eq!(
+                    available_tools,
+                    &vec!["tool_a".to_string(), "tool_b".to_string()]
+                );
+            }
+            other => panic!("unexpected extension variant: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn builtin_extension_null_description_defaults_to_empty() {
+        let wrapper: Wrapper = serde_json::from_value(json!({
+            "extensions": [{
+                "type": "builtin",
+                "name": "null-description-builtin",
+                "description": null,
+            }]
+        }))
+        .expect("failed to deserialize extensions with null description");
+
+        let extensions = wrapper.extensions.expect("expected extensions");
+        assert_eq!(extensions.len(), 1);
+
+        match &extensions[0] {
+            ExtensionConfig::Builtin {
+                name,
+                description,
+                display_name,
+                timeout,
+                bundled,
+                available_tools,
+            } => {
+                assert_eq!(name, "null-description-builtin");
+                assert_eq!(description, "");
+                assert!(display_name.is_none());
+                assert!(timeout.is_none());
+                assert!(bundled.is_none());
+                assert!(available_tools.is_empty());
+            }
+            other => panic!("unexpected extension variant: {:?}", other),
+        }
+    }
 }

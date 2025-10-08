@@ -276,7 +276,7 @@ export type ExtensionConfig = {
      * Python package dependencies required by this extension
      */
     dependencies?: Array<string> | null;
-    description?: string;
+    description: string;
     /**
      * The name used to identify this extension
      */

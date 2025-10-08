@@ -14,7 +14,7 @@ export async function saveRecipe(recipe: Recipe, recipeId?: string | null): Prom
     if (typeof error === 'object' && error !== null && 'message' in error) {
       error_message = error.message as string;
     }
-    throw new Error(`Failed to save recipe: ${error_message}`);
+    throw new Error(error_message);
   }
 }
 

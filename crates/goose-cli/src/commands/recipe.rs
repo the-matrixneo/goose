@@ -18,13 +18,9 @@ use goose::recipe_deeplink;
 pub fn handle_validate(recipe_name: &str) -> Result<()> {
     // Load and validate the recipe file
     let recipe_file = load_recipe_file(recipe_name)?;
-    match validate_recipe_template_from_file(&recipe_file) {
-        Ok(_) => {
-            println!("{} recipe file is valid", style("✓").green().bold());
-            Ok(())
-        }
-        Err(err) => Err(err),
-    }
+    validate_recipe_template_from_file(&recipe_file)?;
+    println!("{} recipe file is valid", style("✓").green().bold());
+    Ok(())
 }
 
 /// Generates a deeplink for a recipe file

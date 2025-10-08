@@ -2635,6 +2635,7 @@
             "description": "Inline Python code that will be executed using uvx",
             "required": [
               "name",
+              "description",
               "code",
               "type"
             ],

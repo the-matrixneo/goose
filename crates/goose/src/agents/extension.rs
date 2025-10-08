@@ -281,7 +281,6 @@ pub enum ExtensionConfig {
     InlinePython {
         /// The name used to identify this extension
         name: String,
-        #[serde(default)]
         description: String,
         /// The Python code to execute
         code: String,
