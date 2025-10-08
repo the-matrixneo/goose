@@ -2754,7 +2754,7 @@
             "type": "string"
           },
           "toolCall": {
-            "type": "object"
+            "$ref": "#/components/schemas/ToolResult"
           }
         }
       },
@@ -4339,7 +4339,7 @@
             "type": "string"
           },
           "toolCall": {
-            "type": "object"
+            "$ref": "#/components/schemas/ToolResult"
           }
         }
       },
@@ -4354,7 +4354,7 @@
             "type": "string"
           },
           "toolResult": {
-            "type": "object"
+            "$ref": "#/components/schemas/ToolResult"
           }
         }
       },

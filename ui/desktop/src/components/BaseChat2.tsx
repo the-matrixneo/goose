@@ -53,12 +53,13 @@ import { MainPanelLayout } from './Layout/MainPanelLayout';
 import ChatInput from './ChatInput';
 import { ScrollArea, ScrollAreaHandle } from './ui/scroll-area';
 import { useFileDrop } from '../hooks/useFileDrop';
-import { Message } from '../types/message';
+import { Message } from '../api';
 import { ChatState } from '../types/chatState';
 import { ChatType } from '../types/chat';
 import { useIsMobile } from '../hooks/use-mobile';
 import { useSidebar } from './ui/sidebar';
 import { cn } from '../utils';
+import { useChatStream } from '../hooks/useChatStream';
 
 interface BaseChatProps {
   chat: ChatType | null;
@@ -113,6 +114,17 @@ function BaseChatContent({
   //   localOutputTokens,
   //   session: sessionMetadata,
   // });
+
+  const { chatState, handleSubmit, stopStreaming } = useChatStream({
+    sessionId: chat?.sessionId || '',
+    messages,
+    setMessages: (newMessages) => {
+      if (chat) {
+        setChat({ ...chat, messages: newMessages });
+      }
+    },
+    onStreamFinish: onMessageStreamFinish,
+  });
 
   // TODO(Douwe): send this to the chatbox instead, possibly autosubmit? or backend
   const append = (_txt: string) => {};

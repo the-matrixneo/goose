@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Button } from './ui/button';
 import { ToolCallArguments, ToolCallArgumentValue } from './ToolCallArguments';
 import MarkdownContent from './MarkdownContent';
-import { Content, ToolRequestMessageContent, ToolResponseMessageContent } from '../types/message';
+import { ToolRequestMessageContent, ToolResponseMessageContent } from '../types/message';
 import { cn, snakeToTitleCase } from '../utils';
 import { LoadingStatus } from './ui/Dot';
 import { NotificationEvent } from '../hooks/useMessageStream';
@@ -12,6 +12,7 @@ import { ChevronRight, FlaskConical } from 'lucide-react';
 import { TooltipWrapper } from './settings/providers/subcomponents/buttons/TooltipWrapper';
 import MCPUIResourceRenderer from './MCPUIResourceRenderer';
 import { isUIResource } from '@mcp-ui/client';
+import { Content } from '../api';
 
 interface ToolCallWithResponseProps {
   isCancelledMessage: boolean;
@@ -27,10 +28,10 @@ export default function ToolCallWithResponse({
   toolRequest,
   toolResponse,
   notifications,
-  isStreamingMessage = false,
+  isStreamingMessage,
   append,
 }: ToolCallWithResponseProps) {
-  const toolCall = toolRequest.toolCall.status === 'success' ? toolRequest.toolCall.value : null;
+  const toolCall = toolRequest.toolCall as { name: string; arguments: Record<string, unknown> };
   if (!toolCall) {
     return null;
   }
@@ -53,11 +54,12 @@ export default function ToolCallWithResponse({
         />
       </div>
       {/* MCP UI — Inline */}
-      {toolResponse?.toolResult?.value &&
-        toolResponse.toolResult.value.map((content, index) => {
+      {toolResponse?.toolResult &&
+        Array.isArray((toolResponse.toolResult as any).value) &&
+        (toolResponse.toolResult as any).value.map((content: Content, index: number) => {
           if (isUIResource(content)) {
             return (
-              <div key={`${content.type}-${index}`} className="mt-3">
+              <div key={`${index}`} className="mt-3">
                 <MCPUIResourceRenderer content={content} appendPromptToChat={append} />
                 <div className="mt-3 p-4 py-3 border border-borderSubtle rounded-lg bg-background-muted flex items-center">
                   <FlaskConical className="mr-2" size={20} />
@@ -211,7 +213,7 @@ function ToolCallView({
     ? shouldShowAsComplete
       ? 'success'
       : 'loading'
-    : toolResponse.toolResult.status;
+    : (toolResponse.toolResult as any).status || 'success';
 
   // Tool call timing tracking
   const [startTime, setStartTime] = useState<number | null>(null);
@@ -547,30 +549,34 @@ interface ToolResultViewProps {
 }
 
 function ToolResultView({ result, isStartExpanded }: ToolResultViewProps) {
+  const resultAny = result as any;
+
   return (
     <ToolCallExpandable
       label={<span className="pl-4 py-1 font-sans text-sm">Output</span>}
       isStartExpanded={isStartExpanded}
     >
       <div className="pl-4 pr-4 py-4">
-        {result.type === 'text' && result.text && (
+        {'text' in resultAny && resultAny.text && (
           <MarkdownContent
-            content={result.text}
+            content={resultAny.text}
             className="whitespace-pre-wrap max-w-full overflow-x-auto"
           />
         )}
-        {result.type === 'image' && (
-          <img
-            src={`data:${result.mimeType};base64,${result.data}`}
-            alt="Tool result"
-            className="max-w-full h-auto rounded-md my-2"
-            onError={(e) => {
-              console.error('Failed to load image');
-              e.currentTarget.style.display = 'none';
-            }}
-          />
-        )}
-        {result.type === 'resource' && (
+        {'mimeType' in resultAny &&
+          'data' in resultAny &&
+          resultAny.mimeType?.startsWith('image') && (
+            <img
+              src={`data:${resultAny.mimeType};base64,${resultAny.data}`}
+              alt="Tool result"
+              className="max-w-full h-auto rounded-md my-2"
+              onError={(e) => {
+                console.error('Failed to load image');
+                e.currentTarget.style.display = 'none';
+              }}
+            />
+          )}
+        {'resource' in resultAny && (
           <pre className="font-sans text-sm">{JSON.stringify(result, null, 2)}</pre>
         )}
       </div>

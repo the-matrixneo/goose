@@ -39,28 +39,44 @@ where
     Ok(content)
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(tag = "status", rename_all = "lowercase")]
+pub enum ToolCallResult<T> {
+    Success { value: T },
+    Error { error: String },
+}
+
+impl<T> From<ToolResult<T>> for ToolCallResult<T> {
+    fn from(result: ToolResult<T>) -> Self {
+        match result {
+            Ok(value) => ToolCallResult::Success { value },
+            Err(error) => ToolCallResult::Error {
+                error: error.to_string(),
+            },
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[derive(ToSchema)]
 pub struct ToolRequest {
     pub id: String,
-    #[serde(with = "tool_result_serde")]
-    #[schema(value_type = Object)]
-    pub tool_call: ToolResult<CallToolRequestParam>,
+    pub tool_call: ToolCallResult<CallToolRequestParam>,
 }
 
 impl ToolRequest {
     pub fn to_readable_string(&self) -> String {
         match &self.tool_call {
-            Ok(tool_call) => {
+            ToolCallResult::Success { value } => {
                 format!(
                     "Tool: {}, Args: {}",
-                    tool_call.name,
-                    serde_json::to_string_pretty(&tool_call.arguments)
+                    value.name,
+                    serde_json::to_string_pretty(&value.arguments)
                         .unwrap_or_else(|_| "<<invalid json>>".to_string())
                 )
             }
-            Err(e) => format!("Invalid tool call: {}", e),
+            ToolCallResult::Error { error } => format!("Invalid tool call: {}", error),
         }
     }
 }
@@ -71,7 +87,6 @@ impl ToolRequest {
 pub struct ToolResponse {
     pub id: String,
     #[serde(with = "tool_result_serde")]
-    #[schema(value_type = Object)]
     pub tool_result: ToolResult<Vec<Content>>,
 }
 
@@ -100,8 +115,6 @@ pub struct RedactedThinkingContent {
 #[serde(rename_all = "camelCase")]
 pub struct FrontendToolRequest {
     pub id: String,
-    #[serde(with = "tool_result_serde")]
-    #[schema(value_type = Object)]
     pub tool_call: ToolResult<CallToolRequestParam>,
 }
 

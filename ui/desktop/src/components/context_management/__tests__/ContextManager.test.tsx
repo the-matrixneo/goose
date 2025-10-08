@@ -1,9 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { ContextManagerProvider, useContextManager } from '../ContextManager';
-import { Message } from '../../../types/message';
 import * as contextManagement from '../index';
-import { ContextManageResponse } from '../../../api';
+import { ContextManageResponse, Message } from '../../../api';
 
 // Mock the context management functions
 vi.mock('../index', () => ({
@@ -12,9 +11,6 @@ vi.mock('../index', () => ({
 }));
 
 const mockManageContextFromBackend = vi.mocked(contextManagement.manageContextFromBackend);
-const mockConvertApiMessageToFrontendMessage = vi.mocked(
-  contextManagement.convertApiMessageToFrontendMessage
-);
 
 describe('ContextManager', () => {
   const mockMessages: Message[] = [
@@ -157,12 +153,6 @@ describe('ContextManager', () => {
         ],
       };
 
-      // Mock the conversion function to return different messages based on call order
-      mockConvertApiMessageToFrontendMessage
-        .mockReturnValueOnce(mockCompactionMarker) // First call - compaction marker
-        .mockReturnValueOnce(mockSummaryMessage) // Second call - summary
-        .mockReturnValueOnce(mockContinuationMessage); // Third call - continuation
-
       const { result } = renderContextManager();
 
       await act(async () => {
@@ -179,33 +169,6 @@ describe('ContextManager', () => {
         manageAction: 'summarize',
         sessionId: 'test-session-id',
       });
-
-      // Verify conversion calls with correct parameters
-      expect(mockConvertApiMessageToFrontendMessage).toHaveBeenNthCalledWith(
-        1,
-        expect.objectContaining({
-          content: [
-            { type: 'summarizationRequested', msg: 'Conversation compacted and summarized' },
-          ],
-        })
-      );
-      expect(mockConvertApiMessageToFrontendMessage).toHaveBeenNthCalledWith(
-        2,
-        expect.objectContaining({
-          content: [{ type: 'text', text: 'Summary content' }],
-        })
-      );
-      expect(mockConvertApiMessageToFrontendMessage).toHaveBeenNthCalledWith(
-        3,
-        expect.objectContaining({
-          content: [
-            {
-              type: 'text',
-              text: expect.stringContaining('The previous message contains a summary'),
-            },
-          ],
-        })
-      );
 
       // Expect setMessages to be called with all 3 converted messages
       expect(mockSetMessages).toHaveBeenCalledWith([
@@ -289,8 +252,6 @@ describe('ContextManager', () => {
         ],
         tokenCounts: [100, 50],
       });
-
-      mockConvertApiMessageToFrontendMessage.mockReturnValue(mockSummaryMessage);
 
       await act(async () => {
         await promise;
@@ -382,11 +343,6 @@ describe('ContextManager', () => {
         ],
       };
 
-      mockConvertApiMessageToFrontendMessage
-        .mockReturnValueOnce(mockCompactionMarker)
-        .mockReturnValueOnce(mockSummaryMessage)
-        .mockReturnValueOnce(mockContinuationMessage);
-
       const { result } = renderContextManager();
 
       await act(async () => {
@@ -430,8 +386,6 @@ describe('ContextManager', () => {
         ],
         tokenCounts: [100, 50],
       });
-
-      mockConvertApiMessageToFrontendMessage.mockReturnValue(mockSummaryMessage);
 
       const { result } = renderContextManager();
 
@@ -500,11 +454,6 @@ describe('ContextManager', () => {
         ],
       };
 
-      mockConvertApiMessageToFrontendMessage
-        .mockReturnValueOnce(mockCompactionMarker)
-        .mockReturnValueOnce(mockSummaryMessage)
-        .mockReturnValueOnce(mockContinuationMessage);
-
       const { result } = renderContextManager();
 
       await act(async () => {
@@ -570,8 +519,6 @@ describe('ContextManager', () => {
         created: 3000,
         content: [{ type: 'toolResponse', id: 'test', toolResult: { status: 'success' } }],
       };
-
-      mockConvertApiMessageToFrontendMessage.mockReturnValue(mockMessageWithoutText);
 
       const { result } = renderContextManager();
 
