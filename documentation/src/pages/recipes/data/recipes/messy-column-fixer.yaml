@@ -12,29 +12,15 @@ activities:
   - Scan CSV columns for type mismatches.
   - Detect missing values and formatting problems.
   - Apply fixes for detected issues.
-parameters:
-  - key: file_path
-    input_type: string
-    requirement: required
-    description: "Path to the CSV file you want to clean."
-  - key: auto_fix
-    input_type: string
-    requirement: optional
-    description: "Automatically apply suggested fixes (true/false)."
-    default: "false"
-    choices:
-      - "true"
-      - "false"
 extensions:
-    description: "Fixes messy columns in CSV files by normalizing and cleaning the data."
+  - type: stdio
     name: filesystem
+    description: "Fixes messy columns in CSV files by normalizing and cleaning the data."
     cmd: npx
     args:
-      [
-        "-y",
-        "@modelcontextprotocol/server-filesystem",
-        "/path/to/allowed/directory",
-      ]
+      - "-y"
+      - "@modelcontextprotocol/server-filesystem"
+      - "/path/to/allowed/directory"
     display_name: Filesystem
     timeout: 300
     bundled: false
