@@ -30,6 +30,18 @@
       "submittedDate": "2025-10-04",
       "tags": ["hacktoberfest"],
       "hacktoberfest": true
+    },
+    {
+      "title": "Goose with Goose Docs MCP",
+      "author": {
+        "name": "Dakshata Mishra",
+        "handle": "the-matrixneo"
+      },
+      "type": "Video",
+      "url": "https://www.youtube.com/shorts/Qidl20e-HOc",
+      "submittedDate": "2025-10-13",
+      "tags": ["hacktoberfest"],
+      "hacktoberfest": true
     }
   ]
 }
