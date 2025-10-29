@@ -13,6 +13,84 @@
     "version": "1.11.0"
   },
   "paths": {
+    "/agent/add_extension": {
+      "post": {
+        "tags": [
+          "super::routes::agent"
+        ],
+        "operationId": "agent_add_extension",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddExtensionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Extension added",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid secret key"
+          },
+          "424": {
+            "description": "Agent not initialized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/agent/remove_extension": {
+      "post": {
+        "tags": [
+          "super::routes::agent"
+        ],
+        "operationId": "agent_remove_extension",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemoveExtensionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Extension removed",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid secret key"
+          },
+          "424": {
+            "description": "Agent not initialized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
     "/agent/resume": {
       "post": {
         "tags": [
@@ -1247,7 +1325,14 @@
         },
         "responses": {
           "200": {
-            "description": "Streaming response initiated"
+            "description": "Streaming response initiated",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageEvent"
+                }
+              }
+            }
           },
           "424": {
             "description": "Agent not initialized"
@@ -1794,57 +1879,6 @@
         ]
       }
     },
-    "/sessions/{session_id}/description": {
-      "put": {
-        "tags": [
-          "Session Management"
-        ],
-        "operationId": "update_session_description",
-        "parameters": [
-          {
-            "name": "session_id",
-            "in": "path",
-            "description": "Unique identifier for the session",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateSessionDescriptionRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Session description updated successfully"
-          },
-          "400": {
-            "description": "Bad request - Description too long (max 200 characters)"
-          },
-          "401": {
-            "description": "Unauthorized - Invalid or missing API key"
-          },
-          "404": {
-            "description": "Session not found"
-          },
-          "500": {
-            "description": "Internal server error"
-          }
-        },
-        "security": [
-          {
-            "api_key": []
-          }
-        ]
-      }
-    },
     "/sessions/{session_id}/export": {
       "get": {
         "tags": [
@@ -1872,6 +1906,57 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Unauthorized - Invalid or missing API key"
+          },
+          "404": {
+            "description": "Session not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/sessions/{session_id}/name": {
+      "put": {
+        "tags": [
+          "Session Management"
+        ],
+        "operationId": "update_session_name",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "description": "Unique identifier for the session",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSessionNameRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Session name updated successfully"
+          },
+          "400": {
+            "description": "Bad request - Name too long (max 200 characters)"
           },
           "401": {
             "description": "Unauthorized - Invalid or missing API key"
@@ -1982,6 +2067,21 @@
   },
   "components": {
     "schemas": {
+      "AddExtensionRequest": {
+        "type": "object",
+        "required": [
+          "session_id",
+          "config"
+        ],
+        "properties": {
+          "config": {
+            "$ref": "#/components/schemas/ExtensionConfig"
+          },
+          "session_id": {
+            "type": "string"
+          }
+        }
+      },
       "Annotations": {
         "type": "object",
         "properties": {
@@ -3172,6 +3272,143 @@
           "propertyName": "type"
         }
       },
+      "MessageEvent": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "message",
+              "type"
+            ],
+            "properties": {
+              "message": {
+                "$ref": "#/components/schemas/Message"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "Message"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "error",
+              "type"
+            ],
+            "properties": {
+              "error": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "Error"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "reason",
+              "type"
+            ],
+            "properties": {
+              "reason": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "Finish"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "model",
+              "mode",
+              "type"
+            ],
+            "properties": {
+              "mode": {
+                "type": "string"
+              },
+              "model": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "ModelChange"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "request_id",
+              "message",
+              "type"
+            ],
+            "properties": {
+              "message": {
+                "type": "object"
+              },
+              "request_id": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "Notification"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "conversation",
+              "type"
+            ],
+            "properties": {
+              "conversation": {
+                "$ref": "#/components/schemas/Conversation"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "UpdateConversation"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "Ping"
+                ]
+              }
+            }
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type"
+        }
+      },
       "MessageMetadata": {
         "type": "object",
         "description": "Metadata for message visibility",
@@ -3668,6 +3905,21 @@
           }
         }
       },
+      "RemoveExtensionRequest": {
+        "type": "object",
+        "required": [
+          "name",
+          "session_id"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "session_id": {
+            "type": "string"
+          }
+        }
+      },
       "ResourceContents": {
         "anyOf": [
           {
@@ -3898,7 +4150,7 @@
         "required": [
           "id",
           "working_dir",
-          "description",
+          "name",
           "created_at",
           "updated_at",
           "extension_data",
@@ -3932,9 +4184,6 @@
             "type": "string",
             "format": "date-time"
           },
-          "description": {
-            "type": "string"
-          },
           "extension_data": {
             "$ref": "#/components/schemas/ExtensionData"
           },
@@ -3949,6 +4198,9 @@
           "message_count": {
             "type": "integer",
             "minimum": 0
+          },
+          "name": {
+            "type": "string"
           },
           "output_tokens": {
             "type": "integer",
@@ -3982,6 +4234,9 @@
               "type": "string"
             },
             "nullable": true
+          },
+          "user_set_name": {
+            "type": "boolean"
           },
           "working_dir": {
             "type": "string"
@@ -4518,15 +4773,15 @@
           }
         }
       },
-      "UpdateSessionDescriptionRequest": {
+      "UpdateSessionNameRequest": {
         "type": "object",
         "required": [
-          "description"
+          "name"
         ],
         "properties": {
-          "description": {
+          "name": {
             "type": "string",
-            "description": "Updated description (name) for the session (max 200 characters)"
+            "description": "Updated name for the session (max 200 characters)"
           }
         }
       },

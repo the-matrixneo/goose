@@ -1,16 +1,16 @@
 ---
 sidebar_position: 1
 title: Shareable Recipes
-description: "Share a Goose session setup (including tools, goals, and instructions) as a reusable recipe that others can launch with a single click"
+description: "Share a goose session setup (including tools, goals, and instructions) as a reusable recipe that others can launch with a single click"
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 import { PanelLeft, Bot } from 'lucide-react';
 
-Sometimes you finish a task in Goose and realize, "Hey, this setup could be useful again." Maybe you have curated a great combination of tools, defined a clear goal, and want to preserve that flow. Or maybe you're trying to help someone else replicate what you just did without walking them through it step by step. 
+Sometimes you finish a task in goose and realize, "Hey, this setup could be useful again." Maybe you have curated a great combination of tools, defined a clear goal, and want to preserve that flow. Or maybe you're trying to help someone else replicate what you just did without walking them through it step by step. 
 
-You can turn your current Goose session into a reusable recipe that includes the tools, goals, and setup you're using right now and package it into a new Agent that others (or future you) can launch with a single click.
+You can turn your current goose session into a reusable recipe that includes the tools, goals, and setup you're using right now and package it into a new Agent that others (or future you) can launch with a single click.
 
 ## Create Recipe
 
@@ -522,13 +522,6 @@ Automate Goose recipes by running them on a schedule.
   You can use either a 5, 6, or 7-digit cron expression for full scheduling precision, following the format "seconds minutes hours day-of-month month day-of-week year".
 
   See the [`schedule` command documentation](/docs/guides/goose-cli-commands.md#schedule) for detailed examples and options.
-
-When scheduling Goose recipes with the CLI, you can use Goose's built-in cron scheduler (default), or the [Temporal scheduler](https://docs.temporal.io/evaluate/development-production-features/schedules) (requires the Temporal CLI). Switch from the default legacy scheduler by setting the `GOOSE_SCHEDULER_TYPE` [environment variable](/docs/guides/environment-variables.md#session-management):
-
-  ```bash
-  export GOOSE_SCHEDULER_TYPE=temporal
-  ```
-  Use Temporal scheduling if you want an advanced workflow engine with monitoring features. The scheduling engines do not share schedules, so schedules created with the legacy Goose scheduler cannot be run with the Temporal scheduler, and vice-versa. 
 </TabItem>
 </Tabs>
 
